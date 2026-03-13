@@ -11,5 +11,7 @@ anthropic
 google-generativeai
 openai
 groq
+stripe
+sentry-sdk[fastapi]
 pydantic
 pydantic-settings
