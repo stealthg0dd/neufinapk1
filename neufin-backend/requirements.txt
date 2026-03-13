@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+requests
+supabase
+pandas
+yfinance
+reportlab
+anthropic
+google-generativeai
+openai
+groq
+pydantic
+pydantic-settings
