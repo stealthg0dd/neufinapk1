@@ -1,24 +1,91 @@
 import time
+import datetime
+import requests
 import pandas as pd
-import yfinance as yf
 import numpy as np
+
+from config import FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
 
 # ── In-process price cache (1-hour TTL) ───────────────────────────────────────
 _PRICE_CACHE: dict = {}
 _CACHE_TTL = 3600  # seconds
 
+_PERIOD_DAYS = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
+
+
+def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series | None":
+    """Fetch daily close prices for one symbol. Returns None on failure."""
+    # ── 1. Finnhub /stock/candle ───────────────────────────────────────────────
+    if FINNHUB_API_KEY:
+        try:
+            r = requests.get(
+                "https://finnhub.io/api/v1/stock/candle",
+                params={
+                    "symbol": sym,
+                    "resolution": "D",
+                    "from": unix_from,
+                    "to": unix_to,
+                    "token": FINNHUB_API_KEY,
+                },
+                timeout=8.0,
+            )
+            data = r.json()
+            if data.get("s") == "ok" and data.get("c") and data.get("t"):
+                idx = [datetime.date.fromtimestamp(ts) for ts in data["t"]]
+                return pd.Series(data["c"], index=idx, name=sym)
+        except Exception:
+            pass
+
+    # ── 2. Alpha Vantage TIME_SERIES_DAILY ────────────────────────────────────
+    if ALPHA_VANTAGE_API_KEY:
+        try:
+            r = requests.get(
+                "https://www.alphavantage.co/query",
+                params={
+                    "function": "TIME_SERIES_DAILY",
+                    "symbol": sym,
+                    "outputsize": "compact",
+                    "apikey": ALPHA_VANTAGE_API_KEY,
+                },
+                timeout=10.0,
+            )
+            data = r.json()
+            ts_data = data.get("Time Series (Daily)", {})
+            if ts_data:
+                closes = {k: float(v["4. close"]) for k, v in ts_data.items()}
+                series = pd.Series(closes).sort_index()
+                series.name = sym
+                # Trim to requested window
+                cutoff = datetime.date.fromtimestamp(unix_from).isoformat()
+                series = series[series.index >= cutoff]
+                return series
+        except Exception:
+            pass
+
+    return None
+
 
 def _fetch_prices(symbols: list[str], period: str) -> pd.DataFrame:
-    """Fetch OHLCV Close prices, returning from cache if fresh."""
+    """Fetch daily Close prices for a period, returning from cache if fresh."""
     cache_key = f"{','.join(sorted(symbols))}:{period}"
     entry = _PRICE_CACHE.get(cache_key)
     if entry and (time.time() - entry["ts"]) < _CACHE_TTL:
         return entry["data"]
 
-    prices = yf.download(symbols, period=period, progress=False, auto_adjust=True)["Close"]
-    if isinstance(prices, pd.Series):
-        prices = prices.to_frame(name=symbols[0])
+    period_days = _PERIOD_DAYS.get(period, 30)
+    unix_to = int(time.time())
+    unix_from = unix_to - period_days * 86400
 
+    all_series: dict[str, pd.Series] = {}
+    for sym in symbols:
+        s = _fetch_symbol_history(sym, unix_from, unix_to)
+        if s is not None:
+            all_series[sym] = s
+
+    if not all_series:
+        raise RuntimeError("No price history available from any source")
+
+    prices = pd.DataFrame(all_series)
     _PRICE_CACHE[cache_key] = {"data": prices, "ts": time.time()}
     return prices
 
@@ -46,11 +113,11 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     latest_prices = prices.iloc[-1]
     df["symbol"] = df["symbol"].str.upper()
-    df["current_price"] = df["symbol"].map(latest_prices)
+    df["current_price"] = df["symbol"].map(latest_prices).fillna(0.0)
     df["current_value"] = df["shares"] * df["current_price"]
 
     total_value = df["current_value"].sum()
-    df["weight"] = df["current_value"] / total_value
+    df["weight"] = df["current_value"] / total_value if total_value > 0 else 0.0
 
     num_stocks = len(df)
     diversification_score = min(30, num_stocks * 3)
