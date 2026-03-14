@@ -2,12 +2,14 @@ import os
 import json
 import io
 import re
+import uuid
+import asyncio
 
 import sentry_sdk
 import pandas as pd
 import yfinance as yf
 from anthropic import Anthropic
-import google.generativeai as genai
+from google import genai  # Updated to new SDK
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,12 +17,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Internal imports (Ensure these files exist in your directory)
 from database import supabase
 from routers import dna, portfolio, reports, payments, referrals
 from config import ANTHROPIC_KEY, GEMINI_KEY, GROQ_KEY, SENTRY_DSN, APP_BASE_URL
 from services.analytics import track
 
-
+# ── Helper Functions ───────────────────────────────────────────────────────────
 def _strip_json_fences(text: str) -> str:
     """Strip markdown code fences that models sometimes wrap around JSON."""
     text = text.strip()
@@ -52,7 +55,7 @@ PUBLIC_PREFIXES = [
     "/api/emails/",
 ]
 
-# ── App ────────────────────────────────────────────────────────────────────────
+# ── App Initialization ────────────────────────────────────────────────────────
 app = FastAPI(
     title="Neufin API",
     description="AI Portfolio Intelligence Platform — Investor DNA + Advisor Reports",
@@ -67,12 +70,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize Google GenAI Client
+google_client = genai.Client(api_key=GEMINI_KEY)
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT on all protected routes."""
     path = request.url.path
 
+    # Skip auth for public paths
     if path in PUBLIC_PATHS or any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
 
@@ -85,6 +91,7 @@ async def auth_middleware(request: Request, call_next):
 
     token = auth_header.split(" ", 1)[1]
     try:
+        # In newer Supabase-py versions, auth.get_user returns a response object
         user_response = supabase.auth.get_user(token)
         request.state.user = user_response.user
     except Exception:
@@ -104,11 +111,10 @@ app.include_router(payments.router)
 app.include_router(referrals.router)
 
 
-# ── Public DNA endpoint (viral, no auth) ──────────────────────────────────────
+# ── Public DNA endpoint ────────────────────────────────────────────────────────
 @app.post("/api/analyze-dna", tags=["dna"])
 async def analyze_dna(request: Request, file: UploadFile = File(...)):
-    """Upload CSV → Investor DNA Score. Public endpoint, no auth required.
-    Optionally captures user_id from Bearer token if present."""
+    """Upload CSV → Investor DNA Score. Fallback sequence: Claude -> Gemini -> Llama."""
     contents = await file.read()
     try:
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
@@ -130,7 +136,7 @@ async def analyze_dna(request: Request, file: UploadFile = File(...)):
         except Exception:
             pass
 
-    # Funnel event: upload started
+    # Funnel tracking
     await track("dna_upload_started", {
         "num_rows": len(df),
         "filename": file.filename,
@@ -139,6 +145,7 @@ async def analyze_dna(request: Request, file: UploadFile = File(...)):
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
     symbols = df["symbol"].str.upper().tolist()
 
+    # Price fetching
     try:
         raw = yf.download(symbols, period="1d", progress=False, auto_adjust=True)["Close"]
         prices = raw.iloc[-1] if hasattr(raw, "iloc") else raw
@@ -150,21 +157,19 @@ async def analyze_dna(request: Request, file: UploadFile = File(...)):
     df["value"] = df["shares"] * df["current_price"]
     total_value = float(df["value"].sum())
 
+    # Scoring Logic
     diversification_score = min(len(df) * 3, 30)
-    max_position_pct = float((df["value"].max() / total_value) * 100)
+    max_position_pct = float((df["value"].max() / total_value) * 100) if total_value > 0 else 0
     concentration_penalty = max(0.0, max_position_pct - 20)
     dna_score = max(0, int(diversification_score - concentration_penalty))
 
     prompt = f"""You are a behavioral finance expert.
-
-Portfolio data:
-{df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
-
+Portfolio data: {df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
 Total value: ${total_value:,.0f}
 Max position: {max_position_pct:.1f}%
 DNA Score: {dna_score}/100
 
-Return ONLY valid JSON (no markdown):
+Return ONLY valid JSON:
 {{
   "investor_type": "one of: Diversified Strategist, Conviction Growth, Momentum Trader, Defensive Allocator, Speculative Investor",
   "strengths": ["strength1", "strength2", "strength3"],
@@ -173,53 +178,64 @@ Return ONLY valid JSON (no markdown):
 }}"""
 
     analysis = None
-    try:
-        client = Anthropic(api_key=ANTHROPIC_KEY)
-        resp = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=500,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        analysis = json.loads(_strip_json_fences(resp.content[0].text))
-    except Exception as e:
-        print(f"Claude failed: {e}")
 
-    if analysis is None:
+    # Fallback 1: Anthropic (Claude)
+    if ANTHROPIC_KEY:
         try:
-            genai.configure(api_key=GEMINI_KEY)
-            model = genai.GenerativeModel("gemini-1.5-pro")
-            resp = model.generate_content(prompt)
+            client = Anthropic(api_key=ANTHROPIC_KEY)
+            resp = client.messages.create(
+                model="claude-3-5-sonnet-20241022", # Updated to stable model name
+                max_tokens=500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            analysis = json.loads(_strip_json_fences(resp.content[0].text))
+        except Exception as e:
+            print(f"Claude failed: {e}")
+
+    # Fallback 2: Google (Gemini) using NEW SDK
+    if analysis is None and GEMINI_KEY:
+        try:
+            # New SDK usage: client.models.generate_content
+            resp = google_client.models.generate_content(
+                model="gemini-1.5-flash", 
+                contents=prompt
+            )
             analysis = json.loads(_strip_json_fences(resp.text))
         except Exception as e:
             print(f"Gemini failed: {e}")
 
-    if analysis is None:
+    # Fallback 3: Groq (Llama)
+    if analysis is None and GROQ_KEY:
         try:
-            from groq import Groq as _Groq
-            _groq_client = _Groq(api_key=GROQ_KEY)
-            _resp = _groq_client.chat.completions.create(
+            from groq import Groq
+            groq_client = Groq(api_key=GROQ_KEY)
+            resp = groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
-                    {"role": "system", "content": "You are a financial analyst. Return ONLY valid JSON, no markdown."},
+                    {"role": "system", "content": "Return ONLY valid JSON."},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens=500,
             )
-            analysis = json.loads(_strip_json_fences(_resp.choices[0].message.content))
+            analysis = json.loads(_strip_json_fences(resp.choices[0].message.content))
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"All AI models failed: {e}")
+            print(f"Groq failed: {e}")
 
+    if not analysis:
+        raise HTTPException(status_code=503, detail="All AI analysis providers are currently unavailable.")
+
+    # Format output
     positions_out = (
         df[["symbol", "shares", "current_price", "value"]]
         .rename(columns={"current_price": "price"})
-        .assign(weight=lambda d: (d["value"] / total_value * 100).round(2))
+        .assign(weight=lambda d: (d["value"] / total_value * 100).round(2) if total_value > 0 else 0)
         .to_dict("records")
     )
 
-    import uuid as _uuid
-    share_token = _uuid.uuid4().hex[:8]
+    share_token = uuid.uuid4().hex[:8]
     record_id = None
+    
+    # Save to Database
     try:
         record = supabase.table("dna_scores").insert({
             "user_id":        user_id,
@@ -234,12 +250,10 @@ Return ONLY valid JSON (no markdown):
     except Exception as e:
         print(f"[Supabase] dna_scores insert failed: {e}")
 
-    # Funnel event: analysis complete
+    # Track complete
     await track("dna_analysis_complete", {
         "dna_score":     dna_score,
         "investor_type": analysis.get("investor_type"),
-        "num_positions": len(df),
-        "total_value":   round(total_value, 2),
         "share_token":   share_token,
     }, user_id=user_id)
 
@@ -255,13 +269,17 @@ Return ONLY valid JSON (no markdown):
         **analysis,
     }
 
-
 # ── System endpoints ───────────────────────────────────────────────────────────
 @app.get("/health", tags=["system"])
 def health():
     return {"status": "ok", "service": "neufin-api"}
 
-
 @app.get("/", tags=["system"])
 def root():
     return {"message": "Neufin AI Portfolio Intelligence API", "docs": "/docs"}
+
+# Ensure Railway/Local listens on the correct port
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
