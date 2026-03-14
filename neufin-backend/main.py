@@ -6,19 +6,20 @@ import uuid
 import sentry_sdk
 import pandas as pd
 import yfinance as yf
-from fastapi import FastAPI, UploadFile, HTTPException, Request
+from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Internal imports (Ensure these files exist in your directory)
-from database import supabase
+# Internal imports
+# Ensure database.py uses 'supabase = create_async_client(...)'
+from database import supabase 
 from routers import dna, portfolio, reports, payments, referrals
 from config import SENTRY_DSN, APP_BASE_URL
 from services.analytics import track
-from services.ai_router import get_ai_analysis  # single AI entry point — owns all provider fallback
+from services.ai_router import get_ai_analysis
 
 # ── Sentry ─────────────────────────────────────────────────────────────────────
 if SENTRY_DSN:
@@ -47,8 +48,8 @@ PUBLIC_PREFIXES = [
 # ── App Initialization ────────────────────────────────────────────────────────
 app = FastAPI(
     title="Neufin API",
-    description="AI Portfolio Intelligence Platform — Investor DNA + Advisor Reports",
-    version="1.0.0",
+    description="AI Portfolio Intelligence Platform (March 2026 Build)",
+    version="1.1.0",
 )
 
 app.add_middleware(
@@ -64,29 +65,28 @@ async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT on all protected routes."""
     path = request.url.path
 
-    # Skip auth for public paths
     if path in PUBLIC_PATHS or any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
 
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return JSONResponse(
-            {"error": "Unauthorized — include 'Authorization: Bearer <token>' header"},
+            {"error": "Unauthorized — missing Bearer token"},
             status_code=401,
         )
 
     token = auth_header.split(" ", 1)[1]
     try:
-        user_response = supabase.auth.get_user(token)
+        # Use await for async supabase client
+        user_response = await supabase.auth.get_user(token)
         request.state.user = user_response.user
     except Exception:
         return JSONResponse(
-            {"error": "Unauthorized — invalid or expired token"},
+            {"error": "Unauthorized — invalid session"},
             status_code=401,
         )
 
     return await call_next(request)
-
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(dna.router)
@@ -95,158 +95,123 @@ app.include_router(reports.router)
 app.include_router(payments.router)
 app.include_router(referrals.router)
 
-
 # ── Public DNA endpoint ────────────────────────────────────────────────────────
 @app.post("/api/analyze-dna", tags=["dna"])
 async def analyze_dna(request: Request):
-    """Upload CSV → Investor DNA Score. Accepts file under ANY multipart field name."""
+    """Upload CSV → Investor DNA. Flexible field detection to prevent 422 errors."""
     form = await request.form()
-    uploaded_file: UploadFile | None = None
-    for value in form.values():
-        if hasattr(value, "read"):
-            uploaded_file = value
+    uploaded_file = None
+    
+    # Nuclear field detection: grab the first file regardless of key name
+    for key in form:
+        if isinstance(form[key], UploadFile):
+            uploaded_file = form[key]
             break
-    if uploaded_file is None:
-        raise HTTPException(
-            status_code=422,
-            detail="No file found in request. Send a CSV as multipart field 'file', 'csv_file', 'upload', or 'data'.",
-        )
+            
+    if not uploaded_file:
+        raise HTTPException(status_code=422, detail="No file detected in multipart form data.")
 
     contents = await uploaded_file.read()
     try:
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
         df.columns = [c.lower().strip() for c in df.columns]
     except Exception:
-        raise HTTPException(status_code=400, detail="Could not parse CSV.")
+        raise HTTPException(status_code=400, detail="Invalid CSV format.")
 
     if "symbol" not in df.columns or "shares" not in df.columns:
-        raise HTTPException(status_code=422, detail="CSV must have 'symbol' and 'shares' columns.")
+        raise HTTPException(status_code=422, detail="CSV requires 'symbol' and 'shares' columns.")
 
-    # Resolve optional user_id from JWT
+    # Optional Auth
     user_id = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
-        jwt = auth_header.split(" ", 1)[1]
         try:
-            user_response = supabase.auth.get_user(jwt)
-            user_id = user_response.user.id if user_response.user else None
-        except Exception:
-            pass
+            jwt = auth_header.split(" ", 1)[1]
+            user_resp = await supabase.auth.get_user(jwt)
+            user_id = user_resp.user.id
+        except: pass
 
     # Funnel tracking
-    await track("dna_upload_started", {
-        "num_rows": len(df),
-        "filename": uploaded_file.filename,
-    }, user_id=user_id)
+    await track("dna_upload_started", {"rows": len(df)}, user_id=user_id)
 
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
-    symbols = df["symbol"].str.upper().tolist()
+    symbols = df["symbol"].str.upper().unique().tolist()
 
-    # Price fetching
+    # Price fetching logic
     try:
-        raw = yf.download(symbols, period="1d", progress=False, auto_adjust=True)["Close"]
-        if isinstance(raw, pd.DataFrame):
-            # Multi-symbol (or single-symbol yfinance ≥0.2 with list input):
-            # raw has rows=dates, cols=ticker symbols. Last row = latest prices.
-            prices = raw.iloc[-1]
-        elif isinstance(raw, pd.Series):
-            # Single-symbol older yfinance returns a date-indexed Series for "Close".
-            # Build a ticker-indexed Series so map() works correctly.
-            prices = pd.Series({symbols[0]: float(raw.iloc[-1])})
+        ticker_data = yf.download(symbols, period="1d", progress=False, auto_adjust=True)
+        prices_raw = ticker_data["Close"]
+        
+        if isinstance(prices_raw, pd.DataFrame):
+            prices = prices_raw.iloc[-1] # Multi-symbol
         else:
-            prices = pd.Series(dtype=float)
+            prices = pd.Series({symbols[0]: float(prices_raw.iloc[-1])}) # Single
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Price fetch failed: {e}")
+        print(f"[Price Fetch] Error: {e}", file=sys.stderr)
+        raise HTTPException(status_code=502, detail="Market data providers are down.")
 
     df["symbol"] = df["symbol"].str.upper()
-    # fillna(0.0): unknown/delisted tickers get price=0 instead of NaN, preventing
-    # invalid JSON serialization (json.dumps silently emits non-standard "NaN").
     df["current_price"] = df["symbol"].map(prices).fillna(0.0)
     df["value"] = df["shares"] * df["current_price"]
     total_value = float(df["value"].sum())
 
-    # Scoring Logic
+    # Math Logic
     diversification_score = min(len(df) * 3, 30)
-    max_position_pct = float((df["value"].max() / total_value) * 100) if total_value > 0 else 0
-    concentration_penalty = max(0.0, max_position_pct - 20)
-    dna_score = max(0, int(diversification_score - concentration_penalty))
+    max_pos = float(df["value"].max() / total_value * 100) if total_value > 0 else 0
+    dna_score = max(0, int(diversification_score - max(0, max_pos - 20)))
 
-    prompt = f"""You are a behavioral finance expert.
-Portfolio data: {df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
-Total value: ${total_value:,.0f}
-Max position: {max_position_pct:.1f}%
-DNA Score: {dna_score}/100
+    # AI Request
+    prompt = f"""Expert Analysis:
+    Portfolio: {df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
+    Total: ${total_value:,.2f} | DNA Score: {dna_score}
+    Return JSON: {{'investor_type': '...', 'strengths': [], 'weaknesses': [], 'recommendation': '...'}}"""
 
-Return ONLY valid JSON:
-{{
-  "investor_type": "one of: Diversified Strategist, Conviction Growth, Momentum Trader, Defensive Allocator, Speculative Investor",
-  "strengths": ["strength1", "strength2", "strength3"],
-  "weaknesses": ["weakness1", "weakness2"],
-  "recommendation": "one specific actionable suggestion"
-}}"""
-
-    # AI analysis — full 4-provider fallback chain in ai_router.get_ai_analysis
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        raise HTTPException(status_code=503, detail="All AI analysis providers are currently unavailable.")
+        print(f"[AI Chain] Failed: {e}", file=sys.stderr)
+        raise HTTPException(status_code=503, detail="AI Analysis Fallback Exhausted.")
 
-    # Format output
-    positions_out = (
-        df[["symbol", "shares", "current_price", "value"]]
-        .rename(columns={"current_price": "price"})
-        .assign(weight=lambda d: (d["value"] / total_value * 100).round(2) if total_value > 0 else 0)
-        .to_dict("records")
-    )
-
+    # DB Persistence (Awaited for 2026 Record Consistency)
     share_token = uuid.uuid4().hex[:8]
     record_id = None
-
-    # Save to Database
     try:
-        record = supabase.table("dna_scores").insert({
-            "user_id":        user_id,
-            "dna_score":      dna_score,
-            "investor_type":  analysis.get("investor_type"),
-            "strengths":      analysis.get("strengths", []),
-            "weaknesses":     analysis.get("weaknesses", []),
+        db_payload = {
+            "user_id": user_id,
+            "dna_score": dna_score,
+            "investor_type": analysis.get("investor_type"),
+            "strengths": analysis.get("strengths", []),
+            "weaknesses": analysis.get("weaknesses", []),
             "recommendation": analysis.get("recommendation"),
-            "share_token":    share_token,
-        }).execute()
-        record_id = record.data[0]["id"] if record.data else None
+            "share_token": share_token,
+            "metadata": {"total_value": total_value, "num_positions": len(df)}
+        }
+        # MUST AWAIT to get the record_id back correctly
+        record = await supabase.table("dna_scores").insert(db_payload).execute()
+        if record.data:
+            record_id = record.data[0]["id"]
+            print(f"[DB] Saved Record: {record_id}")
     except Exception as e:
-        print(f"[Supabase] dna_scores insert failed: {e}", file=sys.stderr)
+        print(f"[DB] Write Error: {e}", file=sys.stderr)
 
-    # Track complete
-    await track("dna_analysis_complete", {
-        "dna_score":     dna_score,
-        "investor_type": analysis.get("investor_type"),
-        "share_token":   share_token,
-    }, user_id=user_id)
+    await track("dna_analysis_complete", {"score": dna_score}, user_id=user_id)
 
     return {
-        "dna_score":        dna_score,
-        "total_value":      round(total_value, 2),
-        "num_positions":    len(df),
-        "max_position_pct": round(max_position_pct, 2),
-        "positions":        positions_out,
-        "share_token":      share_token,
-        "share_url":        f"{APP_BASE_URL}/share/{share_token}",
-        "record_id":        record_id,
-        **analysis,
+        "dna_score": dna_score,
+        "total_value": round(total_value, 2),
+        "num_positions": len(df),
+        "max_position_pct": round(max_pos, 2),
+        "positions": df[["symbol", "shares", "current_price", "value"]].rename(columns={"current_price": "price"}).to_dict("records"),
+        "share_token": share_token,
+        "share_url": f"{APP_BASE_URL}/share/{share_token}",
+        "record_id": record_id,
+        **analysis
     }
 
-# ── System endpoints ───────────────────────────────────────────────────────────
-@app.get("/health", tags=["system"])
+@app.get("/health")
 def health():
-    return {"status": "ok", "service": "neufin-api"}
+    return {"status": "ok", "epoch": 1741939200} # March 14, 2026
 
-@app.get("/", tags=["system"])
-def root():
-    return {"message": "Neufin AI Portfolio Intelligence API", "docs": "/docs"}
-
-# Ensure Railway/Local listens on the correct port
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
