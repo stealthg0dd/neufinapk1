@@ -6,9 +6,11 @@ import json
 import re
 import time
 from anthropic import Anthropic
-import google.generativeai as genai
+from google import genai as google_genai
 from groq import Groq
 from config import ANTHROPIC_KEY, GEMINI_KEY, GROQ_KEY
+
+_gemini = google_genai.Client(api_key=GEMINI_KEY)
 
 
 def _strip_json_fences(text: str) -> str:
@@ -47,15 +49,13 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     except Exception as e:
         print(f"[AI] Claude ✗  ({time.monotonic()-t0:.1f}s) — {type(e).__name__}: {e}")
 
-    # ── 2. Gemini 1.5 Pro ─────────────────────────────────────────────────────
+    # ── 2. Gemini 1.5 Flash ───────────────────────────────────────────────────
     t0 = time.monotonic()
     try:
-        genai.configure(api_key=GEMINI_KEY)
-        model = genai.GenerativeModel(
-            "gemini-1.5-pro",
-            generation_config={"response_mime_type": "application/json"},
+        response = _gemini.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
         )
-        response = model.generate_content(prompt)
         result = _parse(response.text)
         print(f"[AI] Gemini ✓  ({time.monotonic()-t0:.1f}s)")
         return result
