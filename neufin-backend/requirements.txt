@@ -19,7 +19,7 @@ reportlab==4.2.5
 # AI providers
 anthropic
 google-genai
-openai==1.57.4
+openai==1.55.3
 groq==0.13.1
 
 # Payments
