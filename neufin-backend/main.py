@@ -1,16 +1,12 @@
 import os
-import json
+import sys
 import io
-import re
 import uuid
-import asyncio
 
 import sentry_sdk
 import pandas as pd
 import yfinance as yf
-from anthropic import Anthropic
-from google import genai  # Updated to new SDK
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -20,22 +16,15 @@ load_dotenv()
 # Internal imports (Ensure these files exist in your directory)
 from database import supabase
 from routers import dna, portfolio, reports, payments, referrals
-from config import ANTHROPIC_KEY, GEMINI_KEY, GROQ_KEY, SENTRY_DSN, APP_BASE_URL
+from config import SENTRY_DSN, APP_BASE_URL
 from services.analytics import track
-
-# ── Helper Functions ───────────────────────────────────────────────────────────
-def _strip_json_fences(text: str) -> str:
-    """Strip markdown code fences that models sometimes wrap around JSON."""
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    return text.strip()
+from services.ai_router import get_ai_analysis  # single AI entry point — owns all provider fallback
 
 # ── Sentry ─────────────────────────────────────────────────────────────────────
 if SENTRY_DSN:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
-        traces_sample_rate=0.2,   # 20% of transactions
+        traces_sample_rate=0.2,
         profiles_sample_rate=0.1,
         send_default_pii=False,
     )
@@ -70,9 +59,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize Google GenAI Client
-google_client = genai.Client(api_key=GEMINI_KEY)
-
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT on all protected routes."""
@@ -91,7 +77,6 @@ async def auth_middleware(request: Request, call_next):
 
     token = auth_header.split(" ", 1)[1]
     try:
-        # In newer Supabase-py versions, auth.get_user returns a response object
         user_response = supabase.auth.get_user(token)
         request.state.user = user_response.user
     except Exception:
@@ -113,9 +98,21 @@ app.include_router(referrals.router)
 
 # ── Public DNA endpoint ────────────────────────────────────────────────────────
 @app.post("/api/analyze-dna", tags=["dna"])
-async def analyze_dna(request: Request, file: UploadFile = File(...)):
-    """Upload CSV → Investor DNA Score. Fallback sequence: Claude -> Gemini -> Llama."""
-    contents = await file.read()
+async def analyze_dna(request: Request):
+    """Upload CSV → Investor DNA Score. Accepts file under ANY multipart field name."""
+    form = await request.form()
+    uploaded_file: UploadFile | None = None
+    for value in form.values():
+        if hasattr(value, "read"):
+            uploaded_file = value
+            break
+    if uploaded_file is None:
+        raise HTTPException(
+            status_code=422,
+            detail="No file found in request. Send a CSV as multipart field 'file', 'csv_file', 'upload', or 'data'.",
+        )
+
+    contents = await uploaded_file.read()
     try:
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
         df.columns = [c.lower().strip() for c in df.columns]
@@ -139,7 +136,7 @@ async def analyze_dna(request: Request, file: UploadFile = File(...)):
     # Funnel tracking
     await track("dna_upload_started", {
         "num_rows": len(df),
-        "filename": file.filename,
+        "filename": uploaded_file.filename,
     }, user_id=user_id)
 
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
@@ -148,12 +145,23 @@ async def analyze_dna(request: Request, file: UploadFile = File(...)):
     # Price fetching
     try:
         raw = yf.download(symbols, period="1d", progress=False, auto_adjust=True)["Close"]
-        prices = raw.iloc[-1] if hasattr(raw, "iloc") else raw
+        if isinstance(raw, pd.DataFrame):
+            # Multi-symbol (or single-symbol yfinance ≥0.2 with list input):
+            # raw has rows=dates, cols=ticker symbols. Last row = latest prices.
+            prices = raw.iloc[-1]
+        elif isinstance(raw, pd.Series):
+            # Single-symbol older yfinance returns a date-indexed Series for "Close".
+            # Build a ticker-indexed Series so map() works correctly.
+            prices = pd.Series({symbols[0]: float(raw.iloc[-1])})
+        else:
+            prices = pd.Series(dtype=float)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Price fetch failed: {e}")
 
     df["symbol"] = df["symbol"].str.upper()
-    df["current_price"] = df["symbol"].map(prices)
+    # fillna(0.0): unknown/delisted tickers get price=0 instead of NaN, preventing
+    # invalid JSON serialization (json.dumps silently emits non-standard "NaN").
+    df["current_price"] = df["symbol"].map(prices).fillna(0.0)
     df["value"] = df["shares"] * df["current_price"]
     total_value = float(df["value"].sum())
 
@@ -177,51 +185,10 @@ Return ONLY valid JSON:
   "recommendation": "one specific actionable suggestion"
 }}"""
 
-    analysis = None
-
-    # Fallback 1: Anthropic (Claude)
-    if ANTHROPIC_KEY:
-        try:
-            client = Anthropic(api_key=ANTHROPIC_KEY)
-            resp = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=500,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            analysis = json.loads(_strip_json_fences(resp.content[0].text))
-        except Exception as e:
-            print(f"Claude failed: {e}")
-
-    # Fallback 2: Google (Gemini) using NEW SDK
-    if analysis is None and GEMINI_KEY:
-        try:
-            # New SDK usage: client.models.generate_content
-            resp = google_client.models.generate_content(
-                model="gemini-1.5-flash", 
-                contents=prompt
-            )
-            analysis = json.loads(_strip_json_fences(resp.text))
-        except Exception as e:
-            print(f"Gemini failed: {e}")
-
-    # Fallback 3: Groq (Llama)
-    if analysis is None and GROQ_KEY:
-        try:
-            from groq import Groq
-            groq_client = Groq(api_key=GROQ_KEY)
-            resp = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[
-                    {"role": "system", "content": "Return ONLY valid JSON."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.3,
-            )
-            analysis = json.loads(_strip_json_fences(resp.choices[0].message.content))
-        except Exception as e:
-            print(f"Groq failed: {e}")
-
-    if not analysis:
+    # AI analysis — full 4-provider fallback chain in ai_router.get_ai_analysis
+    try:
+        analysis = await get_ai_analysis(prompt)
+    except Exception as e:
         raise HTTPException(status_code=503, detail="All AI analysis providers are currently unavailable.")
 
     # Format output
@@ -234,7 +201,7 @@ Return ONLY valid JSON:
 
     share_token = uuid.uuid4().hex[:8]
     record_id = None
-    
+
     # Save to Database
     try:
         record = supabase.table("dna_scores").insert({
@@ -248,7 +215,7 @@ Return ONLY valid JSON:
         }).execute()
         record_id = record.data[0]["id"] if record.data else None
     except Exception as e:
-        print(f"[Supabase] dna_scores insert failed: {e}")
+        print(f"[Supabase] dna_scores insert failed: {e}", file=sys.stderr)
 
     # Track complete
     await track("dna_analysis_complete", {
