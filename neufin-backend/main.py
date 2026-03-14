@@ -288,25 +288,24 @@ Return ONLY valid JSON:
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
     print(f"[DB] Inserting payload keys: {list(db_payload.keys())}", file=sys.stderr)
     try:
-        response = (
-            supabase
-            .table("dna_scores")
-            .insert(db_payload, returning="representation")
-            .execute()
-        )
-        record_id = None
-        if response.data and len(response.data) > 0:
+        response = supabase.table("dna_scores").insert(db_payload, returning="representation").execute()
+        if hasattr(response, "data") and response.data:
             record_id = response.data[0].get("id")
-        print(f"[DB] Record saved: {record_id}", file=sys.stderr)
+            print(f"[DB] SUCCESS: Saved to DB with ID {record_id}", file=sys.stderr)
+        else:
+            print(f"[DB] Insert returned no data (table may not exist yet)", file=sys.stderr)
     except Exception as e:
         print(f"[DB] Insert failed: {e}", file=sys.stderr)
 
     # ── 10. Analytics — disabled until analytics_events table is created ─────────
-    # await track("dna_analysis_complete", {"dna_score": dna_score, ...}, user_id=user_id)
+    # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
+    # await track("dna_analysis_complete", {"dna_score": dna_score}, user_id=user_id)
 
     # ── 11. Response ───────────────────────────────────────────────────────────
     # IMPORTANT: **analysis is spread FIRST so that our explicitly computed values
     # (dna_score, total_value, etc.) always override any keys the AI may return.
+    print(f"[Final] Payload being sent: dna_score={dna_score}, record_id={record_id}, "
+          f"investor_type={analysis.get('investor_type')}", file=sys.stderr)
     return {
         **analysis,
         "dna_score":        dna_score,          # computed value — always wins
