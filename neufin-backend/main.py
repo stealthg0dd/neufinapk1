@@ -184,7 +184,7 @@ Return ONLY valid JSON:
         try:
             client = Anthropic(api_key=ANTHROPIC_KEY)
             resp = client.messages.create(
-                model="claude-3-5-sonnet-20241022", # Updated to stable model name
+                model="claude-sonnet-4-6",
                 max_tokens=500,
                 messages=[{"role": "user", "content": prompt}],
             )

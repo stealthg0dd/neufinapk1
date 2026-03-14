@@ -24,10 +24,11 @@ async def track(
     """Log an analytics event to Supabase. Never raises."""
     try:
         supabase.table("analytics_events").insert({
-            "event_name":  event,
-            "user_id":     user_id,
-            "session_id":  session_id,
-            "properties":  properties or {},
+            "event":      event,       # column is "event", not "event_name"
+            "user_id":    user_id,
+            "session_id": session_id,
+            "properties": properties or {},
         }).execute()
     except Exception as e:
-        print(f"[Analytics] track({event}) failed: {e}")
+        import sys
+        print(f"[Analytics] track({event}) failed: {e}", file=sys.stderr)
