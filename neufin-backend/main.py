@@ -245,3 +245,4 @@ if __name__ == "__main__":
     # Listen on port defined by Railway or default to 8080
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    # Force rebuild - 2026-03-14
