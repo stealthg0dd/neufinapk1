@@ -1,10 +1,25 @@
+import os
+import sys
 import time
 import datetime
 import requests
 import pandas as pd
 import numpy as np
 
-from config import FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
+from dotenv import load_dotenv
+
+# System env first, .env fallback (mirrors main.py logic)
+FINNHUB_API_KEY       = os.environ.get("FINNHUB_API_KEY")
+ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
+if not FINNHUB_API_KEY or not ALPHA_VANTAGE_API_KEY:
+    load_dotenv()
+    if not FINNHUB_API_KEY:
+        FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+    if not ALPHA_VANTAGE_API_KEY:
+        ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+
+print(f"[calculator] FINNHUB_API_KEY      = {'FOUND ✓' if FINNHUB_API_KEY else 'MISSING ✗'}", file=sys.stderr)
+print(f"[calculator] ALPHA_VANTAGE_API_KEY = {'FOUND ✓' if ALPHA_VANTAGE_API_KEY else 'MISSING ✗'}", file=sys.stderr)
 
 # ── In-process price cache (1-hour TTL) ───────────────────────────────────────
 _PRICE_CACHE: dict = {}

@@ -1,5 +1,20 @@
-import asyncio
 import os
+from dotenv import load_dotenv
+
+# ── Environment loading — system env first (Railway), .env file second (local) ─
+# os.environ holds variables injected by Railway/Docker before Python starts.
+# load_dotenv() is a no-op when a key already exists in os.environ (override=False),
+# so this is safe to call unconditionally and won't mask production values.
+FINNHUB_KEY = os.environ.get("FINNHUB_API_KEY")
+AV_KEY      = os.environ.get("ALPHA_VANTAGE_API_KEY")
+if not FINNHUB_KEY or not AV_KEY:
+    load_dotenv()
+    if not FINNHUB_KEY:
+        FINNHUB_KEY = os.getenv("FINNHUB_API_KEY")
+    if not AV_KEY:
+        AV_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+
+import asyncio
 import sys
 import io
 import uuid
@@ -10,19 +25,16 @@ import pandas as pd
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-
-load_dotenv()
 
 from database import supabase
 from routers import dna, portfolio, reports, payments, referrals
-from config import SENTRY_DSN, APP_BASE_URL, FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
+from config import SENTRY_DSN, APP_BASE_URL
 from services.analytics import track
 from services.ai_router import get_ai_analysis
 
 # ── Startup env-var confirmation ───────────────────────────────────────────────
-print(f"[Config] FINNHUB_API_KEY      = {'SET ✓' if FINNHUB_API_KEY else 'MISSING ✗'}", file=sys.stderr)
-print(f"[Config] ALPHA_VANTAGE_API_KEY = {'SET ✓' if ALPHA_VANTAGE_API_KEY else 'MISSING ✗'}", file=sys.stderr)
+print(f"[Config] FINNHUB_API_KEY      = {'FOUND ✓' if FINNHUB_KEY else 'MISSING ✗'}", file=sys.stderr)
+print(f"[Config] ALPHA_VANTAGE_API_KEY = {'FOUND ✓' if AV_KEY else 'MISSING ✗'}", file=sys.stderr)
 
 # ── Sentry ─────────────────────────────────────────────────────────────────────
 if SENTRY_DSN:
@@ -106,18 +118,13 @@ async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
     Fallback: Alpha Vantage GLOBAL_QUOTE
     Returns 0.0 if both sources fail — never raises.
     """
-    # Read keys fresh from env at call time so Railway env changes are picked up
-    # without a restart and so module-level None values don't mask set variables.
-    finnhub_key = os.getenv("FINNHUB_API_KEY")
-    av_key      = os.getenv("ALPHA_VANTAGE_API_KEY")
-
     # ── 1. Finnhub ─────────────────────────────────────────────────────────────
-    if finnhub_key:
-        print(f"DEBUG: Fetching {symbol} with key {finnhub_key[:4]}...", file=sys.stderr)
+    if FINNHUB_KEY:
+        print(f"DEBUG: Fetching {symbol} with key {FINNHUB_KEY[:4]}...", file=sys.stderr)
         try:
             r = await client.get(
                 "https://finnhub.io/api/v1/quote",
-                params={"symbol": symbol, "token": finnhub_key},
+                params={"symbol": symbol, "token": FINNHUB_KEY},
                 timeout=5.0,
             )
             data = r.json()
@@ -132,15 +139,15 @@ async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
         print(f"[Price] FINNHUB_API_KEY not set — skipping Finnhub for {symbol}", file=sys.stderr)
 
     # ── 2. Alpha Vantage ───────────────────────────────────────────────────────
-    if av_key:
-        print(f"DEBUG: Fetching {symbol} via AlphaVantage with key {av_key[:4]}...", file=sys.stderr)
+    if AV_KEY:
+        print(f"DEBUG: Fetching {symbol} via AlphaVantage with key {AV_KEY[:4]}...", file=sys.stderr)
         try:
             r = await client.get(
                 "https://www.alphavantage.co/query",
                 params={
                     "function": "GLOBAL_QUOTE",
                     "symbol": symbol,
-                    "apikey": av_key,
+                    "apikey": AV_KEY,
                 },
                 timeout=8.0,
             )
@@ -292,14 +299,10 @@ Return ONLY valid JSON:
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
     print(f"[DB] Inserting payload keys: {list(db_payload.keys())}", file=sys.stderr)
     try:
-        record = (
-            supabase.table("dna_scores")
-            .insert(db_payload)
-            .select("id")       # return the inserted row's id
-            .single()           # unwrap the single-row array → dict
-            .execute()          # sync — no await
-        )
-        record_id = record.data["id"] if record.data else None
+        # SyncQueryRequestBuilder does not support .select()/.single() chaining.
+        # Plain .insert().execute() returns the inserted rows in .data (a list).
+        response  = supabase.table("dna_scores").insert(db_payload).execute()
+        record_id = response.data[0]["id"] if response.data else None
         print(f"[DB] Record saved: {record_id}", file=sys.stderr)
     except Exception as e:
         print(f"[DB] Insert failed: {e}", file=sys.stderr)
