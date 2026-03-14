@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # Install only the neufin-backend dependencies — never touches the root requirements.txt
 COPY neufin-backend/requirements.txt ./requirements.txt
