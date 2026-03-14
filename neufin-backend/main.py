@@ -147,11 +147,13 @@ async def analyze_dna(
     symbols = df["symbol"].str.upper().unique().tolist()
 
     # ── 6. Price fetching ──────────────────────────────────────────────────────
-    # yfinance ≥0.2: list input always returns MultiIndex DataFrame → ["Close"] is DataFrame.
-    # Older yfinance with single-symbol list may return Series for ["Close"].
-    # Both cases handled explicitly via isinstance() to avoid NaN cascade.
+    # period="5d" covers weekends/holidays — "1d" returns empty on non-trading days.
+    # Empty DataFrame guard prevents IndexError on .iloc[-1].
+    # Unknown/delisted tickers get price=0.0 via fillna() below rather than crashing.
     try:
-        ticker_data = yf.download(symbols, period="1d", progress=False, auto_adjust=True)
+        ticker_data = yf.download(symbols, period="5d", progress=False, auto_adjust=True)
+        if ticker_data.empty:
+            raise HTTPException(status_code=502, detail="No price data available (market may be closed or all tickers invalid).")
         prices_raw = ticker_data["Close"]
         if isinstance(prices_raw, pd.DataFrame):
             prices = prices_raw.iloc[-1]                                   # multi-symbol path
@@ -159,6 +161,8 @@ async def analyze_dna(
             prices = pd.Series({symbols[0]: float(prices_raw.iloc[-1])})  # single-symbol fallback
         else:
             prices = pd.Series(dtype=float)
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[Price] Fetch error: {e}", file=sys.stderr)
         raise HTTPException(status_code=502, detail=f"Market data unavailable: {e}")
