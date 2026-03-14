@@ -236,13 +236,14 @@ async def analyze_dna(
 
     df["symbol"] = df["symbol"].str.upper()
     df["current_price"] = df["symbol"].map(price_map).fillna(0.0)
-    df["value"] = df["shares"] * df["current_price"]
+    df["value"] = (df["shares"] * df["current_price"]).round(2)
     total_value = float(df["value"].sum())
 
     # ── 6. Scoring ─────────────────────────────────────────────────────────────
-    diversification_score = min(len(df) * 3, 30)
     max_pos = float(df["value"].max() / total_value * 100) if total_value > 0 else 0
-    dna_score = max(0, int(diversification_score - max(0.0, max_pos - 20)))
+    diversification_score = min(len(df) * 10, 50)
+    concentration_penalty = max(0, max_pos - 40)
+    dna_score = max(5, min(100, int(diversification_score - concentration_penalty)))
 
     # ── 7. AI analysis ─────────────────────────────────────────────────────────
     if prices_available:
@@ -299,10 +300,15 @@ Return ONLY valid JSON:
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
     print(f"[DB] Inserting payload keys: {list(db_payload.keys())}", file=sys.stderr)
     try:
-        # SyncQueryRequestBuilder does not support .select()/.single() chaining.
-        # Plain .insert().execute() returns the inserted rows in .data (a list).
-        response  = supabase.table("dna_scores").insert(db_payload).execute()
-        record_id = response.data[0]["id"] if response.data else None
+        response = (
+            supabase
+            .table("dna_scores")
+            .insert(db_payload, returning="representation")
+            .execute()
+        )
+        record_id = None
+        if response.data and len(response.data) > 0:
+            record_id = response.data[0].get("id")
         print(f"[DB] Record saved: {record_id}", file=sys.stderr)
     except Exception as e:
         print(f"[DB] Insert failed: {e}", file=sys.stderr)

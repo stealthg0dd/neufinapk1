@@ -31,3 +31,4 @@ sentry-sdk[fastapi]==2.19.2
 # Validation
 pydantic==2.10.3
 pydantic-settings==2.7.0
+sentry-sdk
