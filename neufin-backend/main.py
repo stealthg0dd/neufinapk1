@@ -6,7 +6,7 @@ import uuid
 import sentry_sdk
 import pandas as pd
 import yfinance as yf
-from fastapi import FastAPI, UploadFile, HTTPException, Request
+from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -95,28 +95,24 @@ app.include_router(referrals.router)
 
 # ── Public DNA endpoint ────────────────────────────────────────────────────────
 @app.post("/api/analyze-dna", tags=["dna"])
-async def analyze_dna(request: Request):
+async def analyze_dna(
+    request: Request,
+    file: UploadFile = File(...),
+):
     """
     Upload CSV → Investor DNA Score.
-    Accepts the file under ANY multipart field name (file, csv_file, upload, data, etc.)
-    by scanning all form values for the first file-like object.
+    Multipart field name must be 'file'.
+    FastAPI/python-multipart handles boundary parsing before this function runs.
     """
-    # ── 1. Parse multipart — field-name agnostic ───────────────────────────────
-    form = await request.form()
-    uploaded_file: UploadFile | None = None
-    for value in form.values():
-        if hasattr(value, "read"):
-            uploaded_file = value
-            break
-    if uploaded_file is None:
-        raise HTTPException(
-            status_code=422,
-            detail="No file in request. Send a CSV as a multipart field (any name: file, csv_file, upload, data…).",
-        )
+    # ── 0. Absolute diagnostics — log on every request so Railway logs show headers ──
+    print(f"[DIAG] content-type: {request.headers.get('content-type', 'MISSING')}", file=sys.stderr)
+    print(f"[DIAG] content-length: {request.headers.get('content-length', 'MISSING')}", file=sys.stderr)
+    print(f"[DIAG] file.filename={file.filename!r}  file.content_type={file.content_type!r}", file=sys.stderr)
+    print(f"[DIAG] scope type={request.scope.get('type')}  http_version={request.scope.get('http_version')}", file=sys.stderr)
 
-    # ── 2. Read + parse CSV ────────────────────────────────────────────────────
+    # ── 1. Read + parse CSV ────────────────────────────────────────────────────
     try:
-        contents = await uploaded_file.read()
+        contents = await file.read()
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
         df.columns = [c.lower().strip() for c in df.columns]
     except Exception as e:
@@ -143,7 +139,7 @@ async def analyze_dna(request: Request):
     # ── 4. Funnel tracking ─────────────────────────────────────────────────────
     await track("dna_upload_started", {
         "rows": len(df),
-        "filename": uploaded_file.filename,
+        "filename": file.filename,
     }, user_id=user_id)
 
     # ── 5. Data preparation ────────────────────────────────────────────────────
