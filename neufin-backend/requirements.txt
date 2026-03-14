@@ -4,8 +4,8 @@ python-multipart==0.0.20
 python-dotenv==1.0.1
 requests==2.32.3
 
-# Database
-supabase==2.10.0
+# Database - Unpinned to resolve httpx conflict
+supabase
 
 # Data / Finance
 pandas==2.2.3
@@ -14,9 +14,9 @@ yfinance==0.2.51
 # PDF generation
 reportlab==4.2.5
 
-# AI providers
-anthropic==0.40.0
-google-genai==1.5.0
+# AI providers - Unpinned to resolve httpx conflict
+anthropic
+google-genai
 openai==1.57.4
 groq==0.13.1
 
