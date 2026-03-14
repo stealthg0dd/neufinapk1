@@ -24,9 +24,6 @@ STRIPE_WEBHOOK_SECRET   = os.getenv("STRIPE_WEBHOOK_SECRET")
 STRIPE_PRICE_SINGLE     = os.getenv("STRIPE_PRICE_SINGLE_REPORT")     # one-time $29
 STRIPE_PRICE_UNLIMITED  = os.getenv("STRIPE_PRICE_UNLIMITED_MONTHLY") # recurring $99/mo
 
-# Monitoring
-SENTRY_DSN = os.getenv("SENTRY_DSN")  # optional — get from sentry.io
-
 # Referral (create coupon id "REFER20" in Stripe Dashboard → 20% off)
 STRIPE_REFERRAL_COUPON_ID = os.getenv("STRIPE_REFERRAL_COUPON_ID", "REFER20")
 

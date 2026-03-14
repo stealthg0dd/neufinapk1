@@ -20,7 +20,6 @@ import io
 import uuid
 
 import httpx
-import sentry_sdk
 import pandas as pd
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,22 +27,13 @@ from fastapi.responses import JSONResponse
 
 from database import supabase
 from routers import dna, portfolio, reports, payments, referrals
-from config import SENTRY_DSN, APP_BASE_URL
+from config import APP_BASE_URL
 from services.analytics import track
 from services.ai_router import get_ai_analysis
 
 # ── Startup env-var confirmation ───────────────────────────────────────────────
 print(f"[Config] FINNHUB_API_KEY      = {'FOUND ✓' if FINNHUB_KEY else 'MISSING ✗'}", file=sys.stderr)
 print(f"[Config] ALPHA_VANTAGE_API_KEY = {'FOUND ✓' if AV_KEY else 'MISSING ✗'}", file=sys.stderr)
-
-# ── Sentry ─────────────────────────────────────────────────────────────────────
-if SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=SENTRY_DSN,
-        traces_sample_rate=0.2,
-        profiles_sample_rate=0.1,
-        send_default_pii=False,
-    )
 
 # ── Auth config ────────────────────────────────────────────────────────────────
 PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
@@ -217,14 +207,8 @@ async def analyze_dna(
         except Exception:
             pass
 
-    # ── 3. Analytics — silenced if table missing ───────────────────────────────
-    try:
-        await track("dna_upload_started", {
-            "rows": len(df),
-            "filename": file.filename,
-        }, user_id=user_id)
-    except Exception:
-        pass
+    # ── 3. Analytics — disabled until analytics_events table is created ──────────
+    # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
 
     # ── 4. Data preparation ────────────────────────────────────────────────────
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
@@ -284,6 +268,10 @@ Return ONLY valid JSON:
         })
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
+    print(f"[Score] dna_score={dna_score}  max_pos={round(max_pos,1)}%  "
+          f"diversification={diversification_score}  penalty={concentration_penalty}",
+          file=sys.stderr)
+
     share_token = uuid.uuid4().hex[:8]
     record_id = None
     db_payload = {                          # only columns that exist in dna_scores
@@ -313,19 +301,15 @@ Return ONLY valid JSON:
     except Exception as e:
         print(f"[DB] Insert failed: {e}", file=sys.stderr)
 
-    # ── 10. Analytics — silenced if table missing ──────────────────────────────
-    try:
-        await track("dna_analysis_complete", {
-            "dna_score":     dna_score,
-            "investor_type": analysis.get("investor_type"),
-            "share_token":   share_token,
-        }, user_id=user_id)
-    except Exception:
-        pass
+    # ── 10. Analytics — disabled until analytics_events table is created ─────────
+    # await track("dna_analysis_complete", {"dna_score": dna_score, ...}, user_id=user_id)
 
     # ── 11. Response ───────────────────────────────────────────────────────────
+    # IMPORTANT: **analysis is spread FIRST so that our explicitly computed values
+    # (dna_score, total_value, etc.) always override any keys the AI may return.
     return {
-        "dna_score":        dna_score,
+        **analysis,
+        "dna_score":        dna_score,          # computed value — always wins
         "total_value":      round(total_value, 2),
         "num_positions":    len(df),
         "max_position_pct": round(max_pos, 2),
@@ -333,7 +317,6 @@ Return ONLY valid JSON:
         "share_token":      share_token,
         "share_url":        f"{APP_BASE_URL}/share/{share_token}",
         "record_id":        record_id,
-        **analysis,
     }
 
 
