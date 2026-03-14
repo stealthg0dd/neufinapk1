@@ -3,18 +3,18 @@ uvicorn[standard]==0.32.1
 python-multipart==0.0.20
 python-dotenv==1.0.1
 requests==2.32.3
+httpx==0.27.2
 
-# Database - Unpinned to resolve httpx conflict
+# Database
 supabase
 
-# Data / Finance
+# Data
 pandas==2.2.3
-yfinance==0.2.51
 
 # PDF generation
 reportlab==4.2.5
 
-# AI providers - Unpinned to resolve httpx conflict
+# AI providers
 anthropic
 google-genai
 openai==1.57.4

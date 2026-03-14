@@ -8,6 +8,10 @@ SUPABASE_URL              = os.getenv("SUPABASE_URL")
 SUPABASE_KEY              = os.getenv("SUPABASE_KEY")                # anon key (public)
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")   # service role (bypasses RLS)
 
+# Market data — Finnhub (primary) → Alpha Vantage (fallback)
+FINNHUB_API_KEY       = os.getenv("FINNHUB_API_KEY")
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+
 # AI models — fallback chain: Claude → Gemini → Groq
 ANTHROPIC_KEY = os.getenv("ANTHROPIC_KEY")
 GEMINI_KEY    = os.getenv("GEMINI_KEY")

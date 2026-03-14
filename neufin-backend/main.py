@@ -1,11 +1,12 @@
+import asyncio
 import os
 import sys
 import io
 import uuid
 
+import httpx
 import sentry_sdk
 import pandas as pd
-import yfinance as yf
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,7 +16,7 @@ load_dotenv()
 
 from database import supabase
 from routers import dna, portfolio, reports, payments, referrals
-from config import SENTRY_DSN, APP_BASE_URL
+from config import SENTRY_DSN, APP_BASE_URL, FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
 from services.analytics import track
 from services.ai_router import get_ai_analysis
 
@@ -93,6 +94,64 @@ app.include_router(payments.router)
 app.include_router(referrals.router)
 
 
+# ── Market data helpers ────────────────────────────────────────────────────────
+async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
+    """
+    Fetch the latest price for a single symbol.
+    Primary:  Finnhub  /quote
+    Fallback: Alpha Vantage GLOBAL_QUOTE
+    Returns 0.0 if both sources fail — never raises.
+    """
+    # ── 1. Finnhub ─────────────────────────────────────────────────────────────
+    if FINNHUB_API_KEY:
+        try:
+            r = await client.get(
+                "https://finnhub.io/api/v1/quote",
+                params={"symbol": symbol, "token": FINNHUB_API_KEY},
+                timeout=5.0,
+            )
+            data = r.json()
+            price = float(data.get("c") or 0)  # "c" = current price
+            if price > 0:
+                print(f"[Price] Finnhub {symbol}={price}", file=sys.stderr)
+                return price
+        except Exception as e:
+            print(f"[Price] Finnhub {symbol} failed: {e}", file=sys.stderr)
+
+    # ── 2. Alpha Vantage ───────────────────────────────────────────────────────
+    if ALPHA_VANTAGE_API_KEY:
+        try:
+            r = await client.get(
+                "https://www.alphavantage.co/query",
+                params={
+                    "function": "GLOBAL_QUOTE",
+                    "symbol": symbol,
+                    "apikey": ALPHA_VANTAGE_API_KEY,
+                },
+                timeout=8.0,
+            )
+            data = r.json()
+            price_str = data.get("Global Quote", {}).get("05. price", "0")
+            price = float(price_str or 0)
+            if price > 0:
+                print(f"[Price] AlphaVantage {symbol}={price}", file=sys.stderr)
+                return price
+        except Exception as e:
+            print(f"[Price] AlphaVantage {symbol} failed: {e}", file=sys.stderr)
+
+    print(f"[Price] {symbol} — all sources failed, defaulting to 0.0", file=sys.stderr)
+    return 0.0
+
+
+async def _fetch_all_prices(symbols: list[str]) -> dict[str, float]:
+    """Fetch prices for all symbols concurrently. Returns {symbol: price}."""
+    async with httpx.AsyncClient() as client:
+        prices_list = await asyncio.gather(
+            *[_get_latest_price(sym, client) for sym in symbols]
+        )
+    return dict(zip(symbols, prices_list))
+
+
 # ── Public DNA endpoint ────────────────────────────────────────────────────────
 @app.post("/api/analyze-dna", tags=["dna"])
 async def analyze_dna(
@@ -102,13 +161,11 @@ async def analyze_dna(
     """
     Upload CSV → Investor DNA Score.
     Multipart field name must be 'file'.
-    FastAPI/python-multipart handles boundary parsing before this function runs.
+    Prices fetched concurrently from Finnhub → Alpha Vantage.
     """
-    # ── 0. Absolute diagnostics — log on every request so Railway logs show headers ──
+    # ── 0. Diagnostics ─────────────────────────────────────────────────────────
     print(f"[DIAG] content-type: {request.headers.get('content-type', 'MISSING')}", file=sys.stderr)
-    print(f"[DIAG] content-length: {request.headers.get('content-length', 'MISSING')}", file=sys.stderr)
-    print(f"[DIAG] file.filename={file.filename!r}  file.content_type={file.content_type!r}", file=sys.stderr)
-    print(f"[DIAG] scope type={request.scope.get('type')}  http_version={request.scope.get('http_version')}", file=sys.stderr)
+    print(f"[DIAG] file.filename={file.filename!r}  content_type={file.content_type!r}", file=sys.stderr)
 
     # ── 1. Read + parse CSV ────────────────────────────────────────────────────
     try:
@@ -125,7 +182,7 @@ async def analyze_dna(
             detail="CSV must contain 'symbol' and 'shares' columns.",
         )
 
-    # ── 3. Resolve optional user_id from JWT ───────────────────────────────────
+    # ── 2. Resolve optional user_id from JWT ───────────────────────────────────
     user_id = None
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -136,51 +193,40 @@ async def analyze_dna(
         except Exception:
             pass
 
-    # ── 4. Funnel tracking ─────────────────────────────────────────────────────
-    await track("dna_upload_started", {
-        "rows": len(df),
-        "filename": file.filename,
-    }, user_id=user_id)
+    # ── 3. Analytics — silenced if table missing ───────────────────────────────
+    try:
+        await track("dna_upload_started", {
+            "rows": len(df),
+            "filename": file.filename,
+        }, user_id=user_id)
+    except Exception:
+        pass
 
-    # ── 5. Data preparation ────────────────────────────────────────────────────
+    # ── 4. Data preparation ────────────────────────────────────────────────────
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
     symbols = df["symbol"].str.upper().unique().tolist()
 
-    # ── 6. Price fetching ──────────────────────────────────────────────────────
-    # period="5d" covers weekends/holidays — "1d" returns empty on non-trading days.
-    # Empty DataFrame guard prevents IndexError on .iloc[-1].
-    # Unknown/delisted tickers get price=0.0 via fillna() below rather than crashing.
-    try:
-        ticker_data = yf.download(symbols, period="5d", progress=False, auto_adjust=True)
-        if ticker_data.empty:
-            raise HTTPException(status_code=502, detail="No price data available (market may be closed or all tickers invalid).")
-        prices_raw = ticker_data["Close"]
-        if isinstance(prices_raw, pd.DataFrame):
-            prices = prices_raw.iloc[-1]                                   # multi-symbol path
-        elif isinstance(prices_raw, pd.Series):
-            prices = pd.Series({symbols[0]: float(prices_raw.iloc[-1])})  # single-symbol fallback
-        else:
-            prices = pd.Series(dtype=float)
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"[Price] Fetch error: {e}", file=sys.stderr)
-        raise HTTPException(status_code=502, detail=f"Market data unavailable: {e}")
+    # ── 5. Price fetching — Finnhub → Alpha Vantage, concurrent ───────────────
+    price_map = await _fetch_all_prices(symbols)
+    prices_available = any(v > 0 for v in price_map.values())
 
     df["symbol"] = df["symbol"].str.upper()
-    # fillna(0.0) prevents NaN from propagating into the JSON response.
-    # json.dumps(float('nan')) produces invalid JSON; 0.0 is a safe sentinel.
-    df["current_price"] = df["symbol"].map(prices).fillna(0.0)
+    df["current_price"] = df["symbol"].map(price_map).fillna(0.0)
     df["value"] = df["shares"] * df["current_price"]
     total_value = float(df["value"].sum())
 
-    # ── 7. Scoring ─────────────────────────────────────────────────────────────
+    # ── 6. Scoring ─────────────────────────────────────────────────────────────
     diversification_score = min(len(df) * 3, 30)
     max_pos = float(df["value"].max() / total_value * 100) if total_value > 0 else 0
     dna_score = max(0, int(diversification_score - max(0.0, max_pos - 20)))
 
-    # ── 8. AI analysis ─────────────────────────────────────────────────────────
-    prompt = f"""You are a behavioral finance expert.
+    # ── 7. AI analysis ─────────────────────────────────────────────────────────
+    if prices_available:
+        price_note = ""
+    else:
+        price_note = "\nNote: Live market prices are currently unavailable. Analyze based on share quantities and symbol weights only; do not reference dollar values.\n"
+
+    prompt = f"""You are a behavioral finance expert.{price_note}
 Portfolio: {df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
 Total value: ${total_value:,.2f}
 Max position: {max_pos:.1f}%
@@ -200,7 +246,7 @@ Return ONLY valid JSON:
         print(f"[AI] All providers failed: {e}", file=sys.stderr)
         raise HTTPException(status_code=503, detail="AI analysis providers are unavailable.")
 
-    # ── 9. Format positions ────────────────────────────────────────────────────
+    # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = (
         df[["symbol", "shares", "current_price", "value"]]
         .rename(columns={"current_price": "price"})
@@ -208,7 +254,7 @@ Return ONLY valid JSON:
         .to_dict("records")
     )
 
-    # ── 10. Persist to DB ──────────────────────────────────────────────────────
+    # ── 9. Persist to DB ───────────────────────────────────────────────────────
     share_token = uuid.uuid4().hex[:8]
     record_id = None
     try:
@@ -226,14 +272,17 @@ Return ONLY valid JSON:
     except Exception as e:
         print(f"[DB] Insert failed: {e}", file=sys.stderr)
 
-    # ── 11. Analytics ──────────────────────────────────────────────────────────
-    await track("dna_analysis_complete", {
-        "dna_score":     dna_score,
-        "investor_type": analysis.get("investor_type"),
-        "share_token":   share_token,
-    }, user_id=user_id)
+    # ── 10. Analytics — silenced if table missing ──────────────────────────────
+    try:
+        await track("dna_analysis_complete", {
+            "dna_score":     dna_score,
+            "investor_type": analysis.get("investor_type"),
+            "share_token":   share_token,
+        }, user_id=user_id)
+    except Exception:
+        pass
 
-    # ── 12. Response ───────────────────────────────────────────────────────────
+    # ── 11. Response ───────────────────────────────────────────────────────────
     return {
         "dna_score":        dna_score,
         "total_value":      round(total_value, 2),
