@@ -20,6 +20,10 @@ from config import SENTRY_DSN, APP_BASE_URL, FINNHUB_API_KEY, ALPHA_VANTAGE_API_
 from services.analytics import track
 from services.ai_router import get_ai_analysis
 
+# ── Startup env-var confirmation ───────────────────────────────────────────────
+print(f"[Config] FINNHUB_API_KEY      = {'SET ✓' if FINNHUB_API_KEY else 'MISSING ✗'}", file=sys.stderr)
+print(f"[Config] ALPHA_VANTAGE_API_KEY = {'SET ✓' if ALPHA_VANTAGE_API_KEY else 'MISSING ✗'}", file=sys.stderr)
+
 # ── Sentry ─────────────────────────────────────────────────────────────────────
 if SENTRY_DSN:
     sentry_sdk.init(
@@ -111,6 +115,7 @@ async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
                 timeout=5.0,
             )
             data = r.json()
+            print(f"[Price] Finnhub raw {symbol}: {data}", file=sys.stderr)  # DEBUG
             price = float(data.get("c") or 0)  # "c" = current price
             if price > 0:
                 print(f"[Price] Finnhub {symbol}={price}", file=sys.stderr)
@@ -131,6 +136,7 @@ async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
                 timeout=8.0,
             )
             data = r.json()
+            print(f"[Price] AlphaVantage raw {symbol}: {data}", file=sys.stderr)  # DEBUG
             price_str = data.get("Global Quote", {}).get("05. price", "0")
             price = float(price_str or 0)
             if price > 0:
@@ -247,26 +253,35 @@ Return ONLY valid JSON:
         raise HTTPException(status_code=503, detail="AI analysis providers are unavailable.")
 
     # ── 8. Format positions ────────────────────────────────────────────────────
-    positions_out = (
-        df[["symbol", "shares", "current_price", "value"]]
-        .rename(columns={"current_price": "price"})
-        .assign(weight=lambda d: (d["value"] / total_value * 100).round(2) if total_value > 0 else 0)
-        .to_dict("records")
-    )
+    positions_out = []
+    for _, row in df[["symbol", "shares", "current_price", "value"]].iterrows():
+        weight = round(float(row["value"]) / total_value * 100, 2) if total_value > 0 else 0.0
+        positions_out.append({
+            "symbol": row["symbol"],
+            "shares": row["shares"],
+            "price":  row["current_price"],
+            "value":  row["value"],
+            "weight": weight,
+        })
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
     share_token = uuid.uuid4().hex[:8]
     record_id = None
+    db_payload = {                          # only columns that exist in dna_scores
+        "user_id":        user_id,
+        "dna_score":      dna_score,
+        "investor_type":  analysis.get("investor_type"),
+        "summary":        analysis.get("summary"),
+        "strengths":      analysis.get("strengths", []),
+        "weaknesses":     analysis.get("weaknesses", []),
+        "recommendation": analysis.get("recommendation"),
+        "total_value":    round(total_value, 2),
+    }
+    # Strip None-valued keys that don't have a matching column to avoid Supabase errors
+    db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
+    print(f"[DB] Inserting payload keys: {list(db_payload.keys())}", file=sys.stderr)
     try:
-        record = supabase.table("dna_scores").insert({  # sync — no await
-            "user_id":        user_id,
-            "dna_score":      dna_score,
-            "investor_type":  analysis.get("investor_type"),
-            "strengths":      analysis.get("strengths", []),
-            "weaknesses":     analysis.get("weaknesses", []),
-            "recommendation": analysis.get("recommendation"),
-            "share_token":    share_token,
-        }).execute()
+        record = supabase.table("dna_scores").insert(db_payload).execute()  # sync — no await
         record_id = record.data[0]["id"] if record.data else None
         print(f"[DB] Record saved: {record_id}", file=sys.stderr)
     except Exception as e:
