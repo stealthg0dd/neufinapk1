@@ -106,37 +106,46 @@ async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
     Fallback: Alpha Vantage GLOBAL_QUOTE
     Returns 0.0 if both sources fail — never raises.
     """
+    # Read keys fresh from env at call time so Railway env changes are picked up
+    # without a restart and so module-level None values don't mask set variables.
+    finnhub_key = os.getenv("FINNHUB_API_KEY")
+    av_key      = os.getenv("ALPHA_VANTAGE_API_KEY")
+
     # ── 1. Finnhub ─────────────────────────────────────────────────────────────
-    if FINNHUB_API_KEY:
+    if finnhub_key:
+        print(f"DEBUG: Fetching {symbol} with key {finnhub_key[:4]}...", file=sys.stderr)
         try:
             r = await client.get(
                 "https://finnhub.io/api/v1/quote",
-                params={"symbol": symbol, "token": FINNHUB_API_KEY},
+                params={"symbol": symbol, "token": finnhub_key},
                 timeout=5.0,
             )
             data = r.json()
-            print(f"[Price] Finnhub raw {symbol}: {data}", file=sys.stderr)  # DEBUG
+            print(f"[Price] Finnhub raw {symbol}: {data}", file=sys.stderr)
             price = float(data.get("c") or 0)  # "c" = current price
             if price > 0:
                 print(f"[Price] Finnhub {symbol}={price}", file=sys.stderr)
                 return price
         except Exception as e:
             print(f"[Price] Finnhub {symbol} failed: {e}", file=sys.stderr)
+    else:
+        print(f"[Price] FINNHUB_API_KEY not set — skipping Finnhub for {symbol}", file=sys.stderr)
 
     # ── 2. Alpha Vantage ───────────────────────────────────────────────────────
-    if ALPHA_VANTAGE_API_KEY:
+    if av_key:
+        print(f"DEBUG: Fetching {symbol} via AlphaVantage with key {av_key[:4]}...", file=sys.stderr)
         try:
             r = await client.get(
                 "https://www.alphavantage.co/query",
                 params={
                     "function": "GLOBAL_QUOTE",
                     "symbol": symbol,
-                    "apikey": ALPHA_VANTAGE_API_KEY,
+                    "apikey": av_key,
                 },
                 timeout=8.0,
             )
             data = r.json()
-            print(f"[Price] AlphaVantage raw {symbol}: {data}", file=sys.stderr)  # DEBUG
+            print(f"[Price] AlphaVantage raw {symbol}: {data}", file=sys.stderr)
             price_str = data.get("Global Quote", {}).get("05. price", "0")
             price = float(price_str or 0)
             if price > 0:
@@ -144,6 +153,8 @@ async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
                 return price
         except Exception as e:
             print(f"[Price] AlphaVantage {symbol} failed: {e}", file=sys.stderr)
+    else:
+        print(f"[Price] ALPHA_VANTAGE_API_KEY not set — skipping AlphaVantage for {symbol}", file=sys.stderr)
 
     print(f"[Price] {symbol} — all sources failed, defaulting to 0.0", file=sys.stderr)
     return 0.0
@@ -281,8 +292,14 @@ Return ONLY valid JSON:
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
     print(f"[DB] Inserting payload keys: {list(db_payload.keys())}", file=sys.stderr)
     try:
-        record = supabase.table("dna_scores").insert(db_payload).execute()  # sync — no await
-        record_id = record.data[0]["id"] if record.data else None
+        record = (
+            supabase.table("dna_scores")
+            .insert(db_payload)
+            .select("id")       # return the inserted row's id
+            .single()           # unwrap the single-row array → dict
+            .execute()          # sync — no await
+        )
+        record_id = record.data["id"] if record.data else None
         print(f"[DB] Record saved: {record_id}", file=sys.stderr)
     except Exception as e:
         print(f"[DB] Insert failed: {e}", file=sys.stderr)
