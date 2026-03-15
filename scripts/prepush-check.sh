@@ -70,7 +70,7 @@ _ANT="sk-ant"
 _ANT+="-api"
 _OAI="sk-"
 _OAI+="proj-"
-_PEM="BE"     # split so regex BEGIN.*PRIVATE KEY never matches this file
+_PEM="BE"
 _PEM+="GIN PR"
 _PEM+="IVATE KEY"
 
