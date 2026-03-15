@@ -1,0 +1,272 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
+import Link from 'next/link'
+
+export interface LeaderboardEntry {
+  dna_score: number
+  investor_type: string
+  share_token: string
+  created_at: string
+}
+
+const TYPE_CONFIG: Record<string, { emoji: string; color: string }> = {
+  'Diversified Strategist': { emoji: '⚖️',  color: '#3b82f6' },
+  'Conviction Growth':      { emoji: '🚀',  color: '#8b5cf6' },
+  'Momentum Trader':        { emoji: '⚡',  color: '#f59e0b' },
+  'Defensive Allocator':    { emoji: '🛡️', color: '#22c55e' },
+  'Speculative Investor':   { emoji: '🎯',  color: '#ef4444' },
+}
+
+const PODIUM_CONFIG = [
+  { rank: 2, label: '🥈', medal: 'Silver', barH: 'h-20', order: 'order-1', offsetY: 'mt-8'  },
+  { rank: 1, label: '🥇', medal: 'Gold',   barH: 'h-32', order: 'order-2', offsetY: 'mt-0'  },
+  { rank: 3, label: '🥉', medal: 'Bronze', barH: 'h-14', order: 'order-3', offsetY: 'mt-12' },
+] as const
+
+const PODIUM_COLORS = {
+  Gold:   { border: 'border-yellow-500/50',  bg: 'bg-yellow-500/10', glow: '#eab308' },
+  Silver: { border: 'border-gray-400/40',    bg: 'bg-gray-400/5',    glow: '#9ca3af' },
+  Bronze: { border: 'border-orange-600/40',  bg: 'bg-orange-600/5',  glow: '#c2410c' },
+} as const
+
+function scoreColor(score: number) {
+  return score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'
+}
+
+const fadeUp = {
+  hidden:  { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 },
+}
+
+const rowVariant = {
+  hidden:  { opacity: 0, x: -12 },
+  visible: { opacity: 1, x: 0 },
+}
+
+// ── Podium card ────────────────────────────────────────────────────────────────
+function PodiumCard({
+  entry,
+  config,
+  isMe,
+}: {
+  entry: LeaderboardEntry
+  config: typeof PODIUM_CONFIG[number]
+  isMe: boolean
+}) {
+  const cfg    = TYPE_CONFIG[entry.investor_type] ?? { emoji: '🧬', color: '#6b7280' }
+  const pCfg   = PODIUM_COLORS[config.medal]
+  const sc     = scoreColor(entry.dna_score)
+
+  return (
+    <motion.div
+      variants={fadeUp}
+      transition={{ duration: 0.5, delay: (3 - config.rank) * 0.1 }}
+      className={`flex flex-col items-center gap-2 ${config.offsetY} ${config.order}`}
+    >
+      {/* Card */}
+      <Link
+        href={`/share/${entry.share_token}`}
+        className={`w-full rounded-xl border p-4 text-center transition-all hover:scale-105 relative overflow-hidden
+          ${pCfg.border} ${pCfg.bg}
+          ${isMe ? 'ring-2 ring-blue-500/60' : ''}`}
+        style={{ boxShadow: `0 0 24px ${pCfg.glow}18` }}
+      >
+        {isMe && (
+          <span className="absolute top-1.5 right-1.5 text-[9px] font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-1.5 py-0.5 leading-none">
+            YOU
+          </span>
+        )}
+        <div className="text-2xl mb-1">{cfg.emoji}</div>
+        <div className="text-xl font-extrabold" style={{ color: sc }}>
+          {entry.dna_score}
+        </div>
+        <div className="text-[10px] text-gray-500 leading-none mb-1">/100</div>
+        <div className="text-xs font-medium truncate" style={{ color: cfg.color }}>
+          {entry.investor_type}
+        </div>
+      </Link>
+
+      {/* Podium bar */}
+      <div
+        className={`w-full ${config.barH} rounded-t-lg flex items-center justify-center`}
+        style={{ background: `${pCfg.glow}22`, borderTop: `2px solid ${pCfg.glow}44` }}
+      >
+        <span className="text-lg">{config.label}</span>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── Main client component ──────────────────────────────────────────────────────
+export default function LeaderboardClient({ entries }: { entries: LeaderboardEntry[] }) {
+  const [myToken, setMyToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('dnaResult')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed?.share_token) setMyToken(parsed.share_token)
+      }
+    } catch {
+      // localStorage unavailable or malformed
+    }
+  }, [])
+
+  const top3 = entries.slice(0, 3)
+  const rest = entries.slice(3)
+  const myRank = myToken ? entries.findIndex((e) => e.share_token === myToken) + 1 : 0
+
+  if (entries.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="card text-center py-16"
+      >
+        <p className="text-5xl mb-4">🏆</p>
+        <p className="text-gray-300 font-semibold mb-1">The leaderboard is empty</p>
+        <p className="text-gray-500 text-sm mb-6">Be the first investor to claim the top spot.</p>
+        <Link href="/upload" className="btn-primary inline-block">
+          Analyze My Portfolio →
+        </Link>
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+      className="space-y-6"
+    >
+      {/* ── Your rank banner ──────────────────────────────────────── */}
+      {myRank > 0 && (
+        <motion.div
+          variants={fadeUp}
+          className="card border-blue-800/40 bg-blue-950/20 flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🧬</span>
+            <div>
+              <p className="text-sm font-semibold text-blue-300">Your current rank</p>
+              <p className="text-xs text-gray-500">Based on your last analysis</p>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="text-2xl font-extrabold text-white">#{myRank}</span>
+            <p className="text-xs text-gray-500">of {entries.length}</p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Podium (top 3) ────────────────────────────────────────── */}
+      {top3.length >= 1 && (
+        <motion.div variants={fadeUp} className="w-full">
+          <div className="flex items-end gap-3 justify-center">
+            {PODIUM_CONFIG.filter((c) => c.rank <= top3.length).map((config) => {
+              const entry = top3[config.rank - 1]
+              return (
+                <div key={config.rank} className={`flex-1 max-w-[140px] ${config.order}`}>
+                  <PodiumCard
+                    entry={entry}
+                    config={config}
+                    isMe={entry.share_token === myToken}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Rankings (4+) ─────────────────────────────────────────── */}
+      {rest.length > 0 && (
+        <motion.div variants={fadeUp} className="card overflow-hidden p-0">
+          <div className="px-5 py-3 border-b border-gray-800/60">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Rankings
+            </h2>
+          </div>
+          <ul className="divide-y divide-gray-800/50">
+            {rest.map((entry, i) => {
+              const rank   = i + 4
+              const cfg    = TYPE_CONFIG[entry.investor_type] ?? { emoji: '🧬', color: '#6b7280' }
+              const sc     = scoreColor(entry.dna_score)
+              const isMe   = entry.share_token === myToken
+
+              return (
+                <motion.li
+                  key={entry.share_token}
+                  variants={rowVariant}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Link
+                    href={`/share/${entry.share_token}`}
+                    className={`flex items-center gap-4 px-5 py-3.5 hover:bg-gray-800/30 transition-colors group relative
+                      ${isMe ? 'bg-blue-950/20 border-l-2 border-l-blue-500' : ''}`}
+                  >
+                    {/* Rank */}
+                    <span className="w-8 text-center text-sm font-bold text-gray-600 shrink-0">
+                      #{rank}
+                    </span>
+
+                    {/* Type */}
+                    <span className="text-base shrink-0">{cfg.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate" style={{ color: cfg.color }}>
+                        {entry.investor_type}
+                      </p>
+                      <p className="text-xs text-gray-600 hidden sm:block">
+                        {new Date(entry.created_at).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+
+                    {/* "You" badge */}
+                    {isMe && (
+                      <span className="text-[10px] font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-2 py-0.5 shrink-0">
+                        You
+                      </span>
+                    )}
+
+                    {/* Score */}
+                    <div className="text-right shrink-0">
+                      <span className="text-xl font-extrabold" style={{ color: sc }}>
+                        {entry.dna_score}
+                      </span>
+                      <span className="text-xs text-gray-600">/100</span>
+                    </div>
+
+                    <span className="text-gray-700 group-hover:text-gray-400 transition-colors text-sm shrink-0">
+                      →
+                    </span>
+                  </Link>
+                </motion.li>
+              )
+            })}
+          </ul>
+        </motion.div>
+      )}
+
+      {/* ── Bottom CTA ────────────────────────────────────────────── */}
+      <motion.div
+        variants={fadeUp}
+        className="card text-center border-blue-800/30 bg-gradient-to-br from-blue-950/40 to-purple-950/30 pb-8"
+      >
+        <p className="text-gray-200 font-semibold mb-1">Think you can beat the top score?</p>
+        <p className="text-gray-500 text-sm mb-4">
+          Upload your portfolio CSV and get your Investor DNA Score in seconds.
+        </p>
+        <Link href="/upload" className="btn-primary inline-block px-10 py-3">
+          Analyze My Portfolio →
+        </Link>
+      </motion.div>
+    </motion.div>
+  )
+}
