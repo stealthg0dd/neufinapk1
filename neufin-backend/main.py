@@ -59,7 +59,11 @@ app = FastAPI(
     description="AI Portfolio Intelligence Platform",
     version="1.1.0",
 )
-
+origins = [
+    "http://localhost:3000",
+    "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
+    # If you have a custom domain later, add it here too
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
