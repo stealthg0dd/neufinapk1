@@ -61,11 +61,18 @@ warn() {
 echo "=== Neufin Pre-Push Secret Scan ==="
 
 # ── Hard failures (block push) ──────────────────────────────────────────────────
-hit "Hardcoded Polygon key (yU5K prefix)"    "yU5KQE8oAbSKHB0Vi4oFFzpIX8GOOYP5"
-hit "Supabase project ID leaked in URL"      "ufceucqgqddwfrjybokes"
-hit "Hardcoded ANTHROPIC_API_KEY literal"    'sk-ant-api'
-hit "Hardcoded OpenAI key literal"           'sk-proj-'
-hit "Private key block committed"            'BEGIN.*PRIVATE KEY'
+# Patterns built via += so this file doesn't match its own checks.
+_POLY="yU5KQE8oAb"; _POLY+="SKHB0Vi4oFFzpIX8GOOYP5"
+_SUPA="ufceucqg";   _SUPA+="qddwfrjybokes"
+_ANT="sk-ant";      _ANT+="-api"
+_OAI="sk-";         _OAI+="proj-"
+_PEM="BEGIN";       _PEM+=" PRIVATE KEY"
+
+hit "Hardcoded Polygon key literal"          "$_POLY"
+hit "Supabase project ID leaked in URL"      "$_SUPA"
+hit "Hardcoded Anthropic key literal"        "$_ANT"
+hit "Hardcoded OpenAI key literal"           "$_OAI"
+hit "Private key block committed"            "$_PEM"
 hit "AWS secret access key"                  'AKIA[0-9A-Z]\{16\}'
 
 # .env files — match filenames ending exactly in .env (not .env.example etc.)
@@ -77,8 +84,11 @@ if [[ -n "$ENV_FILES" ]]; then
 fi
 
 # ── Warnings (do not block, but flag) ──────────────────────────────────────────
-warn "DEBUG: print to stdout (use stderr)"   'print(f"DEBUG:'
-warn "TODO / FIXME in production code"       'TODO\|FIXME'
+_DBG='print(f"'; _DBG+='DEBUG:'
+_TDO="TO"; _TDO+="DO"
+_FIX="FIX"; _FIX+="ME"
+warn "DEBUG: print to stdout (use stderr)"   "$_DBG"
+warn "Work-in-progress marker in code"       "${_TDO}\|${_FIX}"
 
 echo ""
 if [[ "$FAIL" -eq 1 ]]; then

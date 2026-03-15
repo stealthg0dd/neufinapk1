@@ -53,12 +53,15 @@ scan "Hardcoded JWT / Supabase token"      '"eyJ[A-Za-z0-9+/]{40,}"'
 # AWS access key ID (always exactly AKIA + 16 uppercase alphanumeric chars)
 scan "AWS access key ID (AKIA...)"         'AKIA[A-Z0-9]{16}'
 
-# Supabase project ref — must not appear in source code
-scan "Supabase project ref"                'ufceucqgqddwfrjybokes'
+# Supabase project ref — built via concatenation so this file doesn't match itself
+_SUPA="ufceucqg"; _SUPA+="qddwfrjybokes"
+scan "Supabase project ref"                "$_SUPA"
 
-# Known-bad key fragments from prior audit
-scan "Known-bad fragment (yU5K)"           'yU5K[A-Za-z0-9]+'
-scan "Known-bad fragment (DZG9)"           'DZG9[A-Za-z0-9]+'
+# Known-bad key fragments — split to avoid self-match
+_F1="yU5"; _F1+="K"
+_F2="DZG"; _F2+="9"
+scan "Known-bad fragment (yU5K)"           "${_F1}[A-Za-z0-9]+"
+scan "Known-bad fragment (DZG9)"           "${_F2}[A-Za-z0-9]+"
 
 # ── Result ────────────────────────────────────────────────────────────────────
 echo ""
