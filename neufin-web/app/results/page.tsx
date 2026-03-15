@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Script from 'next/script'
+import { motion } from 'framer-motion'
 import { fulfillReport } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { useAnalytics } from '@/lib/posthog'
-import type { DNAResult } from '@/lib/api'
+import type { DNAAnalysisResponse } from '@/lib/api'
 
 // ── Stripe custom element types ───────────────────────────────────────────────
 declare global {
@@ -30,22 +31,41 @@ const PRICING_TABLE_UNLIMITED = 'prctbl_1TAS1jGVXReXuoyMezkYvO6F'
 
 const TYPE_COLORS: Record<string, string> = {
   'Diversified Strategist': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  'Conviction Growth': 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  'Momentum Trader': 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
-  'Defensive Allocator': 'bg-green-500/15 text-green-300 border-green-500/30',
-  'Speculative Investor': 'bg-red-500/15 text-red-300 border-red-500/30',
+  'Conviction Growth':      'bg-purple-500/15 text-purple-300 border-purple-500/30',
+  'Momentum Trader':        'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
+  'Defensive Allocator':    'bg-green-500/15 text-green-300 border-green-500/30',
+  'Speculative Investor':   'bg-red-500/15 text-red-300 border-red-500/30',
 }
 
+// ── Formatters ────────────────────────────────────────────────────────────────
+const usd = (n: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+
+const pct = (n: number) =>
+  new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n / 100)
+
+const usdFull = (n: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+
+// ── Animation variants ────────────────────────────────────────────────────────
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0 },
+}
+
+const stagger = {
+  visible: { transition: { staggerChildren: 0.08 } },
+}
+
+// ── Score circle ──────────────────────────────────────────────────────────────
 function ScoreCircle({ score }: { score: number }) {
   const radius = 70
-  const circ = 2 * Math.PI * radius
+  const circ   = 2 * Math.PI * radius
   const [offset, setOffset] = useState(circ)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setOffset(circ - (score / 100) * circ)
-    }, 200)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => setOffset(circ - (score / 100) * circ), 200)
+    return () => clearTimeout(t)
   }, [score, circ])
 
   const color = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'
@@ -69,58 +89,72 @@ function ScoreCircle({ score }: { score: number }) {
   )
 }
 
+// ── Score label ───────────────────────────────────────────────────────────────
+function ScoreLabel({ score }: { score: number }) {
+  if (score >= 70) return <span className="text-xs text-green-400 font-semibold">Strong portfolio</span>
+  if (score >= 40) return <span className="text-xs text-yellow-400 font-semibold">Room to improve</span>
+  return <span className="text-xs text-red-400 font-semibold">High concentration risk</span>
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function ResultsPage() {
-  const router = useRouter()
+  const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, token } = useAuth()
-  const { track } = useAnalytics()
+  const { track }    = useAnalytics()
 
-  const [result, setResult] = useState<DNAResult | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [result, setResult]               = useState<DNAAnalysisResponse | null>(null)
+  const [copied, setCopied]               = useState(false)
+  const [pdfUrl, setPdfUrl]               = useState<string | null>(null)
   const [fulfillLoading, setFulfillLoading] = useState(false)
   const [activePricingTable, setActivePricingTable] = useState<'single' | 'unlimited'>('single')
-  // Referral state
-  const [refToken, setRefToken] = useState<string | null>(null)
-  const [refDiscount, setRefDiscount] = useState(false)
+  const [refToken, setRefToken]           = useState<string | null>(null)
+  const [refDiscount, setRefDiscount]     = useState(false)
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('dnaResult')
+    const stored = localStorage.getItem('dnaResult')
     if (!stored) { router.replace('/upload'); return }
-    const parsed: DNAResult = JSON.parse(stored)
+
+    let parsed: DNAAnalysisResponse
+    try {
+      parsed = JSON.parse(stored)
+      if (typeof parsed.dna_score !== 'number') throw new Error('malformed')
+    } catch {
+      router.replace('/upload')
+      return
+    }
+
     setResult(parsed)
     track('results_viewed', { dna_score: parsed.dna_score, investor_type: parsed.investor_type })
 
-    // Persist ref_token from URL into sessionStorage
-    const ref = searchParams.get('ref') || sessionStorage.getItem('ref_token')
+    // Referral token from URL or storage
+    const ref = searchParams.get('ref') || localStorage.getItem('ref_token')
     if (ref) {
       setRefToken(ref)
-      sessionStorage.setItem('ref_token', ref)
-      // Validate ref token
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/referrals/validate/${ref}`)
+      localStorage.setItem('ref_token', ref)
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/referrals/validate/${ref}`)
         .then(r => r.json())
         .then(d => setRefDiscount(d.valid))
         .catch(() => {})
     }
 
-    const checkoutSuccess = searchParams.get('checkout_success')
-    const storedReportId  = sessionStorage.getItem('pendingReportId')
+    // Post-checkout fulfillment
+    const checkoutSuccess   = searchParams.get('checkout_success')
+    const storedReportId    = localStorage.getItem('pendingReportId')
     if (checkoutSuccess && storedReportId) {
       setFulfillLoading(true)
       fulfillReport(storedReportId, token)
-        .then((r) => { setPdfUrl(r.pdf_url); sessionStorage.removeItem('pendingReportId') })
+        .then(r => { setPdfUrl(r.pdf_url); localStorage.removeItem('pendingReportId') })
         .catch(() => {})
         .finally(() => setFulfillLoading(false))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams, token])
 
-  // Share URL uses the share_token so the OG page loads correctly
   const shareUrl = result?.share_token
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.share_token}`
     : typeof window !== 'undefined' ? window.location.href : ''
 
-  // Referral link: appends ?ref=<share_token> so new users get 20% off
   const referralUrl = result?.share_token
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/upload?ref=${result.share_token}`
     : ''
@@ -139,6 +173,11 @@ export default function ResultsPage() {
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text + shareUrl)}`, '_blank')
   }
 
+  const startOver = () => {
+    localStorage.removeItem('dnaResult')
+    router.push('/upload')
+  }
+
   if (!result) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -151,34 +190,28 @@ export default function ResultsPage() {
 
   return (
     <>
-      {/* Load Stripe Pricing Table script once */}
-      <Script
-        src="https://js.stripe.com/v3/pricing-table.js"
-        strategy="lazyOnload"
-      />
+      <Script src="https://js.stripe.com/v3/pricing-table.js" strategy="lazyOnload" />
 
       <div className="min-h-screen flex flex-col">
+
+        {/* Nav */}
         <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-            <Link href="/upload" className="text-gray-400 hover:text-white text-sm transition-colors">
+            <button onClick={startOver} className="text-gray-400 hover:text-white text-sm transition-colors">
               ← New analysis
-            </Link>
+            </button>
             <span className="text-xl font-bold text-gradient">Neufin</span>
             <div className="flex items-center gap-3">
               {user ? (
-                <Link href="/dashboard" className="btn-primary py-2 text-sm">
-                  Dashboard →
-                </Link>
+                <Link href="/dashboard" className="btn-primary py-2 text-sm">Dashboard →</Link>
               ) : (
-                <Link href="/auth" className="btn-outline py-2 text-sm">
-                  Sign in
-                </Link>
+                <Link href="/auth" className="btn-outline py-2 text-sm">Sign in</Link>
               )}
             </div>
           </div>
         </nav>
 
-        {/* Referral discount banner */}
+        {/* Referral banner */}
         {refDiscount && (
           <div className="bg-green-950/60 border-b border-green-800/40">
             <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center gap-2">
@@ -190,17 +223,12 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {/* Sign-in save banner */}
+        {/* Sign-in nudge */}
         {!user && (
           <div className="bg-blue-950/60 border-b border-blue-800/40">
             <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
-              <p className="text-xs text-blue-300">
-                Sign in to save your DNA score and access it across devices
-              </p>
-              <Link
-                href="/auth"
-                className="text-xs font-semibold text-blue-400 hover:text-blue-300 whitespace-nowrap"
-              >
+              <p className="text-xs text-blue-300">Sign in to save your DNA score across devices</p>
+              <Link href="/auth" className="text-xs font-semibold text-blue-400 hover:text-blue-300 whitespace-nowrap">
                 Sign in to save →
               </Link>
             </div>
@@ -208,206 +236,309 @@ export default function ResultsPage() {
         )}
 
         <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
-          {/* Score hero */}
-          <div className="card text-center mb-6">
-            <ScoreCircle score={result.dna_score} />
-            <div className="mt-4">
-              <span className={`badge border ${typeClass} text-sm px-4 py-1.5`}>
-                {result.investor_type}
-              </span>
-            </div>
-            <p className="text-gray-400 text-sm mt-3">
-              Portfolio value: <span className="text-white font-semibold">${result.total_value.toLocaleString()}</span>
-              &nbsp;·&nbsp;{result.num_positions} positions&nbsp;·&nbsp;
-              Max position: <span className="text-white font-semibold">{result.max_position_pct.toFixed(1)}%</span>
-            </p>
-          </div>
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            animate="visible"
+            className="space-y-4"
+          >
 
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <div className="card">
-              <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-3">💪 Strengths</h3>
-              <ul className="space-y-2">
-                {result.strengths.map((s, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-300">
-                    <span className="text-green-500 mt-0.5 shrink-0">✓</span>{s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="card">
-              <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">⚠️ Watch out</h3>
-              <ul className="space-y-2">
-                {result.weaknesses.map((w, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-300">
-                    <span className="text-red-500 mt-0.5 shrink-0">!</span>{w}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="card mb-6 border-blue-800/40 bg-blue-950/20">
-            <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wide mb-2">🎯 Recommendation</h3>
-            <p className="text-gray-200 leading-relaxed">{result.recommendation}</p>
-          </div>
-
-          {/* Share */}
-          <div className="card mb-6">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Share your result</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                onClick={copyShare}
-                className="btn-outline text-xs py-2.5 flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
-              >
-                {copied ? '✓ Copied!' : '🔗 Copy link'}
-              </button>
-              <button
-                onClick={shareTwitter}
-                className="bg-sky-600/80 hover:bg-sky-500/80 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-              >
-                𝕏 Twitter/X
-              </button>
-              <a
-                href={`https://wa.me/?text=${encodeURIComponent(`I got ${result.dna_score}/100 on my Investor DNA Score 🧬 I'm a "${result.investor_type}" — see yours free → ${shareUrl}`)}`}
-                target="_blank" rel="noreferrer"
-                onClick={() => track('share_whatsapp_clicked')}
-                className="bg-[#25D366]/80 hover:bg-[#25D366] text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-              >
-                WhatsApp
-              </a>
-              <a
-                href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`My Investor DNA Score: ${result.dna_score}/100 — I'm a "${result.investor_type}"`)}`}
-                target="_blank" rel="noreferrer"
-                onClick={() => track('share_telegram_clicked')}
-                className="bg-[#2AABEE]/80 hover:bg-[#2AABEE] text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
-              >
-                Telegram
-              </a>
-            </div>
-          </div>
-
-          {/* Referral link */}
-          {referralUrl && (
-            <div className="card mb-6 border-purple-800/30 bg-purple-950/20">
-              <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wide mb-1">🎁 Your referral link</h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Share this link — friends get 20% off their first report, and you build your Neufin reputation.
+            {/* ── Hero: Score + Type ─────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="card text-center">
+              <ScoreCircle score={result.dna_score} />
+              <div className="mt-3 mb-1">
+                <ScoreLabel score={result.dna_score} />
+              </div>
+              <div className="mt-2">
+                <span className={`badge border ${typeClass} text-sm px-4 py-1.5`}>
+                  {result.investor_type}
+                </span>
+              </div>
+              <p className="text-gray-400 text-sm mt-3">
+                Portfolio value:&nbsp;
+                <span className="text-white font-semibold">{usd(result.total_value)}</span>
+                &nbsp;·&nbsp;
+                {result.num_positions} positions
+                &nbsp;·&nbsp;
+                Max position:&nbsp;
+                <span className="text-white font-semibold">{pct(result.max_position_pct)}</span>
               </p>
-              <div className="flex gap-2">
-                <input
-                  readOnly
-                  value={referralUrl}
-                  className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono"
-                />
-                <button
-                  onClick={() => { navigator.clipboard.writeText(referralUrl); track('referral_link_copied') }}
-                  className="btn-primary text-xs py-2 px-4 shrink-0"
-                >
-                  Copy
-                </button>
+            </motion.div>
+
+            {/* ── Overview cards ─────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="grid grid-cols-2 gap-4">
+              <div className="card text-center">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Value</p>
+                <p className="text-2xl font-bold text-white">{usd(result.total_value)}</p>
               </div>
-            </div>
-          )}
-
-          {/* Holdings preview */}
-          {result.positions?.length > 0 && (
-            <div className="card mb-6">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Holdings</h3>
-              <div className="space-y-2">
-                {result.positions.slice(0, 6).map((p) => (
-                  <div key={p.symbol} className="flex items-center justify-between text-sm">
-                    <span className="font-mono font-semibold text-white w-16">{p.symbol}</span>
-                    <div className="flex-1 mx-4">
-                      <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
-                      </div>
-                    </div>
-                    <span className="text-gray-400 w-12 text-right">{p.weight.toFixed(1)}%</span>
-                    <span className="text-gray-300 w-24 text-right">
-                      ${p.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </span>
-                  </div>
-                ))}
-                {result.positions.length > 6 && (
-                  <p className="text-xs text-gray-600 pt-1">+{result.positions.length - 6} more</p>
-                )}
+              <div className="card text-center">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Positions</p>
+                <p className="text-2xl font-bold text-white">{result.num_positions}</p>
               </div>
-            </div>
-          )}
+            </motion.div>
 
-          {/* ── Advisor Report — Stripe Pricing Tables ─────────────────────── */}
-          <div className="mt-2">
-            <h2 className="text-xl font-bold text-center mb-2">Unlock Your Full Report</h2>
-            <p className="text-gray-500 text-sm text-center mb-6">
-              AI-generated 10-page PDF with risk analysis, sector allocation, market outlook & action plan
-            </p>
-
-            {/* PDF ready */}
-            {pdfUrl && (
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full btn-primary flex items-center justify-center gap-2 mb-6 py-3 text-center"
-              >
-                ⬇ Download Your Advisor Report (PDF)
-              </a>
-            )}
-
-            {fulfillLoading && (
-              <div className="flex items-center justify-center gap-2 text-sm text-blue-400 mb-6">
-                <span className="inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                Generating your report…
+            {/* ── AI Analysis ────────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="grid md:grid-cols-2 gap-4">
+              <div className="card">
+                <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-3">💪 Strengths</h3>
+                <ul className="space-y-2">
+                  {result.strengths.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-gray-300">
+                      <span className="text-green-500 mt-0.5 shrink-0">✓</span>{s}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            )}
+              <div className="card">
+                <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">⚠️ Watch out</h3>
+                <ul className="space-y-2">
+                  {result.weaknesses.map((w, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-gray-300">
+                      <span className="text-red-500 mt-0.5 shrink-0">!</span>{w}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
 
-            {!pdfUrl && (
-              <>
-                {/* Plan tab toggle */}
-                <div className="flex bg-gray-900 rounded-xl p-1 mb-6 border border-gray-800 max-w-xs mx-auto">
-                  <button
-                    onClick={() => setActivePricingTable('single')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors
-                      ${activePricingTable === 'single' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-                  >
-                    Single · $29
-                  </button>
-                  <button
-                    onClick={() => setActivePricingTable('unlimited')}
-                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors
-                      ${activePricingTable === 'unlimited' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-                  >
-                    Pro · $99/mo
-                  </button>
+            {/* ── Action plan ────────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="card border-blue-800/40 bg-blue-950/20">
+              <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
+              <p className="text-gray-200 leading-relaxed">{result.recommendation}</p>
+            </motion.div>
+
+            {/* ── Holdings table ─────────────────────────────────────────── */}
+            {result.positions?.length > 0 && (
+              <motion.div variants={fadeUp} className="card">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Holdings</h3>
+
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-gray-500 uppercase tracking-wide border-b border-gray-800">
+                        <th className="text-left pb-2 pr-4">Symbol</th>
+                        <th className="text-right pb-2 px-4">Shares</th>
+                        <th className="text-right pb-2 px-4">Price</th>
+                        <th className="text-right pb-2 px-4">Value</th>
+                        <th className="text-left pb-2 pl-4">Weight</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800/60">
+                      {result.positions.map((p) => (
+                        <tr key={p.symbol} className="hover:bg-gray-800/30 transition-colors">
+                          <td className="py-2.5 pr-4 font-mono font-bold text-white">{p.symbol}</td>
+                          <td className="py-2.5 px-4 text-right text-gray-300">
+                            {new Intl.NumberFormat('en-US').format(p.shares)}
+                          </td>
+                          <td className="py-2.5 px-4 text-right text-gray-300">{usdFull(p.price)}</td>
+                          <td className="py-2.5 px-4 text-right text-white font-medium">{usd(p.value)}</td>
+                          <td className="py-2.5 pl-4">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden min-w-[64px]">
+                                <div
+                                  className="h-full bg-blue-500 rounded-full"
+                                  style={{ width: `${Math.min(p.weight, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-gray-400 text-xs w-10 text-right shrink-0">
+                                {pct(p.weight)}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                {/* Stripe Pricing Table — single report */}
-                {activePricingTable === 'single' && (
-                  <stripe-pricing-table
-                    pricing-table-id={PRICING_TABLE_SINGLE}
-                    publishable-key={STRIPE_PK}
-                    {...(user?.email ? { 'customer-email': user.email } : {})}
-                  />
-                )}
-
-                {/* Stripe Pricing Table — unlimited */}
-                {activePricingTable === 'unlimited' && (
-                  <stripe-pricing-table
-                    pricing-table-id={PRICING_TABLE_UNLIMITED}
-                    publishable-key={STRIPE_PK}
-                    {...(user?.email ? { 'customer-email': user.email } : {})}
-                  />
-                )}
-              </>
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-3">
+                  {result.positions.map((p) => (
+                    <div key={p.symbol} className="flex items-center justify-between py-2 border-b border-gray-800/60 last:border-0">
+                      <div>
+                        <p className="font-mono font-bold text-white">{p.symbol}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {new Intl.NumberFormat('en-US').format(p.shares)} shares · {usdFull(p.price)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-white">{usd(p.value)}</p>
+                        <div className="flex items-center gap-1.5 justify-end mt-1">
+                          <div className="w-12 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-400">{pct(p.weight)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
             )}
-          </div>
 
-          <div className="mt-8 text-center">
-            <Link href="/dashboard" className="btn-primary inline-block px-10 py-3">
-              Open Full Dashboard →
-            </Link>
-          </div>
+            {/* ── Actions ────────────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="grid sm:grid-cols-3 gap-3">
+              {/* Share My DNA */}
+              <a
+                href={result.share_url || shareUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => track('share_dna_opened', { share_token: result.share_token })}
+                className="btn-primary flex items-center justify-center gap-2 py-3 text-sm"
+              >
+                🧬 Share My DNA
+              </a>
+
+              {/* Download PDF — UI placeholder */}
+              <button
+                onClick={() => {
+                  if (pdfUrl) {
+                    window.open(pdfUrl, '_blank')
+                  } else {
+                    track('pdf_cta_clicked')
+                    document.getElementById('unlock-report')?.scrollIntoView({ behavior: 'smooth' })
+                  }
+                }}
+                className="btn-outline flex items-center justify-center gap-2 py-3 text-sm"
+              >
+                ⬇ Download PDF Report
+              </button>
+
+              {/* Start Over */}
+              <button
+                onClick={startOver}
+                className="flex items-center justify-center gap-2 py-3 text-sm rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+              >
+                ↩ Start Over
+              </button>
+            </motion.div>
+
+            {/* ── Share panel ─────────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="card">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Share your result</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button
+                  onClick={copyShare}
+                  className="btn-outline text-xs py-2.5 flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
+                >
+                  {copied ? '✓ Copied!' : '🔗 Copy link'}
+                </button>
+                <button
+                  onClick={shareTwitter}
+                  className="bg-sky-600/80 hover:bg-sky-500/80 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                >
+                  𝕏 Twitter/X
+                </button>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent(`I got ${result.dna_score}/100 on my Investor DNA Score 🧬 I'm a "${result.investor_type}" — see yours free → ${shareUrl}`)}`}
+                  target="_blank" rel="noreferrer"
+                  onClick={() => track('share_whatsapp_clicked')}
+                  className="bg-[#25D366]/80 hover:bg-[#25D366] text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                >
+                  WhatsApp
+                </a>
+                <a
+                  href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`My Investor DNA Score: ${result.dna_score}/100 — I'm a "${result.investor_type}"`)}`}
+                  target="_blank" rel="noreferrer"
+                  onClick={() => track('share_telegram_clicked')}
+                  className="bg-[#2AABEE]/80 hover:bg-[#2AABEE] text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                >
+                  Telegram
+                </a>
+              </div>
+            </motion.div>
+
+            {/* ── Referral link ───────────────────────────────────────────── */}
+            {referralUrl && (
+              <motion.div variants={fadeUp} className="card border-purple-800/30 bg-purple-950/20">
+                <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wide mb-1">🎁 Your referral link</h3>
+                <p className="text-xs text-gray-500 mb-3">
+                  Share this link — friends get 20% off their first report, and you build your Neufin reputation.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly value={referralUrl}
+                    className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono"
+                  />
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(referralUrl); track('referral_link_copied') }}
+                    className="btn-primary text-xs py-2 px-4 shrink-0"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* ── Unlock report ───────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} id="unlock-report" className="pt-2">
+              <h2 className="text-xl font-bold text-center mb-2">Unlock Your Full Report</h2>
+              <p className="text-gray-500 text-sm text-center mb-6">
+                AI-generated 10-page PDF with risk analysis, sector allocation, market outlook &amp; action plan
+              </p>
+
+              {pdfUrl && (
+                <a
+                  href={pdfUrl} target="_blank" rel="noreferrer"
+                  className="w-full btn-primary flex items-center justify-center gap-2 mb-6 py-3 text-center"
+                >
+                  ⬇ Download Your Advisor Report (PDF)
+                </a>
+              )}
+
+              {fulfillLoading && (
+                <div className="flex items-center justify-center gap-2 text-sm text-blue-400 mb-6">
+                  <span className="inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  Generating your report…
+                </div>
+              )}
+
+              {!pdfUrl && (
+                <>
+                  <div className="flex bg-gray-900 rounded-xl p-1 mb-6 border border-gray-800 max-w-xs mx-auto">
+                    <button
+                      onClick={() => setActivePricingTable('single')}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors
+                        ${activePricingTable === 'single' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                      Single · $29
+                    </button>
+                    <button
+                      onClick={() => setActivePricingTable('unlimited')}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors
+                        ${activePricingTable === 'unlimited' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                      Pro · $99/mo
+                    </button>
+                  </div>
+
+                  {activePricingTable === 'single' && (
+                    <stripe-pricing-table
+                      pricing-table-id={PRICING_TABLE_SINGLE}
+                      publishable-key={STRIPE_PK}
+                      {...(user?.email ? { 'customer-email': user.email } : {})}
+                    />
+                  )}
+                  {activePricingTable === 'unlimited' && (
+                    <stripe-pricing-table
+                      pricing-table-id={PRICING_TABLE_UNLIMITED}
+                      publishable-key={STRIPE_PK}
+                      {...(user?.email ? { 'customer-email': user.email } : {})}
+                    />
+                  )}
+                </>
+              )}
+            </motion.div>
+
+            {/* ── Dashboard CTA ───────────────────────────────────────────── */}
+            <motion.div variants={fadeUp} className="text-center pb-6">
+              <Link href="/dashboard" className="btn-primary inline-block px-10 py-3">
+                Open Full Dashboard →
+              </Link>
+            </motion.div>
+
+          </motion.div>
         </main>
       </div>
     </>
