@@ -62,11 +62,17 @@ echo "=== Neufin Pre-Push Secret Scan ==="
 
 # ── Hard failures (block push) ──────────────────────────────────────────────────
 # Patterns built via += so this file doesn't match its own checks.
-_POLY="yU5KQE8oAb"; _POLY+="SKHB0Vi4oFFzpIX8GOOYP5"
-_SUPA="ufceucqg";   _SUPA+="qddwfrjybokes"
-_ANT="sk-ant";      _ANT+="-api"
-_OAI="sk-";         _OAI+="proj-"
-_PEM="BEGIN";       _PEM+=" PRIVATE KEY"
+_POLY="yU5KQE8oAb"
+_POLY+="SKHB0Vi4oFFzpIX8GOOYP5"
+_SUPA="ufceucqg"
+_SUPA+="qddwfrjybokes"
+_ANT="sk-ant"
+_ANT+="-api"
+_OAI="sk-"
+_OAI+="proj-"
+_PEM="BE"     # split so regex BEGIN.*PRIVATE KEY never matches this file
+_PEM+="GIN PR"
+_PEM+="IVATE KEY"
 
 hit "Hardcoded Polygon key literal"          "$_POLY"
 hit "Supabase project ID leaked in URL"      "$_SUPA"
