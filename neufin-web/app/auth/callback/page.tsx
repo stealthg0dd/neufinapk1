@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * OAuth / Magic-Link callback handler.
  *
@@ -11,12 +13,29 @@
  * then the user is forwarded to `?next=` (defaults to /vault).
  */
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { claimAnonymousRecord } from '@/lib/api'
 
+const Spinner = () => (
+  <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+    <div className="text-center space-y-3">
+      <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin mx-auto" />
+      <p className="text-gray-500 text-sm">Signing you in…</p>
+    </div>
+  </div>
+)
+
 export default function AuthCallbackPage() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <AuthCallbackContent />
+    </Suspense>
+  )
+}
+
+function AuthCallbackContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const next         = searchParams.get('next') || '/vault'
@@ -42,12 +61,5 @@ export default function AuthCallbackPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="text-center space-y-3">
-        <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin mx-auto" />
-        <p className="text-gray-500 text-sm">Signing you in…</p>
-      </div>
-    </div>
-  )
+  return <Spinner />
 }

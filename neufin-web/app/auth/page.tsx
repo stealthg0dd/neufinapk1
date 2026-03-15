@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, FormEvent } from 'react'
+import { Suspense, useState, useEffect, FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -31,6 +31,18 @@ const fadeUp = {
 }
 
 export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+      </div>
+    }>
+      <AuthContent />
+    </Suspense>
+  )
+}
+
+function AuthContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
 

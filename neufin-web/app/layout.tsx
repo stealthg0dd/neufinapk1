@@ -7,6 +7,7 @@ import { PostHogProvider } from '@/lib/posthog'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app'),
   title: 'Neufin — Investor DNA Score',
   description: 'Discover your investing personality. AI-powered portfolio analysis in seconds.',
   openGraph: {

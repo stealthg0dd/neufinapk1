@@ -2,7 +2,7 @@
 
 import posthog from 'posthog-js'
 import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react'
-import { useEffect, ReactNode } from 'react'
+import { Suspense, useEffect, ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
 const PH_KEY  = process.env.NEXT_PUBLIC_POSTHOG_KEY  || ''
@@ -39,7 +39,9 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
 
   return (
     <PHProvider client={posthog}>
-      <PageViewTracker />
+      <Suspense fallback={null}>
+        <PageViewTracker />
+      </Suspense>
       {children}
     </PHProvider>
   )

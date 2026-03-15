@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, DragEvent, ChangeEvent } from 'react'
+import { Suspense, useState, useRef, DragEvent, ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { analyzeDNA } from '@/lib/api'
@@ -130,7 +130,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <RefCapture />
+      <Suspense fallback={null}><RefCapture /></Suspense>
       <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
           <Link href="/" className="text-gray-400 hover:text-white transition-colors text-sm">← Back</Link>
