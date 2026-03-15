@@ -1,5 +1,5 @@
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
-
+const API = process.env.NEXT_PUBLIC_API_URL;
+if (!API) console.warn("WARNING: NEXT_PUBLIC_API_URL is not set!");
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
 function authHeaders(token?: string | null): Record<string, string> {
@@ -67,8 +67,10 @@ export async function analyzeDNA(file: File, token?: string | null): Promise<DNA
 
 // ── Charts ────────────────────────────────────────────────────────────────────
 
-export async function getChartData(symbol: string, period = '3mo'): Promise<{ data: CandleData[] }> {
-  const res = await fetch(`${API}/api/portfolio/chart/${symbol}?period=${period}`)
+export async function getChartData(symbol: string, period = '3mo', token?: string | null): Promise<{ data: CandleData[] }> {
+  const res = await fetch(`${API}/api/portfolio/chart/${symbol}?period=${period}`, {
+    headers: authHeaders(token),
+  })
   if (!res.ok) throw new Error(`Chart data unavailable for ${symbol}`)
   return res.json()
 }
@@ -76,20 +78,25 @@ export async function getChartData(symbol: string, period = '3mo'): Promise<{ da
 export async function getPortfolioHistory(
   symbols: string[],
   shares: number[],
-  period = '1mo'
+  period = '1mo',
+  token?: string | null,
 ): Promise<{ history: LinePoint[] }> {
   const params = new URLSearchParams({
     symbols: symbols.join(','),
     shares: shares.join(','),
     period,
   })
-  const res = await fetch(`${API}/api/portfolio/value-history?${params}`)
+  const res = await fetch(`${API}/api/portfolio/value-history?${params}`, {
+    headers: authHeaders(token),
+  })
   if (!res.ok) throw new Error('Portfolio history unavailable')
   return res.json()
 }
 
-export async function getLeaderboard(limit = 10) {
-  const res = await fetch(`${API}/api/dna/leaderboard?limit=${limit}`)
+export async function getLeaderboard(limit = 10, token?: string | null) {
+  const res = await fetch(`${API}/api/dna/leaderboard?limit=${limit}`, {
+    headers: authHeaders(token),
+  })
   if (!res.ok) throw new Error('Leaderboard unavailable')
   return res.json()
 }

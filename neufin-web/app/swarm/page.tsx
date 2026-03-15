@@ -213,7 +213,9 @@ export default function SwarmPage() {
     if (typeof window === 'undefined') return
     const savedId = localStorage.getItem('neufin-swarm-report-id')
     if (!savedId || thesis) return
-    fetch(`${API_BASE}/api/swarm/report/${savedId}`)
+    fetch(`${API_BASE}/api/swarm/report/${savedId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.investment_thesis) {
@@ -223,7 +225,7 @@ export default function SwarmPage() {
       })
       .catch(() => {/* non-critical */})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_BASE])
+  }, [API_BASE, token])
 
   const runSwarm = async () => {
     setTraces([])
@@ -231,9 +233,10 @@ export default function SwarmPage() {
     setIsRunning(true)
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('neufin-auth-token') : null
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      }
 
       const res = await fetch(`${API_BASE}/api/swarm/analyze`, {
         method: 'POST',
