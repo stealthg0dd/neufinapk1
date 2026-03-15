@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Neufin",
-    "slug": "neufin-mobile",
+    "slug": "neufin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,11 +17,15 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["neufin"]
+            "CFBundleURLSchemes": [
+              "neufin"
+            ]
           }
         ]
       },
-      "associatedDomains": ["applinks:neufin.app"]
+      "associatedDomains": [
+        "applinks:neufin.app"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -38,8 +42,15 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "data": [{ "scheme": "neufin" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "neufin"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
@@ -51,7 +62,10 @@
               "pathPrefix": "/auth/callback"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
@@ -63,7 +77,10 @@
               "pathPrefix": "/share"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
@@ -75,7 +92,10 @@
               "pathPrefix": "/results"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -84,8 +104,9 @@
       "supabaseUrl": "https://YOUR_SUPABASE_PROJECT.supabase.co",
       "supabaseAnonKey": "YOUR_SUPABASE_ANON_KEY",
       "eas": {
-        "projectId": "neufin-mobile"
+        "projectId": "356bc337-8955-4645-aa2c-cdc6893c971e"
       }
-    }
+    },
+    "owner": "arisole"
   }
 }
