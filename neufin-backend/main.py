@@ -286,16 +286,35 @@ Return ONLY valid JSON:
     }
     # Strip None-valued keys that don't have a matching column to avoid Supabase errors
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
-    print(f"[DB] Inserting payload keys: {list(db_payload.keys())}", file=sys.stderr)
+    print("--- SUPABASE DEBUG START ---", file=sys.stderr)
+    print(f"DEBUG: Supabase URL configured: {'Yes' if os.environ.get('SUPABASE_URL') else 'No'}", file=sys.stderr)
+    print(f"DEBUG: Target Table: dna_scores", file=sys.stderr)
+    print(f"DEBUG: Payload Keys: {list(db_payload.keys())}", file=sys.stderr)
+    print(f"DEBUG: Payload Content: {db_payload}", file=sys.stderr)
+
     try:
-        response = supabase.table("dna_scores").insert(db_payload, returning="representation").execute()
+        response = (
+            supabase
+            .table("dna_scores")
+            .insert(db_payload, returning="representation")
+            .execute()
+        )
+
+        print(f"DEBUG: Full Supabase Response Object: {response}", file=sys.stderr)
+
         if hasattr(response, "data") and response.data:
+            print(f"DEBUG: Success! Data returned: {response.data}", file=sys.stderr)
             record_id = response.data[0].get("id")
-            print(f"[DB] SUCCESS: Saved to DB with ID {record_id}", file=sys.stderr)
+            print(f"DEBUG: Extracted record_id: {record_id}", file=sys.stderr)
         else:
-            print(f"[DB] Insert returned no data (table may not exist yet)", file=sys.stderr)
+            print("DEBUG: Insert executed but NO DATA was returned in response.data.", file=sys.stderr)
+            record_id = None
+
     except Exception as e:
-        print(f"[DB] Insert failed: {e}", file=sys.stderr)
+        print(f"!!! SUPABASE CRITICAL ERROR: {str(e)}", file=sys.stderr)
+        record_id = None
+
+    print("--- SUPABASE DEBUG END ---", file=sys.stderr)
 
     # ── 10. Analytics — disabled until analytics_events table is created ─────────
     # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
