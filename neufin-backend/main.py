@@ -62,11 +62,11 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
-    # If you have a custom domain later, add it here too
+    "https://neufinapk1.vercel.app",
 ]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
