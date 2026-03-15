@@ -274,41 +274,31 @@ Return ONLY valid JSON:
 
     share_token = uuid.uuid4().hex[:8]
     record_id = None
-    db_payload = {                          # columns confirmed in dna_scores table
-        "user_id":       user_id,
-        "dna_score":     dna_score,
-        "investor_type": analysis.get("investor_type"),
-        "summary":       analysis.get("summary"),
-        "share_token":   share_token,
-        "total_value":   round(total_value, 2),
+    db_payload = {
+        "user_id":        user_id,
+        "dna_score":      dna_score,
+        "investor_type":  analysis.get("investor_type"),
+        "summary":        analysis.get("summary"),
+        "strengths":      analysis.get("strengths", []),
+        "weaknesses":     analysis.get("weaknesses", []),
+        "recommendation": analysis.get("recommendation"),
+        "share_token":    share_token,
+        "total_value":    round(total_value, 2),
     }
     # Drop None values (except user_id and summary which may legitimately be null)
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
 
-    print("--- SUPABASE DEBUG START ---", file=sys.stderr)
-    print(f"DEBUG: Supabase URL configured: {'Yes' if os.environ.get('SUPABASE_URL') else 'No'}", file=sys.stderr)
-    print(f"DEBUG: Target Table: dna_scores", file=sys.stderr)
-    print(f"DEBUG: Payload Keys: {list(db_payload.keys())}", file=sys.stderr)
-    print(f"DEBUG: Payload Content: {db_payload}", file=sys.stderr)
-
     try:
-        result = supabase.table("dna_scores").insert(db_payload).execute()
-
-        print(f"DEBUG: Full Supabase Response Object: {result}", file=sys.stderr)
-
-        if result.data:
-            print(f"DEBUG: Success! Data returned: {result.data}", file=sys.stderr)
-            record_id = result.data[0].get("id")
-            print(f"DEBUG: Extracted record_id: {record_id}", file=sys.stderr)
+        response = supabase.table("dna_scores").insert(db_payload).execute()
+        if response.data and len(response.data) > 0:
+            record_id = response.data[0].get("id")
+            print(f"[DB] SUCCESS: Created record {record_id}", file=sys.stderr)
         else:
-            print("DEBUG: Insert executed but NO DATA was returned in result.data.", file=sys.stderr)
+            print("[DB] ERROR: Insert succeeded but no data returned. Check RLS.", file=sys.stderr)
             record_id = None
-
     except Exception as e:
-        print(f"!!! SUPABASE CRITICAL ERROR: {str(e)}", file=sys.stderr)
+        print(f"[DB] INSERT FAILED: {e}", file=sys.stderr)
         record_id = None
-
-    print("--- SUPABASE DEBUG END ---", file=sys.stderr)
 
     # ── 10. Analytics — disabled until analytics_events table is created ─────────
     # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
