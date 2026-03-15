@@ -75,6 +75,11 @@ app.add_middleware(
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT on all protected routes."""
+    # PREFLIGHT BYPASS: Browsers send OPTIONS before POST.
+    # If we challenge OPTIONS with auth, CORS will always fail.
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     path = request.url.path
     if path in PUBLIC_PATHS or any(path.startswith(p) for p in PUBLIC_PREFIXES):
         return await call_next(request)
