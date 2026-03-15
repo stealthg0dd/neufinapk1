@@ -1,3 +1,24 @@
+-- ── Swarm reports ───────────────────────────────────────────────────────────────
+-- Persisted output from the 4-agent Neufin Swarm (background task).
+CREATE TABLE IF NOT EXISTS swarm_reports (
+  id                   UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id              UUID        REFERENCES auth.users(id) ON DELETE CASCADE,
+  dna_score            INTEGER,
+  headline             TEXT,
+  top_risks            JSONB       DEFAULT '[]',
+  macro_advice         TEXT,
+  tax_recommendation   TEXT,
+  agent_trace          JSONB       DEFAULT '[]',
+  created_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_swarm_user_id   ON swarm_reports (user_id);
+CREATE INDEX IF NOT EXISTS idx_swarm_created   ON swarm_reports (created_at DESC);
+
+-- RLS: users can only read their own swarm reports
+ALTER TABLE swarm_reports ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "swarm_own" ON swarm_reports FOR ALL USING (auth.uid() = user_id);
+
 -- ── Analytics funnel events ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS analytics_events (
   id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,

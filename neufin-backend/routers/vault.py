@@ -13,7 +13,7 @@ POST /api/vault/stripe-portal    → create a Stripe Customer Portal session
 import stripe
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from database import supabase
+from database import supabase, claim_guest_data
 from config import STRIPE_SECRET_KEY, APP_BASE_URL
 
 router = APIRouter(prefix="/api/vault", tags=["vault"])
@@ -52,7 +52,7 @@ async def get_vault_history(request: Request, limit: int = 50):
         raise HTTPException(500, f"Could not fetch history: {e}")
 
 
-# ── Claim anonymous record ─────────────────────────────────────────────────────
+# ── Claim anonymous record (single, by record_id) ──────────────────────────────
 
 class ClaimRequest(BaseModel):
     record_id: str
@@ -66,7 +66,6 @@ async def claim_anonymous_record(body: ClaimRequest, request: Request):
     """
     uid = _user_id(request)
     try:
-        # Verify the record exists and is unclaimed
         existing = (
             supabase.table("dna_scores")
             .select("id, user_id")
@@ -81,7 +80,6 @@ async def claim_anonymous_record(body: ClaimRequest, request: Request):
     if not record:
         raise HTTPException(404, "Record not found.")
     if record.get("user_id") is not None:
-        # Already owned — silently succeed if it's the same user
         if record["user_id"] == uid:
             return {"claimed": True, "record_id": body.record_id}
         raise HTTPException(409, "This record is already associated with another account.")
@@ -91,6 +89,42 @@ async def claim_anonymous_record(body: ClaimRequest, request: Request):
         return {"claimed": True, "record_id": body.record_id}
     except Exception as e:
         raise HTTPException(500, f"Claim failed: {e}")
+
+
+# ── Bulk-claim by session_id (Guest → Authenticated) ───────────────────────────
+
+class SessionClaimRequest(BaseModel):
+    session_id: str   # localStorage key generated client-side before auth
+
+
+@router.post("/claim-session")
+async def claim_session_portfolios(body: SessionClaimRequest, request: Request):
+    """
+    Re-assign ALL unclaimed portfolios, dna_scores, and swarm_reports that share
+    a guest session_id to the now-authenticated user.
+
+    Called immediately after registration/login when localStorage contains
+    a 'neufin-session-id' that was set before the user was authenticated.
+
+    Encrypted cost_basis values are left intact — Fernet tokens are user-agnostic,
+    so ownership transfer does not require re-encryption.
+
+    Returns a summary of what was claimed.
+    """
+    uid = _user_id(request)
+    sid = body.session_id.strip()
+    if not sid:
+        raise HTTPException(400, "session_id must not be empty.")
+
+    # Delegates to database.claim_guest_data which also clears session_id after claim
+    claimed = claim_guest_data(session_id=sid, user_id=uid)
+
+    return {
+        "claimed":    claimed,
+        "total":      sum(claimed.values()),
+        "user_id":    uid,
+        "session_id": sid,
+    }
 
 
 # ── Subscription ───────────────────────────────────────────────────────────────

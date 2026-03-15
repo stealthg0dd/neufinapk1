@@ -10,7 +10,7 @@ from anthropic import Anthropic
 from google import genai as google_genai
 from groq import Groq
 from openai import OpenAI
-from config import ANTHROPIC_KEY, GEMINI_KEY, GROQ_KEY, OPENAI_KEY
+from config import ANTHROPIC_API_KEY, GEMINI_KEY, GROQ_KEY, OPENAI_KEY
 
 # Initialize Google Client
 _gemini = google_genai.Client(api_key=GEMINI_KEY)
@@ -83,7 +83,7 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     # ── 1. Claude Sonnet 4.6 (Primary) ───────────────────────────────────────
     t0 = time.monotonic()
     try:
-        client = Anthropic(api_key=ANTHROPIC_KEY)
+        client = Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6", # Latest March 2026 Stable
             max_tokens=2000,
@@ -137,3 +137,82 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
         print(f"[AI] llama-3.3-70b-versatile ✗ — {e}", file=sys.stderr)
 
     raise Exception("All AI providers failed: claude-sonnet-4-6, gpt-4o, gemini-3.1-pro-preview, llama-3.3-70b-versatile. Check API keys and provider status.")
+
+
+async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
+    """
+    Returns raw markdown text from the AI, NOT a parsed JSON dict.
+    Used for the IC Briefing synthesizer where the output is long-form prose.
+
+    Passes system_prompt as a proper system role (not injected into the user turn)
+    so the PE Managing Director persona is preserved across all providers.
+    """
+    # ── 1. Claude (system param) ──────────────────────────────────────────────
+    t0 = time.monotonic()
+    try:
+        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_content}],
+        )
+        text = response.content[0].text
+        print(f"[AI/Briefing] Claude ✓ ({time.monotonic()-t0:.1f}s)", file=sys.stderr)
+        return text
+    except Exception as e:
+        print(f"[AI/Briefing] Claude ✗ — {e}", file=sys.stderr)
+
+    # ── 2. OpenAI GPT-4o ─────────────────────────────────────────────────────
+    t1 = time.monotonic()
+    try:
+        client = OpenAI(api_key=OPENAI_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            max_tokens=4096,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_content},
+            ],
+        )
+        text = response.choices[0].message.content
+        print(f"[AI/Briefing] GPT-4o ✓ ({time.monotonic()-t1:.1f}s)", file=sys.stderr)
+        return text
+    except Exception as e:
+        print(f"[AI/Briefing] GPT-4o ✗ — {e}", file=sys.stderr)
+
+    # ── 3. Gemini (system prepended to prompt) ────────────────────────────────
+    t2 = time.monotonic()
+    for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
+        try:
+            full_prompt = f"SYSTEM INSTRUCTIONS:\n{system_prompt}\n\n---\n\nUSER:\n{user_content}"
+            response = _gemini.models.generate_content(model=model, contents=full_prompt)
+            text = response.text
+            print(f"[AI/Briefing] {model} ✓ ({time.monotonic()-t2:.1f}s)", file=sys.stderr)
+            return text
+        except Exception as e:
+            if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(e):
+                continue
+            print(f"[AI/Briefing] {model} ✗ — {e}", file=sys.stderr)
+            break
+
+    # ── 4. Groq Llama 3.3 70B ────────────────────────────────────────────────
+    t3 = time.monotonic()
+    try:
+        client = Groq(api_key=GROQ_KEY)
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            max_tokens=4096,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_content},
+            ],
+            temperature=0.2,
+        )
+        text = response.choices[0].message.content
+        print(f"[AI/Briefing] Groq ✓ ({time.monotonic()-t3:.1f}s)", file=sys.stderr)
+        return text
+    except Exception as e:
+        print(f"[AI/Briefing] Groq ✗ — {e}", file=sys.stderr)
+
+    raise Exception("All AI providers failed for IC Briefing generation.")

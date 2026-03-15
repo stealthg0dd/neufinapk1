@@ -1,39 +1,33 @@
 import os
-from dotenv import load_dotenv
-
-# ── Environment loading — system env first (Railway), .env file second (local) ─
-# os.environ holds variables injected by Railway/Docker before Python starts.
-# load_dotenv() is a no-op when a key already exists in os.environ (override=False),
-# so this is safe to call unconditionally and won't mask production values.
-FINNHUB_KEY = os.environ.get("FINNHUB_API_KEY")
-AV_KEY      = os.environ.get("ALPHA_VANTAGE_API_KEY")
-if not FINNHUB_KEY or not AV_KEY:
-    load_dotenv()
-    if not FINNHUB_KEY:
-        FINNHUB_KEY = os.getenv("FINNHUB_API_KEY")
-    if not AV_KEY:
-        AV_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
-
 import asyncio
 import sys
 import io
 import uuid
 
-import httpx
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from database import supabase
-from routers import dna, portfolio, reports, payments, referrals, advisors, market, vault
+from routers import dna, portfolio, reports, payments, referrals, advisors, market, vault, swarm, alerts
 from config import APP_BASE_URL
 from services.analytics import track
 from services.ai_router import get_ai_analysis
+from services.calculator import (
+    fetch_spot_price, fetch_beta,
+    _hhi_score, _beta_score, _tax_alpha_score,
+    get_tax_impact_analysis,
+)
+from services.risk_engine import (
+    build_correlation_matrix,
+    find_correlation_clusters,
+    correlation_penalty_score,
+    format_clusters_for_ai,
+)
 
-# ── Startup env-var confirmation ───────────────────────────────────────────────
-print(f"[Config] FINNHUB_API_KEY      = {'FOUND ✓' if FINNHUB_KEY else 'MISSING ✗'}", file=sys.stderr)
-print(f"[Config] ALPHA_VANTAGE_API_KEY = {'FOUND ✓' if AV_KEY else 'MISSING ✗'}", file=sys.stderr)
+# calculator.py prints its own key confirmation on import — no need to repeat here
 
 # ── Auth config ────────────────────────────────────────────────────────────────
 PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
@@ -51,6 +45,8 @@ PUBLIC_PREFIXES = [
     "/api/advisors/",
     "/api/market/",
     "/api/analytics/track",
+    "/api/swarm/",          # Swarm endpoints are public (demo-accessible)
+    "/api/admin/health",    # Health diagnostics — no auth required
 ]
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -59,24 +55,32 @@ app = FastAPI(
     description="AI Portfolio Intelligence Platform",
     version="1.1.0",
 )
-origins = [
+
+# ── CORS origins — dynamic: base set + optional ALLOWED_ORIGINS env var ─────────
+# Add production domains to Railway env: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
+_extra_origins = [
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+origins = list({
     "http://localhost:3000",
+    "http://localhost:3001",
     "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
     "https://neufinapk1.vercel.app",
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    *_extra_origins,
+})
+
+# ── IMPORTANT: register auth_middleware FIRST, then add CORSMiddleware.
+# Starlette prepends each middleware, so the last-registered runs first.
+# We want: CORSMiddleware (outermost) → auth_middleware → app
+# To achieve that, we register auth first, then CORS.
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT on all protected routes."""
-    # PREFLIGHT BYPASS: Browsers send OPTIONS before POST.
-    # If we challenge OPTIONS with auth, CORS will always fail.
+    # CORSMiddleware (outer layer) handles OPTIONS automatically,
+    # but guard here too in case of middleware re-ordering.
     if request.method == "OPTIONS":
         return await call_next(request)
 
@@ -104,6 +108,17 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# CORSMiddleware added AFTER auth_middleware so it becomes the outermost layer.
+# Every response (including 401s) will carry the correct CORS headers.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(dna.router)
 app.include_router(portfolio.router)
@@ -113,72 +128,8 @@ app.include_router(referrals.router)
 app.include_router(advisors.router)
 app.include_router(market.router)
 app.include_router(vault.router)
-
-
-# ── Market data helpers ────────────────────────────────────────────────────────
-async def _get_latest_price(symbol: str, client: httpx.AsyncClient) -> float:
-    """
-    Fetch the latest price for a single symbol.
-    Primary:  Finnhub  /quote
-    Fallback: Alpha Vantage GLOBAL_QUOTE
-    Returns 0.0 if both sources fail — never raises.
-    """
-    # ── 1. Finnhub ─────────────────────────────────────────────────────────────
-    if FINNHUB_KEY:
-        print(f"DEBUG: Fetching {symbol} with key {FINNHUB_KEY[:4]}...", file=sys.stderr)
-        try:
-            r = await client.get(
-                "https://finnhub.io/api/v1/quote",
-                params={"symbol": symbol, "token": FINNHUB_KEY},
-                timeout=5.0,
-            )
-            data = r.json()
-            print(f"[Price] Finnhub raw {symbol}: {data}", file=sys.stderr)
-            price = float(data.get("c") or 0)  # "c" = current price
-            if price > 0:
-                print(f"[Price] Finnhub {symbol}={price}", file=sys.stderr)
-                return price
-        except Exception as e:
-            print(f"[Price] Finnhub {symbol} failed: {e}", file=sys.stderr)
-    else:
-        print(f"[Price] FINNHUB_API_KEY not set — skipping Finnhub for {symbol}", file=sys.stderr)
-
-    # ── 2. Alpha Vantage ───────────────────────────────────────────────────────
-    if AV_KEY:
-        print(f"DEBUG: Fetching {symbol} via AlphaVantage with key {AV_KEY[:4]}...", file=sys.stderr)
-        try:
-            r = await client.get(
-                "https://www.alphavantage.co/query",
-                params={
-                    "function": "GLOBAL_QUOTE",
-                    "symbol": symbol,
-                    "apikey": AV_KEY,
-                },
-                timeout=8.0,
-            )
-            data = r.json()
-            print(f"[Price] AlphaVantage raw {symbol}: {data}", file=sys.stderr)
-            price_str = data.get("Global Quote", {}).get("05. price", "0")
-            price = float(price_str or 0)
-            if price > 0:
-                print(f"[Price] AlphaVantage {symbol}={price}", file=sys.stderr)
-                return price
-        except Exception as e:
-            print(f"[Price] AlphaVantage {symbol} failed: {e}", file=sys.stderr)
-    else:
-        print(f"[Price] ALPHA_VANTAGE_API_KEY not set — skipping AlphaVantage for {symbol}", file=sys.stderr)
-
-    print(f"[Price] {symbol} — all sources failed, defaulting to 0.0", file=sys.stderr)
-    return 0.0
-
-
-async def _fetch_all_prices(symbols: list[str]) -> dict[str, float]:
-    """Fetch prices for all symbols concurrently. Returns {symbol: price}."""
-    async with httpx.AsyncClient() as client:
-        prices_list = await asyncio.gather(
-            *[_get_latest_price(sym, client) for sym in symbols]
-        )
-    return dict(zip(symbols, prices_list))
+app.include_router(swarm.router)
+app.include_router(alerts.router)
 
 
 # ── Public DNA endpoint ────────────────────────────────────────────────────────
@@ -229,20 +180,73 @@ async def analyze_dna(
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
     symbols = df["symbol"].str.upper().unique().tolist()
 
-    # ── 5. Price fetching — Finnhub → Alpha Vantage, concurrent ───────────────
-    price_map = await _fetch_all_prices(symbols)
-    prices_available = any(v > 0 for v in price_map.values())
+    # ── 5. Price fetching — strict validation (DATA_INTEGRITY_ERROR on 0) ──────
+    price_results = await asyncio.gather(
+        *[asyncio.to_thread(fetch_spot_price, sym) for sym in symbols],
+        return_exceptions=True,
+    )
+    failed_tickers: list[str] = []
+    price_map: dict[str, float] = {}
+    for sym, result in zip(symbols, price_results):
+        if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
+            failed_tickers.append(sym)
+        elif isinstance(result, Exception):
+            print(f"[Price] {sym} unexpected error: {result}", file=sys.stderr)
+            failed_tickers.append(sym)
+        else:
+            price_map[sym] = float(result)
 
-    df["symbol"] = df["symbol"].str.upper()
+    if failed_tickers:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"DATA_INTEGRITY_ERROR: Could not verify price for "
+                f"{', '.join(failed_tickers)}. "
+                "Please check these ticker symbols and try again."
+            ),
+        )
+
+    prices_available = bool(price_map)
+    df["symbol"]        = df["symbol"].str.upper()
     df["current_price"] = df["symbol"].map(price_map).fillna(0.0)
-    df["value"] = (df["shares"] * df["current_price"]).round(2)
-    total_value = float(df["value"].sum())
+    df["value"]         = (df["shares"] * df["current_price"]).round(2)
+    total_value         = float(df["value"].sum())
+    df["weight"]        = df["value"] / total_value if total_value > 0 else 0.0
+    max_pos             = float(df["weight"].max() * 100) if total_value > 0 else 0.0
 
-    # ── 6. Scoring ─────────────────────────────────────────────────────────────
-    max_pos = float(df["value"].max() / total_value * 100) if total_value > 0 else 0
-    diversification_score = min(len(df) * 10, 50)
-    concentration_penalty = max(0, max_pos - 40)
-    dna_score = max(5, min(100, int(diversification_score - concentration_penalty)))
+    # ── 6. Scoring — 4-component model ────────────────────────────────────────
+    # HHI concentration (25 pts)
+    hhi_pts = _hhi_score(df["weight"])
+
+    # Weighted beta (25 pts)
+    beta_results = await asyncio.gather(
+        *[asyncio.to_thread(fetch_beta, sym) for sym in df["symbol"].tolist()],
+        return_exceptions=True,
+    )
+    df["beta"]     = [b if isinstance(b, float) else 1.0 for b in beta_results]
+    weighted_beta  = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
+    beta_pts       = _beta_score(weighted_beta)
+
+    # Tax alpha (20 pts)
+    tax_pts = _tax_alpha_score(df)
+
+    # Correlation factor (30 pts) — top-5 holdings via Alpha Vantage TIME_SERIES_DAILY
+    top5_symbols    = (
+        df.nlargest(5, "weight")["symbol"].tolist()
+        if total_value > 0 else df["symbol"].tolist()[:5]
+    )
+    weights_dict    = dict(zip(df["symbol"].tolist(), df["weight"].tolist()))
+    corr_matrix     = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
+    clusters        = find_correlation_clusters(corr_matrix, weights_dict)
+    corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
+
+    dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
+    score_breakdown = {
+        "hhi_concentration": hhi_pts,
+        "beta_risk":         beta_pts,
+        "tax_alpha":         tax_pts,
+        "correlation":       corr_pts,
+    }
 
     # ── 7. AI analysis ─────────────────────────────────────────────────────────
     if prices_available:
@@ -250,11 +254,20 @@ async def analyze_dna(
     else:
         price_note = "\nNote: Live market prices are currently unavailable. Analyze based on share quantities and symbol weights only; do not reference dollar values.\n"
 
+    tax_analysis     = get_tax_impact_analysis(df)
+    tax_narrative    = tax_analysis.get("narrative", "")
+    cluster_narrative = format_clusters_for_ai(clusters)
+
     prompt = f"""You are a behavioral finance expert.{price_note}
 Portfolio: {df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
 Total value: ${total_value:,.2f}
 Max position: {max_pos:.1f}%
+Weighted beta: {weighted_beta:.2f}
 DNA Score: {dna_score}/100
+Score breakdown: HHI={hhi_pts}/25, Beta={beta_pts}/25, TaxAlpha={tax_pts}/20, Correlation={corr_pts}/30
+
+Hidden correlation clusters: {cluster_narrative}
+Tax analysis: {tax_narrative}
 
 Return ONLY valid JSON:
 {{
@@ -283,9 +296,12 @@ Return ONLY valid JSON:
         })
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
-    print(f"[Score] dna_score={dna_score}  max_pos={round(max_pos,1)}%  "
-          f"diversification={diversification_score}  penalty={concentration_penalty}",
-          file=sys.stderr)
+    print(
+        f"[Score] dna_score={dna_score}  max_pos={round(max_pos,1)}%  "
+        f"hhi={hhi_pts}  beta={beta_pts}  tax={tax_pts}  corr={corr_pts}  "
+        f"weighted_beta={round(weighted_beta,2)}  avg_corr={round(avg_corr,3)}",
+        file=sys.stderr,
+    )
 
     share_token = uuid.uuid4().hex[:8]
     record_id = None
@@ -307,12 +323,12 @@ Return ONLY valid JSON:
         res = supabase.table("dna_scores").insert(db_payload).execute()
         if res.data and len(res.data) > 0:
             record_id = res.data[0].get("id")
-            print(f"DEBUG: Successfully saved to Supabase. ID: {record_id}")
+            print(f"[DB] dna_scores insert ok id={record_id}", file=sys.stderr)
         else:
-            print(f"DEBUG: Insert attempted but res.data is empty. Response: {res}")
+            print("[DB] dna_scores insert returned empty data", file=sys.stderr)
             record_id = None
     except Exception as e:
-        print(f"DEBUG: Supabase insertion failed: {str(e)}")
+        print(f"[DB] dna_scores insert failed: {e}", file=sys.stderr)
         record_id = None
 
     # ── 10. Analytics — disabled until analytics_events table is created ─────────
@@ -326,14 +342,19 @@ Return ONLY valid JSON:
           f"investor_type={analysis.get('investor_type')}", file=sys.stderr)
     return {
         **analysis,
-        "dna_score":        dna_score,          # computed value — always wins
-        "total_value":      round(total_value, 2),
-        "num_positions":    len(df),
-        "max_position_pct": round(max_pos, 2),
-        "positions":        positions_out,
-        "share_token":      share_token,
-        "share_url":        f"{APP_BASE_URL}/share/{share_token}",
-        "record_id":        record_id,
+        "dna_score":                  dna_score,           # computed — always wins
+        "score_breakdown":            score_breakdown,
+        "total_value":                round(total_value, 2),
+        "num_positions":              len(df),
+        "max_position_pct":           round(max_pos, 2),
+        "weighted_beta":              round(weighted_beta, 3),
+        "avg_correlation":            round(avg_corr, 3),
+        "hidden_correlation_clusters": clusters,
+        "tax_analysis":               tax_analysis,
+        "positions":                  positions_out,
+        "share_token":                share_token,
+        "share_url":                  f"{APP_BASE_URL}/share/{share_token}",
+        "record_id":                  record_id,
     }
 
 
@@ -341,6 +362,53 @@ Return ONLY valid JSON:
 @app.get("/health", tags=["system"])
 def health():
     return {"status": "ok", "service": "neufin-api"}
+
+
+@app.get("/api/admin/health", tags=["system"])
+def admin_health():
+    """Detailed feature/provider health check — used by frontend useBackendHealth hook."""
+    from config import (
+        ANTHROPIC_API_KEY, OPENAI_KEY, GEMINI_KEY, GROQ_KEY,
+        POLYGON_API_KEY, FMP_API_KEY, TWELVEDATA_API_KEY,
+        MARKETSTACK_API_KEY,
+    )
+    import importlib
+    import importlib.util
+
+    def _has(val: str) -> bool:
+        return bool(val and val.strip())
+
+    ai_models = {
+        "claude":  _has(ANTHROPIC_API_KEY),
+        "openai":  _has(OPENAI_KEY),
+        "gemini":  _has(GEMINI_KEY),
+        "groq":    _has(GROQ_KEY),
+    }
+    market_providers = {
+        "polygon":     _has(POLYGON_API_KEY),
+        "fmp":         _has(FMP_API_KEY),
+        "twelvedata":  _has(TWELVEDATA_API_KEY),
+        "marketstack": _has(MARKETSTACK_API_KEY),
+    }
+    features = {
+        "swarm_engine":      True,
+        "stress_testing":    True,
+        "price_verifier":    True,
+        "alpha_gap":         True,
+        "agent_chat":        True,
+        "paywall":           True,
+        "pdf_reports":       bool(importlib.util.find_spec("reportlab")),
+        "fernet_encryption": bool(importlib.util.find_spec("cryptography")),
+    }
+    return {
+        "status":           "ok",
+        "service":          "neufin-api",
+        "ai_models":        ai_models,
+        "market_providers": market_providers,
+        "features":         features,
+        "active_ai":        next((k for k, v in ai_models.items() if v), "none"),
+    }
+
 
 @app.get("/", tags=["system"])
 def root():

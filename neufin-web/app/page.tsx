@@ -35,6 +35,9 @@ export default function LandingPage() {
             <Link href="/upload" className="btn-outline py-2 text-sm">
               DNA Score
             </Link>
+            <Link href="/swarm" className="btn-outline py-2 text-sm">
+              Swarm
+            </Link>
             <Link href="/dashboard" className="btn-primary py-2 text-sm">
               Dashboard
             </Link>

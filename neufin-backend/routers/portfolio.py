@@ -4,9 +4,10 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
-from database import supabase
-from services.calculator import calculate_portfolio_metrics, _fetch_prices
+from database import supabase, encrypt_value, decrypt_value
+from services.calculator import calculate_portfolio_metrics, _fetch_prices, verify_price_integrity
 from services.ai_router import get_ai_analysis
+from services.risk_engine import build_risk_report
 from config import FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -15,15 +16,23 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 # ─── Models ────────────────────────────────────────────────────────────────────
 
 class PortfolioCreate(BaseModel):
-    user_id: str
-    name: str
-    positions: list[dict]  # [{symbol, shares, cost_basis?, purchase_date?}]
+    user_id:    str
+    name:       str
+    positions:  list[dict]              # [{symbol, shares, cost_basis?, purchase_date?}]
+    session_id: Optional[str] = None   # guest session from localStorage (for claim flow)
 
 
 class SignalRequest(BaseModel):
     user_id: str
     portfolio_id: str
     symbols: list[str]
+
+
+class RiskReportRequest(BaseModel):
+    symbols: list[str]
+    weights: dict[str, float] | None = None   # optional; defaults to equal weight
+    threshold: float = 0.70
+    days: int = 60
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -104,11 +113,14 @@ async def create_portfolio(body: PortfolioCreate):
         raise HTTPException(status_code=422, detail=str(e))
 
     try:
-        port_result = supabase.table("portfolios").insert({
-            "user_id": body.user_id,
-            "name": body.name,
+        port_row: dict = {
+            "user_id":    body.user_id or None,
+            "name":       body.name,
             "total_value": metrics["total_value"],
-        }).execute()
+        }
+        if body.session_id:
+            port_row["session_id"] = body.session_id
+        port_result = supabase.table("portfolios").insert(port_row).execute()
         portfolio_id = port_result.data[0]["id"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not save portfolio: {e}")
@@ -120,7 +132,7 @@ async def create_portfolio(body: PortfolioCreate):
                 "portfolio_id": portfolio_id,
                 "symbol": pos["symbol"],
                 "shares": pos["shares"],
-                "cost_basis": pos.get("cost_basis"),
+                "cost_basis": encrypt_value(pos["cost_basis"]) if pos.get("cost_basis") is not None else None,
             }).execute()
         except Exception:
             pass
@@ -144,8 +156,16 @@ async def get_portfolio_metrics(portfolio_id: str):
     if not positions_result.data:
         raise HTTPException(status_code=404, detail="Portfolio or positions not found.")
 
+    # Decrypt cost_basis in-memory before passing to calculator
+    positions_decrypted = []
+    for row in positions_result.data:
+        row = dict(row)
+        if row.get("cost_basis") is not None:
+            row["cost_basis"] = decrypt_value(row["cost_basis"])
+        positions_decrypted.append(row)
+
     try:
-        metrics = calculate_portfolio_metrics(positions_result.data)
+        metrics = calculate_portfolio_metrics(positions_decrypted)
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -287,6 +307,39 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
     return {"symbol": symbol.upper(), "period": period, "data": data}
 
 
+@router.post("/risk-report")
+async def get_risk_report(body: RiskReportRequest):
+    """
+    Institutional risk report for a list of symbols.
+
+    Returns correlation matrix, high-correlation pairs (|ρ| > threshold),
+    and the Effective Number of Bets diversification index.
+
+    If *weights* are omitted, equal weighting is assumed.
+    """
+    if not body.symbols:
+        raise HTTPException(status_code=400, detail="symbols list must not be empty.")
+
+    symbols = [s.strip().upper() for s in body.symbols[:30]]  # cap at 30
+
+    # Resolve weights: use provided map, fall back to equal weight
+    if body.weights:
+        weights = {s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0)) for s in symbols}
+    else:
+        eq = 1.0 / len(symbols)
+        weights = {s: eq for s in symbols}
+
+    import asyncio
+    report = await asyncio.to_thread(
+        build_risk_report,
+        symbols,
+        weights,
+        body.threshold,
+        body.days,
+    )
+    return report
+
+
 @router.get("/value-history")
 async def get_portfolio_value_history(symbols: str, shares: str, period: str = "1mo"):
     """
@@ -321,3 +374,31 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
         })
 
     return {"history": history}
+
+
+# ── Price integrity verification ───────────────────────────────────────────────
+
+class VerifyPricesRequest(BaseModel):
+    positions:   list[dict]
+    total_value: float = 0.0
+
+
+@router.post("/verify-prices")
+async def verify_prices(body: VerifyPricesRequest):
+    """
+    For any position representing >15% of the portfolio, cross-verify the spot
+    price using Polygon and Finnhub. Returns a DATA_INTEGRITY_WARNING if the
+    spread between providers exceeds 5%.
+
+    Used by the smoke test and optionally by the frontend to surface bad data.
+    """
+    if len(body.positions) > 50:
+        raise HTTPException(status_code=400, detail="Maximum 50 symbols per request.")
+    try:
+        checks = verify_price_integrity(body.positions)
+        return {
+            "integrity_checks": checks,
+            "warnings": [c for c in checks if c.get("warned")],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Price integrity check failed: {e}")

@@ -8,6 +8,7 @@ import * as WebBrowser from 'expo-web-browser'
 import UploadScreen from '@/screens/UploadScreen'
 import ResultsScreen from '@/screens/ResultsScreen'
 import ShareScreen from '@/screens/ShareScreen'
+import SwarmAlertsScreen from '@/screens/SwarmAlertsScreen'
 import type { DNAResult } from '@/lib/api'
 
 // Required for expo-web-browser OAuth redirect completion
@@ -17,6 +18,7 @@ export type RootStackParamList = {
   Upload: undefined
   Results: { result: DNAResult }
   Share: { result: DNAResult }
+  SwarmAlerts: undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>()
@@ -111,6 +113,11 @@ export default function App() {
             name="Share"
             component={ShareScreen}
             options={{ title: 'Share', headerBackTitle: 'Results' }}
+          />
+          <Stack.Screen
+            name="SwarmAlerts"
+            component={SwarmAlertsScreen}
+            options={{ title: 'Swarm Alerts', headerBackTitle: 'Back' }}
           />
         </Stack.Navigator>
       </NavigationContainer>
