@@ -274,18 +274,17 @@ Return ONLY valid JSON:
 
     share_token = uuid.uuid4().hex[:8]
     record_id = None
-    db_payload = {                          # only columns that exist in dna_scores
-        "user_id":        user_id,
-        "dna_score":      dna_score,
-        "investor_type":  analysis.get("investor_type"),
-        "summary":        analysis.get("summary"),
-        "strengths":      analysis.get("strengths", []),
-        "weaknesses":     analysis.get("weaknesses", []),
-        "recommendation": analysis.get("recommendation"),
-        "total_value":    round(total_value, 2),
+    db_payload = {                          # columns confirmed in dna_scores table
+        "user_id":       user_id,
+        "dna_score":     dna_score,
+        "investor_type": analysis.get("investor_type"),
+        "summary":       analysis.get("summary"),
+        "share_token":   share_token,
+        "total_value":   round(total_value, 2),
     }
-    # Strip None-valued keys that don't have a matching column to avoid Supabase errors
+    # Drop None values (except user_id and summary which may legitimately be null)
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
+
     print("--- SUPABASE DEBUG START ---", file=sys.stderr)
     print(f"DEBUG: Supabase URL configured: {'Yes' if os.environ.get('SUPABASE_URL') else 'No'}", file=sys.stderr)
     print(f"DEBUG: Target Table: dna_scores", file=sys.stderr)
@@ -293,21 +292,16 @@ Return ONLY valid JSON:
     print(f"DEBUG: Payload Content: {db_payload}", file=sys.stderr)
 
     try:
-        response = (
-            supabase
-            .table("dna_scores")
-            .insert(db_payload, returning="representation")
-            .execute()
-        )
+        result = supabase.table("dna_scores").insert(db_payload).execute()
 
-        print(f"DEBUG: Full Supabase Response Object: {response}", file=sys.stderr)
+        print(f"DEBUG: Full Supabase Response Object: {result}", file=sys.stderr)
 
-        if hasattr(response, "data") and response.data:
-            print(f"DEBUG: Success! Data returned: {response.data}", file=sys.stderr)
-            record_id = response.data[0].get("id")
+        if result.data:
+            print(f"DEBUG: Success! Data returned: {result.data}", file=sys.stderr)
+            record_id = result.data[0].get("id")
             print(f"DEBUG: Extracted record_id: {record_id}", file=sys.stderr)
         else:
-            print("DEBUG: Insert executed but NO DATA was returned in response.data.", file=sys.stderr)
+            print("DEBUG: Insert executed but NO DATA was returned in result.data.", file=sys.stderr)
             record_id = None
 
     except Exception as e:
