@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+export const dynamic = 'force-dynamic'
+
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
+import nextDynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { fulfillReport, createCheckoutSession } from '@/lib/api'
 import SocialProof from '@/components/SocialProof'
@@ -13,8 +15,7 @@ import { useAuth } from '@/lib/auth-context'
 import { useAnalytics } from '@/lib/posthog'
 import type { DNAAnalysisResponse } from '@/lib/api'
 
-const PortfolioPie = dynamic(() => import('@/components/PortfolioPie'), { ssr: false })
-
+const PortfolioPie = nextDynamic(() => import('@/components/PortfolioPie'), { ssr: false })
 
 
 const TYPE_COLORS: Record<string, string> = {
@@ -86,6 +87,18 @@ function ScoreLabel({ score }: { score: number }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+      </div>
+    }>
+      <ResultsContent />
+    </Suspense>
+  )
+}
+
+function ResultsContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, token } = useAuth()
