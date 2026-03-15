@@ -210,7 +210,7 @@ export async function getAdvisorProfile(
 }
 
 export async function upsertAdvisorProfile(
-  body: AdvisorProfile,
+  body: Partial<AdvisorProfile>,
   token?: string | null
 ): Promise<AdvisorProfile> {
   const res = await fetch(`${API}/api/advisors/me`, {

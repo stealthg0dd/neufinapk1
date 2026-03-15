@@ -58,7 +58,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "neufin.app",
+              "host": "neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
               "pathPrefix": "/auth/callback"
             }
           ],
@@ -73,7 +73,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "neufin.app",
+              "host": "neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
               "pathPrefix": "/share"
             }
           ],
@@ -88,7 +88,7 @@
           "data": [
             {
               "scheme": "https",
-              "host": "neufin.app",
+              "host": "neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
               "pathPrefix": "/results"
             }
           ],
