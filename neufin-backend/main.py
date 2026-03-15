@@ -289,15 +289,15 @@ Return ONLY valid JSON:
     db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
 
     try:
-        response = supabase.table("dna_scores").insert(db_payload).execute()
-        if response.data and len(response.data) > 0:
-            record_id = response.data[0].get("id")
-            print(f"[DB] SUCCESS: Created record {record_id}", file=sys.stderr)
+        res = supabase.table("dna_scores").insert(db_payload).execute()
+        if res.data and len(res.data) > 0:
+            record_id = res.data[0].get("id")
+            print(f"DEBUG: Successfully saved to Supabase. ID: {record_id}")
         else:
-            print("[DB] ERROR: Insert succeeded but no data returned. Check RLS.", file=sys.stderr)
+            print(f"DEBUG: Insert attempted but res.data is empty. Response: {res}")
             record_id = None
     except Exception as e:
-        print(f"[DB] INSERT FAILED: {e}", file=sys.stderr)
+        print(f"DEBUG: Supabase insertion failed: {str(e)}")
         record_id = None
 
     # ── 10. Analytics — disabled until analytics_events table is created ─────────
