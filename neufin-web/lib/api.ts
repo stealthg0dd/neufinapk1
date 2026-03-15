@@ -1,4 +1,4 @@
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
 
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
@@ -8,20 +8,23 @@ function authHeaders(token?: string | null): Record<string, string> {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export interface DNAResult {
+export interface DNAAnalysisResponse {
   dna_score: number
   investor_type: string
-  strengths: string[]
-  weaknesses: string[]
-  recommendation: string
   total_value: number
   num_positions: number
   max_position_pct: number
   positions: Position[]
-  share_token?: string
-  share_url?: string
-  record_id?: string
+  strengths: string[]
+  weaknesses: string[]
+  recommendation: string
+  share_token: string
+  share_url: string
+  record_id: string
 }
+
+// Alias kept for backward compatibility with other pages
+export type DNAResult = DNAAnalysisResponse
 
 export interface Position {
   symbol: string
@@ -47,7 +50,7 @@ export interface LinePoint {
 
 // ── DNA ───────────────────────────────────────────────────────────────────────
 
-export async function analyzeDNA(file: File, token?: string | null): Promise<DNAResult> {
+export async function analyzeDNA(file: File, token?: string | null): Promise<DNAAnalysisResponse> {
   const form = new FormData()
   form.append('file', file)
   const res = await fetch(`${API}/api/analyze-dna`, {

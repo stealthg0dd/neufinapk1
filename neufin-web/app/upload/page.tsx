@@ -55,7 +55,7 @@ export default function UploadPage() {
     track('csv_upload_started', { filename: file.name, size_kb: Math.round(file.size / 1024) })
     try {
       const result = await analyzeDNA(file, token)
-      sessionStorage.setItem('dnaResult', JSON.stringify(result))
+      localStorage.setItem('dnaResult', JSON.stringify(result))
       track('dna_analysis_complete', {
         dna_score:     result.dna_score,
         investor_type: result.investor_type,
