@@ -99,9 +99,11 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         r.raise_for_status()
         payload = r.json()
 
-        # AV returns an "Information" key when the API limit is hit
-        if "Information" in payload:
-            print(f"[RiskEngine] AV rate-limit hit for {sym_upper}: {payload['Information']}", file=sys.stderr)
+        # FIXED: AV returns "Information" for rate-limits and "Note" for premium/quota blocks
+        _av_msg = payload.get("Information", "") or payload.get("Note", "")
+        if _av_msg:
+            _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
+            print(f"[RiskEngine] AV {_reason} for {sym_upper} — skipping: {_av_msg[:120]}", file=sys.stderr)
             return pd.Series(dtype=float, name=sym_upper)
 
         ts_data = payload.get("Time Series (Daily)", {})

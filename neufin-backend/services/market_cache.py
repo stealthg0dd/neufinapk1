@@ -127,7 +127,7 @@ def get_closes(symbol: str, days: int) -> Optional[pd.Series]:
                 .maybe_single()
                 .execute()
             )
-            if row.data:
+            if row is not None and row.data:  # FIXED: guard against None response from maybe_single()
                 series = _json_to_series(row.data["payload"])
                 print(f"[MarketCache] Supabase HIT {k}", file=sys.stderr)
                 # Backfill Redis so the next hit is faster

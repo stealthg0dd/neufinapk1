@@ -84,6 +84,8 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     # ── 1. Claude Sonnet 4.6 (Primary) ───────────────────────────────────────
     t0 = time.monotonic()
     try:
+        if not ANTHROPIC_API_KEY:  # FIXED: skip init entirely when key is absent
+            raise ValueError("ANTHROPIC_API_KEY not set")
         client = Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6", # Latest March 2026 Stable
