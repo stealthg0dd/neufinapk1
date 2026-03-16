@@ -21,7 +21,8 @@ import datetime
 from dataclasses import dataclass
 
 import httpx
-from jose import jwt, JWTError, ExpiredSignatureError, JWTClaimsError
+from jose import jwt, JWTError
+from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
 from config import SUPABASE_URL
 
