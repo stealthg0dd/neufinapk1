@@ -3,6 +3,7 @@ AI Fallback Chain (March 14, 2026 Stable):
 Claude Sonnet 4.6 → OpenAI GPT-4o → Gemini 3.1 Pro (→ 1.5 Flash) → Groq Llama 3.3 70B
 """
 import json
+import os
 import re
 import time
 import sys
@@ -17,7 +18,7 @@ _gemini = google_genai.Client(api_key=GEMINI_KEY)
 
 # Centralized Gemini model config — single source of truth for main.py and ai_router.py
 GEMINI_PRIMARY_MODEL = "gemini-3.1-pro-preview"
-GEMINI_FALLBACK_MODEL = "gemini-1.5-flash"
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.0-flash")
 
 # Print available Gemini models at startup so the correct model ID can be confirmed.
 # Check your Railway/local stderr logs and update GEMINI_PRIMARY_MODEL to match.
@@ -109,7 +110,7 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     except Exception as e:
         print(f"[AI] gpt-4o ✗ — {e}", file=sys.stderr)
 
-    # ── 3. Gemini (Tier 3 Fallback) — auto-fallback: primary → gemini-1.5-flash ─
+    # ── 3. Gemini (Tier 3 Fallback) — auto-fallback: primary → GEMINI_FALLBACK_MODEL ─
     t2 = time.monotonic()
     try:
         result = call_gemini(prompt)

@@ -24,7 +24,7 @@ import httpx
 from jose import jwt, JWTError
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
-from config import SUPABASE_URL
+from config import SUPABASE_URL, SUPABASE_KEY
 
 # ── JWKS endpoint ──────────────────────────────────────────────────────────────
 _JWKS_URL   = f"{SUPABASE_URL}/auth/v1/jwks"
@@ -69,7 +69,7 @@ async def _fetch_jwks() -> list[dict]:
     _log(f"JWKS cache MISS — fetching {_JWKS_URL}")
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get(_JWKS_URL)
+            resp = await client.get(_JWKS_URL, headers={"apikey": SUPABASE_KEY})
             resp.raise_for_status()
             data = resp.json()
     except Exception as exc:
