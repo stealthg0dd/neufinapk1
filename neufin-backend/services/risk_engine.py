@@ -41,9 +41,92 @@ except Exception as _mc_err:
     _CLOSES_CACHE: dict[str, tuple[pd.Series, float]] = {}
     _CACHE_TTL = 3600
 
+# Alternative price providers — fallback chain when AV is rate-limited or premium-blocked
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY") or os.getenv("FINNHUB_API_KEY")
+POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY") or os.getenv("POLYGON_API_KEY")
+
 # Alpha Vantage free tier: 25 req/day, ~5 req/min.
 # Set to 0 in production if using a paid key.
-_AV_REQUEST_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "1.2"))  # FIXED: default 1.2s throttle for free-tier rate limit
+_AV_REQUEST_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "1.2"))
+
+
+# ── Finnhub daily-closes fallback ─────────────────────────────────────────────
+def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
+    """
+    Finnhub /stock/candle daily closes — used when AV is rate-limited or premium-blocked.
+    Returns an empty Series on any failure.
+    """
+    if not FINNHUB_API_KEY:
+        return pd.Series(dtype=float, name=sym.upper())
+    sym_upper = sym.upper()
+    try:
+        import datetime as _dt
+        unix_to   = int(_dt.datetime.utcnow().timestamp())
+        unix_from = unix_to - int(days * 1.8 * 86_400)   # generous window to cover weekends
+        r = requests.get(
+            "https://finnhub.io/api/v1/stock/candle",
+            params={
+                "symbol":     sym_upper.replace(".", "-"),
+                "resolution": "D",
+                "from":       unix_from,
+                "to":         unix_to,
+                "token":      FINNHUB_API_KEY,
+            },
+            timeout=8.0,
+        )
+        data = r.json()
+        if data.get("s") != "ok" or not data.get("c"):
+            return pd.Series(dtype=float, name=sym_upper)
+        closes = {
+            _dt.date.fromtimestamp(ts).isoformat(): c
+            for ts, c in zip(data["t"], data["c"])
+        }
+        series = pd.Series(closes, dtype=float).sort_index().tail(days)
+        series.name = sym_upper
+        if _MARKET_CACHE_AVAILABLE:
+            _cache_set(sym_upper, days, series)
+        return series
+    except Exception as e:
+        print(f"[RiskEngine] Finnhub fallback failed for {sym_upper}: {e}", file=sys.stderr)
+        return pd.Series(dtype=float, name=sym_upper)
+
+
+# ── Polygon daily-closes fallback ─────────────────────────────────────────────
+def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
+    """
+    Polygon /v2/aggs compact daily closes — second-tier fallback after Finnhub.
+    Returns an empty Series on any failure.
+    """
+    if not POLYGON_API_KEY:
+        return pd.Series(dtype=float, name=sym.upper())
+    sym_upper = sym.upper()
+    try:
+        import datetime as _dt
+        date_to   = _dt.date.today().isoformat()
+        date_from = (_dt.date.today() - _dt.timedelta(days=int(days * 1.8))).isoformat()
+        r = requests.get(
+            f"https://api.polygon.io/v2/aggs/ticker/{sym_upper}/range/1/day/{date_from}/{date_to}",
+            params={"adjusted": "true", "sort": "asc", "limit": 300, "apiKey": POLYGON_API_KEY},
+            timeout=10.0,
+        )
+        if r.status_code != 200:
+            return pd.Series(dtype=float, name=sym_upper)
+        data    = r.json()
+        results = data.get("results") or []
+        if not results:
+            return pd.Series(dtype=float, name=sym_upper)
+        closes = {
+            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
+            for bar in results
+        }
+        series = pd.Series(closes, dtype=float).sort_index().tail(days)
+        series.name = sym_upper
+        if _MARKET_CACHE_AVAILABLE:
+            _cache_set(sym_upper, days, series)
+        return series
+    except Exception as e:
+        print(f"[RiskEngine] Polygon fallback failed for {sym_upper}: {e}", file=sys.stderr)
+        return pd.Series(dtype=float, name=sym_upper)
 
 
 # ── Ticker normalisation ───────────────────────────────────────────────────────
@@ -99,12 +182,15 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         r.raise_for_status()
         payload = r.json()
 
-        # FIXED: AV returns "Information" for rate-limits and "Note" for premium/quota blocks
+        # AV returns "Information" for rate-limits / "Note" for premium/quota blocks
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
             _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            print(f"[RiskEngine] AV {_reason} for {sym_upper} — skipping: {_av_msg[:120]}", file=sys.stderr)
-            return pd.Series(dtype=float, name=sym_upper)
+            print(f"[RiskEngine] AV {_reason} for {sym_upper} — trying Finnhub→Polygon fallback", file=sys.stderr)
+            series = _fetch_daily_closes_finnhub(sym_upper, days)
+            if not series.empty:
+                return series
+            return _fetch_daily_closes_polygon(sym_upper, days)
 
         ts_data = payload.get("Time Series (Daily)", {})
         if not ts_data:

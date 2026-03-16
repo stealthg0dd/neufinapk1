@@ -202,27 +202,29 @@ class MarketCache:
         import asyncio
         sym = ticker.upper()
 
+        def _slice(s: pd.Series) -> pd.Series:
+            """Slice s to [start, end] using string-cast index to prevent
+            'Invalid comparison between dtype=int64 and str' in pandas 2.x."""
+            if s.empty:
+                return s
+            try:
+                idx = s.index.astype(str)
+                mask = (idx >= start) & (idx <= end)
+                return s.iloc[mask.values]
+            except Exception:
+                return s   # index cannot be compared — return unsliced
+
         # 1. Try the cache first (full-history key)
         cached = get_closes(sym, _FULL_HIST_SENTINEL)
         if cached is not None and not cached.empty:
-            try:
-                # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
-                sliced = cached[(cached.index >= start) & (cached.index <= end)]
-            except TypeError:
-                sliced = cached  # index dtype mismatch — return full data, slice skipped
-            return sliced
+            return _slice(cached)
 
         # 2. Fetch from Alpha Vantage in a thread (sync HTTP call)
         series = await asyncio.to_thread(self._fetch_av_full, sym)
         if not series.empty:
             set_closes(sym, _FULL_HIST_SENTINEL, series)
 
-        try:
-            # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
-            sliced = series[(series.index >= start) & (series.index <= end)]
-        except TypeError:
-            sliced = series
-        return sliced
+        return _slice(series)
 
     @staticmethod
     def _fetch_av_full(sym: str) -> pd.Series:

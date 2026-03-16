@@ -5,10 +5,15 @@ import io
 import uuid
 import warnings
 
-# FIXED: suppress urllib3/chardet/charset_normalizer version mismatch warnings
+# Suppress library version mismatch and dependency warnings
 warnings.filterwarnings("ignore", message=".*urllib3.*")
 warnings.filterwarnings("ignore", message=".*chardet.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="requests")
+try:
+    from requests.packages.urllib3.exceptions import RequestsDependencyWarning  # type: ignore[import]
+    warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
+except ImportError:
+    pass
 
 import pandas as pd
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File

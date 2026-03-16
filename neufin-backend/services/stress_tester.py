@@ -139,8 +139,10 @@ def _fetch_full_history(sym: str) -> pd.Series:
         r.raise_for_status()
         payload = r.json()
 
-        if "Information" in payload:
-            print(f"[StressTester] AV rate-limit for {sym_upper}", file=sys.stderr)
+        _av_msg = payload.get("Information", "") or payload.get("Note", "")
+        if _av_msg:
+            _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
+            print(f"[StressTester] AV {_reason} for {sym_upper} — skipping: {_av_msg[:120]}", file=sys.stderr)
             return pd.Series(dtype=float, name=sym_upper)
 
         ts = payload.get("Time Series (Daily)", {})
@@ -166,19 +168,35 @@ def _fetch_full_history(sym: str) -> pd.Series:
 
 
 def _price_on_or_after(s: pd.Series, date_str: str) -> float | None:
+    """Return the first close on or after date_str, or None if unavailable.
+
+    Converts the index to str before comparison so a RangeIndex(int64) —
+    which arises from an empty/un-indexed Series stored in cache — never
+    raises 'Invalid comparison between dtype=int64 and str'.
+    """
+    if s is None or s.empty:
+        return None
     try:
-        # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
-        c = s[s.index >= date_str]
-    except TypeError:
+        idx = s.index.astype(str)
+        mask = idx >= date_str
+        c = s.iloc[mask.values]
+    except Exception:
         return None
     return float(c.iloc[0]) if not c.empty else None
 
 
 def _price_on_or_before(s: pd.Series, date_str: str) -> float | None:
+    """Return the last close on or before date_str, or None if unavailable.
+
+    Same int64-RangeIndex guard as _price_on_or_after.
+    """
+    if s is None or s.empty:
+        return None
     try:
-        # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
-        c = s[s.index <= date_str]
-    except TypeError:
+        idx = s.index.astype(str)
+        mask = idx <= date_str
+        c = s.iloc[mask.values]
+    except Exception:
         return None
     return float(c.iloc[-1]) if not c.empty else None
 
