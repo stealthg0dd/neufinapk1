@@ -196,7 +196,16 @@ async def analyze_with_swarm(
     try:
         result = await run_swarm(ticker_data, body.total_value)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Swarm analysis failed: {e}")
+        # FIXED: return 200 with error payload instead of 503 so frontend handles gracefully
+        print(f"[Swarm] analyze exception: {e}", file=sys.stderr)
+        return {
+            "investment_thesis": {"error": str(e), "status": "failed"},
+            "risk_metrics":      {},
+            "tax_analysis":      {},
+            "macro_context":     "",
+            "critique":          "",
+            "agent_trace":       [f"ERROR: {e}"],
+        }
 
     # Generate a report_id upfront so we can return it immediately and also
     # use it as the Supabase primary key in the background task.
@@ -294,7 +303,15 @@ async def chat(body: ChatRequest):
         try:
             result = await chat_with_swarm(clean_message, ticker_data, body.total_value)
         except Exception as e:
-            raise HTTPException(status_code=503, detail=f"Chat analysis failed: {e}")
+            # FIXED: return 200 with error payload instead of 503
+            print(f"[Swarm] chat exception: {e}", file=sys.stderr)
+            return {
+                "reply":         f"Analysis error: {e}. Please try again.",
+                "key_numbers":   {},
+                "action":        "Re-run analysis.",
+                "agent":         "MD",
+                "thinking_steps": [],
+            }
 
         # Normalise legacy response shape → SlidingChatPane shape
         resp = result.get("response", {})

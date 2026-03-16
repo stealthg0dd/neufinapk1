@@ -12,6 +12,7 @@ POST /api/stripe/webhook    → Stripe event handler
 GET  /api/reports/fulfill   → After payment, generate PDF and return URL
 """
 
+import asyncio
 import stripe
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -197,7 +198,8 @@ async def create_checkout(body: CheckoutRequest):
         if discounts:
             session_params["discounts"] = discounts
 
-        session = stripe.checkout.Session.create(**session_params)
+        # FIXED: run blocking Stripe call in a thread to avoid holding the event loop (502 timeout fix)
+        session = await asyncio.to_thread(lambda: stripe.checkout.Session.create(**session_params))
     except stripe.StripeError as e:
         raise HTTPException(502, f"Stripe error: {e.user_message}")
 
