@@ -43,7 +43,7 @@ except Exception as _mc_err:
 
 # Alpha Vantage free tier: 25 req/day, ~5 req/min.
 # Set to 0 in production if using a paid key.
-_AV_REQUEST_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "0.0"))
+_AV_REQUEST_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "1.2"))  # FIXED: default 1.2s throttle for free-tier rate limit
 
 
 # ── Ticker normalisation ───────────────────────────────────────────────────────

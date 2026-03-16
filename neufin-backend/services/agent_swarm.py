@@ -687,7 +687,7 @@ async def market_regime_node(state: SwarmState) -> dict:
     symbols = [t["symbol"] for t in state["ticker_data"][:5]]
     prompt = f"""You are a macro economist. Classify the investment regime given:
 
-CPI YoY: {yoy_str}  |  3m-ann trend: {trend:.1f if trend is not None else 'N/A'}%
+CPI YoY: {yoy_str}  |  3m-ann trend: {f"{trend:.1f}" if trend is not None else "N/A"}%
 Preliminary regime: {regime}  |  Portfolio: {', '.join(symbols)}
 
 Return ONLY valid JSON — no markdown:

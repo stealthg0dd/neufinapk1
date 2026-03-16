@@ -245,7 +245,7 @@ export default function CommandPalette({
 
               {/* Answer */}
               <p className="text-[#E0E0E0] text-[12px] leading-relaxed">
-                {result.response.answer}
+                {result.response?.answer ?? 'Analysis complete.'}
               </p>
 
               {/* Key numbers */}
