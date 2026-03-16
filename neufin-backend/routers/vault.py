@@ -11,33 +11,27 @@ POST /api/vault/stripe-portal    → create a Stripe Customer Portal session
 """
 
 import stripe
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from database import supabase, claim_guest_data
 from config import STRIPE_SECRET_KEY, APP_BASE_URL
+from services.auth_dependency import get_current_user
+from services.jwt_auth import JWTUser
 
 router = APIRouter(prefix="/api/vault", tags=["vault"])
 
 stripe.api_key = STRIPE_SECRET_KEY
 
 
-def _user_id(request: Request) -> str:
-    """Extract user_id from auth middleware state. Raises 401 if missing."""
-    user = getattr(request.state, "user", None)
-    if not user:
-        raise HTTPException(401, "Authentication required.")
-    return user.id
-
-
 # ── History ────────────────────────────────────────────────────────────────────
 
 @router.get("/history")
-async def get_vault_history(request: Request, limit: int = 50):
+async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: int = 50):
     """
     Return all DNA scores for the authenticated user, newest first.
     Excludes positions/raw data — just the scored records.
     """
-    uid = _user_id(request)
+    uid = user.id
     try:
         result = (
             supabase.table("dna_scores")
@@ -59,12 +53,12 @@ class ClaimRequest(BaseModel):
 
 
 @router.post("/claim")
-async def claim_anonymous_record(body: ClaimRequest, request: Request):
+async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get_current_user)):
     """
     Associate an anonymous dna_scores record with the now-authenticated user.
     Only succeeds if the record currently has no user_id (prevents hijacking).
     """
-    uid = _user_id(request)
+    uid = user.id
     try:
         existing = (
             supabase.table("dna_scores")
@@ -98,7 +92,7 @@ class SessionClaimRequest(BaseModel):
 
 
 @router.post("/claim-session")
-async def claim_session_portfolios(body: SessionClaimRequest, request: Request):
+async def claim_session_portfolios(body: SessionClaimRequest, user: JWTUser = Depends(get_current_user)):
     """
     Re-assign ALL unclaimed portfolios, dna_scores, and swarm_reports that share
     a guest session_id to the now-authenticated user.
@@ -111,7 +105,7 @@ async def claim_session_portfolios(body: SessionClaimRequest, request: Request):
 
     Returns a summary of what was claimed.
     """
-    uid = _user_id(request)
+    uid = user.id
     sid = body.session_id.strip()
     if not sid:
         raise HTTPException(400, "session_id must not be empty.")
@@ -130,9 +124,9 @@ async def claim_session_portfolios(body: SessionClaimRequest, request: Request):
 # ── Subscription ───────────────────────────────────────────────────────────────
 
 @router.get("/subscription")
-async def get_subscription(request: Request):
+async def get_subscription(user: JWTUser = Depends(get_current_user)):
     """Return the user's current subscription_tier from user_profiles."""
-    uid = _user_id(request)
+    uid = user.id
     try:
         result = (
             supabase.table("user_profiles")
@@ -159,7 +153,7 @@ class PortalRequest(BaseModel):
 
 
 @router.post("/stripe-portal")
-async def create_stripe_portal(body: PortalRequest, request: Request):
+async def create_stripe_portal(body: PortalRequest, user: JWTUser = Depends(get_current_user)):
     """
     Create a Stripe Customer Portal session so users can manage their subscription.
     Looks up the Stripe customer_id from user_profiles; creates one if missing.
@@ -167,8 +161,7 @@ async def create_stripe_portal(body: PortalRequest, request: Request):
     if not STRIPE_SECRET_KEY:
         raise HTTPException(503, "Stripe is not configured on this server.")
 
-    uid = _user_id(request)
-    user = request.state.user
+    uid = user.id
 
     # Get or create Stripe customer
     try:

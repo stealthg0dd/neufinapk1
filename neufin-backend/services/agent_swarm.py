@@ -1,20 +1,24 @@
 """
 agent_swarm.py — Neufin Agentic Swarm (LangGraph orchestration)
 
-Four specialised agents run in a directed graph, sharing a typed state object.
+Seven specialised agents run in a directed graph, sharing a typed state object.
 Each node appends to agent_trace for the Bloomberg-style "Thinking Trace" UI.
 
 Graph topology:
-  START → strategist → quant → tax_arch → critic → synthesizer → END
-                                               └──(revision)──→ quant
+  START → market_regime → strategist → quant → tax_arch → risk_sentinel → alpha_scout → critic → synthesizer → END
+                                                                                  └──(revision)──→ quant
 
 Agents
 ------
-  Strategist   Finnhub company news + FRED CPI → market-regime narrative
-  Quant        HHI, weighted beta, Sharpe, Pearson correlation clusters
-  Tax Architect  Per-position liability / harvest analysis at 20% LT-CGT
-  Critic         Challenges the quant model; triggers one revision pass
-  Synthesizer    Combines all outputs into a structured Investment Thesis
+  Market Regime   FRED CPI → 5-category macro regime classification (growth/inflation/
+                  recession/stagflation/risk-off) with confidence score
+  Strategist      Finnhub company news + FRED CPI → market-regime narrative
+  Quant           HHI, weighted beta, Sharpe, Pearson correlation clusters
+  Tax Architect   Per-position liability / harvest analysis at 20% LT-CGT
+  Risk Sentinel   Independent watchdog: HHI, correlation, beta, Sharpe → risk level
+  Alpha Scout     AI-driven opportunity discovery outside current portfolio
+  Critic          Challenges the quant model; triggers one revision pass
+  Synthesizer     Combines all 7 outputs into IC Briefing + structured Investment Thesis
 
 Fallback: if langgraph is not installed the same nodes run sequentially.
 """
@@ -101,10 +105,13 @@ class SwarmState(TypedDict):
     total_value:  float
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
-    macro_context:  str         # Strategist: regime + news summary
-    risk_metrics:   dict        # Quant: HHI, beta, Sharpe, correlation
-    tax_estimates:  dict        # Tax Architect: liability + harvesting
-    critique:       str         # Critic: issues to address
+    macro_context:        str   # Strategist: regime + news summary
+    market_regime:        dict  # Market Regime Agent: 5-category classification
+    risk_metrics:         dict  # Quant: HHI, beta, Sharpe, correlation
+    tax_estimates:        dict  # Tax Architect: liability + harvesting
+    risk_sentinel_output: dict  # Risk Sentinel: independent risk watchdog
+    alpha_opportunities:  dict  # Alpha Scout: opportunity discovery
+    critique:             str   # Critic: issues to address
 
     # ── Control ────────────────────────────────────────────────────────────────
     revision_count: int         # Critic uses this to cap revision loops at 1
@@ -591,6 +598,309 @@ async def critic_node(state: SwarmState) -> dict:
     }
 
 
+async def market_regime_node(state: SwarmState) -> dict:
+    """
+    Market Regime Agent — Classifies the current macro environment into one of
+    five regimes using FRED CPI data, then AI-enriches with confidence + drivers.
+
+    Regime taxonomy:
+      growth       CPI ≤ 2%, or near-target + positive trend
+      inflation    CPI > 3% and accelerating or stable
+      stagflation  CPI > 3% but decelerating (growth fading while inflation persists)
+      recession    CPI < 0% or sharply decelerating with deflation risk
+      risk-off     FRED data unavailable; defaulting to defensive posture
+
+    Runs BEFORE strategist so downstream agents can access the canonical regime label.
+    """
+    trace: list[str] = []
+    trace.append("[Market Regime] Fetching FRED CPI data for macro regime classification...")
+
+    cpi_data = await asyncio.to_thread(_get_fred_cpi_analysis)
+
+    yoy   = cpi_data.get("yoy_pct")
+    trend = cpi_data.get("trend_3m_ann")
+
+    # ── Rule-based regime + confidence ────────────────────────────────────────
+    if yoy is None:
+        regime     = "risk-off"
+        confidence = 0.40
+        drivers    = ["FRED data unavailable — defaulting to defensive risk-off posture"]
+    elif yoy < 0:
+        regime     = "recession"
+        confidence = min(0.92, 0.70 + abs(yoy) * 0.05)
+        drivers    = [
+            f"CPI YoY {yoy:.1f}% — deflationary pressure",
+            "Real growth likely contracting",
+            "Flight to quality assets expected",
+        ]
+    elif yoy < 1.5:
+        regime     = "recession"
+        confidence = 0.65
+        drivers    = [
+            f"CPI YoY {yoy:.1f}% — well below Fed target signals demand weakness",
+            "Growth slowdown signals present",
+            "Bond proxies and defensives outperform",
+        ]
+    elif yoy <= 2.0:
+        regime     = "growth"
+        confidence = 0.82
+        drivers    = [
+            f"CPI YoY {yoy:.1f}% at/near Fed 2% target",
+            "Accommodative rate environment supports risk assets",
+            "Equity multiples and growth stocks favoured",
+        ]
+    elif yoy <= 3.0:
+        regime     = "growth"
+        confidence = 0.72
+        drivers    = [
+            f"CPI YoY {yoy:.1f}% slightly above target but controlled",
+            "Controlled inflation historically coincides with expansion",
+            "Monitor for rate-hike signals from Fed",
+        ]
+    elif yoy > 3.0:
+        # Differentiate inflation vs. stagflation by 3m trend direction
+        if trend is not None and yoy > 0 and trend < yoy - 1.5:
+            regime     = "stagflation"
+            confidence = 0.68
+            drivers    = [
+                f"CPI YoY {yoy:.1f}% elevated but 3m-ann {trend:.1f}% decelerating",
+                "Growth momentum fading while inflation persists",
+                "Stagflationary compression on corporate margins",
+            ]
+        else:
+            regime     = "inflation"
+            confidence = min(0.95, 0.72 + (yoy - 3.0) * 0.05)
+            drivers    = [
+                f"CPI YoY {yoy:.1f}% above 3% threshold",
+                f"3m annualised trend {trend:.1f}%" if trend is not None else "Trend data unavailable",
+                "Rate-sensitive sectors under pressure; real assets defensive",
+            ]
+    else:
+        regime     = "inflation"
+        confidence = 0.75
+        drivers    = [f"CPI YoY {yoy:.1f}%", "Above-target inflation regime"]
+
+    yoy_str = f"{yoy:.1f}%" if yoy is not None else "N/A"
+    trace.append(f"[Market Regime] Rule-based: {regime} (conf={confidence:.0%}) | CPI YoY={yoy_str}")
+
+    # ── AI enrichment (optional — falls back to rule-based on failure) ─────────
+    symbols = [t["symbol"] for t in state["ticker_data"][:5]]
+    prompt = f"""You are a macro economist. Classify the investment regime given:
+
+CPI YoY: {yoy_str}  |  3m-ann trend: {trend:.1f if trend is not None else 'N/A'}%
+Preliminary regime: {regime}  |  Portfolio: {', '.join(symbols)}
+
+Return ONLY valid JSON — no markdown:
+{{
+  "regime": "{regime}",
+  "confidence": {round(confidence, 2)},
+  "drivers": ["specific driver 1", "specific driver 2", "specific driver 3"],
+  "portfolio_implication": "one sentence on how {regime} regime specifically affects {', '.join(symbols[:3])}"
+}}
+regime MUST be one of: growth, inflation, recession, stagflation, risk-off"""
+
+    try:
+        result = await get_ai_analysis(prompt)
+        valid_regimes = {"growth", "inflation", "recession", "stagflation", "risk-off"}
+        if result.get("regime") not in valid_regimes:
+            result["regime"] = regime
+        try:
+            result["confidence"] = round(float(result.get("confidence", confidence)), 2)
+        except (TypeError, ValueError):
+            result["confidence"] = round(confidence, 2)
+        market_regime_out = result
+        trace.append(
+            f"[Market Regime] Final: {result['regime']} (conf={result['confidence']:.0%}) | "
+            f"drivers: {'; '.join(str(d) for d in result.get('drivers', [])[:2])}"
+        )
+    except Exception as e:
+        market_regime_out = {
+            "regime":               regime,
+            "confidence":           round(confidence, 2),
+            "drivers":              drivers,
+            "portfolio_implication": cpi_data.get("regime_description", ""),
+        }
+        trace.append(f"[Market Regime] AI enrichment failed ({e}) — rule-based classification used.")
+
+    return {"market_regime": market_regime_out, "agent_trace": trace}
+
+
+async def risk_sentinel_node(state: SwarmState) -> dict:
+    """
+    Risk Sentinel Agent — Independent watchdog that re-examines the Quant's metrics
+    and issues a definitive risk verdict.
+
+    Reads from risk_metrics (already computed by quant_node) — no new data fetches.
+    Returns a structured assessment: risk_level, primary_risks, mitigations.
+
+    Inserted AFTER tax_arch and BEFORE critic so the Critic has sentinel findings
+    available when composing its challenge.
+    """
+    trace: list[str] = []
+    trace.append("[Risk Sentinel] Independent portfolio risk audit initiated...")
+
+    risk = state.get("risk_metrics", {})
+
+    hhi_pts       = risk.get("hhi_pts", 0.0)
+    beta_pts      = risk.get("beta_pts", 0.0)
+    weighted_beta = risk.get("weighted_beta", 1.0)
+    sharpe        = risk.get("sharpe_ratio", 0.0)
+    avg_corr      = risk.get("avg_corr", 0.0)
+    clusters      = risk.get("clusters", [])
+
+    primary_risks: list[str] = []
+    mitigations:   list[str] = []
+    risk_score     = 0.0  # 0–10 scale; ≥6 → high, ≥3 → medium, <3 → low
+
+    # ── HHI concentration (max 3 pts) ─────────────────────────────────────────
+    if hhi_pts < 8:
+        risk_score += 3.0
+        primary_risks.append(f"Extreme concentration — HHI score {hhi_pts:.0f}/25 signals portfolio dominated by few names")
+        mitigations.append("Add 3–5 uncorrelated positions; target HHI score > 15/25")
+    elif hhi_pts < 15:
+        risk_score += 1.5
+        primary_risks.append(f"Moderate concentration — HHI score {hhi_pts:.0f}/25")
+        mitigations.append("Introduce 2–3 positions in sectors absent from current portfolio")
+
+    # ── Beta exposure (max 3 pts) ──────────────────────────────────────────────
+    if weighted_beta > 1.8:
+        risk_score += 3.0
+        primary_risks.append(f"Aggressive beta exposure (β={weighted_beta:.2f}) — portfolio amplifies market moves by {weighted_beta:.1f}×")
+        mitigations.append(f"Trim highest-beta names to bring portfolio beta below 1.4; consider defensive allocation")
+    elif weighted_beta > 1.4:
+        risk_score += 1.5
+        primary_risks.append(f"Elevated beta (β={weighted_beta:.2f}) — above-market volatility profile")
+        mitigations.append("Rotate 10–15% into utilities, consumer staples, or low-vol ETFs to dampen beta")
+
+    # ── Correlation clusters (max 3 pts) ──────────────────────────────────────
+    if avg_corr > 0.80:
+        risk_score += 3.0
+        primary_risks.append(f"Critical correlation (avg ρ={avg_corr:.3f}) — true diversification absent; {len(clusters)} cluster(s) detected")
+        mitigations.append(f"Exit or reduce at least 2 positions in the highest-ρ cluster; diversification is illusory above ρ=0.80")
+    elif avg_corr > 0.65:
+        risk_score += 1.5
+        primary_risks.append(f"Elevated pairwise correlation (avg ρ={avg_corr:.3f})")
+        mitigations.append("Introduce negatively-correlated assets (bonds, gold, commodities, inverse-sector ETFs)")
+
+    # ── Sharpe ratio (max 2 pts) ───────────────────────────────────────────────
+    if sharpe < 0:
+        risk_score += 2.0
+        primary_risks.append(f"Negative Sharpe ({sharpe:.3f}) — risk-adjusted returns below risk-free rate; capital being eroded")
+        mitigations.append("Rebalance toward higher-quality names or de-risk 15–20% into short-duration Treasuries")
+    elif sharpe < 0.5:
+        risk_score += 1.0
+        primary_risks.append(f"Weak Sharpe ({sharpe:.3f}) — insufficient return per unit of risk taken")
+        mitigations.append("Review position sizing; overweight highest-conviction names and reduce speculative tail positions")
+
+    # ── Verdict ────────────────────────────────────────────────────────────────
+    if risk_score >= 6:
+        risk_level = "high"
+    elif risk_score >= 3:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    if not primary_risks:
+        primary_risks = ["No critical structural risks detected across HHI, beta, correlation, and Sharpe metrics"]
+        mitigations   = ["Maintain current allocation; monitor for regime changes and rebalance quarterly"]
+
+    trace.append(f"[Risk Sentinel] Verdict: {risk_level.upper()} (score {risk_score:.1f}/10)")
+    for r in primary_risks[:3]:
+        prefix = "⚠" if risk_level == "high" else "⚑"
+        trace.append(f"[Risk Sentinel] {prefix} {r}")
+
+    risk_sentinel_out = {
+        "risk_level":    risk_level,
+        "risk_score":    round(risk_score, 1),
+        "primary_risks": primary_risks,
+        "mitigations":   mitigations,
+    }
+    return {"risk_sentinel_output": risk_sentinel_out, "agent_trace": trace}
+
+
+async def alpha_scout_node(state: SwarmState) -> dict:
+    """
+    Alpha Scout Agent — AI-driven opportunity discovery outside the current portfolio.
+
+    Uses market regime + macro context + current exposure to identify 3–5 symbols
+    that complement or hedge the portfolio given the prevailing regime.
+    Calls get_ai_analysis() for reasoning.
+
+    Runs AFTER risk_sentinel (has access to risk verdict) and BEFORE critic.
+    """
+    trace: list[str] = []
+    trace.append("[Alpha Scout] Scanning for alpha opportunities not in current portfolio...")
+
+    market_regime    = state.get("market_regime", {})
+    macro_context    = state.get("macro_context", "")
+    risk_sentinel    = state.get("risk_sentinel_output", {})
+    ticker_data      = state["ticker_data"]
+
+    regime           = market_regime.get("regime", "growth")
+    risk_level       = risk_sentinel.get("risk_level", "medium")
+    existing_symbols = {t["symbol"] for t in ticker_data}
+    exposure_summary = [
+        {"symbol": t["symbol"], "weight_pct": round(t.get("weight", 0) * 100, 1)}
+        for t in sorted(ticker_data, key=lambda x: x.get("weight", 0), reverse=True)[:5]
+    ]
+
+    macro_snippet = ""
+    if macro_context and macro_context not in ("", "N/A"):
+        try:
+            macro_obj    = json.loads(macro_context)
+            macro_snippet = macro_obj.get("regime_implication", macro_obj.get("positioning_advice", ""))[:300]
+        except Exception:
+            macro_snippet = macro_context[:300]
+
+    prompt = f"""You are a portfolio alpha-generation specialist identifying investment opportunities.
+
+Current macro regime: {regime}  |  Portfolio risk level: {risk_level}
+Portfolio top holdings (DO NOT recommend these): {json.dumps(exposure_summary)}
+All existing symbols (never include in output): {', '.join(sorted(existing_symbols))}
+Macro context: {macro_snippet or 'N/A'}
+Risk sentinel mitigations: {risk_sentinel.get('mitigations', [])[:2]}
+
+Identify exactly 3–5 specific investment opportunities that:
+1. Are NOT in the existing portfolio (check the exclusion list above)
+2. Either complement or defensively hedge the {regime} regime
+3. Improve diversification relative to existing top holdings
+
+Return ONLY valid JSON — no markdown:
+{{
+  "opportunities": [
+    {{
+      "symbol": "TICKER",
+      "reason": "one sentence: why this fits {regime} regime and adds value to this specific portfolio",
+      "confidence": 0.75
+    }}
+  ]
+}}
+confidence must be between 0.0 and 1.0. Return 3–5 opportunities."""
+
+    try:
+        result = await get_ai_analysis(prompt)
+        opps   = result.get("opportunities", [])
+        # Enforce: remove any symbol already in portfolio
+        opps = [o for o in opps if isinstance(o, dict) and o.get("symbol") not in existing_symbols]
+        for o in opps:
+            try:
+                o["confidence"] = round(max(0.0, min(1.0, float(o.get("confidence", 0.65)))), 2)
+            except (TypeError, ValueError):
+                o["confidence"] = 0.65
+        alpha_out = {"opportunities": opps[:5]}
+        trace.append(f"[Alpha Scout] {len(opps)} opportunity(ies) identified for {regime} regime:")
+        for o in opps[:3]:
+            sym  = o.get("symbol", "?")
+            why  = o.get("reason", "")[:80]
+            conf = o.get("confidence", 0.0)
+            trace.append(f"[Alpha Scout] ✦ {sym}: {why}... (conf={conf:.0%})")
+    except Exception as e:
+        alpha_out = {"opportunities": []}
+        trace.append(f"[Alpha Scout] AI opportunity scan failed ({e}) — no opportunities returned.")
+
+    return {"alpha_opportunities": alpha_out, "agent_trace": trace}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # IC Briefing System Prompt — PE Managing Director persona
 # ══════════════════════════════════════════════════════════════════════════════
@@ -676,6 +986,14 @@ two sub-bullets under the same directive.
 - "Keep up the good work."
 - "It seems like..." / "It appears that..."
 
+### ADDITIONAL AGENT DATA (incorporate where relevant):
+- `market_regime_agent`: 5-category regime classification with confidence and drivers —
+  use in section 3 (Macro Regime Alignment) as the definitive regime label.
+- `risk_sentinel_agent`: independent watchdog verdict (risk_level, primary_risks,
+  mitigations) — incorporate sentinel findings into section 2 (Quantitative Risk Attribution).
+- `alpha_scout_agent`: opportunities not currently in the portfolio — mention the top 2
+  in section 5 (90-Day Directive) as diversification candidates where the risk budget allows.
+
 ### INPUT DATA TO ANALYZE:
 {swarm_state_json}
 """.strip()
@@ -683,24 +1001,34 @@ two sub-bullets under the same directive.
 
 async def synthesizer_node(state: SwarmState) -> dict:
     """
-    Synthesizer Agent — PE Managing Director producing a markdown IC Briefing.
+    Synthesizer Agent — PE Managing Director producing both:
 
-    Calls get_ai_briefing() (not get_ai_analysis) so the output is long-form
-    markdown prose, not a JSON blob.  The briefing is stored in
-    investment_thesis["briefing"] alongside numeric metadata.
+      1. A long-form markdown IC Briefing (existing format — backward-compatible)
+         via get_ai_briefing() with the full 5-section structure.
+
+      2. A structured Investment Thesis JSON combining all 7 agent outputs:
+         market_regime, strategist, quant, tax_architect, risk_sentinel, alpha_scout, critic.
+         Fields: headline, regime, portfolio_health, macro_outlook, risks,
+                 opportunities, tax_strategy, action_plan.
+
+    Both AI calls run in parallel via asyncio.gather.
+    All existing thesis fields are preserved for endpoint backward-compatibility.
     """
     trace: list[str] = []
-    trace.append("[Synthesizer] Compiling swarm outputs for IC Briefing...")
+    trace.append("[Synthesizer] Compiling 7-agent swarm outputs for IC Briefing + Structured Thesis...")
 
-    risk  = state.get("risk_metrics", {})
-    tax   = state.get("tax_estimates", {})
-    macro = state.get("macro_context", "N/A")
-    crit  = state.get("critique", "")
+    risk       = state.get("risk_metrics", {})
+    tax        = state.get("tax_estimates", {})
+    macro      = state.get("macro_context", "N/A")
+    crit       = state.get("critique", "")
+    mkt_regime = state.get("market_regime", {})
+    sentinel   = state.get("risk_sentinel_output", {})
+    alpha      = state.get("alpha_opportunities", {})
 
-    tax_pts  = tax.get("tax_pts", 10.0)
-    hhi_pts  = risk.get("hhi_pts", 0.0)
-    beta_pts = risk.get("beta_pts", 0.0)
-    corr_pts = risk.get("corr_pts", 0.0)
+    tax_pts   = tax.get("tax_pts", 10.0)
+    hhi_pts   = risk.get("hhi_pts", 0.0)
+    beta_pts  = risk.get("beta_pts", 0.0)
+    corr_pts  = risk.get("corr_pts", 0.0)
     dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
 
     score_breakdown = {
@@ -710,7 +1038,7 @@ async def synthesizer_node(state: SwarmState) -> dict:
         "correlation":       corr_pts,
     }
 
-    # ── Build structured input for the MD ─────────────────────────────────────
+    # ── Build structured input payload for the MD (all 7 agents) ──────────────
     portfolio_positions = [
         {
             "symbol":     t["symbol"],
@@ -721,6 +1049,11 @@ async def synthesizer_node(state: SwarmState) -> dict:
         for t in state["ticker_data"]
     ]
 
+    strategist_parsed = (
+        json.loads(macro) if macro and macro not in ("N/A", "")
+        else {"regime": "Unknown"}
+    )
+
     swarm_state_payload = {
         "portfolio": {
             "total_value_usd": round(state["total_value"], 2),
@@ -728,6 +1061,7 @@ async def synthesizer_node(state: SwarmState) -> dict:
             "dna_score":       dna_score,
             "score_breakdown": score_breakdown,
         },
+        "market_regime_agent": mkt_regime,
         "quant_agent": {
             "hhi_concentration_score":  hhi_pts,
             "weighted_beta":            risk.get("weighted_beta"),
@@ -741,57 +1075,125 @@ async def synthesizer_node(state: SwarmState) -> dict:
             "stress_results":           risk.get("stress_results", []),
             "risk_factors":             risk.get("risk_factors", []),
         },
-        "strategist_agent": json.loads(macro) if macro and macro not in ("N/A", "") else {"regime": "Unknown"},
+        "strategist_agent": strategist_parsed,
         "tax_agent": {
-            "cost_basis_available":         tax.get("available", False),
-            "total_deferred_liability_usd": tax.get("total_liability"),
+            "cost_basis_available":          tax.get("available", False),
+            "total_deferred_liability_usd":  tax.get("total_liability"),
             "total_harvest_opportunity_usd": tax.get("total_harvest_opp"),
-            "tax_alpha_score":              tax_pts,
-            "narrative":                    tax.get("narrative"),
-            "top_harvest_positions":        tax.get("harvestable_top3", []),
-            "top_liability_positions":      tax.get("liability_top3", []),
-            "tax_neutral_pairs":            tax.get("tax_neutral_pairs", []),
+            "tax_alpha_score":               tax_pts,
+            "narrative":                     tax.get("narrative"),
+            "top_harvest_positions":         tax.get("harvestable_top3", []),
+            "top_liability_positions":       tax.get("liability_top3", []),
+            "tax_neutral_pairs":             tax.get("tax_neutral_pairs", []),
         },
-        "critic_findings": crit,
+        "risk_sentinel_agent": sentinel,
+        "alpha_scout_agent":   alpha,
+        "critic_findings":     crit,
     }
 
     swarm_state_json = json.dumps(swarm_state_payload, indent=2, default=str)
     system_prompt    = _IC_SYSTEM_PROMPT.format(swarm_state_json=swarm_state_json)
 
-    # ── User turn: the explicit briefing request ───────────────────────────────
+    # ── Derive canonical regime label (market_regime_agent is authoritative) ───
+    regime_label = (
+        mkt_regime.get("regime")
+        or strategist_parsed.get("regime", "Unknown")
+    )
+
+    # ── IC Briefing user turn ──────────────────────────────────────────────────
     user_content = (
         f"Generate the full Investment Committee Briefing for this portfolio. "
         f"Total AUM: ${state['total_value']:,.0f}. DNA Score: {dna_score}/100. "
         "Use the exact 5-section markdown structure specified in your instructions. "
+        "Incorporate Risk Sentinel findings in section 2 and Alpha Scout opportunities in section 5. "
         "Every claim must cite a number from the input data."
     )
 
-    trace.append(f"[Synthesizer] Engaging PE Managing Director persona (DNA={dna_score}/100)...")
+    # ── Structured Investment Thesis prompt ────────────────────────────────────
+    sentinel_risks = sentinel.get("primary_risks", [])
+    alpha_syms     = [o.get("symbol", "") for o in alpha.get("opportunities", [])[:3] if o.get("symbol")]
+    tax_narrative  = (tax.get("narrative") or "")[:200]
 
-    try:
-        briefing_md = await get_ai_briefing(system_prompt, user_content)
-        trace.append("[Synthesizer] IC Briefing generated — 5-section markdown complete.")
-    except Exception as e:
-        # Fallback: minimal structured text so the UI always has something to render
+    struct_prompt = f"""You are a portfolio synthesizer. Generate a structured Investment Thesis JSON.
+
+Input:
+- DNA Score: {dna_score}/100
+- Macro Regime: {regime_label}  |  Regime confidence: {mkt_regime.get("confidence", "N/A")}
+- Risk Level: {sentinel.get("risk_level", "medium")}
+- Primary Risks: {sentinel_risks[:3]}
+- Alpha Opportunities: {alpha_syms}
+- Tax Narrative: {tax_narrative or "N/A"}
+- Critic: {crit[:200] if crit else "No critical issues"}
+- Regime Drivers: {mkt_regime.get("drivers", [])}
+
+Return ONLY valid JSON matching this exact schema:
+{{
+  "headline": "single sentence: portfolio identity + single biggest risk today",
+  "regime": "{regime_label}",
+  "portfolio_health": {dna_score},
+  "macro_outlook": "one sentence on portfolio alignment with current {regime_label} regime",
+  "risks": ["most critical risk", "second risk", "third risk"],
+  "opportunities": ["opportunity 1 with ticker", "opportunity 2 with ticker"],
+  "tax_strategy": ["specific tax action 1", "specific tax action 2"],
+  "action_plan": ["90-day action 1", "90-day action 2", "90-day action 3"]
+}}"""
+
+    trace.append(f"[Synthesizer] Engaging PE MD persona (DNA={dna_score}/100, regime={regime_label})...")
+
+    # ── Run IC Briefing + Structured Thesis in parallel ────────────────────────
+    briefing_result, struct_result = await asyncio.gather(
+        get_ai_briefing(system_prompt, user_content),
+        get_ai_analysis(struct_prompt),
+        return_exceptions=True,
+    )
+
+    # IC Briefing
+    if isinstance(briefing_result, Exception):
         briefing_md = (
             f"## 1. Executive Summary\n"
-            f"Analysis engine encountered an error: {e}. "
+            f"Analysis engine encountered an error: {briefing_result}. "
             f"Raw DNA score: {dna_score}/100.\n\n"
             f"## 5. The 90-Day Directive\n"
             f"- Review the swarm metrics manually and re-run the analysis.\n"
         )
-        trace.append(f"[Synthesizer] AI provider failed ({e}) — fallback briefing returned.")
+        trace.append(f"[Synthesizer] IC Briefing failed ({briefing_result}) — fallback returned.")
+    else:
+        briefing_md = briefing_result
+        trace.append("[Synthesizer] IC Briefing generated — 5-section markdown complete.")
+
+    # Structured Thesis
+    if isinstance(struct_result, Exception) or not isinstance(struct_result, dict):
+        struct_result = {}
+        trace.append("[Synthesizer] Structured thesis generation failed — defaults applied.")
+    else:
+        trace.append("[Synthesizer] Structured Investment Thesis JSON generated.")
 
     thesis = {
+        # ── Existing fields — backward-compatible with /api/swarm/analyze ───────
         "briefing":        briefing_md,
         "dna_score":       dna_score,
         "score_breakdown": score_breakdown,
         "weighted_beta":   risk.get("weighted_beta"),
         "sharpe_ratio":    risk.get("sharpe_ratio"),
         "avg_correlation": risk.get("avg_corr"),
-        "regime":          swarm_state_payload["strategist_agent"].get("regime", "Unknown"),
+        "regime":          regime_label,
         "stress_results":  risk.get("stress_results", []),
         "risk_factors":    risk.get("risk_factors", []),
+        # ── New structured Investment Thesis fields ───────────────────────────
+        "headline":        struct_result.get(
+                               "headline",
+                               f"DNA Score {dna_score}/100 — {sentinel.get('risk_level', 'medium').upper()} risk in {regime_label} regime",
+                           ),
+        "portfolio_health": int(struct_result.get("portfolio_health", dna_score)),
+        "macro_outlook":    struct_result.get("macro_outlook", mkt_regime.get("portfolio_implication", "")),
+        "risks":            struct_result.get("risks", sentinel_risks[:3]),
+        "opportunities":    struct_result.get("opportunities", alpha_syms),
+        "tax_strategy":     struct_result.get("tax_strategy", []),
+        "action_plan":      struct_result.get("action_plan", []),
+        # ── New agent output objects (accessible to frontend) ─────────────────
+        "market_regime":    mkt_regime,
+        "risk_sentinel":    sentinel,
+        "alpha_scout":      alpha,
     }
 
     return {"investment_thesis": thesis, "agent_trace": trace}
@@ -805,27 +1207,40 @@ def _build_swarm():
     Build and compile the LangGraph state machine.
 
     Topology:
-      START → strategist → quant → tax_arch → critic → synthesizer → END
+      START → market_regime → strategist → quant → tax_arch
+                                                       → risk_sentinel → alpha_scout → critic → synthesizer → END
+                                                                                 └──(revision)──→ quant
 
-    The critic sets needs_revision=True on the first pass when avg_corr is very
-    high. The quant node checks revision_count and tightens its threshold
-    accordingly — no explicit back-edge is needed since each node reads shared
-    state.  Both passes flow forward through critic → synthesizer.
+    market_regime runs first (before strategist) to establish the authoritative
+    5-category regime label used by alpha_scout and the synthesizer.
+
+    risk_sentinel and alpha_scout run after tax_arch so they have access to the
+    full quant + tax outputs before the critic reviews everything.
+
+    The critic revision loop (critic → quant) also traverses risk_sentinel →
+    alpha_scout on the second pass, ensuring all watchdog agents see updated metrics.
     """
     builder = StateGraph(SwarmState)
 
-    builder.add_node("strategist",  strategist_node)
-    builder.add_node("quant",       quant_node)
-    builder.add_node("tax_arch",    tax_arch_node)
-    builder.add_node("critic",      critic_node)
-    builder.add_node("synthesizer", synthesizer_node)
+    builder.add_node("market_regime", market_regime_node)
+    builder.add_node("strategist",    strategist_node)
+    builder.add_node("quant",         quant_node)
+    builder.add_node("tax_arch",      tax_arch_node)
+    builder.add_node("risk_sentinel", risk_sentinel_node)
+    builder.add_node("alpha_scout",   alpha_scout_node)
+    builder.add_node("critic",        critic_node)
+    builder.add_node("synthesizer",   synthesizer_node)
 
-    builder.add_edge(START,        "strategist")
-    builder.add_edge("strategist", "quant")
-    builder.add_edge("quant",      "tax_arch")
-    builder.add_edge("tax_arch",   "critic")
+    builder.add_edge(START,            "market_regime")
+    builder.add_edge("market_regime",  "strategist")
+    builder.add_edge("strategist",     "quant")
+    builder.add_edge("quant",          "tax_arch")
+    builder.add_edge("tax_arch",       "risk_sentinel")
+    builder.add_edge("risk_sentinel",  "alpha_scout")
+    builder.add_edge("alpha_scout",    "critic")
 
-    # Critic can route back to quant (once) or forward to synthesizer
+    # Critic can route back to quant (once) or forward to synthesizer.
+    # On revision: quant → tax_arch → risk_sentinel → alpha_scout → critic (second pass).
     def _route_critic(state: SwarmState) -> str:
         if state.get("needs_revision") and state.get("revision_count", 0) <= 1:
             return "quant"
@@ -843,9 +1258,18 @@ def _build_swarm():
 
 # ── Sequential fallback (when langgraph not installed) ─────────────────────────
 async def _run_sequential(initial_state: dict) -> SwarmState:
-    """Run all agents in order without LangGraph."""
+    """Run all 7 agents in order without LangGraph."""
     state: dict = dict(initial_state)
-    for node_fn in [strategist_node, quant_node, tax_arch_node, critic_node, synthesizer_node]:
+    for node_fn in [
+        market_regime_node,
+        strategist_node,
+        quant_node,
+        tax_arch_node,
+        risk_sentinel_node,
+        alpha_scout_node,
+        critic_node,
+        synthesizer_node,
+    ]:
         update = await node_fn(state)  # type: ignore[arg-type]
         for k, v in update.items():
             if k == "agent_trace":
@@ -864,27 +1288,29 @@ else:
 
 async def run_swarm(ticker_data: list[dict], total_value: float) -> dict:
     """
-    Primary entry point: run the full agent swarm and return the final state.
+    Primary entry point: run the full 7-agent swarm and return the final state.
 
     Works whether or not langgraph is installed.
     """
     initial: dict = {
-        "ticker_data":        ticker_data,
-        "total_value":        total_value,
-        "macro_context":      "",
-        "risk_metrics":       {},
-        "tax_estimates":      {},
-        "critique":           "",
-        "revision_count":     0,
-        "needs_revision":     False,
-        "investment_thesis":  {},
-        "agent_trace":        [],
+        "ticker_data":           ticker_data,
+        "total_value":           total_value,
+        "macro_context":         "",
+        "market_regime":         {},
+        "risk_metrics":          {},
+        "tax_estimates":         {},
+        "risk_sentinel_output":  {},
+        "alpha_opportunities":   {},
+        "critique":              "",
+        "revision_count":        0,
+        "needs_revision":        False,
+        "investment_thesis":     {},
+        "agent_trace":           [],
     }
 
     if swarm is not None:
         return await swarm.ainvoke(initial)  # type: ignore[union-attr]
-    else:
-        return await _run_sequential(initial)
+    return await _run_sequential(initial)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -917,18 +1343,21 @@ async def chat_with_swarm(
     agent = _classify_question(message)
     thinking: list[str] = [f"[Router] Question classified → routing to {agent.upper()} agent"]
 
-    # Build minimal state
+    # Build minimal state (chat only runs the relevant single node)
     initial: dict = {
-        "ticker_data":        ticker_data,
-        "total_value":        total_value,
-        "macro_context":      "",
-        "risk_metrics":       {},
-        "tax_estimates":      {},
-        "critique":           "",
-        "revision_count":     0,
-        "needs_revision":     False,
-        "investment_thesis":  {},
-        "agent_trace":        [],
+        "ticker_data":           ticker_data,
+        "total_value":           total_value,
+        "macro_context":         "",
+        "market_regime":         {},
+        "risk_metrics":          {},
+        "tax_estimates":         {},
+        "risk_sentinel_output":  {},
+        "alpha_opportunities":   {},
+        "critique":              "",
+        "revision_count":        0,
+        "needs_revision":        False,
+        "investment_thesis":     {},
+        "agent_trace":           [],
     }
 
     # Run only the relevant node + synthesizer for a focused response

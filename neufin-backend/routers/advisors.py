@@ -6,10 +6,12 @@ GET  /api/advisors/{advisor_id}            → public profile by user UUID
 PUT  /api/advisors/me                      → upsert own profile (requires Bearer token)
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from database import supabase
+from services.auth_dependency import get_current_user
+from services.jwt_auth import JWTUser
 
 router = APIRouter(prefix="/api/advisors", tags=["advisors"])
 
@@ -22,22 +24,6 @@ class AdvisorProfileRequest(BaseModel):
     brand_color: str = "#1A56DB"
     white_label: bool = False
 
-
-def _resolve_user_from_request(request: Request) -> str:
-    """Extract and validate Bearer token, return user_id. Raises HTTPException on failure."""
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(401, "Authentication required.")
-    token = auth_header.split(" ", 1)[1]
-    try:
-        user_resp = supabase.auth.get_user(token)
-        if not user_resp.user:
-            raise HTTPException(401, "Invalid session.")
-        return user_resp.user.id
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(401, "Invalid session.")
 
 
 @router.get("/by-token/{share_token}")
@@ -103,12 +89,9 @@ async def get_advisor_profile(advisor_id: str):
 
 
 @router.put("/me")
-async def upsert_advisor_profile(body: AdvisorProfileRequest, request: Request):
-    """
-    Upsert the authenticated user's advisor profile.
-    Validates Bearer token directly (works even when path is under a public prefix).
-    """
-    user_id = _resolve_user_from_request(request)
+async def upsert_advisor_profile(body: AdvisorProfileRequest, user: JWTUser = Depends(get_current_user)):
+    """Upsert the authenticated user's advisor profile."""
+    user_id = user.id
 
     payload = {
         "id":            user_id,

@@ -37,5 +37,8 @@ fredapi>=0.5.0
 # Caching
 redis>=5.0.0
 
+# JWT verification (ES256 via Supabase JWKS)
+python-jose[cryptography]==3.3.0
+
 # Field-level encryption (AES-256-GCM)
 cryptography>=42.0.0

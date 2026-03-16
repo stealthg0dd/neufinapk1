@@ -5,15 +5,14 @@ import io
 import uuid
 
 import pandas as pd
-from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from database import supabase
+from services.jwt_auth import verify_jwt
 from routers import dna, portfolio, reports, payments, referrals, advisors, market, vault, swarm, alerts
 from config import APP_BASE_URL
-from services.analytics import track
 from services.ai_router import get_ai_analysis
 from services.calculator import (
     fetch_spot_price, fetch_beta,
@@ -66,10 +65,14 @@ _extra_origins = [
 origins = list({
     "http://localhost:3000",
     "http://localhost:3001",
-    "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
+    "http://localhost:5173",   # Vite dev server
     "https://neufinapk1.vercel.app",
+    "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
     *_extra_origins,
 })
+# Regex covers all Vercel preview deployments (https://*.vercel.app)
+# Starlette does not support glob wildcards in allow_origins — use allow_origin_regex instead.
+_origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
 
 # ── IMPORTANT: register auth_middleware FIRST, then add CORSMiddleware.
 # Starlette prepends each middleware, so the last-registered runs first.
@@ -78,44 +81,40 @@ origins = list({
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    """Verify Supabase JWT on all protected routes."""
-    # CORSMiddleware (outer layer) handles OPTIONS automatically,
-    # but guard here too in case of middleware re-ordering.
+    """Soft-attach a verified JWTUser to request.state.user when a Bearer token
+    is present.  Never rejects — authentication enforcement is handled per-endpoint
+    via Depends(get_current_user) in each router.
+    """
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    path = request.url.path
-    if path in PUBLIC_PATHS or any(path.startswith(p) for p in PUBLIC_PREFIXES):
-        return await call_next(request)
-
     auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return JSONResponse(
-            {"error": "Unauthorized — missing Bearer token"},
-            status_code=401,
-        )
-
-    token = auth_header.split(" ", 1)[1]
-    try:
-        user_response = supabase.auth.get_user(token)  # sync client — no await
-        request.state.user = user_response.user
-    except Exception:
-        return JSONResponse(
-            {"error": "Unauthorized — invalid session"},
-            status_code=401,
-        )
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        try:
+            request.state.user = await verify_jwt(token)
+        except Exception as exc:
+            print(f"[Auth] Token rejected (proceeding as anonymous): {exc}",
+                  file=sys.stderr)
+            request.state.user = None
+    else:
+        request.state.user = None
 
     return await call_next(request)
 
 
 # CORSMiddleware added AFTER auth_middleware so it becomes the outermost layer.
 # Every response (including 401s) will carry the correct CORS headers.
+# allow_origin_regex handles https://*.vercel.app preview URLs; allow_origins covers
+# the explicit list. Both are evaluated — a match in either grants the header.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
@@ -167,11 +166,10 @@ async def analyze_dna(
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         try:
-            jwt = auth_header.split(" ", 1)[1]
-            user_resp = supabase.auth.get_user(jwt)  # sync — no await
-            user_id = user_resp.user.id if user_resp.user else None
+            user = await verify_jwt(auth_header.split(" ", 1)[1])
+            user_id = user.id
         except Exception:
-            pass
+            pass  # anonymous upload — user_id stays None
 
     # ── 3. Analytics — disabled until analytics_events table is created ──────────
     # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
