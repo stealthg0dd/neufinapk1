@@ -7,11 +7,11 @@
  *
  * Usage: <RefCapture />
  */
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { captureReferral } from '@/lib/api'
 
-export default function RefCapture() {
+function RefCaptureInner() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -20,4 +20,12 @@ export default function RefCapture() {
   }, [searchParams])
 
   return null
+}
+
+export default function RefCapture() {
+  return (
+    <Suspense fallback={null}>
+      <RefCaptureInner />
+    </Suspense>
+  )
 }

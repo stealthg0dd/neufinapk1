@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const RAILWAY_API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const RAILWAY_API = process.env.RAILWAY_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const nextConfig = {
   reactStrictMode: true,

@@ -68,26 +68,71 @@ origins = list({
     "http://localhost:5173",   # Vite dev server
     "https://neufinapk1.vercel.app",
     "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
+    "https://neufin.ai",
+    "https://www.neufin.ai",
     *_extra_origins,
 })
 # Regex covers all Vercel preview deployments (https://*.vercel.app)
 # Starlette does not support glob wildcards in allow_origins — use allow_origin_regex instead.
 _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
 
-# ── IMPORTANT: register auth_middleware FIRST, then add CORSMiddleware.
-# Starlette prepends each middleware, so the last-registered runs first.
-# We want: CORSMiddleware (outermost) → auth_middleware → app
-# To achieve that, we register auth first, then CORS.
+# ── Middleware ordering ────────────────────────────────────────────────────────
+#
+# Starlette builds the stack with each add_middleware() call prepending to the
+# internal list, then reversing it at startup. Result: the LAST registration
+# becomes the OUTERMOST layer (first to receive every request).
+#
+# Desired execution order (outermost → innermost):
+#   auth_middleware  →  CORSMiddleware  →  router
+#
+# To achieve this:
+#   1. Register CORSMiddleware FIRST (inner position after reversal).
+#   2. Register auth_middleware SECOND via @app.middleware (outermost after reversal).
+#
+# Consequence: auth_middleware receives ALL requests first, including CORS
+# preflights (OPTIONS).  The explicit OPTIONS bypass below is therefore required —
+# it passes preflights directly to CORSMiddleware, which returns 200 with the
+# correct Access-Control-* headers without ever calling app logic.
 
+# ── Step 1: CORSMiddleware (registered first → inner position) ────────────────
+# allow_origin_regex covers all Vercel preview deployments (https://*.vercel.app).
+# allow_origins lists every explicit origin; ALLOWED_ORIGINS env var extends it.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=_origin_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+# ── Step 2: auth_middleware (registered last → outermost layer) ───────────────
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    """Soft-attach a verified JWTUser to request.state.user when a Bearer token
-    is present.  Never rejects — authentication enforcement is handled per-endpoint
-    via Depends(get_current_user) in each router.
     """
+    Outermost HTTP middleware — runs before every request including preflights.
+
+    Explicit bypass rules (no JWT work, no state mutation):
+      • OPTIONS  — CORS preflight; must reach CORSMiddleware which returns 200.
+      • /health, /api/admin/health — monitoring probes; zero-overhead path.
+
+    All other requests: soft-attach a verified JWTUser to request.state.user.
+    Never rejects — authentication enforcement is per-endpoint via
+    Depends(get_current_user) in each router.
+    """
+    # ── Bypass 1: CORS preflight ───────────────────────────────────────────────
+    # CORSMiddleware (next in chain) intercepts OPTIONS and returns 200 with
+    # Access-Control-* headers.  Do NOT inspect or modify the request here.
     if request.method == "OPTIONS":
         return await call_next(request)
 
+    # ── Bypass 2: health-check endpoints ──────────────────────────────────────
+    if request.url.path in ("/health", "/api/admin/health"):
+        return await call_next(request)
+
+    # ── Soft JWT attachment ────────────────────────────────────────────────────
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ", 1)[1]
@@ -103,21 +148,6 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# CORSMiddleware added AFTER auth_middleware so it becomes the outermost layer.
-# Every response (including 401s) will carry the correct CORS headers.
-# allow_origin_regex handles https://*.vercel.app preview URLs; allow_origins covers
-# the explicit list. Both are evaluated — a match in either grants the header.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=_origin_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
-
-
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(dna.router)
 app.include_router(portfolio.router)
@@ -129,6 +159,16 @@ app.include_router(market.router)
 app.include_router(vault.router)
 app.include_router(swarm.router)
 app.include_router(alerts.router)
+
+
+# ── Global OPTIONS handler ─────────────────────────────────────────────────────
+# Safety net for non-preflight OPTIONS requests (missing Access-Control-Request-Method
+# header) that Starlette's CORSMiddleware does not short-circuit itself.
+# CORSMiddleware wraps this response and adds the Access-Control-* headers.
+@app.options("/{full_path:path}", include_in_schema=False)
+async def global_options_handler(full_path: str):
+    from fastapi.responses import Response
+    return Response(status_code=200)
 
 
 # ── Public DNA endpoint ────────────────────────────────────────────────────────

@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://neufin101-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://neufin101-production.up.railway.app/health"
+    }
+  ]
+}
