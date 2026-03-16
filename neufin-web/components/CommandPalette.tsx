@@ -248,10 +248,10 @@ export default function CommandPalette({
                 {result.response?.answer ?? 'Analysis complete.'}
               </p>
 
-              {/* Key numbers */}
-              {Object.keys(result.response.key_numbers ?? {}).length > 0 && (
+              {/* Key numbers — FIXED: optional chain so undefined response never crashes */}
+              {Object.keys(result.response?.key_numbers ?? {}).length > 0 && (
                 <div className="flex flex-wrap gap-3">
-                  {Object.entries(result.response.key_numbers).map(([k, v]) => (
+                  {Object.entries(result.response?.key_numbers ?? {}).map(([k, v]) => (
                     <div key={k} className="text-[11px]">
                       <span className="text-[#555] uppercase">{k}: </span>
                       <span className="text-[#FFB900] font-bold">{v}</span>

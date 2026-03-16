@@ -13,7 +13,7 @@ import json
 import sys
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
-from typing import Any
+from typing import Any, Literal
 
 # ── Prompt injection patterns ─────────────────────────────────────────────────
 _INJECTION_PATTERNS = re.compile(
@@ -80,6 +80,11 @@ class ChatRequest(BaseModel):
     record_id:     str  | None           = None
     # Full thesis blob passed from frontend (avoids a DB round-trip for record_id)
     thesis_context: dict | None          = None
+
+
+class GlobalChatRequest(BaseModel):
+    message:    str  = Field(..., min_length=3, max_length=500)
+    agent_type: str  = "general"   # quant | macro | sentiment | trend | general
 
 
 # ── Background persistence helper ──────────────────────────────────────────────
@@ -155,20 +160,28 @@ Return ONLY valid JSON (no markdown):
 }}"""
 
     try:
-        result = await get_ai_analysis(prompt)
-        return {
-            "reply":       result.get("reply", "Analysis complete."),
-            "key_numbers": result.get("key_numbers", {}),
-            "action":      result.get("action", ""),
-            "agent":       "MD",
-        }
+        result      = await get_ai_analysis(prompt)
+        reply       = result.get("reply", "Analysis complete.")
+        key_numbers = result.get("key_numbers") or {}   # FIXED: never None
+        action      = result.get("action", "")
     except Exception as e:
-        return {
-            "reply":       f"IC system error: {e}. Please run the full swarm analysis first.",
-            "key_numbers": {},
-            "action":      "Re-run swarm analysis for fresh context.",
-            "agent":       "MD",
-        }
+        reply       = f"IC system error: {e}. Please run the full swarm analysis first."
+        key_numbers = {}   # FIXED: always present
+        action      = "Re-run swarm analysis for fresh context."
+
+    return {
+        # Flat shape (SlidingChatPane / AgentChat)
+        "reply":       reply,
+        "key_numbers": key_numbers,   # FIXED: always present
+        "action":      action,
+        "agent":       "MD",
+        # Nested shape (CommandPalette legacy)
+        "response": {
+            "answer":             reply,
+            "key_numbers":        key_numbers,
+            "recommended_action": action,
+        },
+    }
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -196,7 +209,6 @@ async def analyze_with_swarm(
     try:
         result = await run_swarm(ticker_data, body.total_value)
     except Exception as e:
-        # FIXED: return 200 with error payload instead of 503 so frontend handles gracefully
         print(f"[Swarm] analyze exception: {e}", file=sys.stderr)
         return {
             "investment_thesis": {"error": str(e), "status": "failed"},
@@ -205,15 +217,14 @@ async def analyze_with_swarm(
             "macro_context":     "",
             "critique":          "",
             "agent_trace":       [f"ERROR: {e}"],
+            # FIXED: key_numbers always present so frontend never crashes on undefined
+            "key_numbers":       {"score": 0, "status": "unavailable"},
         }
 
-    # Generate a report_id upfront so we can return it immediately and also
-    # use it as the Supabase primary key in the background task.
     report_id = str(uuid.uuid4())
     thesis = result.get("investment_thesis", {})
     thesis["swarm_report_id"] = report_id
 
-    # Persist asynchronously — never block the response
     if body.user_id:
         background_tasks.add_task(_persist_swarm_result, report_id, body.user_id, result)
 
@@ -224,6 +235,13 @@ async def analyze_with_swarm(
         "macro_context":     result.get("macro_context", ""),
         "critique":          result.get("critique", ""),
         "agent_trace":       result.get("agent_trace", []),
+        # FIXED: key_numbers always present — extracted from thesis for convenience
+        "key_numbers":       {
+            "dna_score":      str(thesis.get("dna_score") or thesis.get("health_score") or ""),
+            "weighted_beta":  str(thesis.get("weighted_beta") or ""),
+            "sharpe_ratio":   str(thesis.get("sharpe_ratio") or ""),
+            "regime":         str(thesis.get("regime") or ""),
+        },
     }
 
 
@@ -313,17 +331,116 @@ async def chat(body: ChatRequest):
                 "thinking_steps": [],
             }
 
-        # Normalise legacy response shape → SlidingChatPane shape
-        resp = result.get("response", {})
+        # Normalise response — support both flat {reply} and nested {response:{answer}} shapes
+        # FIXED: always emit both shapes so CommandPalette and SlidingChatPane both work
+        resp        = result.get("response", {})
+        answer      = resp.get("answer") or result.get("reply", "Analysis complete.")
+        key_numbers = resp.get("key_numbers") or result.get("key_numbers") or {}
+        action      = resp.get("recommended_action") or result.get("action", "")
         return {
-            "reply":         resp.get("answer", "Analysis complete."),
-            "key_numbers":   resp.get("key_numbers", {}),
-            "action":        resp.get("recommended_action", ""),
-            "agent":         result.get("agent", "synthesis"),
+            # Flat shape (SlidingChatPane / AgentChat)
+            "reply":          answer,
+            "key_numbers":    key_numbers,   # FIXED: always present
+            "action":         action,
+            "agent":          result.get("agent", "synthesis"),
             "thinking_steps": result.get("thinking_steps", []),
+            # Nested shape (CommandPalette legacy)
+            "response": {
+                "answer":             answer,
+                "key_numbers":        key_numbers,   # FIXED: always present
+                "recommended_action": action,
+            },
         }
 
     raise HTTPException(
         status_code=400,
         detail="Provide thesis_context, record_id, or positions+total_value.",
     )
+
+
+# ── System prompts per agent type ──────────────────────────────────────────────
+_GLOBAL_AGENT_PROMPTS: dict[str, str] = {
+    "quant": (
+        "You are a quantitative analyst at a top-tier hedge fund. "
+        "You specialise in risk metrics, volatility, beta, correlation, and portfolio mathematics. "
+        "Be precise, cite numbers, and think in terms of factor exposure and statistical risk."
+    ),
+    "macro": (
+        "You are a macro strategist covering global markets, central bank policy, inflation, "
+        "currency flows, and geopolitical risk. Speak with the authority of a sell-side research head. "
+        "Reference real macro indicators (CPI, Fed funds rate, yield curve) where relevant."
+    ),
+    "sentiment": (
+        "You are a market sentiment analyst specialising in news flow, investor psychology, "
+        "fear/greed cycles, and short-term momentum. "
+        "Translate market mood into actionable intelligence. "
+        "Be concise and direct — no waffle."
+    ),
+    "trend": (
+        "You are a global trend analyst tracking structural shifts in technology, demographics, "
+        "energy, and capital markets. Think in multi-year themes. "
+        "Identify the trend, its stage (early/mid/late), and investable angle."
+    ),
+    "general": (
+        "You are a senior investment analyst with broad knowledge across equities, macro, "
+        "fixed income, and portfolio construction. Answer clearly and concisely. "
+        "If you cite a number, make it real. No generic advice."
+    ),
+}
+
+
+@router.post("/global-chat")
+async def global_chat(body: GlobalChatRequest):
+    """
+    Portfolio-free market intelligence chat.
+    Accepts agent_type to switch personality (quant / macro / sentiment / trend / general).
+    No portfolio or auth required — safe to call from the public landing page.
+    """
+    clean = _sanitize_message(body.message)
+    if clean is None:
+        return {
+            "reply":      "I can only discuss markets, trends, and investment concepts.",
+            "key_numbers": {},  # FIXED: always present
+            "action":     "",
+            "agent":      body.agent_type,
+            "response":   {"answer": "I can only discuss markets, trends, and investment concepts.", "key_numbers": {}, "recommended_action": ""},
+        }
+
+    agent_type   = body.agent_type.lower().strip() if body.agent_type else "general"
+    system_prose = _GLOBAL_AGENT_PROMPTS.get(agent_type, _GLOBAL_AGENT_PROMPTS["general"])
+
+    prompt = f"""{system_prose}
+
+User question: "{clean}"
+
+Return ONLY valid JSON (no markdown fences):
+{{
+  "reply": "clear, direct 2-4 sentence answer",
+  "key_numbers": {{"metric_name": "value with units"}},
+  "action": "one specific, actionable takeaway or watch-point"
+}}"""
+
+    try:
+        data        = await get_ai_analysis(prompt)
+        reply       = data.get("reply", "Analysis complete.")
+        key_numbers = data.get("key_numbers") or {}   # FIXED: never None
+        action      = data.get("action", "")
+    except Exception as e:
+        print(f"[GlobalChat] AI error: {e}", file=sys.stderr)
+        reply       = f"Analysis temporarily unavailable. Please try again shortly."
+        key_numbers = {}   # FIXED: always present
+        action      = ""
+
+    return {
+        # Flat shape
+        "reply":          reply,
+        "key_numbers":    key_numbers,   # FIXED: always present
+        "action":         action,
+        "agent":          agent_type,
+        # Nested shape (CommandPalette compatibility)
+        "response": {
+            "answer":             reply,
+            "key_numbers":        key_numbers,
+            "recommended_action": action,
+        },
+    }

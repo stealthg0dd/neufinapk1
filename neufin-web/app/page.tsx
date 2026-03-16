@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
+import GlobalChatWidget from '@/components/GlobalChatWidget'
 
 const features = [
   {
@@ -122,6 +124,11 @@ export default function LandingPage() {
       <footer className="border-t border-gray-800/60 py-6 text-center text-sm text-gray-600">
         Neufin © {new Date().getFullYear()} · For informational purposes only · Not financial advice
       </footer>
+
+      {/* Floating market-intelligence chatbot — no auth required */}
+      <Suspense fallback={null}>
+        <GlobalChatWidget />
+      </Suspense>
     </div>
   )
 }
