@@ -205,7 +205,11 @@ class MarketCache:
         # 1. Try the cache first (full-history key)
         cached = get_closes(sym, _FULL_HIST_SENTINEL)
         if cached is not None and not cached.empty:
-            sliced = cached[(cached.index >= start) & (cached.index <= end)]
+            try:
+                # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
+                sliced = cached[(cached.index >= start) & (cached.index <= end)]
+            except TypeError:
+                sliced = cached  # index dtype mismatch — return full data, slice skipped
             return sliced
 
         # 2. Fetch from Alpha Vantage in a thread (sync HTTP call)
@@ -213,7 +217,11 @@ class MarketCache:
         if not series.empty:
             set_closes(sym, _FULL_HIST_SENTINEL, series)
 
-        sliced = series[(series.index >= start) & (series.index <= end)]
+        try:
+            # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
+            sliced = series[(series.index >= start) & (series.index <= end)]
+        except TypeError:
+            sliced = series
         return sliced
 
     @staticmethod

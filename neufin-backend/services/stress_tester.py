@@ -166,12 +166,20 @@ def _fetch_full_history(sym: str) -> pd.Series:
 
 
 def _price_on_or_after(s: pd.Series, date_str: str) -> float | None:
-    c = s[s.index >= date_str]
+    try:
+        # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
+        c = s[s.index >= date_str]
+    except TypeError:
+        return None
     return float(c.iloc[0]) if not c.empty else None
 
 
 def _price_on_or_before(s: pd.Series, date_str: str) -> float | None:
-    c = s[s.index <= date_str]
+    try:
+        # FIXED: guard against int64 RangeIndex vs string comparison (TypeError in pandas 2.x)
+        c = s[s.index <= date_str]
+    except TypeError:
+        return None
     return float(c.iloc[-1]) if not c.empty else None
 
 
