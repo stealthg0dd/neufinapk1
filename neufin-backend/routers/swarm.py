@@ -11,7 +11,7 @@ import re
 import uuid
 import json
 import sys
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any, Literal
 
@@ -88,13 +88,19 @@ class GlobalChatRequest(BaseModel):
 
 
 # ── Background persistence helper ──────────────────────────────────────────────
-def _persist_swarm_result(report_id: str, user_id: str, result: dict) -> None:
-    """Fire-and-forget: persist swarm result to Supabase swarm_reports table."""
+async def _persist_swarm_result(report_id: str, user_id: str | None, result: dict) -> None:
+    """
+    Persist swarm result to Supabase swarm_reports table.
+    Now async and awaited directly in the analyze endpoint so the record is
+    guaranteed to exist before the response (and any redirect to /report/{id}) fires.
+    user_id is None for anonymous/guest users — saved as NULL in Supabase.
+    """
+    import asyncio
     try:
         thesis = result.get("investment_thesis", {})
-        supabase.table("swarm_reports").insert({
+        row = {
             "id":                   report_id,
-            "user_id":              user_id,
+            "user_id":              user_id,   # NULL for anonymous — allowed by schema
             "dna_score":            thesis.get("dna_score") or thesis.get("health_score"),
             "headline":             thesis.get("headline"),
             "briefing":             thesis.get("briefing"),
@@ -108,9 +114,14 @@ def _persist_swarm_result(report_id: str, user_id: str, result: dict) -> None:
             "sharpe_ratio":         thesis.get("sharpe_ratio"),
             "regime":               thesis.get("regime"),
             "agent_trace":          result.get("agent_trace", []),
-        }).execute()
+        }
+        # Run the synchronous Supabase call in a thread so we don't block the event loop
+        await asyncio.to_thread(
+            lambda: supabase.table("swarm_reports").upsert(row, on_conflict="id").execute()
+        )
+        print(f"[Swarm] Report {report_id} persisted ✓", file=sys.stderr)
     except Exception as e:
-        print(f"[Swarm] Persist failed: {e}", file=sys.stderr)
+        print(f"[Swarm] Persist failed for {report_id}: {e}", file=sys.stderr)
 
 
 # ── MD context builder ─────────────────────────────────────────────────────────
@@ -188,7 +199,6 @@ Return ONLY valid JSON (no markdown):
 @router.post("/analyze")
 async def analyze_with_swarm(
     body: SwarmAnalyzeRequest,
-    background_tasks: BackgroundTasks,
 ):
     """
     Run the full Neufin Agent Swarm on a portfolio.
@@ -225,8 +235,8 @@ async def analyze_with_swarm(
     thesis = result.get("investment_thesis", {})
     thesis["swarm_report_id"] = report_id
 
-    if body.user_id:
-        background_tasks.add_task(_persist_swarm_result, report_id, body.user_id, result)
+    # Always persist — user_id is NULL for anonymous users (allowed by schema)
+    await _persist_swarm_result(report_id, body.user_id, result)
 
     return {
         "investment_thesis": thesis,
@@ -370,6 +380,12 @@ _GLOBAL_AGENT_PROMPTS: dict[str, str] = {
         "currency flows, and geopolitical risk. Speak with the authority of a sell-side research head. "
         "Reference real macro indicators (CPI, Fed funds rate, yield curve) where relevant."
     ),
+    "technical": (
+        "You are a technical analyst with deep expertise in price action, chart patterns, "
+        "moving averages, RSI, MACD, support/resistance levels, and volume analysis. "
+        "Give precise, chart-based insights. Reference specific levels and timeframes. "
+        "Be direct — no fundamental commentary unless asked."
+    ),
     "sentiment": (
         "You are a market sentiment analyst specialising in news flow, investor psychology, "
         "fear/greed cycles, and short-term momentum. "
@@ -423,13 +439,21 @@ Return ONLY valid JSON (no markdown fences):
     try:
         data        = await get_ai_analysis(prompt)
         reply       = data.get("reply", "Analysis complete.")
-        key_numbers = data.get("key_numbers") or {}   # FIXED: never None
+        raw_kn      = data.get("key_numbers") or {}
         action      = data.get("action", "")
     except Exception as e:
         print(f"[GlobalChat] AI error: {e}", file=sys.stderr)
-        reply       = f"Analysis temporarily unavailable. Please try again shortly."
-        key_numbers = {}   # FIXED: always present
+        reply       = "Analysis temporarily unavailable. Please try again shortly."
+        raw_kn      = {}
         action      = ""
+
+    # Round any numeric values in key_numbers to 2 decimal places for readability
+    key_numbers: dict[str, str] = {}
+    for k, v in raw_kn.items():
+        try:
+            key_numbers[k] = f"{float(v):.2f}" if str(v).replace('.', '', 1).replace('-', '', 1).isdigit() else str(v)
+        except (ValueError, TypeError):
+            key_numbers[k] = str(v)
 
     return {
         # Flat shape
