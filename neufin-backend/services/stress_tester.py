@@ -142,8 +142,8 @@ def _fetch_full_history(sym: str) -> pd.Series:
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
             _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            print(f"[StressTester] AV {_reason} for {sym_upper} — skipping: {_av_msg[:120]}", file=sys.stderr)
-            return pd.Series(dtype=float, name=sym_upper)
+            print(f"[StressTester] AV {_reason} for {sym_upper} — trying Finnhub→Polygon fallback", file=sys.stderr)
+            return _fetch_full_history_fallback(sym_upper)
 
         ts = payload.get("Time Series (Daily)", {})
         if not ts:
@@ -456,6 +456,32 @@ def _fetch_history_finnhub(sym: str, start: str, end: str) -> pd.Series:
     except Exception as e:
         print(f"[IndexPerf] Finnhub candle {sym} failed: {e}", file=sys.stderr)
         return pd.Series(dtype=float, name=sym)
+
+
+def _fetch_full_history_fallback(sym: str) -> pd.Series:
+    """
+    Fetch ~5 years of daily closes from Finnhub → Polygon when AV is blocked.
+    Results are cached in all tiers on success.
+    """
+    sym_upper = sym.upper()
+    start_5y  = (datetime.date.today() - datetime.timedelta(days=5 * 365)).isoformat()
+    end_today = datetime.date.today().isoformat()
+
+    for fetch_fn in (_fetch_history_finnhub, _fetch_history_polygon):
+        try:
+            series = fetch_fn(sym_upper, start_5y, end_today)
+        except Exception:
+            series = pd.Series(dtype=float, name=sym_upper)
+        if not series.empty:
+            series.name = sym_upper
+            series = series.sort_index()
+            if _CACHE_AVAILABLE:
+                _cache_set(sym_upper, _FULL_HIST_DAYS, series)
+            _LOCAL_FULL[sym_upper] = (series, time.time())
+            print(f"[StressTester] {fetch_fn.__name__} supplied full history for {sym_upper} ({len(series)} rows)", file=sys.stderr)
+            return series
+
+    return pd.Series(dtype=float, name=sym_upper)
 
 
 def _period_return(series: pd.Series) -> float | None:

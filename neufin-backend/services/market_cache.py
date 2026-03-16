@@ -228,39 +228,103 @@ class MarketCache:
 
     @staticmethod
     def _fetch_av_full(sym: str) -> pd.Series:
-        """Synchronous AV TIME_SERIES_DAILY_ADJUSTED full history fetch."""
+        """
+        Synchronous full-history fetch.  Waterfall:
+          1. AV TIME_SERIES_DAILY_ADJUSTED (outputsize=full)
+          2. Finnhub /stock/candle  (5-year window)          — when AV is blocked
+          3. Polygon /v2/aggs       (5-year window)          — when Finnhub also fails
+        Returns an empty Series on complete failure — never raises.
+        """
         import requests as _req
+        import datetime as _dt
+
         av_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "") or os.getenv("ALPHA_VANTAGE_API_KEY", "")
-        if not av_key:
-            return pd.Series(dtype=float, name=sym)
-        try:
-            r = _req.get(
-                "https://www.alphavantage.co/query",
-                params={
-                    "function":   "TIME_SERIES_DAILY_ADJUSTED",
-                    "symbol":     sym.replace("-", "."),
-                    "outputsize": "full",
-                    "apikey":     av_key,
-                },
-                timeout=20.0,
-            )
-            r.raise_for_status()
-            payload = r.json()
-            if "Information" in payload:
-                print(f"[MarketCache] AV rate-limit for {sym}", file=sys.stderr)
-                return pd.Series(dtype=float, name=sym)
-            ts = payload.get("Time Series (Daily)", {})
-            closes = {
-                d: float(v.get("5. adjusted close") or v.get("4. close") or 0)
-                for d, v in ts.items()
-                if v.get("5. adjusted close") or v.get("4. close")
-            }
-            series = pd.Series(closes, dtype=float).sort_index()
-            series.name = sym
-            return series
-        except Exception as e:
-            print(f"[MarketCache] AV full-history fetch failed for {sym}: {e}", file=sys.stderr)
-            return pd.Series(dtype=float, name=sym)
+
+        # ── 1. Alpha Vantage ──────────────────────────────────────────────────
+        if av_key:
+            try:
+                r = _req.get(
+                    "https://www.alphavantage.co/query",
+                    params={
+                        "function":   "TIME_SERIES_DAILY_ADJUSTED",
+                        "symbol":     sym.replace("-", "."),
+                        "outputsize": "full",
+                        "apikey":     av_key,
+                    },
+                    timeout=20.0,
+                )
+                r.raise_for_status()
+                payload = r.json()
+                _av_msg = payload.get("Information", "") or payload.get("Note", "")
+                if not _av_msg:
+                    ts = payload.get("Time Series (Daily)", {})
+                    if ts:
+                        closes = {
+                            d: float(v.get("5. adjusted close") or v.get("4. close") or 0)
+                            for d, v in ts.items()
+                            if v.get("5. adjusted close") or v.get("4. close")
+                        }
+                        series = pd.Series(closes, dtype=float).sort_index()
+                        series.name = sym
+                        return series
+                else:
+                    _reason = "premium" if "premium" in _av_msg.lower() else "rate-limit"
+                    print(f"[MarketCache] AV {_reason} for {sym} — trying Finnhub→Polygon", file=sys.stderr)
+            except Exception as e:
+                print(f"[MarketCache] AV fetch error for {sym}: {e}", file=sys.stderr)
+
+        # ── 2. Finnhub fallback ───────────────────────────────────────────────
+        fh_key = os.environ.get("FINNHUB_API_KEY", "") or os.getenv("FINNHUB_API_KEY", "")
+        if fh_key:
+            try:
+                start_5y  = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
+                unix_from = int(_dt.datetime.strptime(start_5y, "%Y-%m-%d").timestamp())
+                unix_to   = int(_dt.datetime.now(_dt.timezone.utc).timestamp())
+                fh_sym    = sym.replace(".", "-")
+                r = _req.get(
+                    "https://finnhub.io/api/v1/stock/candle",
+                    params={"symbol": fh_sym, "resolution": "D", "from": unix_from, "to": unix_to, "token": fh_key},
+                    timeout=10.0,
+                )
+                data = r.json()
+                if data.get("s") == "ok" and data.get("c"):
+                    closes = {
+                        _dt.date.fromtimestamp(ts).isoformat(): c
+                        for ts, c in zip(data["t"], data["c"])
+                    }
+                    series = pd.Series(closes, dtype=float).sort_index()
+                    series.name = sym
+                    print(f"[MarketCache] Finnhub supplied full history for {sym} ({len(series)} rows)", file=sys.stderr)
+                    return series
+            except Exception as e:
+                print(f"[MarketCache] Finnhub fallback error for {sym}: {e}", file=sys.stderr)
+
+        # ── 3. Polygon fallback ───────────────────────────────────────────────
+        pg_key = os.environ.get("POLYGON_API_KEY", "") or os.getenv("POLYGON_API_KEY", "")
+        if pg_key:
+            try:
+                start_5y  = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
+                end_today = _dt.date.today().isoformat()
+                r = _req.get(
+                    f"https://api.polygon.io/v2/aggs/ticker/{sym}/range/1/day/{start_5y}/{end_today}",
+                    params={"adjusted": "true", "sort": "asc", "limit": 2000, "apiKey": pg_key},
+                    timeout=10.0,
+                )
+                if r.status_code == 200:
+                    results = r.json().get("results") or []
+                    if results:
+                        closes = {
+                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
+                            for bar in results
+                        }
+                        series = pd.Series(closes, dtype=float).sort_index()
+                        series.name = sym
+                        print(f"[MarketCache] Polygon supplied full history for {sym} ({len(series)} rows)", file=sys.stderr)
+                        return series
+            except Exception as e:
+                print(f"[MarketCache] Polygon fallback error for {sym}: {e}", file=sys.stderr)
+
+        return pd.Series(dtype=float, name=sym)
 
 
 # Module-level singleton — import as: from services.market_cache import market_cache
