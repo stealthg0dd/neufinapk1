@@ -32,6 +32,9 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <span className="text-xl font-bold text-gradient">Neufin</span>
           <div className="flex items-center gap-3">
+            <Link href="/repositories" className="btn-outline py-2 text-sm">
+              Repositories
+            </Link>
             <Link href="/upload" className="btn-outline py-2 text-sm">
               DNA Score
             </Link>
