@@ -50,3 +50,43 @@ export async function getLeaderboard(limit = 10) {
   if (!res.ok) throw new Error('Leaderboard unavailable')
   return res.json()
 }
+
+export interface PortfolioSummary {
+  portfolio_id: string
+  portfolio_name: string
+  total_value: number
+  dna_score: number | null
+  positions_count: number
+  created_at: string
+}
+
+export async function getPortfolioList(token: string): Promise<PortfolioSummary[]> {
+  const res = await fetch(`${API}/api/portfolio/list`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error('Portfolio list unavailable')
+  const data = await res.json()
+  return Array.isArray(data) ? data : (data.portfolios ?? [])
+}
+
+export interface SwarmReport {
+  swarm_report_id: string
+  briefing: string
+  regime: string
+  dna_score: number | null
+  market_regime: Record<string, any> | null
+  quant_analysis: Record<string, any> | null
+  tax_report: Record<string, any> | null
+  risk_sentinel: Record<string, any> | null
+  alpha_scout: Record<string, any> | null
+  created_at: string
+}
+
+export async function getLatestSwarmReport(token: string): Promise<SwarmReport | null> {
+  const res = await fetch(`${API}/api/swarm/report/latest`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error('Swarm report unavailable')
+  return res.json()
+}

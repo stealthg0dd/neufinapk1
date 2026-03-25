@@ -224,6 +224,48 @@ create policy "Anyone can insert referrals"
 create index if not exists referrals_token_idx on public.referrals(referrer_token);
 
 
+-- ── swarm_reports ──────────────────────────────────────────────
+create table if not exists public.swarm_reports (
+  id                   text        primary key,
+  user_id              uuid        references auth.users(id) on delete set null,
+  session_id           text,
+  dna_score            integer,
+  headline             text,
+  briefing             text,
+  top_risks            jsonb       default '[]',
+  macro_advice         text,
+  tax_recommendation   text,
+  stress_results       jsonb       default '{}',
+  risk_factors         jsonb       default '[]',
+  score_breakdown      jsonb       default '{}',
+  weighted_beta        numeric,
+  sharpe_ratio         numeric,
+  regime               text,
+  agent_trace          jsonb       default '[]',
+  has_paid_report      boolean     default false,
+  created_at           timestamptz default now()
+);
+
+alter table public.swarm_reports enable row level security;
+
+create policy "swarm_reports: owner full access"
+  on public.swarm_reports for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "swarm_reports: anon insert guest"
+  on public.swarm_reports for insert
+  with check (user_id is null);
+
+create policy "swarm_reports: session read"
+  on public.swarm_reports for select
+  using (auth.uid() = user_id or (user_id is null and session_id is not null));
+
+create index if not exists idx_swarm_reports_user_id    on public.swarm_reports (user_id);
+create index if not exists idx_swarm_reports_created_at on public.swarm_reports (created_at desc);
+create index if not exists idx_swarm_reports_session_id on public.swarm_reports (session_id) where user_id is null;
+
+
 -- ── Supabase Storage bucket ────────────────────────────────────
 -- Run this AFTER enabling Storage extension in your project.
 -- Creates the advisor-reports private bucket if it doesn't exist.

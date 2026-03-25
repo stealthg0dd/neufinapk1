@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import nextDynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
+import confetti from 'canvas-confetti'
 import { fulfillReport, createCheckoutSession } from '@/lib/api'
 import SocialProof from '@/components/SocialProof'
 import AdvisorCTA from '@/components/AdvisorCTA'
@@ -55,17 +56,27 @@ function ScoreCircle({ score }: { score: number }) {
     return () => clearTimeout(t)
   }, [score, circ])
 
-  const color = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'
+  const color    = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'
+  const glowRgba = score >= 70 ? 'rgba(34,197,94,0.18)' : score >= 40 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'
 
   return (
     <div className="relative inline-flex items-center justify-center">
+      {/* Radial glow matching score color */}
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: 200, height: 200,
+          background: `radial-gradient(circle, ${glowRgba} 0%, transparent 70%)`,
+          pointerEvents: 'none',
+        }}
+      />
       <svg width="180" height="180" className="-rotate-90">
         <circle cx="90" cy="90" r={radius} fill="none" stroke="#1f2937" strokeWidth="12" />
         <circle
           cx="90" cy="90" r={radius} fill="none"
           stroke={color} strokeWidth="12" strokeLinecap="round"
           strokeDasharray={circ} strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)' }}
+          style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', filter: `drop-shadow(0 0 6px ${color}88)` }}
         />
       </svg>
       <div className="absolute flex flex-col items-center">
@@ -152,6 +163,13 @@ export default function ResultsContent() {
     setCopied(true)
     track('share_link_copied', { share_token: result?.share_token })
     setTimeout(() => setCopied(false), 2000)
+    // Confetti burst on share
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b'],
+    })
   }
 
   const shareTwitter = () => {
@@ -283,23 +301,35 @@ export default function ResultsContent() {
 
             {/* ── AI Analysis ────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="grid md:grid-cols-2 gap-4">
-              <div className="card">
+              <div className="glass-card rounded-xl p-5">
                 <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-3">💪 Strengths</h3>
                 <ul className="space-y-2">
                   {result.strengths.map((s, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-gray-300">
+                    <motion.li
+                      key={i}
+                      initial={{ opacity: 0, x: -16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
+                      className="flex gap-2 text-sm text-gray-300"
+                    >
                       <span className="text-green-500 mt-0.5 shrink-0">✓</span>{s}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               </div>
-              <div className="card">
+              <div className="glass-card rounded-xl p-5">
                 <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">⚠️ Watch out</h3>
                 <ul className="space-y-2">
                   {result.weaknesses.map((w, i) => (
-                    <li key={i} className="flex gap-2 text-sm text-gray-300">
+                    <motion.li
+                      key={i}
+                      initial={{ opacity: 0, x: 16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
+                      className="flex gap-2 text-sm text-gray-300"
+                    >
                       <span className="text-red-500 mt-0.5 shrink-0">!</span>{w}
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               </div>

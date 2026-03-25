@@ -1,3 +1,4 @@
+import './global.css'
 import React, { useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
@@ -5,21 +6,24 @@ import { createStackNavigator } from '@react-navigation/stack'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { Linking } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
-import UploadScreen from '@/screens/UploadScreen'
-import ResultsScreen from '@/screens/ResultsScreen'
+import PortfolioSyncScreen from '@/screens/PortfolioSyncScreen'
+import AnalysisScreen from '@/screens/AnalysisScreen'
+import SwarmReportScreen from '@/screens/SwarmReportScreen'
 import ShareScreen from '@/screens/ShareScreen'
 import SwarmAlertsScreen from '@/screens/SwarmAlertsScreen'
 import { supabase } from '@/lib/supabase'
-import type { DNAResult } from '@/lib/api'
+import type { PortfolioSummary, DNAResult } from '@/lib/api'
 
 // Required for expo-web-browser OAuth redirect completion on Android
 WebBrowser.maybeCompleteAuthSession()
 
 export type RootStackParamList = {
-  Upload: undefined
-  Results: { result: DNAResult }
-  Share: { result: DNAResult }
-  SwarmAlerts: undefined
+  PortfolioSync: undefined
+  Analysis:      { portfolio: PortfolioSummary }
+  SwarmReport:   undefined
+  // ShareScreen kept for backward compatibility
+  Share:         { result: DNAResult }
+  SwarmAlerts:   undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>()
@@ -28,11 +32,11 @@ const DarkTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: '#030712',
-    card: '#0d1117',
-    text: '#f1f5f9',
-    border: '#1f2937',
-    primary: '#3b82f6',
+    background:   '#030712',
+    card:         '#0d1117',
+    text:         '#f1f5f9',
+    border:       '#1f2937',
+    primary:      '#3b82f6',
     notification: '#3b82f6',
   },
 }
@@ -43,10 +47,6 @@ const DarkTheme = {
  * After Google/Apple OAuth or a magic-link click, Supabase redirects to
  * neufin://auth/callback?code=...  (PKCE flow) or
  * neufin://auth/callback#access_token=...  (implicit flow).
- *
- * Calling supabase.auth.getSession() triggers the SDK to read the URL
- * hash/query that was set during WebBrowser.openAuthSessionAsync and
- * exchange/restore the session into AsyncStorage automatically.
  */
 async function handleAuthDeepLink(url: string): Promise<void> {
   const isAuthCallback =
@@ -87,35 +87,23 @@ export default function App() {
       <NavigationContainer theme={DarkTheme}>
         <StatusBar style="light" />
         <Stack.Navigator
-          initialRouteName="Upload"
+          initialRouteName="PortfolioSync"
           screenOptions={{
-            headerStyle: { backgroundColor: '#0d1117' },
-            headerTintColor: '#f1f5f9',
-            headerTitleStyle: { fontWeight: '700', fontSize: 17 },
-            headerBackTitleVisible: false,
-            cardStyle: { backgroundColor: '#030712' },
+            headerShown:         false,
+            cardStyle:           { backgroundColor: '#030712' },
+            cardStyleInterpolator: ({ current, layouts }) => ({
+              cardStyle: {
+                opacity: current.progress,
+                transform: [{ translateX: current.progress.interpolate({ inputRange: [0, 1], outputRange: [layouts.screen.width * 0.1, 0] }) }],
+              },
+            }),
           }}
         >
-          <Stack.Screen
-            name="Upload"
-            component={UploadScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Results"
-            component={ResultsScreen}
-            options={{ title: 'Your DNA Score', headerBackTitle: 'Back' }}
-          />
-          <Stack.Screen
-            name="Share"
-            component={ShareScreen}
-            options={{ title: 'Share', headerBackTitle: 'Results' }}
-          />
-          <Stack.Screen
-            name="SwarmAlerts"
-            component={SwarmAlertsScreen}
-            options={{ title: 'Swarm Alerts', headerBackTitle: 'Back' }}
-          />
+          <Stack.Screen name="PortfolioSync" component={PortfolioSyncScreen} />
+          <Stack.Screen name="Analysis"      component={AnalysisScreen}      />
+          <Stack.Screen name="SwarmReport"   component={SwarmReportScreen}   />
+          <Stack.Screen name="Share"         component={ShareScreen}         />
+          <Stack.Screen name="SwarmAlerts"   component={SwarmAlertsScreen}   />
         </Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>

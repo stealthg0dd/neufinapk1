@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#030712"
+      "backgroundColor": "#0F172A"
     },
     "scheme": "neufin",
     "ios": {
@@ -98,6 +98,15 @@
           ]
         }
       ]
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/356bc337-8955-4645-aa2c-cdc6893c971e"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "extra": {
       "apiUrl": "https://neufin101-production.up.railway.app",

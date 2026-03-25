@@ -34,8 +34,12 @@ langgraph>=0.2.0
 langchain-core>=0.3.0
 fredapi>=0.5.0
 
-# Caching
+# Server
+gunicorn==23.0.0
+
+# Caching + task queue
 redis>=5.0.0
+celery[redis]==5.4.0
 
 # JWT verification (ES256 via Supabase JWKS)
 python-jose[cryptography]==3.3.0

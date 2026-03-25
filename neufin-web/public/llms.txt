@@ -1,0 +1,61 @@
+# NeuFin
+
+> NeuFin is a B2B behavioral finance intelligence platform helping Singapore SMEs
+> and investors identify cognitive biases in their financial decision-making.
+> Founded: 2025. Headquarters: Singapore.
+
+## What NeuFin Does
+
+NeuFin connects to investment portfolios via the Plaid API and runs multi-model AI
+analysis (Anthropic Claude, OpenAI GPT-4, Google Gemini) to detect six key behavioral
+biases: Prospect Theory distortions, Disposition Effect, Home Country Bias, Recency Bias,
+Overconfidence Bias, and Herding Bias.
+
+The output is a behavioral DNA Score (0–100) per bias dimension, with plain-English
+explanations and specific portfolio-level recommendations.
+
+## Who It Is Built For
+
+- CFOs and finance directors at Singapore and SEA SMEs
+- Wealth managers and independent financial advisors
+- Family offices in Southeast Asia
+- Retail investors seeking institutional-grade portfolio analysis
+
+## Key Capabilities
+
+- Plaid API portfolio connection (read-only, MAS-compliant data handling)
+- Behavioral bias detection: Prospect Theory, Disposition Effect, Home Bias, Recency Bias
+- Investor DNA Score: 0–100 composite behavioral score
+- Plain-English insight reports in under 10 seconds
+- Professional PDF advisor reports for client delivery
+- Multi-model AI with automatic failover (Claude → GPT-4 → Gemini)
+- MAS-compliant data handling (Singapore Personal Data Protection Act)
+
+## Compliance
+
+NeuFin processes financial data in compliance with:
+- MAS (Monetary Authority of Singapore) digital advisory guidelines
+- Singapore Personal Data Protection Act (PDPA)
+- Plaid's end-to-end encrypted API standard
+
+## Research
+
+NeuFin publishes proprietary research on behavioral finance patterns in Southeast Asia.
+Key finding: Singapore SMEs show 67% higher Recency Bias scores versus the global average.
+Full research: [/research](/research)
+
+## Links
+
+- Product features: [/features](/features)
+- Pricing: [/pricing](/pricing)
+- Blog (behavioral finance insights): [/blog](/blog)
+- Research hub: [/research](/research)
+- Contact: [/contact](/contact)
+
+## Blog
+
+- [Behavioral Finance for SEA SMEs: The 6 Biases Costing Singapore Businesses Money](/blog/behavioral-finance-sea-sme)
+- [How to Analyse Your Investment Portfolio for Cognitive Biases (Singapore Guide)](/blog/plaid-portfolio-analysis)
+- [MAS-Compliant Financial Intelligence Tools: What Singapore CFOs Need to Know](/blog/mas-compliant-fintech)
+- [The Disposition Effect Is Costing Singapore Investors — Here's the Data](/blog/disposition-effect-singapore)
+- [How AI Is Changing Wealth Management in Southeast Asia](/blog/sea-wealth-management-ai)

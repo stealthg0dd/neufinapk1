@@ -1,0 +1,135 @@
+# ── Neufin local development stack ────────────────────────────────────────────
+#
+# Setup (first time):
+#   cp .env.docker .env          # copy template
+#   nano .env                    # fill in Supabase + AI API keys
+#   docker-compose up --build
+#
+# All four services hot-reload on source changes:
+#   api-backend  — uvicorn --reload watches neufin-backend/
+#   ai-worker    — shares the same image; restart to pick up code changes
+#   web-frontend — next dev watches neufin-web/
+#   db-redis     — stateless cache; data survives restarts via named volume
+
+services:
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  # Tier-1 market data cache (market_cache.py) and Celery broker/backend.
+  # No password for local dev — matches REDIS_URL=redis://db-redis:6379/0.
+  db-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── FastAPI backend ───────────────────────────────────────────────────────────
+  # Runs uvicorn --reload for instant hot-reload on any .py change.
+  # Packages live in the image (/usr/local); source is the host volume (/app).
+  api-backend:
+    build:
+      context: ./neufin-backend
+      dockerfile: Dockerfile
+    # Override production CMD with dev server
+    command:
+      - uvicorn
+      - main:app
+      - --reload
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    env_file: .env
+    environment:
+      # Internal service URL — overrides whatever is in .env
+      REDIS_URL: redis://db-redis:6379/0
+      APP_BASE_URL: http://localhost:3000
+    volumes:
+      # Mount source for hot-reload; packages in /usr/local are unaffected.
+      - ./neufin-backend:/app
+    depends_on:
+      db-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ── Celery AI worker ──────────────────────────────────────────────────────────
+  # Shares the same Docker image as api-backend; only the CMD differs.
+  # Currently a scaffold — no tasks registered yet.  Will process jobs from
+  # the 'swarm' and 'default' queues once task functions are added to
+  # services/celery_app.py.
+  #
+  # To restart the worker after a code change:
+  #   docker-compose restart ai-worker
+  ai-worker:
+    build:
+      context: ./neufin-backend
+      dockerfile: Dockerfile
+    command:
+      - celery
+      - -A
+      - services.celery_app
+      - worker
+      - --loglevel=info
+      - --queues=swarm,default
+      - --concurrency=2
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      REDIS_URL: redis://db-redis:6379/0
+    volumes:
+      - ./neufin-backend:/app
+    depends_on:
+      db-redis:
+        condition: service_healthy
+      api-backend:
+        condition: service_healthy
+
+  # ── Next.js frontend ──────────────────────────────────────────────────────────
+  # Uses the 'development' Dockerfile stage — runs `next dev` with full HMR.
+  # NEXT_PUBLIC_* vars are read from .env at runtime (next dev reads process.env).
+  # RAILWAY_API_URL points to api-backend so server-side rewrites work
+  # inside the Docker network.
+  web-frontend:
+    build:
+      context: ./neufin-web
+      dockerfile: Dockerfile
+      target: development       # <-- hot-reload stage; NOT the standalone build
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      # Server-side rewrite destination — api-backend is the Docker DNS name.
+      RAILWAY_API_URL: http://api-backend:8000
+      # NEXT_PUBLIC_API_URL is what the browser uses for direct fetch calls.
+      # Keep it pointing at localhost so the browser can reach the host port.
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    volumes:
+      # Mount source for HMR
+      - ./neufin-web:/app
+      # Anonymous volume — preserves container node_modules so the macOS host
+      # tree (possibly empty or different arch) does not shadow them.
+      - /app/node_modules
+    depends_on:
+      api-backend:
+        condition: service_healthy
+
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  redis_data:

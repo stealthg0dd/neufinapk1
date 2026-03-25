@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
 import {
   ResponsiveContainer,
@@ -163,7 +164,16 @@ export default function DashboardPage() {
   if (!result) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-400">No portfolio data found.</p>
+        {/* Skeleton loader for empty state */}
+        <div className="w-full max-w-screen-xl px-4 space-y-4">
+          <div className="shimmer rounded-xl h-40 w-full" />
+          <div className="grid grid-cols-3 gap-4">
+            <div className="shimmer rounded-xl h-64" />
+            <div className="shimmer rounded-xl h-64" />
+            <div className="shimmer rounded-xl h-64" />
+          </div>
+        </div>
+        <p className="text-gray-500 text-sm mt-4">No portfolio data found.</p>
         <Link href="/upload" className="btn-primary">Upload Portfolio →</Link>
       </div>
     )
@@ -182,6 +192,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 text-sm">
             <span className="text-gray-400 hidden sm:block">{result.investor_type}</span>
             <ScoreBadge score={result.dna_score} />
+            <Link href="/swarm" className="btn-outline py-1.5 text-xs">Swarm Analysis</Link>
             <Link href="/upload" className="btn-outline py-1.5 text-xs">New Analysis</Link>
             {user && (
               <button
@@ -198,7 +209,12 @@ export default function DashboardPage() {
       <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
 
         {/* ── Top row: Portfolio value line chart ──────────────────────────── */}
-        <div className="card">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="glass-card-dark rounded-xl p-5"
+        >
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Portfolio Value (30d)</h2>
@@ -209,9 +225,7 @@ export default function DashboardPage() {
             </span>
           </div>
           {histLoading ? (
-            <div className="h-32 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-            </div>
+            <div className="shimmer rounded-lg h-32 w-full" />
           ) : (
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={portfolioHistory} margin={{ top: 0, right: 8, bottom: 0, left: 8 }}>
@@ -242,13 +256,18 @@ export default function DashboardPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
-        </div>
+        </motion.div>
 
         {/* ── Three-column row ──────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-4 flex-1">
 
           {/* ── Left: Holdings list ─────────────────────────────────────────── */}
-          <div className="card flex flex-col overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="glass-card-dark rounded-xl p-5 flex flex-col overflow-hidden"
+          >
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               Holdings · {result.positions.length} positions
             </h3>
@@ -259,12 +278,14 @@ export default function DashboardPage() {
                   const active = p.symbol === selectedSymbol
                   const sector = getSector(p.symbol)
                   return (
-                    <button
+                    <motion.button
                       key={p.symbol}
                       onClick={() => setSelectedSymbol(p.symbol)}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors text-sm
                         ${active
-                          ? 'bg-blue-600/20 border border-blue-500/40'
+                          ? 'bg-blue-600/20 border border-blue-500/40 shadow-sm shadow-blue-500/10'
                           : 'hover:bg-gray-800/60 border border-transparent'
                         }`}
                     >
@@ -286,14 +307,19 @@ export default function DashboardPage() {
                           }}
                         />
                       </div>
-                    </button>
+                    </motion.button>
                   )
                 })}
             </div>
-          </div>
+          </motion.div>
 
           {/* ── Center: Candlestick chart ────────────────────────────────────── */}
-          <div className="card flex flex-col">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="glass-card-dark rounded-xl p-5 flex flex-col"
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <h3 className="font-bold text-white font-mono text-lg">{selectedSymbol}</h3>
@@ -301,7 +327,7 @@ export default function DashboardPage() {
                 <span className="text-xs badge bg-gray-800 text-gray-400">3 months</span>
               </div>
               {candleLoading && (
-                <div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                <div className="shimmer rounded w-32 h-4" />
               )}
             </div>
             <div className="flex-1 min-h-0">
@@ -334,10 +360,15 @@ export default function DashboardPage() {
                 </div>
               )
             })()}
-          </div>
+          </motion.div>
 
           {/* ── Right: AI Insights ───────────────────────────────────────────── */}
-          <div className="card flex flex-col gap-4 overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="glass-card-dark rounded-xl p-5 flex flex-col gap-4 overflow-y-auto"
+          >
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI Recommendation</h3>
               <p className="text-sm text-gray-300 leading-relaxed">{result.recommendation}</p>
@@ -398,11 +429,16 @@ export default function DashboardPage() {
                 <p className="text-xs text-red-400 text-center">{reportError}</p>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* ── Bottom row: Sector allocation pie ────────────────────────────── */}
-        <div className="card">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="glass-card-dark rounded-xl p-5"
+        >
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">
             Sector Allocation
           </h3>
@@ -457,7 +493,7 @@ export default function DashboardPage() {
                 })}
             </div>
           </div>
-        </div>
+        </motion.div>
 
       </main>
     </div>

@@ -15,10 +15,10 @@
     @apply bg-gray-900 border border-gray-800 rounded-xl p-5;
   }
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors duration-150;
+    @apply bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-150 hover:scale-105;
   }
   .btn-outline {
-    @apply border border-gray-700 hover:border-blue-500 hover:text-blue-400 text-gray-300 font-semibold px-6 py-3 rounded-lg transition-colors duration-150;
+    @apply border border-gray-700 hover:border-blue-500 hover:text-blue-400 text-gray-300 font-semibold px-6 py-3 rounded-lg transition-all duration-150 hover:scale-105;
   }
   .badge {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
@@ -32,9 +32,29 @@
     background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
     animation: shimmer-sweep 1.6s infinite;
   }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+  .glass-card-dark {
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(148, 163, 184, 0.1);
+  }
+  .focus-glow:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  }
 }
 
 @keyframes shimmer-sweep {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+@keyframes float-bg {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50%       { transform: translate(-50%, -50%) scale(1.08); }
 }

@@ -48,8 +48,9 @@ except ImportError:
 
 # ── Service imports ────────────────────────────────────────────────────────────
 from services.risk_engine import (
-    _fetch_daily_closes_av,
+    fetch_all_closes,
     build_correlation_matrix,
+    build_correlation_matrix_from_series,
     find_correlation_clusters,
     correlation_penalty_score,
     format_clusters_for_ai,
@@ -261,6 +262,36 @@ def _compute_portfolio_sharpe(
     return round(float(excess.mean() / std * np.sqrt(252)), 3)
 
 
+def _compute_portfolio_sharpe_from_series(
+    price_series: dict[str, pd.Series],
+    weights: dict[str, float],
+    min_rows: int = 10,
+) -> float:
+    """
+    Compute annualised Sharpe ratio from **pre-fetched** price series.
+    Avoids redundant HTTP calls when data is already available via fetch_all_closes.
+    """
+    valid = {s: v for s, v in price_series.items() if len(v) >= min_rows}
+    if not valid:
+        return 0.0
+    price_df = pd.DataFrame(valid).dropna()
+    if len(price_df) < 5:
+        return 0.0
+    returns = price_df.pct_change().dropna()
+    w = np.array([weights.get(s, 0.0) for s in returns.columns], dtype=float)
+    w_sum = w.sum()
+    if w_sum <= 0:
+        return 0.0
+    w /= w_sum
+    portfolio_returns = returns.values @ w
+    rf_daily = _RISK_FREE_ANNUAL / 252
+    excess = portfolio_returns - rf_daily
+    std = excess.std()
+    if std == 0:
+        return 0.0
+    return round(float(excess.mean() / std * np.sqrt(252)), 3)
+
+
 def _top_n_by_weight(ticker_data: list[dict], n: int = 3) -> list[str]:
     """Return the top-N symbols by portfolio weight."""
     sorted_tickers = sorted(ticker_data, key=lambda x: x.get("weight", 0), reverse=True)
@@ -403,17 +434,41 @@ async def quant_node(state: SwarmState) -> dict:
     beta_pts = _beta_score(weighted_beta)
     trace.append(f"[Quant] Weighted beta: {weighted_beta:.3f} → beta_score: {beta_pts}/25")
 
-    # ── Sharpe ratio ──────────────────────────────────────────────────────────
-    sharpe = await asyncio.to_thread(_compute_portfolio_sharpe, symbols, weights)
+    # ── Parallel price fetch (single batch for sharpe + correlation) ─────────────
+    # fetch_all_closes uses asyncio.gather internally — all tickers fetched at once.
+    # The provider blacklist in risk_engine ensures that once AV/Finnhub is
+    # rate-limited, remaining symbols skip that provider immediately.
+    trace.append(f"[Quant] Fetching 60-day price history for {len(symbols)} symbols in parallel...")
+    price_series = await fetch_all_closes(symbols, days=60)
+    fetched_count = sum(1 for s in price_series.values() if len(s) >= 10)
+    trace.append(f"[Quant] Price data ready — {fetched_count}/{len(symbols)} symbols with sufficient history.")
+
+    # ── Sharpe ratio (from pre-fetched data — no extra HTTP calls) ───────────────
+    sharpe = _compute_portfolio_sharpe_from_series(price_series, weights)
     sharpe_rating = "Strong" if sharpe > 1.0 else "Acceptable" if sharpe > 0.5 else "Weak" if sharpe > 0 else "Negative"
     trace.append(f"[Quant] Annualised Sharpe ratio: {sharpe} ({sharpe_rating})")
 
-    # ── Correlation clusters ───────────────────────────────────────────────────
+    # ── Correlation clusters (from pre-fetched data — no extra HTTP calls) ───────
     trace.append(f"[Quant] Building 60-day Pearson correlation matrix (threshold ρ>{corr_threshold})...")
-    corr_matrix = await asyncio.to_thread(build_correlation_matrix, symbols)
+    corr_matrix = build_correlation_matrix_from_series(price_series)
     clusters    = find_correlation_clusters(corr_matrix, weights, threshold=corr_threshold)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
     cluster_summary = format_clusters_for_ai(clusters)
+
+    # Serialise top-5 correlation sub-matrix for frontend heatmap
+    top5_by_wt = sorted(symbols, key=lambda s: weights.get(s, 0), reverse=True)[:5]
+    top5_in_mx = [s for s in top5_by_wt if not corr_matrix.empty and s in corr_matrix.index]
+    if top5_in_mx:
+        try:
+            _sub = corr_matrix.loc[top5_in_mx, top5_in_mx]
+            corr_matrix_data: dict = {
+                "symbols": top5_in_mx,
+                "values":  [[round(float(v), 3) for v in row] for row in _sub.values.tolist()],
+            }
+        except Exception:
+            corr_matrix_data = {"symbols": [], "values": []}
+    else:
+        corr_matrix_data = {"symbols": [], "values": []}
 
     if clusters:
         trace.append(f"[Quant] ⚠ {len(clusters)} correlation cluster(s) found. avg_corr={avg_corr:.3f} → corr_score: {corr_pts}/30")
@@ -456,8 +511,9 @@ async def quant_node(state: SwarmState) -> dict:
         "cluster_summary":  cluster_summary,
         "corr_threshold":   corr_threshold,
         "total_score":      round(hhi_pts + beta_pts + corr_pts, 2),
-        "stress_results":   stress_results,
-        "risk_factors":     factor_metrics,
+        "stress_results":    stress_results,
+        "risk_factors":      factor_metrics,
+        "corr_matrix_data":  corr_matrix_data,
     }
     trace.append(f"[Quant] Risk model complete. Sub-total (excl. tax): {risk_metrics['total_score']}/80")
 
@@ -721,6 +777,10 @@ regime MUST be one of: growth, inflation, recession, stagflation, risk-off"""
             "portfolio_implication": cpi_data.get("regime_description", ""),
         }
         trace.append(f"[Market Regime] AI enrichment failed ({e}) — rule-based classification used.")
+
+    # Inject raw CPI scalars so the frontend can render sparklines / badges
+    market_regime_out["cpi_yoy"]      = yoy      # float | None
+    market_regime_out["cpi_trend_3m"] = trend    # float | None
 
     return {"market_regime": market_regime_out, "agent_trace": trace}
 
@@ -1194,6 +1254,56 @@ Return ONLY valid JSON matching this exact schema:
         "market_regime":    mkt_regime,
         "risk_sentinel":    sentinel,
         "alpha_scout":      alpha,
+    }
+
+    # ── Structured intel for 6-card Research Intelligence Grid ─────────────────
+    try:
+        _strat = json.loads(macro) if macro and macro not in ("N/A", "") else {}
+    except Exception:
+        _strat = {}
+
+    _sentiment_text = (_strat.get("regime_implication", "") + " " + _strat.get("positioning_advice", "")).lower()
+    thesis["strategist_intel"] = {
+        "narrative":          _strat.get("regime_implication", mkt_regime.get("portfolio_implication", "")),
+        "key_drivers":        mkt_regime.get("drivers", [])[:3],
+        "news_risks":         _strat.get("news_risks", []),
+        "hedge_positions":    _strat.get("hedge_positions", []),
+        "positioning_advice": _strat.get("positioning_advice", ""),
+        "sentiment":          (
+            "cautious" if any(w in _sentiment_text for w in
+                              ("risk", "pressure", "volatile", "concern", "headwind", "weak"))
+            else "constructive"
+        ),
+    }
+
+    thesis["quant_analysis"] = {
+        "hhi_pts":           hhi_pts,
+        "hhi_interpretation": (
+            "Extreme Concentration" if hhi_pts < 8  else
+            "High Concentration"    if hhi_pts < 15 else
+            "Moderate"              if hhi_pts < 20 else "Diversified"
+        ),
+        "weighted_beta":     risk.get("weighted_beta"),
+        "beta_map":          risk.get("beta_map", {}),
+        "sharpe_ratio":      risk.get("sharpe_ratio"),
+        "sharpe_rating":     risk.get("sharpe_rating"),
+        "avg_corr":          risk.get("avg_corr"),
+        "clusters":          risk.get("clusters", []),
+        "corr_matrix_data":  risk.get("corr_matrix_data", {"symbols": [], "values": []}),
+        "top_symbols":       [t["symbol"] for t in
+                              sorted(state["ticker_data"], key=lambda x: x.get("weight", 0), reverse=True)[:5]],
+    }
+
+    _liability = tax.get("total_liability") or 0
+    thesis["tax_report"] = {
+        "available":             tax.get("available", False),
+        "total_liability":       _liability,
+        "harvest_opportunities": tax.get("harvestable_top3", []),
+        "liability_top3":        tax.get("liability_top3", []),
+        "tax_drag_pct":          round(_liability / max(state["total_value"], 1) * 100, 2) if tax.get("available") else None,
+        "tax_pts":               tax.get("tax_pts", 10),
+        "narrative":             tax.get("narrative", ""),
+        "tax_neutral_pairs":     tax.get("tax_neutral_pairs", []),
     }
 
     return {"investment_thesis": thesis, "agent_trace": trace}

@@ -1,243 +1,485 @@
 /**
- * SwarmAlertsScreen — Bloomberg-style push alert inbox for macro regime shifts.
+ * SwarmAlertsScreen — 6-card swarm report + live macro push alerts.
  *
- * Features:
- *  • Registers for Expo push notifications on first visit
- *  • Subscribes to macro-shift alerts for a hardcoded demo portfolio
- *    (replace DEMO_SYMBOLS with the user's actual holdings once auth is wired)
- *  • Polls the backend for recent alerts and renders them in a terminal-style list
- *  • Colour-codes by regime severity: Inflationary (amber), Disinflationary (green), Unknown (grey)
+ * Top section: Research Intelligence Grid (6 cards matching web design)
+ *   Fetches GET /api/swarm/report/latest
+ *   Empty state if no report — prompts user to run swarm on web
+ *
+ * Bottom section: Macro push alert inbox (existing functionality preserved)
+ *   Polls GET /api/alerts/recent every 60s
+ *
+ * Uses: Reanimated 3 stagger, expo-blur, expo-haptics — NO demo/mock data
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Dimensions,
   FlatList,
   Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withDelay,
+} from 'react-native-reanimated'
+import { BlurView } from 'expo-blur'
+import * as Haptics from 'expo-haptics'
+import { supabase } from '@/lib/supabase'
+import { getLatestSwarmReport, type SwarmReport } from '@/lib/api'
 import { subscribeToSwarmAlerts, fetchRecentAlerts } from '@/lib/notifications'
 import type { MacroAlert } from '@/lib/notifications'
 
-// ── Demo portfolio (swap for user session data) ───────────────────────────────
-const DEMO_SYMBOLS = ['AAPL', 'MSFT', 'NVDA', 'XOM', 'BRK-B']
+const { width: SCREEN_W } = Dimensions.get('window')
+const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace'
+const SPRING = { damping: 15, stiffness: 150 }
 
-// ── Colour palette (Bloomberg terminal) ──────────────────────────────────────
 const C = {
-  bg:       '#080808',
-  surface:  '#0D0D0D',
-  border:   '#1E1E1E',
-  header:   '#141414',
+  bg:       '#0F172A',
+  surface:  '#1E293B',
+  border:   '#334155',
   amber:    '#FFB900',
-  green:    '#00FF00',
-  red:      '#FF4444',
+  green:    '#22c55e',
+  red:      '#ef4444',
   blue:     '#60A5FA',
-  dimText:  '#555555',
-  midText:  '#888888',
-  bodyText: '#C8C8C8',
+  purple:   '#a78bfa',
+  teal:     '#2dd4bf',
+  dimText:  '#64748b',
+  bodyText: '#CBD5E1',
   white:    '#FFFFFF',
 }
 
-// ── Regime → colour mapping ───────────────────────────────────────────────────
-function regimeColor(regime: string): string {
-  const r = regime.toLowerCase()
-  if (r.includes('inflation'))    return C.amber
-  if (r.includes('disinflation')) return C.green
-  if (r.includes('target'))       return C.green
-  if (r.includes('elevated'))     return C.amber
-  if (r.includes('high'))         return C.red
-  return C.midText
+// ── Animated glass card wrapper ───────────────────────────────────────────────
+function GlassCard({
+  children,
+  index = 0,
+  accent = C.border,
+  style: extraStyle,
+}: {
+  children: React.ReactNode
+  index?: number
+  accent?: string
+  style?: object
+}) {
+  const translateY = useSharedValue(24)
+  const opacity    = useSharedValue(0)
+
+  useEffect(() => {
+    translateY.value = withDelay(index * 70, withSpring(0, SPRING))
+    opacity.value    = withDelay(index * 70, withSpring(1, { damping: 20 }))
+  }, [])
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }))
+
+  return (
+    <Animated.View style={[animStyle, extraStyle]}>
+      <BlurView intensity={16} tint="dark" style={[styles.glassCard, { borderColor: accent + '35' }]}>
+        {children}
+      </BlurView>
+    </Animated.View>
+  )
 }
 
-// ── Individual alert card ─────────────────────────────────────────────────────
+// ── Skeleton shimmer ──────────────────────────────────────────────────────────
+function Skeleton({ height = 120, index = 0 }: { height?: number; index?: number }) {
+  const opacity = useSharedValue(0.35)
+  useEffect(() => {
+    const t = setInterval(() => {
+      opacity.value = withSpring(opacity.value < 0.65 ? 0.65 : 0.35, { damping: 18, stiffness: 50 })
+    }, 700 + index * 150)
+    return () => clearInterval(t)
+  }, [])
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }))
+  return (
+    <Animated.View style={[styles.skeleton, { height }, style]} />
+  )
+}
+
+// ── Research card components ──────────────────────────────────────────────────
+
+function CardHeader({ title, accent }: { title: string; accent: string }) {
+  return (
+    <View style={styles.cardHeaderRow}>
+      <Text style={[styles.cardTitle, { color: accent }]}>{title}</Text>
+    </View>
+  )
+}
+
+function MarketRegimeCard({ data }: { data: Record<string, any> }) {
+  const regime = (data.regime ?? 'N/A') as string
+  const conf   = data.confidence ? Math.round((data.confidence as number) * 100) : null
+  const color  = regime === 'growth'       ? '#3b82f6'
+               : regime === 'inflation'    ? C.red
+               : regime === 'stagflation'  ? '#f97316'
+               : regime === 'recession'    ? C.dimText
+               : C.amber
+
+  return (
+    <GlassCard index={0} accent={color}>
+      <CardHeader title="◈ MARKET REGIME" accent={color} />
+      <View style={[styles.regimeBig, { borderColor: color + '50', backgroundColor: color + '12' }]}>
+        <Text style={[styles.regimeBigText, { color }]}>{regime.toUpperCase()} REGIME</Text>
+      </View>
+      <View style={styles.pillRow}>
+        {conf && <Pill label="CONFIDENCE" value={`${conf}%`}      color={color} />}
+        {data.cpi_yoy && <Pill label="CPI YOY"    value={`${data.cpi_yoy}%`} color={C.bodyText} />}
+      </View>
+      {data.portfolio_implication && (
+        <Text style={styles.bodyText}>{(data.portfolio_implication as string).slice(0, 130)}</Text>
+      )}
+    </GlassCard>
+  )
+}
+
+function StrategistCard({ data }: { data: Record<string, any> }) {
+  const sentiment = (data.sentiment ?? 'constructive') as string
+  const color = sentiment === 'cautious' ? C.amber : sentiment === 'bearish' ? C.red : C.green
+  const drivers = (data.key_drivers ?? []) as string[]
+
+  return (
+    <GlassCard index={1} accent={color}>
+      <CardHeader title="◈ STRATEGIST INTEL" accent={color} />
+      <View style={[styles.sentimentBadge, { borderColor: color + '50', backgroundColor: color + '10' }]}>
+        <Text style={[styles.sentimentText, { color }]}>{sentiment.toUpperCase()}</Text>
+      </View>
+      {data.narrative && (
+        <Text style={styles.bodyText}>{(data.narrative as string).slice(0, 160)}</Text>
+      )}
+      {drivers.slice(0, 3).map((d, i) => (
+        <View key={i} style={styles.bulletRow}>
+          <Text style={[styles.bullet, { color }]}>›</Text>
+          <Text style={styles.bulletText}>{d}</Text>
+        </View>
+      ))}
+    </GlassCard>
+  )
+}
+
+function QuantCard({ data }: { data: Record<string, any> }) {
+  const betaMap = (data.beta_map ?? {}) as Record<string, number>
+  const syms    = Object.keys(betaMap).slice(0, 5)
+
+  return (
+    <GlassCard index={2} accent={C.purple}>
+      <CardHeader title="◈ QUANT ANALYSIS" accent={C.purple} />
+      <View style={styles.pillRow}>
+        <Pill label="HHI"    value={data.hhi_pts     ? `${data.hhi_pts}/25`                  : '—'} color={C.purple} />
+        <Pill label="β"      value={data.weighted_beta ? (data.weighted_beta as number).toFixed(2) : '—'} color={C.amber} />
+        <Pill label="SHARPE" value={data.sharpe_ratio  ? (data.sharpe_ratio as number).toFixed(2)  : '—'} color={C.blue} />
+        <Pill label="ρ avg"  value={data.avg_corr      ? (data.avg_corr as number).toFixed(2)      : '—'} color={C.amber} />
+      </View>
+      {data.hhi_interpretation && (
+        <Text style={[styles.bodyText, { color: C.amber }]}>{data.hhi_interpretation as string}</Text>
+      )}
+      {/* Per-symbol beta bars */}
+      {syms.length > 0 && (
+        <View style={styles.betaList}>
+          {syms.map((s) => {
+            const b    = betaMap[s]
+            const bPct = Math.min((b / 2.5) * 100, 100)
+            return (
+              <View key={s} style={styles.betaRow}>
+                <Text style={styles.betaSym}>{s}</Text>
+                <View style={styles.betaTrack}>
+                  <View style={[styles.betaFill, { width: `${bPct}%` as any, backgroundColor: b >= 1.5 ? C.red : b >= 1.2 ? C.amber : C.green }]} />
+                </View>
+                <Text style={[styles.betaVal, { color: b >= 1.5 ? C.red : b >= 1.2 ? C.amber : C.green }]}>{b.toFixed(2)}β</Text>
+              </View>
+            )
+          })}
+        </View>
+      )}
+    </GlassCard>
+  )
+}
+
+function TaxCard({ data }: { data: Record<string, any> }) {
+  const available = data.available === true
+  const opps      = (data.harvest_opportunities ?? []) as any[]
+
+  return (
+    <GlassCard index={3} accent={C.teal}>
+      <CardHeader title="◈ TAX OPTIMIZATION" accent={C.teal} />
+      {!available ? (
+        <Text style={styles.bodyText}>{(data.narrative as string) || 'No cost basis provided. Upload CSV with cost_basis column on neufin.app.'}</Text>
+      ) : (
+        <>
+          <View style={styles.pillRow}>
+            {data.total_liability != null && (
+              <Pill label="LIABILITY" value={`$${((data.total_liability as number) / 1000).toFixed(1)}K`} color={C.red} />
+            )}
+            {data.tax_drag_pct != null && (
+              <Pill label="TAX DRAG"  value={`${data.tax_drag_pct}%`} color={C.amber} />
+            )}
+          </View>
+          {opps.slice(0, 3).map((o: any, i: number) => (
+            <View key={i} style={styles.bulletRow}>
+              <Text style={[styles.bullet, { color: C.teal }]}>✓</Text>
+              <Text style={styles.bulletText}>{o.symbol}: harvest ${((o.harvest_amount ?? o.gain ?? 0) / 1000).toFixed(1)}K</Text>
+            </View>
+          ))}
+        </>
+      )}
+    </GlassCard>
+  )
+}
+
+function RiskCard({ data }: { data: Record<string, any> }) {
+  const level  = (data.risk_level ?? 'medium') as string
+  const score  = (data.risk_score ?? 5) as number
+  const color  = level === 'high' ? C.red : level === 'medium' ? C.amber : C.green
+  const flags  = (data.primary_risks ?? []) as string[]
+
+  return (
+    <GlassCard index={4} accent={color}>
+      <CardHeader title="◈ RISK WATCHDOG" accent={color} />
+      <View style={[styles.riskLevelBadge, { borderColor: color + '50', backgroundColor: color + '10' }]}>
+        <Text style={[styles.riskLevelText, { color }]}>
+          {level.toUpperCase()} RISK · {score.toFixed(1)}/10
+        </Text>
+      </View>
+      {flags.map((f, i) => (
+        <View key={i} style={styles.bulletRow}>
+          <View style={[styles.flagDot, { backgroundColor: color }]} />
+          <Text style={styles.bulletText}>{f}</Text>
+        </View>
+      ))}
+    </GlassCard>
+  )
+}
+
+function AlphaCard({ data }: { data: Record<string, any> }) {
+  const opps = (data.opportunities ?? []) as any[]
+
+  return (
+    <GlassCard index={5} accent={C.amber}>
+      <CardHeader title="◈ ALPHA SCOUT" accent={C.amber} />
+      {opps.length === 0 ? (
+        <Text style={styles.bodyText}>No opportunities identified</Text>
+      ) : (
+        opps.slice(0, 3).map((o: any, i: number) => (
+          <View key={i} style={[styles.oppBlock, i > 0 && { borderTopWidth: 1, borderTopColor: C.border, paddingTop: 8 }]}>
+            <View style={styles.oppHeader}>
+              <Text style={styles.oppSym}>{o.symbol}</Text>
+              <View style={styles.confTrack}>
+                <View style={[styles.confFill, { width: `${Math.round((o.confidence ?? 0) * 100)}%` as any }]} />
+              </View>
+              <Text style={styles.confPct}>{Math.round((o.confidence ?? 0) * 100)}%</Text>
+            </View>
+            <Text style={styles.oppReason}>{(o.reason as string).slice(0, 90)}</Text>
+          </View>
+        ))
+      )}
+    </GlassCard>
+  )
+}
+
+function Pill({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <View style={styles.pill}>
+      <Text style={styles.pillLabel}>{label}</Text>
+      <Text style={[styles.pillValue, { color }]}>{value}</Text>
+    </View>
+  )
+}
+
+// ── Macro alert card (preserved from original screen) ────────────────────────
 function AlertCard({ alert }: { alert: MacroAlert }) {
-  const color   = regimeColor(alert.regime)
+  const regime = alert.regime.toLowerCase()
+  const color  = regime.includes('inflation') ? C.amber
+               : regime.includes('disinflation') || regime.includes('target') ? C.green
+               : regime.includes('high') ? C.red
+               : C.dimText
   const dateStr = new Date(alert.timestamp).toLocaleString('en-US', {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   })
-  const affected = alert.affected_symbols?.join(', ') || '—'
 
   return (
-    <View style={[styles.card, { borderLeftColor: color }]}>
-      {/* Top row: regime badge + timestamp */}
-      <View style={styles.cardHeader}>
-        <View style={[styles.regimePill, { borderColor: color + '60' }]}>
-          <View style={[styles.regimeDot, { backgroundColor: color }]} />
-          <Text style={[styles.regimeText, { color }]}>{alert.regime.toUpperCase()}</Text>
+    <View style={[styles.alertCard, { borderLeftColor: color }]}>
+      <View style={styles.alertHeader}>
+        <View style={[styles.alertPill, { borderColor: color + '60' }]}>
+          <View style={[styles.alertDot, { backgroundColor: color }]} />
+          <Text style={[styles.alertRegime, { color }]}>{alert.regime.toUpperCase()}</Text>
         </View>
-        <Text style={styles.timestamp}>{dateStr}</Text>
+        <Text style={styles.alertTime}>{dateStr}</Text>
       </View>
-
-      {/* Title */}
       <Text style={styles.alertTitle}>{alert.title}</Text>
-
-      {/* Body */}
       <Text style={styles.alertBody}>{alert.body}</Text>
-
-      {/* Metrics row */}
-      <View style={styles.metaRow}>
-        <MetaBadge label="CPI YoY" value={alert.cpi_yoy} color={color} />
-        <MetaBadge label="Portfolio impact" value={affected} color={C.blue} />
-      </View>
-    </View>
-  )
-}
-
-function MetaBadge({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <View style={styles.metaBadge}>
-      <Text style={styles.metaLabel}>{label.toUpperCase()}: </Text>
-      <Text style={[styles.metaValue, { color }]}>{value}</Text>
-    </View>
-  )
-}
-
-// ── Empty state ───────────────────────────────────────────────────────────────
-function EmptyState({ subscribed }: { subscribed: boolean }) {
-  return (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>◈</Text>
-      <Text style={styles.emptyTitle}>
-        {subscribed ? 'No Alerts Yet' : 'Not Subscribed'}
-      </Text>
-      <Text style={styles.emptyBody}>
-        {subscribed
-          ? 'You will be notified when the Strategist Agent detects a macro regime shift affecting your holdings.'
-          : 'Subscribe to receive push alerts when the FRED CPI data triggers a regime change.'}
-      </Text>
     </View>
   )
 }
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function SwarmAlertsScreen() {
-  const [alerts,     setAlerts]     = useState<MacroAlert[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [subscribed, setSubscribed] = useState(false)
-  const [subLoading, setSubLoading] = useState(false)
-  const [subStatus,  setSubStatus]  = useState<'idle' | 'ok' | 'error'>('idle')
-
+  const [report,       setReport]       = useState<SwarmReport | null>(null)
+  const [reportLoading, setReportLoading] = useState(true)
+  const [reportError,  setReportError]  = useState(false)
+  const [alerts,       setAlerts]       = useState<MacroAlert[]>([])
+  const [alertsLoading, setAlertsLoading] = useState(true)
+  const [refreshing,   setRefreshing]   = useState(false)
+  const [subscribed,   setSubscribed]   = useState(false)
+  const [subLoading,   setSubLoading]   = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const loadAlerts = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true)
-    const data = await fetchRecentAlerts(30)
-    setAlerts(data)
-    if (!silent) setLoading(false)
+  const loadReport = useCallback(async () => {
+    setReportLoading(true)
+    setReportError(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) { setReport(null); return }
+      const r = await getLatestSwarmReport(session.access_token)
+      setReport(r)
+    } catch {
+      setReportError(true)
+    } finally {
+      setReportLoading(false)
+    }
   }, [])
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await loadAlerts(true)
-    setRefreshing(false)
-  }, [loadAlerts])
-
-  const handleSubscribe = async () => {
-    setSubLoading(true)
-    const ok = await subscribeToSwarmAlerts(DEMO_SYMBOLS, 'Neufin Mobile User')
-    setSubscribed(ok)
-    setSubStatus(ok ? 'ok' : 'error')
-    setSubLoading(false)
-    if (ok) loadAlerts()
-  }
+  const loadAlerts = useCallback(async (silent = false) => {
+    if (!silent) setAlertsLoading(true)
+    const data = await fetchRecentAlerts(30)
+    setAlerts(data)
+    if (!silent) setAlertsLoading(false)
+  }, [])
 
   useEffect(() => {
+    loadReport()
     loadAlerts()
-    // Poll every 60 s for new alerts while the screen is active
     pollRef.current = setInterval(() => loadAlerts(true), 60_000)
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [loadReport, loadAlerts])
+
+  const onRefresh = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setRefreshing(true)
+    Promise.all([loadReport(), loadAlerts(true)]).finally(() => setRefreshing(false))
+  }
+
+  const handleSubscribe = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    setSubLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const symbols: string[] = []
+      // Use real user portfolio symbols from report if available
+      if (report?.quant_analysis?.top_symbols) {
+        symbols.push(...(report.quant_analysis.top_symbols as string[]).slice(0, 5))
+      }
+      const ok = await subscribeToSwarmAlerts(symbols, 'Neufin Mobile User')
+      setSubscribed(ok)
+      if (ok) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); loadAlerts() }
+    } finally {
+      setSubLoading(false)
     }
-  }, [loadAlerts])
+  }
+
+  const mr   = report?.market_regime    ?? null
+  const si   = report?.strategist_intel ?? null
+  const qa   = report?.quant_analysis   ?? null
+  const tr   = report?.tax_report       ?? null
+  const rs   = report?.risk_sentinel    ?? null
+  const as_  = report?.alpha_scout      ?? null
 
   return (
-    <View style={styles.root}>
-      {/* ── Nav bar ── */}
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.amber} />}
+    >
+      {/* Nav */}
       <View style={styles.nav}>
         <Text style={styles.navBrand}>NEUFIN</Text>
         <Text style={styles.navSep}>/</Text>
         <Text style={styles.navTitle}>SWARM ALERTS</Text>
-
         <TouchableOpacity
-          style={[
-            styles.subButton,
-            subscribed && styles.subButtonActive,
-          ]}
+          style={[styles.subBtn, subscribed && styles.subBtnActive]}
           onPress={handleSubscribe}
           disabled={subLoading || subscribed}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
           {subLoading
             ? <ActivityIndicator size="small" color={C.amber} />
-            : <Text style={[styles.subButtonText, subscribed && { color: C.green }]}>
-                {subscribed ? '● LIVE' : '▶ SUBSCRIBE'}
-              </Text>
+            : <Text style={[styles.subBtnText, subscribed && { color: C.green }]}>{subscribed ? '● LIVE' : '▶ SUBSCRIBE'}</Text>
           }
         </TouchableOpacity>
       </View>
 
-      {/* ── Status strip ── */}
-      <View style={styles.statusStrip}>
-        <StatusChip label="ORCHESTRATOR" value="LANGGRAPH" color={C.green} />
-        <StatusChip label="FRED" value="CPIAUCSL" color={C.green} />
-        <StatusChip label="ALERTS" value={`${alerts.length}`} color={C.amber} />
-        <StatusChip
-          label="PUSH"
-          value={subscribed ? 'ACTIVE' : 'OFF'}
-          color={subscribed ? C.green : C.dimText}
-        />
+      {/* Status strip */}
+      <View style={styles.strip}>
+        <Chip label="REGIME" value={report?.regime?.toUpperCase() ?? '—'} color={C.blue} />
+        {report?.dna_score && <Chip label="DNA" value={`${report.dna_score}/100`} color={report.dna_score >= 70 ? C.green : report.dna_score >= 45 ? C.amber : C.red} />}
+        <Chip label="ALERTS" value={String(alerts.length)} color={C.amber} />
+        <Chip label="PUSH" value={subscribed ? 'ACTIVE' : 'OFF'} color={subscribed ? C.green : C.dimText} />
       </View>
 
-      {/* ── Subscription error ── */}
-      {subStatus === 'error' && (
-        <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>
-            ⚠ Subscription failed — check notification permissions in Settings.
-          </Text>
-        </View>
-      )}
+      {/* ── Research Intelligence Grid ────────────────────────────────── */}
+      <Text style={styles.sectionHeader}>RESEARCH INTELLIGENCE</Text>
 
-      {/* ── Alert list ── */}
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={C.amber} />
-          <Text style={styles.loadingText}>Fetching macro alerts...</Text>
+      {reportLoading ? (
+        <>
+          {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={110} index={i} />)}
+        </>
+      ) : reportError ? (
+        <TouchableOpacity
+          style={styles.errorCard}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); loadReport() }}
+        >
+          <Text style={styles.errorText}>Failed to load swarm report</Text>
+          <Text style={styles.retryText}>↺ TAP TO RETRY</Text>
+        </TouchableOpacity>
+      ) : !report ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyIcon}>◈</Text>
+          <Text style={styles.emptyTitle}>No swarm report yet</Text>
+          <Text style={styles.emptyBody}>Open neufin.app → Upload CSV → Run Swarm to generate your Intelligence Report</Text>
         </View>
       ) : (
-        <FlatList
-          data={alerts}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => <AlertCard alert={item} />}
-          contentContainerStyle={alerts.length === 0 ? styles.listEmpty : styles.listContent}
-          ListEmptyComponent={<EmptyState subscribed={subscribed} />}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={C.amber}
-            />
-          }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+        <>
+          {mr && <MarketRegimeCard  data={mr} />}
+          {si && <StrategistCard   data={si} />}
+          {qa && <QuantCard        data={qa} />}
+          {tr && <TaxCard          data={tr} />}
+          {rs && <RiskCard         data={rs} />}
+          {as_ && <AlphaCard      data={as_} />}
+        </>
       )}
 
-      {/* ── Footer ── */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Alerts trigger when FRED CPI YoY crosses regime thresholds (3%, 5%)
-        </Text>
-        <Text style={styles.footerPowered}>Powered by LangGraph · Neufin Swarm v1</Text>
-      </View>
-    </View>
+      {/* ── Macro Alerts ─────────────────────────────────────────────── */}
+      <Text style={[styles.sectionHeader, { marginTop: 16 }]}>MACRO ALERTS</Text>
+
+      {alertsLoading ? (
+        <Skeleton height={80} />
+      ) : alerts.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyIcon}>{subscribed ? '◉' : '◌'}</Text>
+          <Text style={styles.emptyTitle}>{subscribed ? 'Monitoring...' : 'Not subscribed'}</Text>
+          <Text style={styles.emptyBody}>
+            {subscribed
+              ? 'You will be notified when FRED CPI data triggers a macro regime change.'
+              : 'Subscribe above to receive push notifications on regime shifts.'}
+          </Text>
+        </View>
+      ) : (
+        alerts.map((a) => <AlertCard key={a.id} alert={a} />)
+      )}
+
+      <Text style={styles.footer}>Alerts trigger when FRED CPI YoY crosses regime thresholds · Neufin Swarm v1</Text>
+    </ScrollView>
   )
 }
 
-function StatusChip({ label, value, color }: { label: string; value: string; color: string }) {
+function Chip({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <View style={styles.chip}>
       <Text style={styles.chipLabel}>{label}: </Text>
@@ -248,93 +490,98 @@ function StatusChip({ label, value, color }: { label: string; value: string; col
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg },
+  root:    { flex: 1, backgroundColor: C.bg },
+  content: { padding: 12, gap: 10, paddingBottom: 40 },
 
   nav: {
-    height: 48,
-    backgroundColor: '#0D0D0D',
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginBottom: 0, paddingVertical: 8,
   },
-  navBrand:  { color: C.amber, fontWeight: '700', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', letterSpacing: 2 },
-  navSep:    { color: C.dimText, fontSize: 11 },
-  navTitle:  { color: C.dimText, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', letterSpacing: 2, flex: 1 },
+  navBrand:    { color: C.amber, fontWeight: '700', fontSize: 13, fontFamily: MONO, letterSpacing: 2 },
+  navSep:      { color: C.dimText, fontSize: 11 },
+  navTitle:    { color: C.dimText, fontSize: 11, fontFamily: MONO, letterSpacing: 2, flex: 1 },
+  subBtn:      { borderWidth: 1, borderColor: C.amber, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, minWidth: 80, alignItems: 'center' },
+  subBtnActive:{ borderColor: C.green },
+  subBtnText:  { color: C.amber, fontSize: 9, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
 
-  subButton: {
+  strip: { flexDirection: 'row', gap: 14, flexWrap: 'wrap', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: C.border, marginBottom: 4, paddingBottom: 8 },
+  chip:  { flexDirection: 'row' },
+  chipLabel: { color: C.dimText, fontSize: 9, fontFamily: MONO, textTransform: 'uppercase', letterSpacing: 1 },
+  chipValue: { fontSize: 9, fontWeight: '700', fontFamily: MONO, textTransform: 'uppercase', letterSpacing: 1 },
+
+  sectionHeader: { color: C.amber, fontSize: 9, fontFamily: MONO, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 },
+
+  // Glass card
+  glassCard: {
+    borderRadius: 10, overflow: 'hidden',
+    padding: 12, gap: 8,
+    backgroundColor: 'rgba(30,41,59,0.55)',
     borderWidth: 1,
-    borderColor: C.amber,
-    borderRadius: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    minWidth: 90,
-    alignItems: 'center',
   },
-  subButtonActive: { borderColor: C.green },
-  subButtonText:   { color: C.amber, fontSize: 10, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', letterSpacing: 1 },
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center' },
+  cardTitle:     { fontSize: 9, fontWeight: '700', fontFamily: MONO, letterSpacing: 2, textTransform: 'uppercase' },
 
-  statusStrip: {
-    backgroundColor: '#111',
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    gap: 16,
-    flexWrap: 'wrap',
-  },
-  chip:       { flexDirection: 'row' },
-  chipLabel:  { color: C.dimText, fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', textTransform: 'uppercase', letterSpacing: 1 },
-  chipValue:  { fontSize: 9, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', textTransform: 'uppercase', letterSpacing: 1 },
+  // Regime
+  regimeBig:     { paddingVertical: 6, paddingHorizontal: 10, borderWidth: 1, borderRadius: 5, alignItems: 'center' },
+  regimeBigText: { fontSize: 12, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
 
-  errorBanner: { backgroundColor: '#1a0000', borderBottomWidth: 1, borderBottomColor: '#550000', padding: 10 },
-  errorText:   { color: C.red, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
+  // Sentiment
+  sentimentBadge: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 4, alignSelf: 'flex-start' },
+  sentimentText:  { fontSize: 10, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
 
-  listContent: { padding: 12, gap: 8 },
-  listEmpty:   { flex: 1 },
+  bodyText: { color: C.bodyText, fontSize: 10, fontFamily: MONO, lineHeight: 15 },
+  bulletRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  bullet:   { fontSize: 11, fontWeight: '700', marginTop: -1 },
+  bulletText:{ color: C.bodyText, fontSize: 10, fontFamily: MONO, flex: 1, lineHeight: 14 },
 
-  card: {
-    backgroundColor: C.surface,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: C.border,
-    borderLeftWidth: 3,
-    padding: 12,
-    gap: 6,
-  },
-  cardHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  regimePill:   { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
-  regimeDot:    { width: 5, height: 5, borderRadius: 3 },
-  regimeText:   { fontSize: 9, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', letterSpacing: 1 },
-  timestamp:    { color: C.dimText, fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
-  alertTitle:   { color: C.white, fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
-  alertBody:    { color: C.bodyText, fontSize: 11, lineHeight: 16, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
-  metaRow:      { flexDirection: 'row', gap: 12, flexWrap: 'wrap', marginTop: 2 },
-  metaBadge:    { flexDirection: 'row' },
-  metaLabel:    { color: C.dimText, fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
-  metaValue:    { fontSize: 9, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
+  pillRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  pill:    { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 5, paddingHorizontal: 7, paddingVertical: 5, alignItems: 'center', minWidth: 50 },
+  pillLabel:{ color: C.dimText, fontSize: 7, fontFamily: MONO, textTransform: 'uppercase', letterSpacing: 1 },
+  pillValue:{ fontSize: 12, fontWeight: '700', fontFamily: MONO, marginTop: 2 },
 
-  separator: { height: 8 },
+  // Beta bars
+  betaList: { gap: 4 },
+  betaRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  betaSym:  { color: C.dimText, fontSize: 9, fontFamily: MONO, width: 40 },
+  betaTrack:{ flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' },
+  betaFill: { height: 3, borderRadius: 2 },
+  betaVal:  { fontSize: 9, fontWeight: '700', fontFamily: MONO, width: 36, textAlign: 'right' },
 
-  centered:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { color: C.amber, fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', letterSpacing: 1 },
+  // Risk
+  riskLevelBadge: { borderWidth: 1, borderRadius: 5, paddingVertical: 5, paddingHorizontal: 10, alignItems: 'center' },
+  riskLevelText:  { fontSize: 11, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
+  flagDot:        { width: 5, height: 5, borderRadius: 3, marginTop: 4, flexShrink: 0 },
 
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
-  emptyIcon:      { fontSize: 48, color: '#222' },
-  emptyTitle:     { color: C.midText, fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', letterSpacing: 2, textTransform: 'uppercase' },
-  emptyBody:      { color: '#333', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', textAlign: 'center', lineHeight: 18 },
+  // Alpha scout
+  oppBlock:  { gap: 4 },
+  oppHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  oppSym:    { color: C.amber, fontSize: 12, fontWeight: '700', fontFamily: MONO, width: 48 },
+  confTrack: { flex: 1, height: 3, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, overflow: 'hidden' },
+  confFill:  { height: 3, backgroundColor: C.amber, borderRadius: 2 },
+  confPct:   { color: C.dimText, fontSize: 9, fontFamily: MONO, width: 30, textAlign: 'right' },
+  oppReason: { color: C.dimText, fontSize: 9, fontFamily: MONO, lineHeight: 13 },
 
-  footer: {
-    backgroundColor: '#111',
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  footerText:    { color: '#333', fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace' },
-  footerPowered: { color: '#222', fontSize: 9, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', textTransform: 'uppercase', letterSpacing: 1 },
+  // Skeleton
+  skeleton: { backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border },
+
+  // Empty / error
+  emptyCard:  { backgroundColor: C.surface, borderRadius: 10, borderWidth: 1, borderColor: C.border, padding: 24, alignItems: 'center', gap: 8 },
+  emptyIcon:  { color: C.dimText, fontSize: 32 },
+  emptyTitle: { color: C.white, fontSize: 13, fontWeight: '700', fontFamily: MONO },
+  emptyBody:  { color: C.dimText, fontSize: 10, fontFamily: MONO, textAlign: 'center', lineHeight: 16 },
+  errorCard:  { backgroundColor: 'rgba(239,68,68,0.08)', borderRadius: 10, borderWidth: 1, borderColor: C.red + '40', padding: 16, alignItems: 'center', gap: 6 },
+  errorText:  { color: C.red, fontSize: 11, fontFamily: MONO },
+  retryText:  { color: C.red + 'aa', fontSize: 9, fontFamily: MONO, letterSpacing: 1 },
+
+  // Macro alert cards
+  alertCard:   { backgroundColor: 'rgba(30,41,59,0.55)', borderRadius: 8, borderWidth: 1, borderColor: C.border, borderLeftWidth: 3, padding: 10, gap: 4 },
+  alertHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  alertPill:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
+  alertDot:    { width: 5, height: 5, borderRadius: 3 },
+  alertRegime: { fontSize: 8, fontWeight: '700', fontFamily: MONO, letterSpacing: 1 },
+  alertTime:   { color: C.dimText, fontSize: 8, fontFamily: MONO },
+  alertTitle:  { color: C.white, fontSize: 12, fontWeight: '700', fontFamily: MONO },
+  alertBody:   { color: C.bodyText, fontSize: 10, fontFamily: MONO, lineHeight: 14 },
+
+  footer: { color: C.dimText, fontSize: 8, fontFamily: MONO, textAlign: 'center', marginTop: 8 },
 })

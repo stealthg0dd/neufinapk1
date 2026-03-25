@@ -15,6 +15,7 @@ format_clusters_for_ai(clusters)                     -> str
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import time
@@ -49,6 +50,33 @@ POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY") or os.getenv("POLYGON_API_KE
 # Set to 0 in production if using a paid key.
 _AV_REQUEST_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "1.2"))
 
+# ── Provider blacklist (batch-level skip for rate-limited providers) ───────────
+# Maps provider name → expiry epoch.  When a provider signals rate-limit /
+# quota exhaustion, all subsequent calls in this process skip it for 5 minutes.
+_PROVIDER_SKIP: dict[str, float] = {}
+_PROVIDER_SKIP_TTL = 300  # seconds
+
+
+def _is_blacklisted(name: str) -> bool:
+    """Return True if *name* is currently blacklisted (rate-limited)."""
+    exp = _PROVIDER_SKIP.get(name)
+    if exp is None:
+        return False
+    if time.time() > exp:
+        del _PROVIDER_SKIP[name]
+        return False
+    return True
+
+
+def _blacklist(name: str) -> None:
+    """Mark *name* as rate-limited for _PROVIDER_SKIP_TTL seconds."""
+    _PROVIDER_SKIP[name] = time.time() + _PROVIDER_SKIP_TTL
+    print(
+        f"[RiskEngine] Provider '{name}' blacklisted for {_PROVIDER_SKIP_TTL}s "
+        "— skipping for remainder of batch.",
+        file=sys.stderr,
+    )
+
 
 # ── Finnhub daily-closes fallback ─────────────────────────────────────────────
 def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
@@ -56,7 +84,7 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
     Finnhub /stock/candle daily closes — used when AV is rate-limited or premium-blocked.
     Returns an empty Series on any failure.
     """
-    if not FINNHUB_API_KEY:
+    if not FINNHUB_API_KEY or _is_blacklisted('finnhub'):
         return pd.Series(dtype=float, name=sym.upper())
     sym_upper = sym.upper()
     try:
@@ -74,6 +102,9 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
             },
             timeout=8.0,
         )
+        if r.status_code == 429:
+            _blacklist('finnhub')
+            return pd.Series(dtype=float, name=sym_upper)
         data = r.json()
         if data.get("s") != "ok" or not data.get("c"):
             return pd.Series(dtype=float, name=sym_upper)
@@ -97,7 +128,7 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
     Polygon /v2/aggs compact daily closes — second-tier fallback after Finnhub.
     Returns an empty Series on any failure.
     """
-    if not POLYGON_API_KEY:
+    if not POLYGON_API_KEY or _is_blacklisted('polygon'):
         return pd.Series(dtype=float, name=sym.upper())
     sym_upper = sym.upper()
     try:
@@ -109,6 +140,9 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
             params={"adjusted": "true", "sort": "asc", "limit": 300, "apiKey": POLYGON_API_KEY},
             timeout=10.0,
         )
+        if r.status_code == 429:
+            _blacklist('polygon')
+            return pd.Series(dtype=float, name=sym_upper)
         if r.status_code != 200:
             return pd.Series(dtype=float, name=sym_upper)
         data    = r.json()
@@ -161,6 +195,11 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         if _cached and (time.time() - _cached[1]) < _CACHE_TTL:
             return _cached[0]
 
+    # ── Batch blacklist check: skip AV entirely if it was rate-limited earlier ──
+    if _is_blacklisted('av'):
+        series = _fetch_daily_closes_finnhub(sym_upper, days)
+        return series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
+
     if not ALPHA_VANTAGE_API_KEY:
         print(f"[RiskEngine] ALPHA_VANTAGE_API_KEY not set — skipping {sym_upper}", file=sys.stderr)
         return pd.Series(dtype=float, name=sym_upper)
@@ -177,7 +216,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
                 "outputsize": "compact",   # last 100 trading days
                 "apikey":     ALPHA_VANTAGE_API_KEY,
             },
-            timeout=12.0,
+            timeout=20.0,
         )
         r.raise_for_status()
         payload = r.json()
@@ -186,7 +225,8 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
             _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            print(f"[RiskEngine] AV {_reason} for {sym_upper} — trying Finnhub→Polygon fallback", file=sys.stderr)
+            print(f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon", file=sys.stderr)
+            _blacklist('av')
             series = _fetch_daily_closes_finnhub(sym_upper, days)
             if not series.empty:
                 return series
@@ -411,6 +451,46 @@ def build_correlation_matrix(symbols: list[str]) -> pd.DataFrame:
     price_df   = pd.DataFrame(all_series).dropna()
     returns_df = _compute_returns(price_df)
     return _pearson_matrix(returns_df)
+
+
+def build_correlation_matrix_from_series(
+    price_series: dict[str, pd.Series],
+    min_rows: int = 10,
+) -> pd.DataFrame:
+    """
+    Build a Pearson correlation matrix from *pre-fetched* price series.
+    Avoids redundant HTTP calls when data is already available.
+    Returns an empty DataFrame when < 2 symbols have sufficient data.
+    """
+    valid = {sym: s for sym, s in price_series.items() if len(s) >= min_rows}
+    if len(valid) < 2:
+        return pd.DataFrame()
+    price_df   = pd.DataFrame(valid).dropna()
+    returns_df = _compute_returns(price_df)
+    return _pearson_matrix(returns_df)
+
+
+async def fetch_all_closes(
+    symbols: list[str],
+    days: int = 60,
+) -> dict[str, pd.Series]:
+    """
+    Fetch daily closes for *all* symbols **in parallel** using asyncio.gather.
+
+    Each symbol runs in its own thread-pool slot via asyncio.to_thread so the
+    event loop is never blocked.  The module-level provider blacklist ensures
+    that once Alpha Vantage (or Finnhub) signals rate-limiting, every
+    *subsequent* call in the batch skips that provider immediately — instead
+    of retrying it for every remaining ticker.
+
+    Returns a dict mapping upper-case symbol → pd.Series (may be empty on failure).
+    """
+    syms_upper = [s.upper() for s in symbols]
+    results: list[pd.Series] = await asyncio.gather(*[
+        asyncio.to_thread(_fetch_daily_closes_av, sym, days)
+        for sym in syms_upper
+    ])
+    return dict(zip(syms_upper, results))
 
 
 def find_correlation_clusters(

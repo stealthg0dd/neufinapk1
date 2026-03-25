@@ -32,6 +32,7 @@ from config import SUPABASE_URL, SUPABASE_KEY
 _JWKS_URL         = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
 _JWKS_TTL         = 3600.0   # seconds between cache refreshes (1 hour)
 _JWKS_RETRY_AFTER = 60.0     # backoff after a failed fetch
+_JWT_LEEWAY       = 60       # seconds of clock-skew tolerance (Railway ↔ Supabase)
 
 # Prefer the anon key for JWKS — some Supabase instances reject service_role here
 _SUPABASE_ANON_KEY = (
@@ -245,6 +246,7 @@ async def verify_jwt(token: str) -> JWTUser:
                     algorithms=["HS256"],
                     audience="authenticated",
                     options={"verify_aud": True, "verify_exp": True},
+                    leeway=_JWT_LEEWAY,
                 )
                 user_id = payload.get("sub")
                 if not user_id:
@@ -269,6 +271,7 @@ async def verify_jwt(token: str) -> JWTUser:
             algorithms=_ALGORITHMS,
             audience="authenticated",
             options={"verify_aud": True, "verify_exp": True},
+            leeway=_JWT_LEEWAY,
         )
 
     except ExpiredSignatureError as exc:
