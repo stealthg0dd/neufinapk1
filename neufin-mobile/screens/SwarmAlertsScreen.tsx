@@ -15,7 +15,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Dimensions,
-  FlatList,
   Platform,
   RefreshControl,
   ScrollView,
@@ -32,10 +31,12 @@ import Animated, {
 } from 'react-native-reanimated'
 import { BlurView } from 'expo-blur'
 import * as Haptics from 'expo-haptics'
-import { supabase } from '@/lib/supabase'
-import { getLatestSwarmReport, type SwarmReport } from '@/lib/api'
-import { subscribeToSwarmAlerts, fetchRecentAlerts } from '@/lib/notifications'
+import type { SwarmReport } from '@/lib/api'
 import type { MacroAlert } from '@/lib/notifications'
+import { getLatestSwarmReport } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
+
+const API_BASE = 'https://neufin101-production.up.railway.app'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace'
@@ -321,14 +322,14 @@ function AlertCard({ alert }: { alert: MacroAlert }) {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function SwarmAlertsScreen() {
-  const [report,       setReport]       = useState<SwarmReport | null>(null)
+  const [report,        setReport]        = useState<SwarmReport | null>(null)
   const [reportLoading, setReportLoading] = useState(true)
-  const [reportError,  setReportError]  = useState(false)
-  const [alerts,       setAlerts]       = useState<MacroAlert[]>([])
+  const [reportError,   setReportError]   = useState(false)
+  const [alerts,        setAlerts]        = useState<MacroAlert[]>([])
   const [alertsLoading, setAlertsLoading] = useState(true)
-  const [refreshing,   setRefreshing]   = useState(false)
-  const [subscribed,   setSubscribed]   = useState(false)
-  const [subLoading,   setSubLoading]   = useState(false)
+  const [refreshing,    setRefreshing]    = useState(false)
+  const [subscribed,    setSubscribed]    = useState(false)
+  const [subLoading,    setSubLoading]    = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadReport = useCallback(async () => {
@@ -339,49 +340,47 @@ export default function SwarmAlertsScreen() {
       if (!session?.access_token) { setReport(null); return }
       const r = await getLatestSwarmReport(session.access_token)
       setReport(r)
-    } catch {
+    } catch (err) {
+      console.error('[SwarmAlerts] loadReport error:', err)
       setReportError(true)
     } finally {
       setReportLoading(false)
     }
   }, [])
 
-  const loadAlerts = useCallback(async (silent = false) => {
-    if (!silent) setAlertsLoading(true)
-    const data = await fetchRecentAlerts(30)
-    setAlerts(data)
-    if (!silent) setAlertsLoading(false)
+  const loadAlerts = useCallback(async () => {
+    setAlertsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/alerts/recent?limit=20`)
+      if (res.ok) {
+        const data = await res.json()
+        setAlerts(Array.isArray(data) ? data : (data.alerts ?? []))
+      }
+    } catch (err) {
+      console.warn('[SwarmAlerts] loadAlerts error:', err)
+    } finally {
+      setAlertsLoading(false)
+    }
   }, [])
 
   useEffect(() => {
     loadReport()
     loadAlerts()
-    pollRef.current = setInterval(() => loadAlerts(true), 60_000)
+    // Poll alerts every 60 seconds
+    pollRef.current = setInterval(() => loadAlerts(), 60_000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [loadReport, loadAlerts])
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     setRefreshing(true)
-    Promise.all([loadReport(), loadAlerts(true)]).finally(() => setRefreshing(false))
-  }
+    Promise.all([loadReport(), loadAlerts()]).finally(() => setRefreshing(false))
+  }, [loadReport, loadAlerts])
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-    setSubLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const symbols: string[] = []
-      // Use real user portfolio symbols from report if available
-      if (report?.quant_analysis?.top_symbols) {
-        symbols.push(...(report.quant_analysis.top_symbols as string[]).slice(0, 5))
-      }
-      const ok = await subscribeToSwarmAlerts(symbols, 'Neufin Mobile User')
-      setSubscribed(ok)
-      if (ok) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); loadAlerts() }
-    } finally {
-      setSubLoading(false)
-    }
+    setSubscribed(true)
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
   }
 
   const mr   = report?.market_regime    ?? null

@@ -185,7 +185,7 @@ export default function AnalysisScreen({ navigation, route }: Props) {
     setLoadError(false)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) { setReport(null); return }
+      if (!session?.access_token) { setReport(null); setLoading(false); return }
       const r = await getLatestSwarmReport(session.access_token)
       setReport(r)
     } catch {

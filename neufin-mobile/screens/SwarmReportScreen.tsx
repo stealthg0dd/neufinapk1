@@ -21,9 +21,10 @@ import {
 } from 'react-native'
 import { BarChart } from 'react-native-chart-kit'
 import type { StackNavigationProp } from '@react-navigation/stack'
-import { supabase } from '@/lib/supabase'
-import { getLatestSwarmReport, type SwarmReport } from '@/lib/api'
+import type { SwarmReport } from '@/lib/api'
 import type { RootStackParamList } from '@/App'
+import { getLatestSwarmReport } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace'
@@ -69,15 +70,24 @@ export default function SwarmReportScreen({ navigation }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) {
-        setReport(null); setEmptyReason('unauthenticated'); return
+        setReport(null)
+        setEmptyReason('unauthenticated')
+        return
       }
       const r = await getLatestSwarmReport(session.access_token)
-      if (!r) { setReport(null); setEmptyReason('no_data') }
-      else     { setReport(r) }
-    } catch {
-      setReport(null); setEmptyReason('error')
+      if (!r) {
+        setReport(null)
+        setEmptyReason('no_data')
+      } else {
+        setReport(r)
+      }
+    } catch (err) {
+      console.error('[SwarmReport] load error:', err)
+      setReport(null)
+      setEmptyReason('error')
     } finally {
-      setLoading(false); setRefreshing(false)
+      setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 

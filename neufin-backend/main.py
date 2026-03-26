@@ -57,6 +57,7 @@ PUBLIC_PREFIXES = [
     "/api/analytics/track",
     "/api/swarm/",          # Swarm endpoints are public (demo-accessible)
     "/api/admin/health",    # Health diagnostics — no auth required
+    "/api/auth/status",     # Auth status probe — unauthenticated callers get authenticated=false
 ]
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -411,6 +412,70 @@ Return ONLY valid JSON:
 @app.get("/health", tags=["system"])
 def health():
     return {"status": "ok", "service": "neufin-api"}
+
+
+@app.get("/api/auth/status", tags=["auth"])
+async def auth_status(request: Request):
+    """
+    Auth status probe — safe to call unauthenticated.
+
+    Returns:
+      authenticated: true if a valid, non-expired JWT was supplied.
+      user_id:       Supabase UUID of the authenticated user, or null.
+      expires_at:    ISO-8601 UTC timestamp when the token expires, or null.
+      error:         Human-readable rejection reason when authenticated=false.
+
+    Use this endpoint to:
+      - Debug auth issues from the frontend/mobile app.
+      - Gate protected UI sections before attempting protected API calls.
+    """
+    import datetime
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return {
+            "authenticated": False,
+            "user_id":       None,
+            "expires_at":    None,
+            "error":         "No Bearer token supplied",
+        }
+
+    token = auth_header.split(" ", 1)[1]
+    try:
+        from jose import jwt as _jwt
+        # Parse unverified claims first so we can always return expires_at
+        raw_claims = _jwt.get_unverified_claims(token)
+        exp_ts     = raw_claims.get("exp")
+        expires_at = (
+            datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if exp_ts else None
+        )
+
+        user = await verify_jwt(token)
+        return {
+            "authenticated": True,
+            "user_id":       user.id,
+            "expires_at":    expires_at,
+            "error":         None,
+        }
+    except Exception as exc:
+        # Parse expires_at even on failure so callers know whether to refresh
+        try:
+            raw_claims = _jwt.get_unverified_claims(token)   # type: ignore[possibly-undefined]
+            exp_ts     = raw_claims.get("exp")
+            expires_at = (
+                datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%dT%H:%M:%SZ")
+                if exp_ts else None
+            )
+        except Exception:
+            expires_at = None
+
+        return {
+            "authenticated": False,
+            "user_id":       None,
+            "expires_at":    expires_at,
+            "error":         str(exc),
+        }
 
 
 @app.get("/api/admin/health", tags=["system"])
