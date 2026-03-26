@@ -1,0 +1,84 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# Directories to skip entirely
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "alembic/",
+    "node_modules",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "S",   # flake8-bandit (security)
+    "N",   # pep8-naming
+    "RUF", # ruff-specific rules
+]
+ignore = [
+    "E501",  # line too long — enforced by formatter instead
+    "S101",  # assert statements (used in tests)
+    "S104",  # hardcoded binding — intentional in containers
+    "S311",  # random for non-crypto use
+    "B008",  # FastAPI Depends() calls in function defaults are intentional
+    "N803",  # argument names (some pydantic models use CamelCase)
+    "N806",  # variable in function should be lowercase
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S", "B"]  # security + bugbear skipped in tests
+"alembic/**/*.py" = ["ALL"]   # skip everything in alembic migrations
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true
+exclude = ["alembic/", "tests/"]
+# Disallow untyped function bodies that lack return annotations
+disallow_untyped_defs = false
+# Warn on unused ignores (keeps suppression comments clean)
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--tb=short",
+    "--strict-markers",
+    "-q",
+]
+markers = [
+    "unit: fast, no I/O",
+    "integration: hits real Supabase / external APIs",
+    "e2e: full end-to-end flow",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "alembic/*",
+    ".venv/*",
+]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = false

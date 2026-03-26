@@ -1,0 +1,24 @@
+# Bandit security linter configuration for neufin-backend.
+# Run: bandit -r . -c .bandit --exclude ./tests,./alembic
+# CI also runs: bandit -r . -x ./tests,./alembic -ll
+
+[bandit]
+# Severity threshold: only report medium+ severity findings.
+# LOW items (e.g. hardcoded /tmp paths) are too noisy for this codebase.
+severity = medium
+
+# Confidence threshold: skip low-confidence guesses.
+confidence = medium
+
+# Directories to always skip (relative to the project root).
+exclude_dirs =
+    tests
+    alembic
+    .venv
+    node_modules
+
+# Tests to skip globally — each has a documented reason.
+# B101 — assert statements are used in tests only; excluded above.
+# B104 — binding 0.0.0.0 is intentional for containerised deployments.
+# B311 — random is used for non-cryptographic ID generation (report_id UUIDs use uuid4).
+skips = B101,B104,B311

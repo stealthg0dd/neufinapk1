@@ -1,18 +1,25 @@
 /**
  * instrumentation.ts — Next.js 15+ instrumentation hook.
  *
- * This file is required by Next.js 15+ to resolve the
- * `private-next-instrumentation-client` internal module.
- * Add SDK initialisation here if needed (e.g. OpenTelemetry).
+ * Initialises Sentry for the Node.js and Edge runtimes.  The client-side
+ * counterpart lives in sentry.client.config.ts (loaded automatically by
+ * the @sentry/nextjs webpack plugin via withSentryConfig in next.config.js).
  */
 export async function register() {
-  // No-op: no server-side instrumentation configured yet.
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./sentry.server.config");
+  }
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config");
+  }
 }
 
 export async function onRequestError(
-  _err: unknown,
-  _request: { path: string; method: string },
-  _context: { routeType: string },
+  err: unknown,
+  request: { path: string; method: string },
+  context: { routeType: string },
 ) {
-  // No-op: extend here to forward errors to an error-tracking service.
+  const { captureRequestError } = await import("@sentry/nextjs");
+  captureRequestError(err, request, context);
 }
+

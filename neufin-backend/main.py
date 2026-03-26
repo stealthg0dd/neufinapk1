@@ -15,6 +15,34 @@ try:
 except ImportError:
     pass
 
+# ── Observability: Sentry (initialise before any app code) ────────────────────
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
+
+_SENTRY_DSN = os.getenv("SENTRY_DSN")
+if _SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        integrations=[
+            StarletteIntegration(transaction_style="endpoint"),
+            FastApiIntegration(transaction_style="endpoint"),
+        ],
+        # Capture 10 % of transactions for performance monitoring in production.
+        # Increase to 1.0 in staging/dev via SENTRY_TRACES_SAMPLE_RATE env var.
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        environment=os.getenv("APP_ENV", "production"),
+        release=os.getenv("APP_VERSION", "1.1.0"),
+        # Strip PII from events
+        send_default_pii=False,
+    )
+
+# ── Observability: structured logging ─────────────────────────────────────────
+import structlog
+from services.logging_config import configure_logging
+configure_logging()
+logger = structlog.get_logger("neufin.main")
+
 import pandas as pd
 from fastapi import FastAPI, UploadFile, HTTPException, Request, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +68,7 @@ from services.risk_engine import (
 # calculator.py prints its own key confirmation on import — no need to repeat here
 
 # ── Auth config ────────────────────────────────────────────────────────────────
-PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
+PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json", "/metrics"}
 PUBLIC_PREFIXES = [
     "/api/analyze-dna",
     "/api/dna/share/",
@@ -66,6 +94,21 @@ app = FastAPI(
     description="AI Portfolio Intelligence Platform",
     version="1.1.0",
 )
+
+# ── Observability: Prometheus metrics endpoint (/metrics) ─────────────────────
+# Tracks HTTP request count, latency histograms, and in-flight requests by
+# default.  Exposed at GET /metrics — excluded from auth middleware via
+# PUBLIC_PATHS above.
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator(
+        should_group_status_codes=True,
+        should_ignore_untemplated=True,
+        should_respect_env_var=False,
+        excluded_handlers=["/metrics", "/health"],
+    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=True, tags=["system"])
+except ImportError:
+    logger.warning("prometheus_fastapi_instrumentator not installed; /metrics unavailable")
 
 # ── CORS origins — dynamic: base set + optional ALLOWED_ORIGINS env var ─────────
 # Add production domains to Railway env: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
@@ -151,8 +194,7 @@ async def auth_middleware(request: Request, call_next):
         try:
             request.state.user = await verify_jwt(token)
         except Exception as exc:
-            print(f"[Auth] Token rejected (proceeding as anonymous): {exc}",
-                  file=sys.stderr)
+            logger.warning("auth.token_rejected", path=request.url.path, reason=str(exc))
             request.state.user = None
     else:
         request.state.user = None

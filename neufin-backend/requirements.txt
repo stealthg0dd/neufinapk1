@@ -46,3 +46,8 @@ python-jose[cryptography]==3.3.0
 
 # Field-level encryption (AES-256-GCM)
 cryptography>=42.0.0
+
+# Observability
+sentry-sdk[fastapi]>=2.0.0
+structlog>=24.1.0
+prometheus-fastapi-instrumentator>=7.0.0
