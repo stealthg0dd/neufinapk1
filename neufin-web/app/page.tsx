@@ -24,6 +24,18 @@ const features = [
   },
 ]
 
+const investorSteps = [
+  { step: '1', label: 'Upload your portfolio CSV' },
+  { step: '2', label: 'Receive your DNA score & analysis' },
+  { step: '3', label: 'Save to vault — or buy the full PDF' },
+]
+
+const advisorSteps = [
+  { step: '1', label: 'Sign up & add your firm branding' },
+  { step: '2', label: 'Upload any client portfolio' },
+  { step: '3', label: 'Download a white-label PDF report' },
+]
+
 const stats = [
   { value: 10,    suffix: 's',   label: 'Analysis time' },
   { value: 4,     suffix: ' AI', label: 'Models with fallback' },
@@ -92,6 +104,9 @@ export default function LandingPage() {
             </Link>
             <Link href="/swarm" className="btn-outline py-2 text-sm">
               Swarm
+            </Link>
+            <Link href="/advisor/dashboard" className="btn-outline py-2 text-sm">
+              For Advisors
             </Link>
             <Link href="/dashboard" className="btn-primary py-2 text-sm">
               Dashboard
@@ -183,6 +198,95 @@ export default function LandingPage() {
                 <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Two-track user journey ──────────────────────────────────────────── */}
+      <section className="py-20 px-6 border-t border-gray-800/60">
+        <div className="max-w-5xl mx-auto">
+          <motion.h2
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-80px' }}
+            className="text-3xl font-bold text-center mb-3"
+          >
+            Who is Neufin for?
+          </motion.h2>
+          <motion.p
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-80px' }}
+            className="text-gray-400 text-center mb-12"
+          >
+            Two journeys, one platform. Pick yours.
+          </motion.p>
+
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="grid md:grid-cols-2 gap-6"
+          >
+            {/* Retail Investor Card */}
+            <motion.div
+              variants={springScale}
+              className="glass-card rounded-2xl p-8 flex flex-col gap-6 border-blue-500/20 hover:border-blue-500/40 transition-all duration-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-xl">🧬</div>
+                <div>
+                  <p className="text-xs text-blue-400 font-medium uppercase tracking-wider">Retail Investor</p>
+                  <h3 className="text-lg font-bold">Understand your own portfolio</h3>
+                </div>
+              </div>
+              <ol className="space-y-3">
+                {investorSteps.map(({ step, label }) => (
+                  <li key={step} className="flex items-center gap-3 text-sm text-gray-300">
+                    <span className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold shrink-0">{step}</span>
+                    {label}
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-auto flex flex-col gap-2">
+                <Link href="/upload" className="btn-primary text-sm text-center py-3">
+                  Get My DNA Score — Free →
+                </Link>
+                <p className="text-xs text-gray-500 text-center">No account required · results in &lt; 10 s</p>
+              </div>
+            </motion.div>
+
+            {/* Financial Advisor Card */}
+            <motion.div
+              variants={springScale}
+              className="glass-card rounded-2xl p-8 flex flex-col gap-6 border-purple-500/20 hover:border-purple-500/40 transition-all duration-200"
+              style={{ background: 'linear-gradient(135deg, rgba(88,28,135,0.15) 0%, rgba(30,58,138,0.1) 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-xl">💼</div>
+                <div>
+                  <p className="text-xs text-purple-400 font-medium uppercase tracking-wider">Financial Advisor</p>
+                  <h3 className="text-lg font-bold">White-label reports for clients</h3>
+                </div>
+              </div>
+              <ol className="space-y-3">
+                {advisorSteps.map(({ step, label }) => (
+                  <li key={step} className="flex items-center gap-3 text-sm text-gray-300">
+                    <span className="w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold shrink-0">{step}</span>
+                    {label}
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-auto flex flex-col gap-2">
+                <Link href="/auth?next=/onboarding&user_type=advisor" className="btn-outline border-purple-500/40 text-purple-300 hover:bg-purple-500/10 text-sm text-center py-3 rounded-xl">
+                  Start as an Advisor →
+                </Link>
+                <p className="text-xs text-gray-500 text-center">$99 / mo for unlimited reports</p>
+              </div>
+            </motion.div>
           </motion.div>
         </div>
       </section>

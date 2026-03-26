@@ -1,10 +1,13 @@
 import './global.css'
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
+import { View, ActivityIndicator } from 'react-native'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as Sentry from '@sentry/react-native'
+import { supabase } from '@/lib/supabase'
+import LoginScreen from '@/screens/LoginScreen'
 import PortfolioSyncScreen from '@/screens/PortfolioSyncScreen'
 import AnalysisScreen from '@/screens/AnalysisScreen'
 import SwarmReportScreen from '@/screens/SwarmReportScreen'
@@ -48,6 +51,46 @@ const DarkTheme = {
 }
 
 export default Sentry.wrap(function App() {
+  // ── Auth state ─────────────────────────────────────────────────────────────
+  // Three states: null = checking (show splash), false = unauthenticated
+  // (show LoginScreen), true = authenticated (show main stack).
+  const [authed, setAuthed] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    // Fast path: check for an existing session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthed(Boolean(session))
+    })
+
+    // Subscribe to auth state changes (sign-in / sign-out / token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setAuthed(Boolean(session))
+      },
+    )
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // ── Splash while checking auth ─────────────────────────────────────────────
+  if (authed === null) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#030712', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color="#3b82f6" size="large" />
+      </View>
+    )
+  }
+
+  // ── Unauthenticated: show dedicated login screen ───────────────────────────
+  if (!authed) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <StatusBar style="light" />
+        <LoginScreen onAuthSuccess={() => setAuthed(true)} />
+      </GestureHandlerRootView>
+    )
+  }
+
+  // ── Authenticated: main navigation stack ──────────────────────────────────
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer theme={DarkTheme}>

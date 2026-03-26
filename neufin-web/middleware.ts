@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 // Routes that require authentication
-const PROTECTED = ['/dashboard', '/vault', '/swarm']
+const PROTECTED = ['/dashboard', '/vault', '/swarm', '/onboarding', '/advisor']
 
 // Backend auth-status probe URL
 const API_AUTH_STATUS = 'https://neufin101-production.up.railway.app/api/auth/status'
@@ -70,5 +70,5 @@ function redirectToAuth(request: NextRequest, pathname: string) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/vault/:path*', '/swarm/:path*'],
+  matcher: ['/dashboard/:path*', '/vault/:path*', '/swarm/:path*', '/onboarding/:path*', '/advisor/:path*'],
 }

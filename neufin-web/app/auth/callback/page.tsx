@@ -95,6 +95,27 @@ function AuthCallbackContent() {
         }
       }
 
+      // ── New-user onboarding check ───────────────────────────────────────
+      // If the user has never completed onboarding (no user_metadata.onboarding_complete),
+      // send them through the onboarding flow first. Store the original destination
+      // so onboarding can redirect there after collecting user_type.
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user && !user.user_metadata?.onboarding_complete) {
+          console.log(`${TAG} New user — redirecting to onboarding`)
+          // Preserve the original intended destination so onboarding can redirect there.
+          localStorage.setItem('onboarding_next', next)
+          // If the sign-in URL hints at user_type (from the advisor CTA), pass it along.
+          const userTypeHint = searchParams.get('user_type')
+          const qs = userTypeHint ? `?user_type=${userTypeHint}` : ''
+          router.replace(`/onboarding${qs}`)
+          return
+        }
+      } catch (checkErr) {
+        // Non-fatal — log and fall through to normal redirect
+        console.warn(`${TAG} Onboarding check failed (non-fatal):`, checkErr)
+      }
+
       console.log(`${TAG} Redirecting to: ${next}`)
       router.replace(next)
     }
