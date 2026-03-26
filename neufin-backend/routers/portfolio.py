@@ -1,13 +1,15 @@
 import datetime
 import requests
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from pydantic import BaseModel
 from typing import Optional
 from database import supabase, encrypt_value, decrypt_value
 from services.calculator import calculate_portfolio_metrics, _fetch_prices, verify_price_integrity
 from services.ai_router import get_ai_analysis
 from services.risk_engine import build_risk_report
+from services.auth_dependency import get_current_user
+from services.jwt_auth import JWTUser
 from config import FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
@@ -265,6 +267,83 @@ async def get_portfolio_sentiment(portfolio_id: str):
         return {"sentiment": sentiment_result.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/list")
+async def list_portfolios(user: JWTUser = Depends(get_current_user)):
+    """
+    List all portfolios for the authenticated user.
+
+    Returns a PortfolioSummary array matching the mobile app interface:
+      portfolio_id, portfolio_name, total_value, dna_score,
+      positions_count, created_at
+
+    positions_count is derived from portfolio_positions rows.
+    dna_score is pulled from the user's most recent DNA analysis record.
+    """
+    # ── 1. Fetch portfolios ────────────────────────────────────────────────────
+    try:
+        port_result = (
+            supabase.table("portfolios")
+            .select("id, name, total_value, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch portfolios: {exc}")
+
+    portfolios = port_result.data or []
+    if not portfolios:
+        return []
+
+    portfolio_ids = [p["id"] for p in portfolios]
+
+    # ── 2. Fetch position counts in a single query ─────────────────────────────
+    counts: dict[str, int] = {}
+    try:
+        pos_result = (
+            supabase.table("portfolio_positions")
+            .select("portfolio_id")
+            .in_("portfolio_id", portfolio_ids)
+            .execute()
+        )
+        for row in (pos_result.data or []):
+            pid = row["portfolio_id"]
+            counts[pid] = counts.get(pid, 0) + 1
+    except Exception:
+        pass  # non-fatal — positions_count will default to 0
+
+    # ── 3. Fetch latest DNA score for this user ────────────────────────────────
+    # dna_scores are stored per-analysis, not per-portfolio.  Return the most
+    # recent score as a best-effort value; null if none exist yet.
+    latest_dna: int | None = None
+    try:
+        dna_result = (
+            supabase.table("dna_scores")
+            .select("dna_score")
+            .eq("user_id", user.id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if dna_result.data:
+            latest_dna = dna_result.data[0].get("dna_score")
+    except Exception:
+        pass  # non-fatal — dna_score will be null
+
+    # ── 4. Shape response ──────────────────────────────────────────────────────
+    return [
+        {
+            "portfolio_id":    p["id"],
+            "portfolio_name":  p["name"],
+            "total_value":     p.get("total_value") or 0,
+            "dna_score":       latest_dna,
+            "positions_count": counts.get(p["id"], 0),
+            "created_at":      p["created_at"],
+        }
+        for p in portfolios
+    ]
 
 
 @router.get("/user/{user_id}")

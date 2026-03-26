@@ -11,7 +11,7 @@ import re
 import uuid
 import json
 import sys
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 from typing import Any, Literal
 
@@ -50,6 +50,8 @@ def _sanitize_message(message: str) -> str | None:
 
 from services.agent_swarm import run_swarm, chat_with_swarm
 from services.ai_router import get_ai_analysis
+from services.auth_dependency import get_current_user
+from services.jwt_auth import JWTUser
 from database import supabase
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
@@ -114,6 +116,15 @@ async def _persist_swarm_result(report_id: str, user_id: str | None, result: dic
             "sharpe_ratio":         thesis.get("sharpe_ratio"),
             "regime":               thesis.get("regime"),
             "agent_trace":          result.get("agent_trace", []),
+            # ── Rich nested agent outputs ─────────────────────────────────────
+            # These fields are populated by the synthesizer and stored as JSONB
+            # so that /api/swarm/report/latest can return fully structured data.
+            "market_regime":        thesis.get("market_regime"),
+            "quant_analysis":       thesis.get("quant_analysis"),
+            "tax_report":           thesis.get("tax_report"),
+            "risk_sentinel":        thesis.get("risk_sentinel"),
+            "alpha_scout":          thesis.get("alpha_scout"),
+            "strategist_intel":     thesis.get("strategist_intel"),
         }
         # Run the synchronous Supabase call in a thread so we don't block the event loop
         await asyncio.to_thread(
@@ -252,6 +263,107 @@ async def analyze_with_swarm(
             "sharpe_ratio":   str(thesis.get("sharpe_ratio") or ""),
             "regime":         str(thesis.get("regime") or ""),
         },
+    }
+
+
+@router.get("/report/latest")
+async def get_latest_report(user: JWTUser = Depends(get_current_user)):
+    """
+    Return the authenticated user's most recent swarm report.
+
+    Shapes the raw DB row into the SwarmReport interface expected by the
+    mobile app and web frontend:
+      swarm_report_id, briefing, regime, dna_score,
+      market_regime, quant_analysis, tax_report,
+      risk_sentinel, alpha_scout, strategist_intel, created_at
+
+    Returns 404 if the user has never run a swarm analysis.
+    """
+    try:
+        result = (
+            supabase.table("swarm_reports")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not fetch swarm report: {exc}")
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="No swarm report found for this user.")
+
+    row = result.data[0]
+
+    # ── Shape response ─────────────────────────────────────────────────────────
+    # Fields stored by _persist_swarm_result (flat scalar fields):
+    #   dna_score, briefing, regime, weighted_beta, sharpe_ratio,
+    #   score_breakdown, top_risks, risk_factors, agent_trace, created_at
+    #
+    # New fields added by the updated _persist_swarm_result (rich JSON objects):
+    #   market_regime, risk_sentinel, alpha_scout, strategist_intel,
+    #   quant_analysis, tax_report
+    #
+    # For reports persisted before the schema update we reconstruct the nested
+    # objects from the flat scalars so old records remain readable.
+
+    score_bd    = row.get("score_breakdown") or {}
+    hhi_pts     = score_bd.get("hhi_concentration")
+
+    # market_regime — use stored object if present, else reconstruct minimum
+    market_regime = row.get("market_regime") or {
+        "regime":     row.get("regime"),
+        "confidence": None,
+        "cpi_yoy":    None,
+        "portfolio_implication": row.get("macro_advice"),
+    }
+
+    # quant_analysis — use stored object if present, else reconstruct from flat fields
+    quant_analysis = row.get("quant_analysis") or {
+        "hhi_pts":        hhi_pts,
+        "weighted_beta":  row.get("weighted_beta"),
+        "sharpe_ratio":   row.get("sharpe_ratio"),
+        "avg_corr":       None,
+        "beta_map":       {},
+    }
+
+    # tax_report — use stored object if present, else reconstruct from flat recommendation
+    tax_report = row.get("tax_report") or {
+        "available":             bool(row.get("tax_recommendation")),
+        "total_liability":       None,
+        "harvest_opportunities": [],
+        "tax_drag_pct":          None,
+        "narrative":             row.get("tax_recommendation"),
+    }
+
+    # risk_sentinel — use stored object if present, else reconstruct from flat lists
+    primary_risks = (
+        row.get("risk_factors") or row.get("top_risks") or []
+    )
+    risk_sentinel = row.get("risk_sentinel") or {
+        "risk_level":    "medium",
+        "risk_score":    None,
+        "primary_risks": primary_risks,
+        "mitigations":   [],
+    }
+
+    # alpha_scout / strategist_intel — stored directly after schema update
+    alpha_scout     = row.get("alpha_scout")     or {"opportunities": [], "watchlist": []}
+    strategist_intel = row.get("strategist_intel") or {}
+
+    return {
+        "swarm_report_id":  row["id"],
+        "briefing":         row.get("briefing") or row.get("headline"),
+        "regime":           row.get("regime"),
+        "dna_score":        row.get("dna_score"),
+        "market_regime":    market_regime,
+        "quant_analysis":   quant_analysis,
+        "tax_report":       tax_report,
+        "risk_sentinel":    risk_sentinel,
+        "alpha_scout":      alpha_scout,
+        "strategist_intel": strategist_intel,
+        "created_at":       row.get("created_at"),
     }
 
 
