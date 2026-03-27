@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import { supabase, type AuthUser } from './supabase'
+import * as Sentry from '@sentry/nextjs'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -43,6 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null)
       setToken(session?.access_token ?? null)
       setLoading(false)
+      // Attach user identity to all future Sentry events
+      if (session?.user) {
+        Sentry.setUser({ id: session.user.id, email: session.user.email })
+      } else {
+        Sentry.setUser(null)
+      }
     })
 
     return () => listener.subscription.unsubscribe()

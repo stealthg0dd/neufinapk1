@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
 import { PostHogProvider } from '@/lib/posthog'
+import { WebVitals } from '@/app/components/WebVitals'
 
 // Using `variable` mode avoids the server/client className mismatch that causes
 // Next.js hydration warnings. The CSS variable is applied consistently on both sides.
@@ -154,6 +155,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <PostHogProvider>
           <AuthProvider>
+            <WebVitals />
             {children}
           </AuthProvider>
         </PostHogProvider>

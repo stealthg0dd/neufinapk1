@@ -66,6 +66,12 @@ export default Sentry.wrap(function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setAuthed(Boolean(session))
+        // Attach user identity to all future Sentry events
+        if (session?.user) {
+          Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined })
+        } else {
+          Sentry.setUser(null)
+        }
       },
     )
     return () => subscription.unsubscribe()

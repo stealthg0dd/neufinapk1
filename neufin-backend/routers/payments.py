@@ -14,6 +14,7 @@ GET  /api/reports/fulfill   → After payment, generate PDF and return URL
 
 import asyncio
 import stripe
+import sentry_sdk
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -269,7 +270,8 @@ async def stripe_webhook(request: Request):
                     "trial_ends_at":     None,
                 }).eq("id", advisor_id).execute()
             except Exception as e:
-                print(f"[Webhook] subscription upgrade failed: {e}")
+                sentry_sdk.set_tag("stripe_event_type", "subscription_upgrade")
+                sentry_sdk.capture_exception(e)
 
     elif event["type"] == "customer.subscription.deleted":
         # Downgrade if subscription cancelled
@@ -284,7 +286,8 @@ async def stripe_webhook(request: Request):
                     "subscription_tier": "free",
                 }).eq("id", advisor_id).execute()
         except Exception as e:
-            print(f"[Webhook] subscription downgrade failed: {e}")
+            sentry_sdk.set_tag("stripe_event_type", "subscription_deleted")
+            sentry_sdk.capture_exception(e)
 
     return {"status": "ok"}
 
