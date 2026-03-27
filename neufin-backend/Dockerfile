@@ -48,11 +48,11 @@ EXPOSE 8000
 #
 # Override for the Celery worker container:
 #   command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=info", "--queues=swarm,default"]
-CMD ["gunicorn", "main:app", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--workers", "2", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "300", \
-     "--keep-alive", "5", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+CMD sh -c 'exec gunicorn main:app \
+     --worker-class uvicorn.workers.UvicornWorker \
+     --workers 2 \
+     --bind 0.0.0.0:${PORT:-8000} \
+     --timeout 300 \
+     --keep-alive 5 \
+     --access-logfile - \
+     --error-logfile -'
