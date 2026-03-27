@@ -1,15 +1,8 @@
 # Bandit security linter configuration for neufin-backend.
-# Run: bandit -r . -c .bandit --exclude ./tests,./alembic
-# CI also runs: bandit -r . -x ./tests,./alembic -ll
+# Run: bandit -r . --exclude ./tests,./alembic
+# CI also runs: bandit -r . -x ./tests,./alembic
 
 [bandit]
-# Severity threshold: only report medium+ severity findings.
-# LOW items (e.g. hardcoded /tmp paths) are too noisy for this codebase.
-severity = medium
-
-# Confidence threshold: skip low-confidence guesses.
-confidence = medium
-
 # Directories to always skip (relative to the project root).
 exclude_dirs =
     tests

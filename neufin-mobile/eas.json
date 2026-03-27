@@ -8,9 +8,10 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "ANDROID_HOME": "/opt/homebrew/share/android-commandlinetools",
         "EXPO_PUBLIC_API_URL": "https://neufin101-production.up.railway.app",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR_SUPABASE_PROJECT.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR_SUPABASE_ANON_KEY"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://gpczchjipalfgkfqamcu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwY3pjaGppcGFsZmdrZnFhbWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwNzgxMjIsImV4cCI6MjA3MzY1NDEyMn0.MCPjoXNNdtFmGjvDKVFxFXi5ff-0Lp366nkVOkEBWa8"
       }
     },
     "preview": {
@@ -18,10 +19,12 @@
         "buildType": "apk"
       },
       "distribution": "internal",
+      "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://neufin101-production.up.railway.app",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR_SUPABASE_PROJECT.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR_SUPABASE_ANON_KEY"
+        "ANDROID_HOME": "/opt/homebrew/share/android-commandlinetools",
+        "EXPO_PUBLIC_API_URL": "https://neufin101-staging.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://gpczchjipalfgkfqamcu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwY3pjaGppcGFsZmdrZnFhbWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwNzgxMjIsImV4cCI6MjA3MzY1NDEyMn0.MCPjoXNNdtFmGjvDKVFxFXi5ff-0Lp366nkVOkEBWa8"
       }
     },
     "production": {
@@ -31,9 +34,10 @@
       "autoIncrement": true,
       "channel": "production",
       "env": {
+        "ANDROID_HOME": "/opt/homebrew/share/android-commandlinetools",
         "EXPO_PUBLIC_API_URL": "https://neufin101-production.up.railway.app",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://YOUR_SUPABASE_PROJECT.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR_SUPABASE_ANON_KEY"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://gpczchjipalfgkfqamcu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwY3pjaGppcGFsZmdrZnFhbWN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwNzgxMjIsImV4cCI6MjA3MzY1NDEyMn0.MCPjoXNNdtFmGjvDKVFxFXi5ff-0Lp366nkVOkEBWa8"
       }
     }
   },

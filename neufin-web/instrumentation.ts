@@ -16,10 +16,13 @@ export async function register() {
 
 export async function onRequestError(
   err: unknown,
-  request: { path: string; method: string },
+  // Next.js 15 passes { path, method, headers }; Sentry v10 accepts RequestInfo
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  request: any,
   context: { routeType: string },
 ) {
   const { captureRequestError } = await import("@sentry/nextjs");
-  captureRequestError(err, request, context);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  captureRequestError(err, request, context as any);
 }
 
