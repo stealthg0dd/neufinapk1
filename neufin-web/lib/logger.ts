@@ -59,7 +59,9 @@ function makeServerLogger(): Logger {
   const pino = require("pino") as typeof import("pino");
   const isProd = process.env.NODE_ENV === "production";
 
-  const instance = pino.default({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pinoFn = ((pino as any).default ?? pino) as (opts: unknown) => import("pino").Logger;
+  const instance = pinoFn({
     level:      process.env.LOG_LEVEL ?? "info",
     // In production emit compact JSON; in dev use pino-pretty for readability.
     transport:  isProd

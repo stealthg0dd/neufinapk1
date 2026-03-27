@@ -22,6 +22,7 @@ export async function onRequestError(
   context: { routeType: string },
 ) {
   const { captureRequestError } = await import("@sentry/nextjs");
-  captureRequestError(err, request, context);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  captureRequestError(err, request, context as any);
 }
 
