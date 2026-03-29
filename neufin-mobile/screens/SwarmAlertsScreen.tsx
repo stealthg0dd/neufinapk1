@@ -36,7 +36,7 @@ import type { MacroAlert } from '@/lib/notifications'
 import { getLatestSwarmReport } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 
-const API_BASE = 'https://neufin101-production.up.railway.app'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://neufin101-production.up.railway.app'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace'

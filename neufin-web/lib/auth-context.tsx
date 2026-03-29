@@ -1,7 +1,9 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
-import { supabase, type AuthUser } from './supabase'
+import { supabase, attachSupabaseAuthDebug, type AuthUser } from './supabase'
+import { debugAuth } from './auth-debug'
+import { syncAuthCookie } from './sync-auth-cookie'
 import * as Sentry from '@sentry/nextjs'
 
 interface AuthContextValue {
@@ -32,18 +34,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    debugAuth('AuthProvider:mount')
+
     // Hydrate from current session on mount
     supabase.auth.getSession().then(({ data }) => {
+      console.log('[AuthContext] Initial getSession:', {
+        hasSession: Boolean(data.session),
+        hasToken: Boolean(data.session?.access_token),
+        userId: data.session?.user?.id ?? null,
+      })
       setUser(data.session?.user ?? null)
       setToken(data.session?.access_token ?? null)
       setLoading(false)
+      syncAuthCookie(data.session ?? null)
+      debugAuth('AuthProvider:getSession')
     })
 
     // Keep token in sync on every auth event, including TOKEN_REFRESHED
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthContext] User state:', session?.user ?? null)
+      console.log('[AuthContext] Token:', session?.access_token ?? null)
+      console.log('[AuthContext] Auth event:', event)
       setUser(session?.user ?? null)
       setToken(session?.access_token ?? null)
       setLoading(false)
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        syncAuthCookie(session ?? null)
+      }
+
+      if (event === 'SIGNED_OUT') {
+        syncAuthCookie(null)
+      }
+
+      debugAuth(`AuthProvider:${event}`)
       // Attach user identity to all future Sentry events
       if (session?.user) {
         Sentry.setUser({ id: session.user.id, email: session.user.email })
@@ -52,10 +76,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => listener.subscription.unsubscribe()
+    // Proactively refresh the session every 5 minutes so the neufin-auth cookie
+    // stays valid for long-lived browser tabs. The Supabase SDK silently rotates
+    // the access token when it's near expiry; we re-sync the cookie each time.
+    const refreshInterval = setInterval(async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        console.log('[AuthContext] Proactive session refresh — syncing cookie')
+        syncAuthCookie(data.session)
+        setToken(data.session.access_token)
+      }
+    }, 5 * 60 * 1000)
+
+    const detachSupabaseDebug = attachSupabaseAuthDebug()
+
+    return () => {
+      listener.subscription.unsubscribe()
+      clearInterval(refreshInterval)
+      detachSupabaseDebug()
+    }
   }, [])
 
   const signOut = async () => {
+    syncAuthCookie(null)
     await supabase.auth.signOut()
   }
 

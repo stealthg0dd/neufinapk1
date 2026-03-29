@@ -11,7 +11,7 @@ import ProgressCircle from '@/components/ProgressCircle'
 import type { RootStackParamList } from '@/App'
 import type { Position } from '@/lib/api'
 
-const API = 'https://neufin101-production.up.railway.app'
+const API = process.env.EXPO_PUBLIC_API_URL ?? 'https://neufin101-production.up.railway.app'
 
 type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Results'>
@@ -220,7 +220,7 @@ export default function ResultsScreen({ navigation, route }: Props) {
       {/* ── Strengths ──────────────────────────────────────────────────── */}
       <View style={styles.card}>
         <Text style={[styles.sectionTitle, { color: '#22c55e' }]}>💪 Strengths</Text>
-        {result.strengths.map((s, i) => (
+        {result.strengths.map((s: string, i: number) => (
           <View key={i} style={styles.listRow}>
             <Text style={styles.listCheck}>✓</Text>
             <Text style={styles.listText}>{s}</Text>
@@ -231,7 +231,7 @@ export default function ResultsScreen({ navigation, route }: Props) {
       {/* ── Weaknesses ─────────────────────────────────────────────────── */}
       <View style={styles.card}>
         <Text style={[styles.sectionTitle, { color: '#f59e0b' }]}>⚠️ Watch out</Text>
-        {result.weaknesses.map((w, i) => (
+        {result.weaknesses.map((w: string, i: number) => (
           <View key={i} style={styles.listRow}>
             <Text style={[styles.listCheck, { color: '#f59e0b' }]}>!</Text>
             <Text style={styles.listText}>{w}</Text>

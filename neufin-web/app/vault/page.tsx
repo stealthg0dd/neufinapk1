@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
+import { debugAuth } from '@/lib/auth-debug'
 import { useUser } from '@/lib/store'
 import {
   getVaultHistory,
@@ -43,6 +44,10 @@ export default function VaultPage() {
   const [query,         setQuery]         = useState('')
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalError,   setPortalError]   = useState<string | null>(null)
+
+  useEffect(() => {
+    debugAuth('vault:mount')
+  }, [])
 
   useEffect(() => {
     if (!token) { setFetching(false); return }

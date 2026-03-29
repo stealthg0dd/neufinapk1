@@ -1,0 +1,37 @@
+version: "3.9"
+
+# Staging stack — mirrors production, uses test secrets
+# Usage: docker-compose -f infrastructure/docker/docker-compose.staging.yml up
+
+services:
+  neufin-backend:
+    image: ghcr.io/varunsrivastava/neufin-backend:staging
+    ports:
+      - "8000:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY_TEST}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET_TEST}
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY}
+      - FERNET_KEY=${FERNET_KEY}
+      - REDIS_URL=redis://redis:6379/0
+      - APP_BASE_URL=https://neufin101-staging.up.railway.app
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-staging:/data
+
+volumes:
+  redis-staging:

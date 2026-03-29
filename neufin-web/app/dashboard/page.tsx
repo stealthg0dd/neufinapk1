@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
+import { debugAuth } from '@/lib/auth-debug'
 import {
   ResponsiveContainer,
   LineChart,
@@ -75,7 +75,6 @@ function SignalBadge({ type }: { type: string }) {
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
 export default function DashboardPage() {
-  const router = useRouter()
   const { user, loading: authLoading, signOut, token } = useAuth()
   const [result, setResult] = useState<DNAResult | null>(null)
   const [selectedSymbol, setSelectedSymbol] = useState<string>('')
@@ -86,10 +85,9 @@ export default function DashboardPage() {
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
 
-  // Auth guard — redirect unauthenticated users to sign-in
   useEffect(() => {
-    if (!authLoading && !user) router.replace('/auth?next=/dashboard')
-  }, [authLoading, user, router])
+    debugAuth('dashboard:mount')
+  }, [])
 
   // Load result from sessionStorage
   useEffect(() => {
@@ -160,6 +158,14 @@ export default function DashboardPage() {
   const lastHistValue = portfolioHistory[portfolioHistory.length - 1]?.value ?? result?.total_value ?? 0
   const firstHistValue = portfolioHistory[0]?.value ?? lastHistValue
   const pctChange = firstHistValue ? ((lastHistValue - firstHistValue) / firstHistValue) * 100 : 0
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   if (!result) {
     return (

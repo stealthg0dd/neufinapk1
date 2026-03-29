@@ -1,0 +1,127 @@
+ROUTING AND AUTH ANALYSIS
+=========================
+
+Task 1: Complete route map
+--------------------------
+A full route inventory and per-route auth/link mapping is documented in:
+- routing-map.md
+
+Total mapped files:
+- 33 route/layout/api files under app/
+
+Task 2: Auth flow trace
+-----------------------
+
+1) middleware.ts
+- Protected route prefixes: /dashboard, /vault, /swarm, /onboarding, /advisor
+- Matcher: ['/dashboard/:path*', '/vault/:path*', '/swarm/:path*', '/onboarding/:path*', '/advisor/:path*']
+- Token read order:
+  1. cookie 'neufin-auth'
+  2. cookie 'sb-access-token'
+  3. Authorization Bearer header
+- If token missing: redirect to /auth?next=<pathname>
+- If token present: probes backend /api/auth/status
+- If backend says unauthenticated: redirect /auth?next=<pathname>&reason=token_invalid and clear cookies
+- If backend probe fails: request is allowed through (fallback), relying on client-side guard
+
+2) lib/auth-context.tsx
+- Auth state source: Supabase getSession() on mount + onAuthStateChange listener
+- Logged in condition: `session?.user` exists (user != null)
+- Token source in context: `session?.access_token`
+- Token retrieval helper: getAccessToken() calls getSession() for refresh-capable token fetch
+
+3) lib/supabase.ts
+- Session persistence: localStorage, storageKey='neufin-auth', persistSession=true
+- No cookie write in this module
+- Added debug listener helper (attachSupabaseAuthDebug)
+
+4) Protected page client checks
+- /dashboard: explicit router.replace('/auth?next=/dashboard')
+- /onboarding: explicit router.replace('/auth?next=/onboarding...') when token absent
+- /vault: conditional sign-in page when unauthenticated
+- /advisor/dashboard and /advisor/settings: conditional sign-in page when unauthenticated
+- /swarm: no explicit redirect; uses token opportunistically from useUser()
+- /dashboard/cos and /dashboard/agent-os: rely on middleware only
+
+Task 3: Auth issue findings
+---------------------------
+
+Primary finding:
+- Middleware expects token in cookies/header, while Supabase persists auth in localStorage.
+- This mismatch is the most likely cause of repeated login prompts on protected routes.
+
+Additional findings:
+- Duplicate auth enforcement exists on several routes (middleware + client guards).
+- Advisor pages previously linked to /login instead of /auth (fixed in this pass).
+- No hardcoded infinite redirect loop found.
+
+Full issue list documented in:
+- auth-flow-issues.md
+
+Task 4: Broken flow trace (Landing -> Google Login -> Swarm)
+------------------------------------------------------------
+
+1. Start: /
+- File: app/page.tsx
+- User clicks sign in CTA -> /auth (or advisor CTA with /auth?next=/onboarding&user_type=advisor)
+
+2. /auth
+- File: app/auth/page.tsx
+- Google button triggers supabase.auth.signInWithOAuth with redirectTo=/auth/callback?next=<next>
+
+3. /auth/callback
+- File: app/auth/callback/page.tsx
+- Waits for SIGNED_IN/TOKEN_REFRESHED or uses fast path getSession()
+- If onboarding incomplete: redirect /onboarding
+- Else redirect to `next` (default /vault)
+
+4. After callback token/session handling
+- Session is persisted by Supabase client in localStorage (key: neufin-auth)
+- Middleware cannot read localStorage, only cookies/header
+
+5. User lands where
+- If `next` exists, callback sends there; otherwise /vault
+
+6. User clicks /swarm
+- /swarm is middleware protected
+- Middleware attempts cookie/header token lookup
+- If cookie/header token absent -> redirect /auth?next=/swarm
+
+7. Why asked to log in again
+- Because middleware token source and client session persistence are not aligned:
+  - client session in localStorage
+  - middleware expects cookie/header
+
+Prompt #2 instrumentation changes applied
+-----------------------------------------
+
+Added files:
+- lib/auth-debug.ts
+- app/components/AuthDebugBoot.tsx
+
+Updated with debug logs:
+- middleware.ts
+- lib/supabase.ts
+- lib/auth-context.tsx
+- app/auth/callback/page.tsx
+- app/layout.tsx (boot hook)
+- app/dashboard/page.tsx
+- app/swarm/page.tsx
+- app/vault/page.tsx
+- app/onboarding/page.tsx
+- app/advisor/dashboard/page.tsx
+- app/advisor/settings/page.tsx
+
+Additional routing fixes made while diagnosing:
+- app/advisor/dashboard/page.tsx: /login -> /auth?next=/advisor/dashboard
+- app/advisor/settings/page.tsx: /login -> /auth?next=/advisor/settings
+
+Console-output request
+----------------------
+The requested runtime console output requires running the Next.js app in a browser session and capturing both browser console and server middleware logs during a full OAuth round-trip. Instrumentation is in place; run sequence:
+1) npm run dev (or next dev)
+2) open /auth and complete Google login
+3) navigate to /swarm
+4) collect browser console + terminal logs containing [AUTH DEBUG], [AuthContext], [Supabase], [Callback], [Middleware]
+
+I can parse and diagnose those logs immediately once you share them.

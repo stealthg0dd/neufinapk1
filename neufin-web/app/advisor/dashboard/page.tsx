@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
+import { debugAuth } from '@/lib/auth-debug'
 import { getAdvisorReports, generateWhiteLabelReport, type AdvisorProfile } from '@/lib/api'
 
 interface Report {
@@ -27,6 +28,10 @@ export default function AdvisorDashboardPage() {
   const [genError,      setGenError]      = useState<string | null>(null)
   const [shareCount,    setShareCount]    = useState(0)
   const [referralUrl,   setReferralUrl]   = useState('')
+
+  useEffect(() => {
+    debugAuth('advisor/dashboard:mount')
+  }, [])
 
   // Load profile + reports + share stats from localStorage
   useEffect(() => {
@@ -101,7 +106,7 @@ export default function AdvisorDashboardPage() {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 text-center px-6">
         <p className="text-2xl font-bold text-white">Sign in required</p>
-        <Link href="/login" className="btn-primary px-6 py-2">Sign In</Link>
+        <Link href="/auth?next=/advisor/dashboard" className="btn-primary px-6 py-2">Sign In</Link>
       </div>
     )
   }

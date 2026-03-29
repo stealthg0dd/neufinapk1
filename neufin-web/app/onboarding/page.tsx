@@ -18,6 +18,7 @@ import { Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
+import { debugAuth } from '@/lib/auth-debug'
 import { upsertAdvisorProfile } from '@/lib/api'
 
 type UserType = 'investor' | 'advisor'
@@ -39,6 +40,10 @@ function OnboardingContent() {
   const [logoB64, setLogoB64]   = useState<string | null>(null)
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState<string | null>(null)
+
+  useEffect(() => {
+    debugAuth('onboarding:mount')
+  }, [])
 
   const fileRef = useRef<HTMLInputElement>(null)
 

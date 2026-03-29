@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
+import { debugAuth } from '@/lib/auth-debug'
 import { upsertAdvisorProfile, type AdvisorProfile } from '@/lib/api'
 
 const BRAND_COLORS = [
@@ -30,6 +31,10 @@ export default function AdvisorSettingsPage() {
   const [error,     setError]     = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    debugAuth('advisor/settings:mount')
+  }, [])
 
   // Pre-fill from localStorage if available
   useEffect(() => {
@@ -96,7 +101,7 @@ export default function AdvisorSettingsPage() {
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 text-center px-6">
         <p className="text-2xl font-bold text-white">Sign in required</p>
         <p className="text-gray-500 text-sm">You need an account to manage your advisor profile.</p>
-        <Link href="/login" className="btn-primary px-6 py-2">Sign In</Link>
+        <Link href="/auth?next=/advisor/settings" className="btn-primary px-6 py-2">Sign In</Link>
       </div>
     )
   }

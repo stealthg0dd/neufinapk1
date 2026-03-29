@@ -1,0 +1,30 @@
+# CODEOWNERS — every PR requires review from the appropriate owner.
+# Order matters: later rules override earlier ones.
+
+# Global fallback — Varun reviews everything
+*                          @varunsrivastava
+
+# Backend
+neufin-backend/            @varunsrivastava
+neufin-backend/routers/    @varunsrivastava
+neufin-backend/services/   @varunsrivastava
+neufin-backend/tests/      @varunsrivastava
+
+# Frontend
+neufin-web/                @varunsrivastava
+neufin-web/app/            @varunsrivastava
+neufin-web/components/     @varunsrivastava
+
+# Mobile
+neufin-mobile/             @varunsrivastava
+neufin-mobile/screens/     @varunsrivastava
+
+# Infrastructure & CI
+.github/                   @varunsrivastava
+infrastructure/            @varunsrivastava
+Dockerfile                 @varunsrivastava
+docker-compose.yml         @varunsrivastava
+
+# Documentation
+docs/                      @varunsrivastava
+AUDIT_REPORT.md            @varunsrivastava

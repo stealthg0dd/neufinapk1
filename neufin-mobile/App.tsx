@@ -5,7 +5,6 @@ import { View, ActivityIndicator } from 'react-native'
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import * as Sentry from '@sentry/react-native'
 import { supabase } from '@/lib/supabase'
 import LoginScreen from '@/screens/LoginScreen'
 import PortfolioSyncScreen from '@/screens/PortfolioSyncScreen'
@@ -15,21 +14,11 @@ import ShareScreen from '@/screens/ShareScreen'
 import SwarmAlertsScreen from '@/screens/SwarmAlertsScreen'
 import type { PortfolioSummary, DNAResult } from '@/lib/api'
 
-// ── Sentry: initialise before any component renders ───────────────────────────
-// DSN is read from the EAS / Expo env variable at build time.
-// Set SENTRY_DSN in eas.json or app.config.js extra.sentryDsn.
-Sentry.init({
-  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  // Capture 10 % of transactions for performance monitoring.
-  tracesSampleRate: 0.1,
-  // Attach JS bundle context for better stack trace deobfuscation.
-  attachScreenshot: false,
-  enabled: Boolean(process.env.EXPO_PUBLIC_SENTRY_DSN),
-})
-
 export type RootStackParamList = {
   PortfolioSync: undefined
+  Upload:        undefined
   Analysis:      { portfolio: PortfolioSummary }
+  Results:       { result: DNAResult }
   SwarmReport:   undefined
   Share:         { result: DNAResult }
   SwarmAlerts:   undefined
@@ -50,7 +39,7 @@ const DarkTheme = {
   },
 }
 
-export default Sentry.wrap(function App() {
+export default function App() {
   // ── Auth state ─────────────────────────────────────────────────────────────
   // Three states: null = checking (show splash), false = unauthenticated
   // (show LoginScreen), true = authenticated (show main stack).
@@ -66,12 +55,6 @@ export default Sentry.wrap(function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setAuthed(Boolean(session))
-        // Attach user identity to all future Sentry events
-        if (session?.user) {
-          Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined })
-        } else {
-          Sentry.setUser(null)
-        }
       },
     )
     return () => subscription.unsubscribe()
@@ -123,4 +106,4 @@ export default Sentry.wrap(function App() {
       </NavigationContainer>
     </GestureHandlerRootView>
   )
-})
+}

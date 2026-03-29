@@ -24,8 +24,10 @@ export const dynamic = 'force-dynamic'
  */
 
 import { Suspense, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { debugAuth } from '@/lib/auth-debug'
+import { syncAuthCookie } from '@/lib/sync-auth-cookie'
 import { claimAnonymousRecord } from '@/lib/api'
 
 const TAG = '[AuthCallback]'
@@ -48,9 +50,8 @@ export default function AuthCallbackPage() {
 }
 
 function AuthCallbackContent() {
-  const router       = useRouter()
   const searchParams = useSearchParams()
-  const next         = searchParams.get('next') || '/vault'
+  const next         = searchParams.get('next') || '/dashboard'
 
   const [error, setError] = useState<string | null>(null)
 
@@ -69,10 +70,16 @@ function AuthCallbackContent() {
     let done = false
 
     /** Claim any anonymous DNA record then navigate to `next`. */
-    async function finishAndRedirect(accessToken: string | undefined) {
+    async function finishAndRedirect(accessToken: string | undefined, expiresIn?: number | null) {
       if (done) return
       done = true
       console.log(`${TAG} finishAndRedirect — token present: ${Boolean(accessToken)}, next: ${next}`)
+      debugAuth('auth/callback:finishAndRedirect:start')
+
+      // ── Sync token to cookie BEFORE navigating so middleware can read it ──
+      // window.location.href causes a full page reload; the cookie must be set
+      // in the browser's cookie jar first so the very next HTTP request carries it.
+      syncAuthCookie(accessToken ? { access_token: accessToken } : null)
 
       if (accessToken) {
         const raw = localStorage.getItem('dnaResult')
@@ -89,35 +96,48 @@ function AuthCallbackContent() {
               console.log(`${TAG} Anonymous record claimed ✓`)
             }
           } catch (claimErr) {
-            // Non-fatal — log and proceed to redirect
             console.warn(`${TAG} claimAnonymousRecord failed (non-fatal):`, claimErr)
           }
         }
       }
 
-      // ── New-user onboarding check ───────────────────────────────────────
-      // If the user has never completed onboarding (no user_metadata.onboarding_complete),
-      // send them through the onboarding flow first. Store the original destination
-      // so onboarding can redirect there after collecting user_type.
+      // ── User routing ───────────────────────────────────────────────────────
       try {
         const { data: { user } } = await supabase.auth.getUser()
+        console.log('[Callback] User:', user)
+
         if (user && !user.user_metadata?.onboarding_complete) {
+          // New user: run onboarding flow first, then send to original destination.
           console.log(`${TAG} New user — redirecting to onboarding`)
-          // Preserve the original intended destination so onboarding can redirect there.
           localStorage.setItem('onboarding_next', next)
-          // If the sign-in URL hints at user_type (from the advisor CTA), pass it along.
           const userTypeHint = searchParams.get('user_type')
           const qs = userTypeHint ? `?user_type=${userTypeHint}` : ''
-          router.replace(`/onboarding${qs}`)
+          console.log('[Callback] Redirecting to:', `/onboarding${qs}`)
+          debugAuth('auth/callback:before-onboarding-redirect')
+          // Full page reload so middleware cookie check passes immediately.
+          window.location.href = `/onboarding${qs}`
+          return
+        }
+
+        // Returning advisor: send to advisor dashboard unless a specific next is set.
+        if (
+          user?.user_metadata?.user_type === 'advisor' &&
+          (next === '/dashboard' || next === '/vault')
+        ) {
+          console.log(`${TAG} Returning advisor — redirecting to /advisor/dashboard`)
+          debugAuth('auth/callback:before-advisor-redirect')
+          window.location.href = '/advisor/dashboard'
           return
         }
       } catch (checkErr) {
-        // Non-fatal — log and fall through to normal redirect
-        console.warn(`${TAG} Onboarding check failed (non-fatal):`, checkErr)
+        console.warn(`${TAG} User routing check failed (non-fatal):`, checkErr)
       }
 
       console.log(`${TAG} Redirecting to: ${next}`)
-      router.replace(next)
+      debugAuth('auth/callback:before-final-redirect')
+      // Full page reload ensures the neufin-auth cookie is sent with the next
+      // HTTP request so the Edge middleware validates the session correctly.
+      window.location.href = next
     }
 
     // ── 1. Primary path: onAuthStateChange ────────────────────────────────
@@ -131,7 +151,7 @@ function AuthCallbackContent() {
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
           console.log(`${TAG} ${event} — proceeding to redirect`)
           subscription.unsubscribe()
-          await finishAndRedirect(session.access_token)
+          await finishAndRedirect(session.access_token, session.expires_in)
           return
         }
 
@@ -155,7 +175,7 @@ function AuthCallbackContent() {
       if (data.session) {
         console.log(`${TAG} Fast path — existing session found, redirecting`)
         subscription.unsubscribe()
-        await finishAndRedirect(data.session.access_token)
+        await finishAndRedirect(data.session.access_token, data.session.expires_in)
       } else {
         console.log(`${TAG} Fast path — no session yet, waiting for SIGNED_IN event`)
       }
@@ -177,7 +197,7 @@ function AuthCallbackContent() {
           <h2 className="text-white font-semibold text-base">Sign-in failed</h2>
           <p className="text-gray-400 text-sm leading-relaxed">{error}</p>
           <button
-            onClick={() => router.replace('/auth')}
+            onClick={() => { window.location.href = '/auth' }}
             className="mt-2 px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
           >
             Try again

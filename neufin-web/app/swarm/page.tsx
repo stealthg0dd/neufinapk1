@@ -10,6 +10,7 @@ import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
 import { useUser } from '@/lib/store'
+import { debugAuth } from '@/lib/auth-debug'
 import { useBackendHealth } from '@/lib/useBackendHealth'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as RadixTooltip from '@radix-ui/react-tooltip'
@@ -732,8 +733,12 @@ export default function SwarmPage() {
   const [positions,       setPositions]       = useState<SwarmPosition[]>([])
   const [totalValue,      setTotalValue]      = useState(0)
 
-  const { isPro, token } = useUser()
+  const { isPro, token, loading: authLoading } = useUser()
   const isUnlocked = isPro || unlockedLocally
+
+  useEffect(() => {
+    debugAuth('swarm:mount')
+  }, [])
 
   // Load portfolio from localStorage (written by upload/analyze flow)
   useEffect(() => {
@@ -864,6 +869,14 @@ export default function SwarmPage() {
   }
 
   const sb = thesis?.score_breakdown ?? {}
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-green-500/40 border-t-green-500 rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div

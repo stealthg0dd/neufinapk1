@@ -3,8 +3,10 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { motion, useInView } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { useRef, useState, useEffect } from 'react'
 import GlobalChatWidget from '@/components/GlobalChatWidget'
+import { useAuth } from '@/lib/auth-context'
 
 const features = [
   {
@@ -92,6 +94,17 @@ const springScale = {
 }
 
 export default function LandingPage() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  // Redirect logged-in users to dashboard — landing page is for unauthenticated visitors.
+  useEffect(() => {
+    if (!loading && user) router.replace('/dashboard')
+  }, [loading, user, router])
+
+  // Avoid flash of landing content while redirect is in flight.
+  if (!loading && user) return null
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Nav */}

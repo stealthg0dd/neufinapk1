@@ -1,4 +1,4 @@
-const API = 'https://neufin101-production.up.railway.app'
+const API = process.env.EXPO_PUBLIC_API_URL ?? 'https://neufin101-production.up.railway.app'
 
 export interface Position {
   symbol: string
@@ -75,6 +75,7 @@ export interface SwarmReport {
   regime: string
   dna_score: number | null
   market_regime: Record<string, any> | null
+  strategist_intel: Record<string, any> | null
   quant_analysis: Record<string, any> | null
   tax_report: Record<string, any> | null
   risk_sentinel: Record<string, any> | null

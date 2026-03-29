@@ -7,7 +7,7 @@
  * App.tsx can switch to the authenticated navigation stack.
  */
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   View,
   Text,
@@ -18,14 +18,11 @@ import {
   Platform,
 } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
-import { supabase } from '@/lib/supabase'
+import * as Linking from 'expo-linking'
+import { getOAuthRedirectUrl, supabase } from '@/lib/supabase'
 
 // Required for expo-web-browser to dismiss the auth session properly on Android
 WebBrowser.maybeCompleteAuthSession()
-
-// Deep-link redirect URI — must match the scheme in app.json and the
-// Supabase dashboard "Redirect URLs" allow-list.
-const REDIRECT_URI = 'neufin://auth/callback'
 
 interface Props {
   onAuthSuccess: () => void
@@ -35,17 +32,45 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
 
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      console.log('[OAuth][DeepLink] incoming_url=', url)
+    })
+
+    return () => {
+      sub.remove()
+    }
+  }, [])
+
+  function debugRedirectUri() {
+    let makeRedirectUriValue = ''
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { makeRedirectUri } = require('expo-auth-session')
+      makeRedirectUriValue = makeRedirectUri({ path: 'auth/callback' })
+    } catch {
+      makeRedirectUriValue = Linking.createURL('auth/callback')
+    }
+
+    const resolvedRedirect = getOAuthRedirectUrl()
+    console.log('[OAuth][Debug] makeRedirectUri=', makeRedirectUriValue)
+    console.log('[OAuth][Debug] resolved_redirect=', resolvedRedirect)
+    return resolvedRedirect
+  }
+
   async function signInWithGoogle() {
     setLoading(true)
     setError(null)
 
     try {
+      const redirectTo = debugRedirectUri()
+
       // 1. Get the OAuth URL from Supabase (skipBrowserRedirect so we can
       //    open it with expo-web-browser instead of the default behaviour).
       const { data, error: oauthErr } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo:           REDIRECT_URI,
+          redirectTo,
           skipBrowserRedirect:  true,
         },
       })
@@ -53,8 +78,15 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
       if (oauthErr) throw oauthErr
       if (!data.url)  throw new Error('No OAuth URL returned from Supabase')
 
+      console.log('[OAuth][Debug] provider_url=', data.url)
+
       // 2. Open in the system browser, waiting for the deep-link redirect back.
-      const result = await WebBrowser.openAuthSessionAsync(data.url, REDIRECT_URI)
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+
+      console.log('[OAuth][Debug] browser_result_type=', result.type)
+      if (result.type === 'success') {
+        console.log('[OAuth][Debug] callback_url=', result.url)
+      }
 
       if (result.type !== 'success') {
         // User cancelled or browser was dismissed — not an error.
@@ -68,6 +100,27 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
       const fragment = url.includes('#') ? url.split('#')[1] : ''
       const query    = url.includes('?') ? url.split('?')[1].split('#')[0] : ''
       const params   = new URLSearchParams(fragment || query)
+
+      const authCode = params.get('code')
+      const authError = params.get('error')
+      const authErrorDescription = params.get('error_description')
+
+      console.log('[OAuth][Debug] parsed_code=', authCode)
+      console.log('[OAuth][Debug] parsed_error=', authError)
+      console.log('[OAuth][Debug] parsed_error_description=', authErrorDescription)
+
+      if (authError || authErrorDescription) {
+        throw new Error(authErrorDescription || authError || 'OAuth redirect failed.')
+      }
+
+      if (authCode) {
+        const { error: exchangeErr } = await supabase.auth.exchangeCodeForSession(authCode)
+        if (exchangeErr) throw exchangeErr
+
+        const { data: { session }, error: getErr } = await supabase.auth.getSession()
+        if (getErr) throw getErr
+        if (session) { onAuthSuccess(); return }
+      }
 
       const accessToken  = params.get('access_token')
       const refreshToken = params.get('refresh_token')

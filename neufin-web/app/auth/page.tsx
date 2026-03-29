@@ -54,7 +54,7 @@ function AuthContent() {
   const [error,    setError]    = useState('')
   const [sent,     setSent]     = useState(false)
 
-  const next = searchParams.get('next') || '/vault'
+  const next = searchParams.get('next') || '/dashboard'
   const hasPending = typeof window !== 'undefined' && (() => {
     try { return !!(JSON.parse(localStorage.getItem('dnaResult') || 'null')?.record_id) } catch { return false }
   })()

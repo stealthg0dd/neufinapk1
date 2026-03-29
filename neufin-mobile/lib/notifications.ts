@@ -19,7 +19,7 @@ try {
   console.warn('[Notifications] expo-notifications or expo-device not installed.')
 }
 
-const API_BASE = 'https://neufin101-production.up.railway.app'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://neufin101-production.up.railway.app'
 
 export interface AlertSubscription {
   expo_push_token: string
@@ -53,6 +53,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
     }),

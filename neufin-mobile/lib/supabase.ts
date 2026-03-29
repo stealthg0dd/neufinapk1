@@ -21,6 +21,22 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
   },
 })
 
+export function getOAuthRedirectUrl(): string {
+  const explicitRedirect = process.env.EXPO_PUBLIC_SUPABASE_REDIRECT_URI?.trim()
+  if (explicitRedirect) {
+    return explicitRedirect
+  }
+
+  try {
+    // Optional dependency in Expo projects; falls back safely when unavailable.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { makeRedirectUri } = require('expo-auth-session')
+    return makeRedirectUri({ path: 'auth/callback' })
+  } catch {
+    return Linking.createURL('auth/callback')
+  }
+}
+
 /**
  * Sign in with Google OAuth.
  * The redirect target is the deep-link URL for this app, e.g. neufin://auth/callback.
@@ -28,7 +44,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
  * in App.tsx calls supabase.auth.getSession() to complete the session.
  */
 export async function signInWithGoogle(): Promise<void> {
-  const redirectTo = Linking.createURL('/auth/callback') // → neufin://auth/callback
+  const redirectTo = getOAuthRedirectUrl()
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options:  { redirectTo },
@@ -40,7 +56,7 @@ export async function signInWithGoogle(): Promise<void> {
  * Sign in with Apple OAuth (iOS only).
  */
 export async function signInWithApple(): Promise<void> {
-  const redirectTo = Linking.createURL('/auth/callback')
+  const redirectTo = getOAuthRedirectUrl()
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'apple',
     options:  { redirectTo },
