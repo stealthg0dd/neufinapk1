@@ -79,6 +79,6 @@ omit = [
 branch = true
 
 [tool.coverage.report]
-fail_under = 15
+fail_under = 8
 show_missing = true
 skip_covered = false

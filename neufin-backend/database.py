@@ -1,7 +1,8 @@
 import os
 import sys
+
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
@@ -46,7 +47,7 @@ def get_supabase_client() -> Client:
 # ──────────────────────────────────────────────────────────────────────────────
 
 try:
-    from cryptography.fernet import Fernet, InvalidToken
+    from cryptography.fernet import Fernet
     _FERNET_AVAILABLE = True
 except ImportError:
     _FERNET_AVAILABLE = False

@@ -7,13 +7,13 @@ POST /api/swarm/chat      Bloomberg-style agentic chat with MD context
 Both endpoints are public (added to PUBLIC_PREFIXES in main.py).
 """
 
-import re
-import uuid
 import json
+import re
 import sys
-from fastapi import APIRouter, HTTPException, Depends, Request
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from typing import Any, Literal
 
 # ── Prompt injection patterns ─────────────────────────────────────────────────
 _INJECTION_PATTERNS = re.compile(
@@ -48,11 +48,11 @@ def _sanitize_message(message: str) -> str | None:
         return None
     return message
 
-from services.agent_swarm import run_swarm, chat_with_swarm
-from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user, get_optional_user
-from services.jwt_auth import JWTUser
-from database import supabase
+from database import supabase  # noqa: E402
+from services.agent_swarm import chat_with_swarm, run_swarm  # noqa: E402
+from services.ai_router import get_ai_analysis  # noqa: E402
+from services.auth_dependency import get_current_user, get_optional_user  # noqa: E402
+from services.jwt_auth import JWTUser  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
@@ -289,7 +289,7 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not fetch swarm report: {exc}")
+        raise HTTPException(status_code=500, detail=f"Could not fetch swarm report: {exc}") from exc
 
     if not result.data:
         raise HTTPException(status_code=404, detail="No swarm report found for this user.")
@@ -390,7 +390,7 @@ async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Report not found: {e}")
+        raise HTTPException(status_code=404, detail=f"Report not found: {e}") from e
 
 
 @router.post("/chat")

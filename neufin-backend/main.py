@@ -1,7 +1,7 @@
-import os
 import asyncio
-import sys
 import io
+import os
+import sys
 import uuid
 import warnings
 
@@ -10,15 +10,17 @@ warnings.filterwarnings("ignore", message=".*urllib3.*")
 warnings.filterwarnings("ignore", message=".*chardet.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="requests")
 try:
-    from requests.packages.urllib3.exceptions import RequestsDependencyWarning  # type: ignore[import]
+    from requests.packages.urllib3.exceptions import (
+        RequestsDependencyWarning,  # type: ignore[import]
+    )
     warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
 except ImportError:
     pass
 
 # ── Observability: Sentry (initialise before any app code) ────────────────────
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.starlette import StarletteIntegration
+import sentry_sdk  # noqa: E402
+from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
+from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
 
 _SENTRY_DSN = os.getenv("SENTRY_DSN")
 if _SENTRY_DSN:
@@ -38,30 +40,45 @@ if _SENTRY_DSN:
     )
 
 # ── Observability: structured logging ─────────────────────────────────────────
-import structlog
-from services.logging_config import configure_logging
+import structlog  # noqa: E402
+
+from services.logging_config import configure_logging  # noqa: E402
+
 configure_logging()
 logger = structlog.get_logger("neufin.main")
 
-import pandas as pd
-from fastapi import FastAPI, UploadFile, HTTPException, Request, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+import pandas as pd  # noqa: E402
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from database import supabase
-from services.jwt_auth import verify_jwt
-from routers import dna, portfolio, reports, payments, referrals, advisors, market, vault, swarm, alerts
-from config import APP_BASE_URL
-from services.ai_router import get_ai_analysis
-from services.calculator import (
-    fetch_spot_price, fetch_beta,
-    _hhi_score, _beta_score, _tax_alpha_score,
+from config import APP_BASE_URL  # noqa: E402
+from database import supabase  # noqa: E402
+from routers import (  # noqa: E402
+    advisors,
+    alerts,
+    dna,
+    market,
+    payments,
+    portfolio,
+    referrals,
+    reports,
+    swarm,
+    vault,
+)
+from services.ai_router import get_ai_analysis  # noqa: E402
+from services.calculator import (  # noqa: E402
+    _beta_score,
+    _hhi_score,
+    _tax_alpha_score,
+    fetch_beta,
+    fetch_spot_price,
     get_tax_impact_analysis,
 )
-from services.risk_engine import (
+from services.jwt_auth import verify_jwt  # noqa: E402
+from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,
-    find_correlation_clusters,
     correlation_penalty_score,
+    find_correlation_clusters,
     format_clusters_for_ai,
 )
 
@@ -251,7 +268,7 @@ async def analyze_dna(
         df.columns = [c.lower().strip() for c in df.columns]
     except Exception as e:
         print(f"[CSV] Parse error: {e}", file=sys.stderr)
-        raise HTTPException(status_code=400, detail=f"Invalid CSV: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid CSV: {e}") from e
 
     if "symbol" not in df.columns or "shares" not in df.columns:
         raise HTTPException(
@@ -267,7 +284,7 @@ async def analyze_dna(
             user = await verify_jwt(auth_header.split(" ", 1)[1])
             user_id = user.id
         except Exception:
-            pass  # anonymous upload — user_id stays None
+            logger.warning("JWT verification failed for anonymous upload", exc_info=True)
 
     # ── 3. Analytics — disabled until analytics_events table is created ──────────
     # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
@@ -283,7 +300,7 @@ async def analyze_dna(
     )
     failed_tickers: list[str] = []
     price_map: dict[str, float] = {}
-    for sym, result in zip(symbols, price_results):
+    for sym, result in zip(symbols, price_results, strict=False):
         if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
             failed_tickers.append(sym)
         elif isinstance(result, Exception):
@@ -331,7 +348,7 @@ async def analyze_dna(
         df.nlargest(5, "weight")["symbol"].tolist()
         if total_value > 0 else df["symbol"].tolist()[:5]
     )
-    weights_dict    = dict(zip(df["symbol"].tolist(), df["weight"].tolist()))
+    weights_dict    = dict(zip(df["symbol"].tolist(), df["weight"].tolist(), strict=False))
     corr_matrix     = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
     clusters        = find_correlation_clusters(corr_matrix, weights_dict)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
@@ -377,7 +394,7 @@ Return ONLY valid JSON:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
         print(f"[AI] All providers failed: {e}", file=sys.stderr)
-        raise HTTPException(status_code=503, detail="AI analysis providers are unavailable.")
+        raise HTTPException(status_code=503, detail="AI analysis providers are unavailable.") from e
 
     # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = []
@@ -527,13 +544,19 @@ async def auth_status(request: Request):
 @app.get("/api/admin/health", tags=["system"])
 def admin_health():
     """Detailed feature/provider health check — used by frontend useBackendHealth hook."""
-    from config import (
-        ANTHROPIC_API_KEY, OPENAI_KEY, GEMINI_KEY, GROQ_KEY,
-        POLYGON_API_KEY, FMP_API_KEY, TWELVEDATA_API_KEY,
-        MARKETSTACK_API_KEY,
-    )
     import importlib
     import importlib.util
+
+    from config import (
+        ANTHROPIC_API_KEY,
+        FMP_API_KEY,
+        GEMINI_KEY,
+        GROQ_KEY,
+        MARKETSTACK_API_KEY,
+        OPENAI_KEY,
+        POLYGON_API_KEY,
+        TWELVEDATA_API_KEY,
+    )
 
     def _has(val: str) -> bool:
         return bool(val and val.strip())

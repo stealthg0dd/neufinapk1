@@ -15,14 +15,14 @@ Usage:
     FERNET_MASTER_KEY=<your_key> python scripts/migrate_encrypt_cost_basis.py --dry-run
 """
 
-import sys
-import os
 import argparse
+import os
+import sys
 
 # Allow running from project root
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from database import get_supabase_client, encrypt_value
+from database import encrypt_value, get_supabase_client
 
 
 def _looks_encrypted(val: str) -> bool:
@@ -67,7 +67,7 @@ def run(dry_run: bool = False) -> None:
 
         # Attempt to parse as a plain float
         try:
-            plain_val = float(raw_cb) if isinstance(raw_cb, str) else float(raw_cb)
+            plain_val = float(raw_cb)
         except (ValueError, TypeError):
             print(f"[migrate] WARNING: row {row_id} — cannot parse cost_basis={raw_cb!r}, skipping.")
             errors += 1

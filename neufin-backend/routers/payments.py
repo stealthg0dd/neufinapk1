@@ -13,26 +13,31 @@ GET  /api/reports/fulfill   → After payment, generate PDF and return URL
 """
 
 import asyncio
-import stripe
+import datetime
+
 import sentry_sdk
+import stripe
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from typing import Optional
+
+from config import (
+    APP_BASE_URL,
+    STRIPE_PRICE_SINGLE,
+    STRIPE_PRICE_UNLIMITED,
+    STRIPE_REFERRAL_COUPON_ID,
+    STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET,
+)
 from database import supabase
-from services.calculator import calculate_portfolio_metrics
-from services.pdf_generator import generate_advisor_report
 from services.ai_router import get_ai_analysis
 from services.analytics import track
-from services.auth_dependency import get_current_user, get_optional_user
+from services.auth_dependency import get_optional_user
+from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
-from config import (
-    STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-    STRIPE_PRICE_SINGLE, STRIPE_PRICE_UNLIMITED,
-    STRIPE_REFERRAL_COUPON_ID,
-    APP_BASE_URL,
-)
-import uuid
-import datetime
+from services.pdf_generator import generate_advisor_report
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["payments"])
 
@@ -43,17 +48,17 @@ stripe.api_key = STRIPE_SECRET_KEY
 
 class CheckoutRequest(BaseModel):
     plan: str                          # "single" | "unlimited"
-    positions: Optional[list[dict]] = None  # anonymous flow: pass positions directly
-    portfolio_id: Optional[str] = None     # authenticated flow: existing portfolio
+    positions: list[dict] | None = None  # anonymous flow: pass positions directly
+    portfolio_id: str | None = None     # authenticated flow: existing portfolio
     advisor_id: str = "anonymous"
-    ref_token: Optional[str] = None        # referral token → apply 20% coupon
+    ref_token: str | None = None        # referral token → apply 20% coupon
     success_url: str = f"{APP_BASE_URL}/results?checkout_success=1"
     cancel_url:  str = f"{APP_BASE_URL}/results"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-def _upload_pdf(pdf_bytes: bytes, report_id: str) -> Optional[str]:
+def _upload_pdf(pdf_bytes: bytes, report_id: str) -> str | None:
     filename = f"{datetime.datetime.utcnow().strftime('%Y/%m/%d')}/report-{report_id[:8]}.pdf"
     try:
         supabase.storage.from_("advisor-reports").upload(
@@ -66,7 +71,7 @@ def _upload_pdf(pdf_bytes: bytes, report_id: str) -> Optional[str]:
         return None
 
 
-async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> Optional[str]:
+async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | None:
     """Run full PDF generation pipeline and update the advisor_reports record."""
     try:
         positions_result = (
@@ -117,7 +122,7 @@ def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(404, f"Portfolio not found: {exc}")
+        raise HTTPException(404, f"Portfolio not found: {exc}") from exc
 
     portfolio = portfolio_result.data
     if not portfolio:
@@ -179,7 +184,7 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                         "cost_basis":   pos.get("cost_basis"),
                     }).execute()
             except Exception as e:
-                raise HTTPException(422, f"Could not create portfolio: {e}")
+                raise HTTPException(422, f"Could not create portfolio: {e}") from e
 
         if not portfolio_id:
             raise HTTPException(400, "portfolio_id or positions required for single report plan")
@@ -193,7 +198,7 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
             }).execute()
             report_id = report_result.data[0]["id"]
         except Exception as e:
-            raise HTTPException(500, f"Could not create report record: {e}")
+            raise HTTPException(500, f"Could not create report record: {e}") from e
 
     # ── Validate referral token → apply 20% Stripe coupon ─────────────────────
     discounts = []
@@ -209,31 +214,31 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
             if ref_check.data:
                 discounts = [{"coupon": STRIPE_REFERRAL_COUPON_ID}]
         except Exception:
-            pass  # invalid ref — no coupon
+            logger.warning("Referral token validation failed", exc_info=True)
 
     # ── Create Stripe Checkout session ────────────────────────────────────────
     try:
-        session_params: dict = dict(
-            line_items=[{"price": price_id, "quantity": 1}],
-            mode="payment" if plan == "single" else "subscription",
-            success_url=body.success_url + "&session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=body.cancel_url,
-            metadata={
+        session_params: dict = {
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "mode": "payment" if plan == "single" else "subscription",
+            "success_url": body.success_url + "&session_id={CHECKOUT_SESSION_ID}",
+            "cancel_url": body.cancel_url,
+            "metadata": {
                 "plan":         plan,
                 "portfolio_id": portfolio_id or "",
                 "report_id":    report_id or "",
                 "advisor_id":   effective_advisor_id,
                 "ref_token":    body.ref_token or "",
             },
-            allow_promotion_codes=not bool(discounts),  # no promo codes if coupon applied
-        )
+            "allow_promotion_codes": not bool(discounts),  # no promo codes if coupon applied
+        }
         if discounts:
             session_params["discounts"] = discounts
 
         # FIXED: run blocking Stripe call in a thread to avoid holding the event loop (502 timeout fix)
         session = await asyncio.to_thread(lambda: stripe.checkout.Session.create(**session_params))
     except stripe.StripeError as e:
-        raise HTTPException(502, f"Stripe error: {e.user_message}")
+        raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
     # Funnel event: checkout initiated
     await track("checkout_initiated", {
@@ -267,10 +272,10 @@ async def stripe_webhook(request: Request):
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except stripe.SignatureVerificationError:
-        raise HTTPException(400, "Invalid Stripe signature")
+    except stripe.SignatureVerificationError as e:
+        raise HTTPException(400, "Invalid Stripe signature") from e
     except Exception as e:
-        raise HTTPException(400, f"Webhook error: {e}")
+        raise HTTPException(400, f"Webhook error: {e}") from e
 
     if event["type"] == "checkout.session.completed":
         session  = event["data"]["object"]
@@ -338,9 +343,8 @@ async def fulfill_report(report_id: str, user: JWTUser | None = Depends(get_opti
             .single()
             .execute()
         )
-    except Exception:
-        raise HTTPException(404, "Report not found.")
-
+    except Exception as e:
+        raise HTTPException(404, "Report not found.") from e
     record = result.data
     if not record:
         raise HTTPException(404, "Report not found.")
@@ -376,7 +380,7 @@ async def get_plans():
                 "currency":    "usd",
                 "interval":    None,
                 "description": "Behavioral investor profile, strengths, weaknesses, recommendation",
-                "features":    ["Investor DNA Score (0–100)", "Investor type classification",
+                "features":    ["Investor DNA Score (0-100)", "Investor type classification",
                                 "3 key strengths", "2 risk areas", "Shareable card"],
             },
             {

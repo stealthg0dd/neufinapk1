@@ -1,12 +1,17 @@
+import io
 import time
-from fastapi import APIRouter, UploadFile, File, HTTPException
+import uuid
+
+import pandas as pd
+import structlog
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
+from config import APP_BASE_URL
+from database import supabase
 from services.ai_router import get_ai_analysis
 from services.calculator import calculate_portfolio_metrics
-from database import supabase
-import pandas as pd
-import uuid
-import io
-from config import APP_BASE_URL
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/dna", tags=["dna"])
 
@@ -28,14 +33,14 @@ async def generate_dna_score(file: UploadFile = File(...)):
     try:
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
     except Exception:
-        raise HTTPException(status_code=400, detail="Could not parse CSV file.")
+        raise HTTPException(status_code=400, detail="Could not parse CSV file.") from None
 
     positions = df.to_dict("records")
 
     try:
         metrics = calculate_portfolio_metrics(positions)
     except (ValueError, RuntimeError) as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     prompt = f"""You are a behavioral finance expert analyzing an investor's portfolio.
 
@@ -57,7 +62,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}")
+        raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
 
     share_token = str(uuid.uuid4())[:8]
 
@@ -90,7 +95,7 @@ async def get_shared_dna(token: str):
     try:
         result = supabase.table("dna_scores").select("*").eq("share_token", token).single().execute()
     except Exception:
-        raise HTTPException(status_code=404, detail="Share not found.")
+        raise HTTPException(status_code=404, detail="Share not found.") from None
 
     record = result.data
     if not record:
@@ -102,7 +107,7 @@ async def get_shared_dna(token: str):
             {"view_count": (record.get("view_count") or 0) + 1}
         ).eq("share_token", token).execute()
     except Exception:
-        pass
+        logger.warning("Failed to update view count", exc_info=True)
 
     return record
 
@@ -127,4 +132,4 @@ async def get_leaderboard(limit: int = 10):
         _lb_cache[limit] = (time.monotonic(), payload)
         return payload
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

@@ -16,12 +16,11 @@ the helper `notify_macro_shift()` exported from this module.
 
 from __future__ import annotations
 
-import sys
 import datetime
-import requests as _requests
-from typing import Optional
+import sys
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+import requests as _requests
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, field_validator
 
 from database import get_supabase_client
@@ -39,7 +38,7 @@ _MAX_BATCH     = 100   # Expo recommends ≤ 100 messages per request
 class RegisterRequest(BaseModel):
     expo_push_token: str
     symbols:         list[str]
-    user_label:      Optional[str] = "Mobile User"
+    user_label:      str | None = "Mobile User"
 
     @field_validator("symbols", mode="before")
     @classmethod
@@ -56,7 +55,7 @@ class RegisterRequest(BaseModel):
 
 class TestPushRequest(BaseModel):
     expo_push_token: str
-    message: Optional[str] = "Neufin Swarm: test alert ✓"
+    message: str | None = "Neufin Swarm: test alert ✓"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -145,7 +144,7 @@ async def notify_macro_shift(
             return
 
         # Filter to subscribers who hold any affected symbol
-        affected_set = set(s.upper() for s in affected_symbols)
+        affected_set = {s.upper() for s in affected_symbols}
         tokens = [
             row["expo_push_token"]
             for row in subs.data

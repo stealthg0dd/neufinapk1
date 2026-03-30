@@ -1,15 +1,16 @@
+import datetime
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
-from typing import Optional
+
 from database import supabase
 from services.ai_router import get_ai_analysis
-from services.calculator import calculate_portfolio_metrics
-from services.pdf_generator import generate_advisor_report
 from services.auth_dependency import get_current_user
+from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
-import uuid
-import datetime
+from services.pdf_generator import generate_advisor_report
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -24,11 +25,11 @@ class ReportRequest(BaseModel):
     portfolio_id: str
     advisor_id:   str
     advisor_name: str = "Neufin Advisor"
-    logo_base64:  Optional[str] = None   # base64-encoded PNG/JPG advisor logo
-    color_scheme: Optional[ColorScheme] = None
+    logo_base64:  str | None = None   # base64-encoded PNG/JPG advisor logo
+    color_scheme: ColorScheme | None = None
 
 
-def _upload_to_storage(pdf_bytes: bytes, filename: str) -> Optional[str]:
+def _upload_to_storage(pdf_bytes: bytes, filename: str) -> str | None:
     """Upload PDF to Supabase Storage 'advisor-reports' bucket.
     Returns a 1-hour signed URL (falls back to public URL if signing fails)."""
     try:
@@ -44,9 +45,8 @@ def _upload_to_storage(pdf_bytes: bytes, filename: str) -> Optional[str]:
             url = signed.get("signedURL") or signed.get("signedUrl")
             if url:
                 return url
-        except Exception:
+        except Exception:  # noqa: S110 — fall through to public URL
             pass
-        return supabase.storage.from_("advisor-reports").get_public_url(path)
     except Exception as e:
         print(f"Supabase Storage upload failed: {e}")
         return None
@@ -62,7 +62,7 @@ def _load_report_for_advisor(report_id: str, user: JWTUser) -> dict:
             .execute()
         )
     except Exception:
-        raise HTTPException(status_code=404, detail="Report not found.")
+        raise HTTPException(status_code=404, detail="Report not found.") from None
 
     data = record.data
     if not data or data.get("advisor_id") != user.id:
@@ -101,7 +101,7 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     if not positions_result.data:
         raise HTTPException(status_code=404, detail="No positions found for this portfolio.")
@@ -110,7 +110,7 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
     try:
         metrics = calculate_portfolio_metrics(positions_result.data)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     # 3. Check for existing DNA score
     try:
@@ -151,7 +151,7 @@ Be specific, data-driven, and professional."""
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}")
+        raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
 
     # 5. Generate 10-page PDF with custom branding
     try:
@@ -164,7 +164,7 @@ Be specific, data-driven, and professional."""
             color_scheme=color_dict,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}") from e
 
     # 6. Upload to Supabase Storage
     filename = f"report-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}.pdf"
@@ -219,4 +219,4 @@ async def get_advisor_reports(advisor_id: str, user: JWTUser = Depends(get_curre
         )
         return {"reports": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

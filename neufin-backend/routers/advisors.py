@@ -6,9 +6,10 @@ GET  /api/advisors/{advisor_id}            → public profile by user UUID
 PUT  /api/advisors/me                      → upsert own profile (requires Bearer token)
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+
 from database import supabase
 from services.auth_dependency import get_current_user
 from services.jwt_auth import JWTUser
@@ -20,7 +21,7 @@ class AdvisorProfileRequest(BaseModel):
     advisor_name: str
     firm_name: str
     calendar_link: str
-    logo_base64: Optional[str] = None
+    logo_base64: str | None = None
     brand_color: str = "#1A56DB"
     white_label: bool = False
 
@@ -42,7 +43,7 @@ async def get_advisor_by_share_token(share_token: str):
             .execute()
         )
     except Exception:
-        raise HTTPException(404, "Token not found.")
+        raise HTTPException(404, "Token not found.") from None
 
     if not dna_result.data or not dna_result.data[0].get("user_id"):
         raise HTTPException(404, "No advisor linked to this token.")
@@ -59,7 +60,7 @@ async def get_advisor_by_share_token(share_token: str):
             .execute()
         )
     except Exception:
-        raise HTTPException(404, "Advisor profile not found.")
+        raise HTTPException(404, "Advisor profile not found.") from None
 
     data = result.data
     if not data or not data.get("advisor_name"):
@@ -80,7 +81,7 @@ async def get_advisor_profile(advisor_id: str):
             .execute()
         )
     except Exception:
-        raise HTTPException(404, "Advisor not found.")
+        raise HTTPException(404, "Advisor not found.") from None
 
     if not result.data:
         raise HTTPException(404, "Advisor not found.")
@@ -111,4 +112,4 @@ async def upsert_advisor_profile(body: AdvisorProfileRequest, user: JWTUser = De
         )
         return result.data[0] if result.data else payload
     except Exception as e:
-        raise HTTPException(500, f"Could not save profile: {e}")
+        raise HTTPException(500, f"Could not save profile: {e}") from e

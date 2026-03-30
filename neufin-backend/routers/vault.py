@@ -11,10 +11,11 @@ POST /api/vault/stripe-portal    → create a Stripe Customer Portal session
 """
 
 import stripe
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from database import supabase, claim_guest_data
-from config import STRIPE_SECRET_KEY, APP_BASE_URL
+
+from config import APP_BASE_URL, STRIPE_SECRET_KEY
+from database import claim_guest_data, supabase
 from services.auth_dependency import get_current_user
 from services.jwt_auth import JWTUser
 
@@ -43,7 +44,7 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
         )
         return {"history": result.data or []}
     except Exception as e:
-        raise HTTPException(500, f"Could not fetch history: {e}")
+        raise HTTPException(500, f"Could not fetch history: {e}") from e
 
 
 # ── Claim anonymous record (single, by record_id) ──────────────────────────────
@@ -68,7 +69,7 @@ async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get
             .execute()
         )
     except Exception:
-        raise HTTPException(404, "Record not found.")
+        raise HTTPException(404, "Record not found.") from None
 
     record = existing.data
     if not record:
@@ -82,7 +83,7 @@ async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get
         supabase.table("dna_scores").update({"user_id": uid}).eq("id", body.record_id).execute()
         return {"claimed": True, "record_id": body.record_id}
     except Exception as e:
-        raise HTTPException(500, f"Claim failed: {e}")
+        raise HTTPException(500, f"Claim failed: {e}") from e
 
 
 # ── Bulk-claim by session_id (Guest → Authenticated) ───────────────────────────
@@ -191,7 +192,7 @@ async def create_stripe_portal(body: PortalRequest, user: JWTUser = Depends(get_
                 "stripe_customer_id": customer_id,
             }, on_conflict="id").execute()
         except Exception as e:
-            raise HTTPException(500, f"Could not create Stripe customer: {e}")
+            raise HTTPException(500, f"Could not create Stripe customer: {e}") from e
 
     try:
         session = stripe.billing_portal.Session.create(
@@ -200,4 +201,4 @@ async def create_stripe_portal(body: PortalRequest, user: JWTUser = Depends(get_
         )
         return {"portal_url": session.url}
     except stripe.StripeError as e:
-        raise HTTPException(502, f"Stripe error: {e.user_message}")
+        raise HTTPException(502, f"Stripe error: {e.user_message}") from e

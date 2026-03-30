@@ -8,9 +8,13 @@ POST /api/emails/subscribe                → subscribe to weekly digest
 GET  /api/emails/weekly-digest            → data payload for cron email job
 """
 
+import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from database import supabase
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["referrals"])
 
@@ -32,8 +36,7 @@ async def validate_referral(ref_token: str):
         if result.data:
             return {"valid": True, "discount_pct": 20, "ref_token": ref_token}
     except Exception:
-        pass
-    return {"valid": False, "discount_pct": 0, "ref_token": ref_token}
+        logger.warning("Referral token lookup failed", exc_info=True)
 
 
 # ── Email subscription ─────────────────────────────────────────────────────────
@@ -54,7 +57,7 @@ async def subscribe_email(body: SubscribeRequest):
         }, on_conflict="email").execute()
         return {"subscribed": True}
     except Exception as e:
-        raise HTTPException(500, f"Subscription failed: {e}")
+        raise HTTPException(500, f"Subscription failed: {e}") from e
 
 
 @router.get("/api/emails/weekly-digest")
@@ -75,7 +78,7 @@ async def weekly_digest_data(limit: int = 100):
             .execute()
         )
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
     digest = []
     for sub in subscribers.data:
@@ -93,7 +96,7 @@ async def weekly_digest_data(limit: int = 100):
                 )
                 latest_score = score_result.data[0] if score_result.data else None
             except Exception:
-                pass
+                logger.warning("Failed to fetch latest score for digest", exc_info=True)
         digest.append({"email": sub["email"], "latest_score": latest_score})
 
     return {"recipients": len(digest), "digest": digest}

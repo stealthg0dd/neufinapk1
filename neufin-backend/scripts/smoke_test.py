@@ -19,10 +19,9 @@ Requires: pip install pytest httpx
 """
 
 import os
-import json
-import time
-import pytest
+
 import httpx
+import pytest
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 BASE_URL = os.environ.get("NEUFIN_BASE_URL", "http://localhost:8000")
@@ -206,5 +205,6 @@ def test_agent_trace_parseable(swarm_result: dict) -> None:
 
 if __name__ == "__main__":
     # Quick manual run: python scripts/smoke_test.py
-    import subprocess, sys
-    sys.exit(subprocess.call(["pytest", __file__, "-v", "--tb=short"]))
+    import subprocess
+    import sys
+    sys.exit(subprocess.call(["pytest", __file__, "-v", "--tb=short"]))  # noqa: S603, S607

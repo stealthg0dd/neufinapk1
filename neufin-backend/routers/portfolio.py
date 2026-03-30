@@ -1,16 +1,19 @@
 import datetime
+
 import requests
-import pandas as pd
-from fastapi import APIRouter, HTTPException, Query, Depends, Request
+import structlog
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional
-from database import supabase, encrypt_value, decrypt_value
-from services.calculator import calculate_portfolio_metrics, _fetch_prices, verify_price_integrity
+
+from config import ALPHA_VANTAGE_API_KEY, FINNHUB_API_KEY
+from database import decrypt_value, encrypt_value, supabase
 from services.ai_router import get_ai_analysis
-from services.risk_engine import build_risk_report
 from services.auth_dependency import get_current_user
+from services.calculator import _fetch_prices, calculate_portfolio_metrics, verify_price_integrity
 from services.jwt_auth import JWTUser
-from config import FINNHUB_API_KEY, ALPHA_VANTAGE_API_KEY
+from services.risk_engine import build_risk_report
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
@@ -21,7 +24,7 @@ class PortfolioCreate(BaseModel):
     user_id:    str
     name:       str
     positions:  list[dict]              # [{symbol, shares, cost_basis?, purchase_date?}]
-    session_id: Optional[str] = None   # guest session from localStorage (for claim flow)
+    session_id: str | None = None   # guest session from localStorage (for claim flow)
 
 
 class SignalRequest(BaseModel):
@@ -66,7 +69,7 @@ def _candle(symbol: str, period_days: int) -> dict | None:
             if data.get("s") == "ok" and data.get("c"):
                 return data
         except Exception:
-            pass
+            logger.warning("Finnhub OHLC fetch failed", exc_info=True)
 
     # ── 2. Alpha Vantage ───────────────────────────────────────────────────────
     if ALPHA_VANTAGE_API_KEY:
@@ -99,7 +102,7 @@ def _candle(symbol: str, period_days: int) -> dict | None:
                         "v": [int(float(v["5. volume"])) for _, v in rows],
                     }
         except Exception:
-            pass
+            logger.warning("AlphaVantage OHLC fetch failed", exc_info=True)
 
     return None
 
@@ -112,7 +115,7 @@ async def create_portfolio(body: PortfolioCreate):
     try:
         metrics = calculate_portfolio_metrics(body.positions)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     try:
         port_row: dict = {
@@ -125,7 +128,7 @@ async def create_portfolio(body: PortfolioCreate):
         port_result = supabase.table("portfolios").insert(port_row).execute()
         portfolio_id = port_result.data[0]["id"]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save portfolio: {e}")
+        raise HTTPException(status_code=500, detail=f"Could not save portfolio: {e}") from e
 
     # Insert positions
     for pos in metrics["positions"]:
@@ -137,7 +140,7 @@ async def create_portfolio(body: PortfolioCreate):
                 "cost_basis": encrypt_value(pos["cost_basis"]) if pos.get("cost_basis") is not None else None,
             }).execute()
         except Exception:
-            pass
+            logger.warning("Position insert failed", exc_info=True)
 
     return {"portfolio_id": portfolio_id, "metrics": metrics}
 
@@ -153,7 +156,7 @@ async def get_portfolio_metrics(portfolio_id: str):
             .execute()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     if not positions_result.data:
         raise HTTPException(status_code=404, detail="Portfolio or positions not found.")
@@ -169,7 +172,7 @@ async def get_portfolio_metrics(portfolio_id: str):
     try:
         metrics = calculate_portfolio_metrics(positions_decrypted)
     except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     # Update cached total_value
     try:
@@ -177,7 +180,7 @@ async def get_portfolio_metrics(portfolio_id: str):
             {"total_value": metrics["total_value"]}
         ).eq("id", portfolio_id).execute()
     except Exception:
-        pass
+        logger.warning("Portfolio total_value update failed", exc_info=True)
 
     return metrics
 
@@ -200,7 +203,7 @@ async def generate_trading_signals(body: SignalRequest):
                     "avg_volume": int(sum(volumes) / len(volumes)) if volumes else 0,
                 }
         except Exception:
-            pass
+            logger.warning("Price summary fetch failed", exc_info=True)
 
     prompt = f"""You are a quantitative analyst generating trading signals.
 
@@ -224,7 +227,7 @@ For each symbol return a signal. Return ONLY valid JSON:
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI signal generation failed: {e}")
+        raise HTTPException(status_code=503, detail=f"AI signal generation failed: {e}") from e
 
     # Persist signals to Supabase
     saved = []
@@ -266,7 +269,7 @@ async def get_portfolio_sentiment(portfolio_id: str):
         )
         return {"sentiment": sentiment_result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/list")
@@ -291,7 +294,7 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not fetch portfolios: {exc}")
+        raise HTTPException(status_code=500, detail=f"Could not fetch portfolios: {exc}") from exc
 
     portfolios = port_result.data or []
     if not portfolios:
@@ -312,7 +315,7 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
             pid = row["portfolio_id"]
             counts[pid] = counts.get(pid, 0) + 1
     except Exception:
-        pass  # non-fatal — positions_count will default to 0
+        logger.warning("Failed to fetch position counts", exc_info=True)
 
     # ── 3. Fetch latest DNA score for this user ────────────────────────────────
     # dna_scores are stored per-analysis, not per-portfolio.  Return the most
@@ -330,7 +333,7 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
         if dna_result.data:
             latest_dna = dna_result.data[0].get("dna_score")
     except Exception:
-        pass  # non-fatal — dna_score will be null
+        logger.warning("Failed to fetch latest DNA score", exc_info=True)
 
     # ── 4. Shape response ──────────────────────────────────────────────────────
     return [
@@ -359,7 +362,7 @@ async def get_user_portfolios(user_id: str):
         )
         return {"portfolios": result.data}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/chart/{symbol}")
@@ -375,12 +378,12 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
             "time": datetime.date.fromtimestamp(t).isoformat(),
             "open": round(o, 2),
             "high": round(h, 2),
-            "low": round(l, 2),
+            "low": round(lam, 2),
             "close": round(c, 2),
             "volume": v,
         }
-        for t, o, h, l, c, v in zip(
-            candle["t"], candle["o"], candle["h"], candle["l"], candle["c"], candle.get("v", [0] * len(candle["c"]))
+        for t, o, h, lam, c, v in zip(
+            candle["t"], candle["o"], candle["h"], candle["l"], candle["c"], candle.get("v", [0] * len(candle["c"])), strict=False
         )
     ]
     return {"symbol": symbol.upper(), "period": period, "data": data}
@@ -391,7 +394,7 @@ async def get_risk_report(body: RiskReportRequest):
     """
     Institutional risk report for a list of symbols.
 
-    Returns correlation matrix, high-correlation pairs (|ρ| > threshold),
+    Returns correlation matrix, high-correlation pairs (|rho| > threshold),
     and the Effective Number of Bets diversification index.
 
     If *weights* are omitted, equal weighting is assumed.
@@ -406,7 +409,7 @@ async def get_risk_report(body: RiskReportRequest):
         weights = {s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0)) for s in symbols}
     else:
         eq = 1.0 / len(symbols)
-        weights = {s: eq for s in symbols}
+        weights = dict.fromkeys(symbols, eq)
 
     import asyncio
     report = await asyncio.to_thread(
@@ -429,8 +432,8 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     sym_list = [s.strip().upper() for s in symbols.split(",")]
     try:
         shares_list = [float(s.strip()) for s in shares.split(",")]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="shares must be numeric values.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="shares must be numeric values.") from e
 
     if len(sym_list) != len(shares_list):
         raise HTTPException(status_code=400, detail="symbols and shares counts must match.")
@@ -438,9 +441,9 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     try:
         prices = _fetch_prices(sym_list, period)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Price fetch failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Price fetch failed: {e}") from e
 
-    weight_map = dict(zip(sym_list, shares_list))
+    weight_map = dict(zip(sym_list, shares_list, strict=False))
     history = []
     for date_idx, row in prices.iterrows():
         day_value = sum(
@@ -480,4 +483,4 @@ async def verify_prices(body: VerifyPricesRequest):
             "warnings": [c for c in checks if c.get("warned")],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Price integrity check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Price integrity check failed: {e}") from e

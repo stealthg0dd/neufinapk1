@@ -9,10 +9,14 @@ POST /api/analytics/track        → client-side funnel event ingestion
 """
 
 import time
+
+import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+
 from database import supabase
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["market"])
 
@@ -44,11 +48,11 @@ _TYPE_META = {
 }
 
 _SCORE_BANDS = [
-    {"range": "0–20",  "label": "High Risk"},
-    {"range": "21–40", "label": "Below Avg"},
-    {"range": "41–60", "label": "Average"},
-    {"range": "61–80", "label": "Good"},
-    {"range": "81–100","label": "Excellent"},
+    {"range": "0-20",  "label": "High Risk"},
+    {"range": "21-40", "label": "Below Avg"},
+    {"range": "41-60", "label": "Average"},
+    {"range": "61-80", "label": "Good"},
+    {"range": "81-100","label": "Excellent"},
 ]
 
 
@@ -73,7 +77,7 @@ async def market_health():
         )
         rows = result.data or []
     except Exception as e:
-        raise HTTPException(500, f"Could not fetch market data: {e}")
+        raise HTTPException(500, f"Could not fetch market data: {e}") from e
 
     if not rows:
         payload = {
@@ -164,7 +168,7 @@ async def score_trend():
         )
         rows = result.data or []
     except Exception as e:
-        raise HTTPException(500, f"Could not fetch trend data: {e}")
+        raise HTTPException(500, f"Could not fetch trend data: {e}") from e
 
     # Bucket by date (YYYY-MM-DD)
     daily: dict[str, list[int]] = {}
@@ -191,8 +195,8 @@ async def score_trend():
 
 class TrackRequest(BaseModel):
     event: str
-    properties: Optional[dict] = None
-    session_id: Optional[str] = None
+    properties: dict | None = None
+    session_id: str | None = None
 
 
 @router.post("/api/analytics/track")
@@ -209,5 +213,5 @@ async def track_event(body: TrackRequest):
             "properties": body.properties or {},
         }).execute()
     except Exception:
-        pass  # fire-and-forget
+        logger.warning("Failed to track analytics event", exc_info=True)  # fire-and-forget
     return {"ok": True}
