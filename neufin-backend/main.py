@@ -121,6 +121,7 @@ origins = list({
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:5173",   # Vite dev server
+    "https://neufin-web.vercel.app",
     "https://neufinapk1.vercel.app",
     "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
     "https://neufin.ai",
