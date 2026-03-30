@@ -107,7 +107,7 @@ jobs:
 
       - name: Check bundle size
         if: github.event_name == 'pull_request'
-        uses: preactjs/compressed-size-action@v2
+        uses: preactjs/compressed-size-action@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           install-script: npm ci --prefix neufin-web
