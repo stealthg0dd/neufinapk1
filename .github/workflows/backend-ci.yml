@@ -148,8 +148,9 @@ jobs:
       - name: Deploy to Railway (staging)
         uses: bervProject/railway-deploy@main
         with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
           service: neufin-backend-staging
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   # ── Deploy to Production ──────────────────────────────────────────────────
   deploy-production:
@@ -164,8 +165,9 @@ jobs:
       - name: Deploy to Railway (production)
         uses: bervProject/railway-deploy@main
         with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
           service: neufin-backend-production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       - name: Notify Sentry of deployment
         uses: getsentry/action-release@v1
