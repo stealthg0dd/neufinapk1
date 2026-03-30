@@ -3,8 +3,10 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# startCommand is intentionally omitted — the Dockerfile CMD runs gunicorn
-# with ${GUNICORN_WORKERS:-4} workers and ${PORT} from Railway's env injection.
+# Explicit startCommand so Railway never falls back to its internal cd-based default.
+# Uses gunicorn for production-grade worker isolation.
+# GUNICORN_WORKERS env var can be set in Railway dashboard (default: 4).
+startCommand = "gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers ${GUNICORN_WORKERS:-4} --bind 0.0.0.0:${PORT:-8000} --timeout 300 --keep-alive 5 --access-logfile - --error-logfile -"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
