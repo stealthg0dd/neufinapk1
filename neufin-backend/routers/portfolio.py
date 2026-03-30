@@ -20,11 +20,12 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 # ─── Models ────────────────────────────────────────────────────────────────────
 
+
 class PortfolioCreate(BaseModel):
-    user_id:    str
-    name:       str
-    positions:  list[dict]              # [{symbol, shares, cost_basis?, purchase_date?}]
-    session_id: str | None = None   # guest session from localStorage (for claim flow)
+    user_id: str
+    name: str
+    positions: list[dict]  # [{symbol, shares, cost_basis?, purchase_date?}]
+    session_id: str | None = None  # guest session from localStorage (for claim flow)
 
 
 class SignalRequest(BaseModel):
@@ -35,12 +36,13 @@ class SignalRequest(BaseModel):
 
 class RiskReportRequest(BaseModel):
     symbols: list[str]
-    weights: dict[str, float] | None = None   # optional; defaults to equal weight
+    weights: dict[str, float] | None = None  # optional; defaults to equal weight
     threshold: float = 0.70
     days: int = 60
 
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _candle(symbol: str, period_days: int) -> dict | None:
     """
@@ -109,6 +111,7 @@ def _candle(symbol: str, period_days: int) -> dict | None:
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
 
+
 @router.post("/create")
 async def create_portfolio(body: PortfolioCreate):
     """Create a portfolio and calculate initial metrics."""
@@ -119,8 +122,8 @@ async def create_portfolio(body: PortfolioCreate):
 
     try:
         port_row: dict = {
-            "user_id":    body.user_id or None,
-            "name":       body.name,
+            "user_id": body.user_id or None,
+            "name": body.name,
             "total_value": metrics["total_value"],
         }
         if body.session_id:
@@ -133,12 +136,16 @@ async def create_portfolio(body: PortfolioCreate):
     # Insert positions
     for pos in metrics["positions"]:
         try:
-            supabase.table("portfolio_positions").insert({
-                "portfolio_id": portfolio_id,
-                "symbol": pos["symbol"],
-                "shares": pos["shares"],
-                "cost_basis": encrypt_value(pos["cost_basis"]) if pos.get("cost_basis") is not None else None,
-            }).execute()
+            supabase.table("portfolio_positions").insert(
+                {
+                    "portfolio_id": portfolio_id,
+                    "symbol": pos["symbol"],
+                    "shares": pos["shares"],
+                    "cost_basis": encrypt_value(pos["cost_basis"])
+                    if pos.get("cost_basis") is not None
+                    else None,
+                }
+            ).execute()
         except Exception:
             logger.warning("Position insert failed", exc_info=True)
 
@@ -176,9 +183,9 @@ async def get_portfolio_metrics(portfolio_id: str):
 
     # Update cached total_value
     try:
-        supabase.table("portfolios").update(
-            {"total_value": metrics["total_value"]}
-        ).eq("id", portfolio_id).execute()
+        supabase.table("portfolios").update({"total_value": metrics["total_value"]}).eq(
+            "id", portfolio_id
+        ).execute()
     except Exception:
         logger.warning("Portfolio total_value update failed", exc_info=True)
 
@@ -197,9 +204,9 @@ async def generate_trading_signals(body: SignalRequest):
                 volumes = candle.get("v", [])
                 price_summary[symbol] = {
                     "current": round(float(closes[-1]), 2),
-                    "change_3mo_pct": round(
-                        (closes[-1] - closes[0]) / closes[0] * 100, 2
-                    ) if closes[0] else 0,
+                    "change_3mo_pct": round((closes[-1] - closes[0]) / closes[0] * 100, 2)
+                    if closes[0]
+                    else 0,
                     "avg_volume": int(sum(volumes) / len(volumes)) if volumes else 0,
                 }
         except Exception:
@@ -233,13 +240,19 @@ For each symbol return a signal. Return ONLY valid JSON:
     saved = []
     for signal in analysis.get("signals", []):
         try:
-            result = supabase.table("trading_signals").insert({
-                "user_id": body.user_id,
-                "symbol": signal["symbol"],
-                "signal_type": signal["signal_type"],
-                "confidence": signal["confidence"],
-                "reasoning": signal["reasoning"],
-            }).execute()
+            result = (
+                supabase.table("trading_signals")
+                .insert(
+                    {
+                        "user_id": body.user_id,
+                        "symbol": signal["symbol"],
+                        "signal_type": signal["signal_type"],
+                        "confidence": signal["confidence"],
+                        "reasoning": signal["reasoning"],
+                    }
+                )
+                .execute()
+            )
             saved.append(result.data[0])
         except Exception:
             saved.append(signal)
@@ -311,7 +324,7 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
             .in_("portfolio_id", portfolio_ids)
             .execute()
         )
-        for row in (pos_result.data or []):
+        for row in pos_result.data or []:
             pid = row["portfolio_id"]
             counts[pid] = counts.get(pid, 0) + 1
     except Exception:
@@ -338,12 +351,12 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
     # ── 4. Shape response ──────────────────────────────────────────────────────
     return [
         {
-            "portfolio_id":    p["id"],
-            "portfolio_name":  p["name"],
-            "total_value":     p.get("total_value") or 0,
-            "dna_score":       latest_dna,
+            "portfolio_id": p["id"],
+            "portfolio_name": p["name"],
+            "total_value": p.get("total_value") or 0,
+            "dna_score": latest_dna,
             "positions_count": counts.get(p["id"], 0),
-            "created_at":      p["created_at"],
+            "created_at": p["created_at"],
         }
         for p in portfolios
     ]
@@ -383,7 +396,13 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
             "volume": v,
         }
         for t, o, h, lam, c, v in zip(
-            candle["t"], candle["o"], candle["h"], candle["l"], candle["c"], candle.get("v", [0] * len(candle["c"])), strict=False
+            candle["t"],
+            candle["o"],
+            candle["h"],
+            candle["l"],
+            candle["c"],
+            candle.get("v", [0] * len(candle["c"])),
+            strict=False,
         )
     ]
     return {"symbol": symbol.upper(), "period": period, "data": data}
@@ -406,12 +425,15 @@ async def get_risk_report(body: RiskReportRequest):
 
     # Resolve weights: use provided map, fall back to equal weight
     if body.weights:
-        weights = {s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0)) for s in symbols}
+        weights = {
+            s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0)) for s in symbols
+        }
     else:
         eq = 1.0 / len(symbols)
         weights = dict.fromkeys(symbols, eq)
 
     import asyncio
+
     report = await asyncio.to_thread(
         build_risk_report,
         symbols,
@@ -446,22 +468,22 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     weight_map = dict(zip(sym_list, shares_list, strict=False))
     history = []
     for date_idx, row in prices.iterrows():
-        day_value = sum(
-            float(row.get(sym, 0) or 0) * wt
-            for sym, wt in weight_map.items()
+        day_value = sum(float(row.get(sym, 0) or 0) * wt for sym, wt in weight_map.items())
+        history.append(
+            {
+                "time": date_idx.isoformat() if hasattr(date_idx, "isoformat") else str(date_idx),
+                "value": round(day_value, 2),
+            }
         )
-        history.append({
-            "time": date_idx.isoformat() if hasattr(date_idx, "isoformat") else str(date_idx),
-            "value": round(day_value, 2),
-        })
 
     return {"history": history}
 
 
 # ── Price integrity verification ───────────────────────────────────────────────
 
+
 class VerifyPricesRequest(BaseModel):
-    positions:   list[dict]
+    positions: list[dict]
     total_value: float = 0.0
 
 

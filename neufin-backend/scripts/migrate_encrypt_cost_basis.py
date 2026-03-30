@@ -58,8 +58,8 @@ def run(dry_run: bool = False) -> None:
     errors = 0
 
     for row in rows:
-        row_id   = row["id"]
-        raw_cb   = row["cost_basis"]
+        row_id = row["id"]
+        raw_cb = row["cost_basis"]
 
         if _looks_encrypted(raw_cb):
             skipped += 1
@@ -69,7 +69,9 @@ def run(dry_run: bool = False) -> None:
         try:
             plain_val = float(raw_cb)
         except (ValueError, TypeError):
-            print(f"[migrate] WARNING: row {row_id} — cannot parse cost_basis={raw_cb!r}, skipping.")
+            print(
+                f"[migrate] WARNING: row {row_id} — cannot parse cost_basis={raw_cb!r}, skipping."
+            )
             errors += 1
             continue
 
@@ -81,9 +83,9 @@ def run(dry_run: bool = False) -> None:
             continue
 
         try:
-            sb.table("portfolio_positions").update(
-                {"cost_basis": new_val}
-            ).eq("id", row_id).execute()
+            sb.table("portfolio_positions").update({"cost_basis": new_val}).eq(
+                "id", row_id
+            ).execute()
             encrypted += 1
         except Exception as e:
             print(f"[migrate] ERROR updating row {row_id}: {e}")
@@ -93,8 +95,7 @@ def run(dry_run: bool = False) -> None:
         f"\n[migrate] Done.\n"
         f"  Encrypted : {encrypted}\n"
         f"  Skipped   : {skipped}  (already encrypted)\n"
-        f"  Errors    : {errors}\n"
-        + ("[dry-run mode — no writes made]" if dry_run else "")
+        f"  Errors    : {errors}\n" + ("[dry-run mode — no writes made]" if dry_run else "")
     )
 
     if errors:
@@ -103,6 +104,8 @@ def run(dry_run: bool = False) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Encrypt plaintext cost_basis rows.")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would change without writing.")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would change without writing."
+    )
     args = parser.parse_args()
     run(dry_run=args.dry_run)

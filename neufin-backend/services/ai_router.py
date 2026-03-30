@@ -2,6 +2,7 @@
 AI Fallback Chain (March 14, 2026 Stable):
 Claude Sonnet 4.6 → OpenAI GPT-4o → Gemini 3.1 Pro (→ 1.5 Flash) → Groq Llama 3.3 70B
 """
+
 import json
 import os
 import re
@@ -23,21 +24,27 @@ def _get_gemini_client() -> google_genai.Client:
     """Lazily initialize and return the Gemini client."""
     global _gemini
     if _gemini is None:
+        if not GEMINI_KEY:
+            raise ValueError("GEMINI_KEY not set")
         _gemini = google_genai.Client(api_key=GEMINI_KEY)
     return _gemini
+
 
 # Centralized Gemini model config — single source of truth for main.py and ai_router.py
 GEMINI_PRIMARY_MODEL = "gemini-3.1-pro-preview"
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.0-flash")
 
-# Print available Gemini models at startup so the correct model ID can be confirmed.
-# Check your Railway/local stderr logs and update GEMINI_PRIMARY_MODEL to match.
-try:
-    _available = [m.name for m in _get_gemini_client().models.list() if "gemini" in m.name.lower()]
-    print(f"[Gemini] Available: {_available}", file=sys.stderr)
-    print(f"[Gemini] Primary: {GEMINI_PRIMARY_MODEL} | Fallback: {GEMINI_FALLBACK_MODEL}", file=sys.stderr)
-except Exception as _e:
-    print(f"[Gemini] Model list failed: {_e}", file=sys.stderr)
+# Avoid any network/API calls during import so tests can run without provider keys.
+if GEMINI_KEY:
+    print(
+        f"[Gemini] Primary: {GEMINI_PRIMARY_MODEL} | Fallback: {GEMINI_FALLBACK_MODEL}",
+        file=sys.stderr,
+    )
+else:
+    print(
+        "[Gemini] GEMINI_KEY missing; Gemini provider disabled until key is configured.",
+        file=sys.stderr,
+    )
 
 
 def _strip_json_fences(text: str) -> str:
@@ -68,7 +75,10 @@ def _parse_ai_response(text: str) -> dict:
 def _is_model_not_found(exc: Exception) -> bool:
     """Return True if the exception indicates an unknown/unsupported model."""
     msg = str(exc).lower()
-    return any(k in msg for k in ("not found", "not_found", "404", "unsupported", "invalid model", "does not exist"))
+    return any(
+        k in msg
+        for k in ("not found", "not_found", "404", "unsupported", "invalid model", "does not exist")
+    )
 
 
 def call_gemini(prompt: str) -> dict:
@@ -85,11 +95,17 @@ def call_gemini(prompt: str) -> dict:
             return result
         except Exception as exc:
             if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(exc):
-                print(f"[AI] {model} not found — retrying with {GEMINI_FALLBACK_MODEL}", file=sys.stderr)
+                print(
+                    f"[AI] {model} not found — retrying with {GEMINI_FALLBACK_MODEL}",
+                    file=sys.stderr,
+                )
                 continue
             print(f"[AI] {model} ✗ — {exc}", file=sys.stderr)
             raise
-    raise RuntimeError(f"Both Gemini models failed: {GEMINI_PRIMARY_MODEL}, {GEMINI_FALLBACK_MODEL}")
+    raise RuntimeError(
+        f"Both Gemini models failed: {GEMINI_PRIMARY_MODEL}, {GEMINI_FALLBACK_MODEL}"
+    )
+
 
 async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     """
@@ -103,12 +119,12 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
             raise ValueError("ANTHROPIC_API_KEY not set")
         client = Anthropic(api_key=ANTHROPIC_API_KEY)
         response = client.messages.create(
-            model="claude-sonnet-4-6", # Latest March 2026 Stable
+            model="claude-sonnet-4-6",  # Latest March 2026 Stable
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse(response.content[0].text)
-        print(f"[AI] Claude ✓ ({time.monotonic()-t0:.1f}s)")
+        print(f"[AI] Claude ✓ ({time.monotonic() - t0:.1f}s)")
         return result
     except Exception as e:
         print(f"[AI] Claude ✗ — Error: {e}", file=sys.stderr)
@@ -122,7 +138,7 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse(response.choices[0].message.content)
-        print(f"[AI] gpt-4o ✓ ({time.monotonic()-t1:.1f}s)")
+        print(f"[AI] gpt-4o ✓ ({time.monotonic() - t1:.1f}s)")
         return result
     except Exception as e:
         print(f"[AI] gpt-4o ✗ — {e}", file=sys.stderr)
@@ -131,7 +147,7 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     t2 = time.monotonic()
     try:
         result = call_gemini(prompt)
-        print(f"[AI] Gemini ✓ ({time.monotonic()-t2:.1f}s)")
+        print(f"[AI] Gemini ✓ ({time.monotonic() - t2:.1f}s)")
         return result
     except Exception as e:
         print(f"[AI] Gemini ✗ — {e}", file=sys.stderr)
@@ -143,18 +159,23 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
-                {"role": "system", "content": "You are a financial analyst. Return ONLY valid JSON, no markdown."},
+                {
+                    "role": "system",
+                    "content": "You are a financial analyst. Return ONLY valid JSON, no markdown.",
+                },
                 {"role": "user", "content": prompt},
             ],
             temperature=0.1,
         )
         result = _parse(response.choices[0].message.content)
-        print(f"[AI] llama-3.3-70b-versatile ✓ ({time.monotonic()-t3:.1f}s)")
+        print(f"[AI] llama-3.3-70b-versatile ✓ ({time.monotonic() - t3:.1f}s)")
         return result
     except Exception as e:
         print(f"[AI] llama-3.3-70b-versatile ✗ — {e}", file=sys.stderr)
 
-    raise Exception("All AI providers failed: claude-sonnet-4-6, gpt-4o, gemini-3.1-pro-preview, llama-3.3-70b-versatile. Check API keys and provider status.")
+    raise Exception(
+        "All AI providers failed: claude-sonnet-4-6, gpt-4o, gemini-3.1-pro-preview, llama-3.3-70b-versatile. Check API keys and provider status."
+    )
 
 
 async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
@@ -176,7 +197,7 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
             messages=[{"role": "user", "content": user_content}],
         )
         text = response.content[0].text
-        print(f"[AI/Briefing] Claude ✓ ({time.monotonic()-t0:.1f}s)", file=sys.stderr)
+        print(f"[AI/Briefing] Claude ✓ ({time.monotonic() - t0:.1f}s)", file=sys.stderr)
         return text
     except Exception as e:
         print(f"[AI/Briefing] Claude ✗ — {e}", file=sys.stderr)
@@ -190,11 +211,11 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
             max_tokens=4096,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_content},
+                {"role": "user", "content": user_content},
             ],
         )
         text = response.choices[0].message.content
-        print(f"[AI/Briefing] GPT-4o ✓ ({time.monotonic()-t1:.1f}s)", file=sys.stderr)
+        print(f"[AI/Briefing] GPT-4o ✓ ({time.monotonic() - t1:.1f}s)", file=sys.stderr)
         return text
     except Exception as e:
         print(f"[AI/Briefing] GPT-4o ✗ — {e}", file=sys.stderr)
@@ -204,9 +225,11 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
     for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
         try:
             full_prompt = f"SYSTEM INSTRUCTIONS:\n{system_prompt}\n\n---\n\nUSER:\n{user_content}"
-            response = _get_gemini_client().models.generate_content(model=model, contents=full_prompt)
+            response = _get_gemini_client().models.generate_content(
+                model=model, contents=full_prompt
+            )
             text = response.text
-            print(f"[AI/Briefing] {model} ✓ ({time.monotonic()-t2:.1f}s)", file=sys.stderr)
+            print(f"[AI/Briefing] {model} ✓ ({time.monotonic() - t2:.1f}s)", file=sys.stderr)
             return text
         except Exception as e:
             if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(e):
@@ -223,12 +246,12 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
             max_tokens=4096,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_content},
+                {"role": "user", "content": user_content},
             ],
             temperature=0.2,
         )
         text = response.choices[0].message.content
-        print(f"[AI/Briefing] Groq ✓ ({time.monotonic()-t3:.1f}s)", file=sys.stderr)
+        print(f"[AI/Briefing] Groq ✓ ({time.monotonic() - t3:.1f}s)", file=sys.stderr)
         return text
     except Exception as e:
         print(f"[AI/Briefing] Groq ✗ — {e}", file=sys.stderr)

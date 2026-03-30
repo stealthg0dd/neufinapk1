@@ -16,16 +16,16 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
 class ColorScheme(BaseModel):
-    primary:   str = "#1A56DB"
+    primary: str = "#1A56DB"
     secondary: str = "#8B5CF6"
-    accent:    str = "#F97316"
+    accent: str = "#F97316"
 
 
 class ReportRequest(BaseModel):
     portfolio_id: str
-    advisor_id:   str
+    advisor_id: str
     advisor_name: str = "Neufin Advisor"
-    logo_base64:  str | None = None   # base64-encoded PNG/JPG advisor logo
+    logo_base64: str | None = None  # base64-encoded PNG/JPG advisor logo
     color_scheme: ColorScheme | None = None
 
 
@@ -172,23 +172,29 @@ Be specific, data-driven, and professional."""
 
     # 7. Save report record with public URL
     try:
-        report_result = supabase.table("advisor_reports").insert({
-            "portfolio_id": body.portfolio_id,
-            "advisor_id":   user.id,
-            "pdf_url":      pdf_url,
-            "is_paid":      False,
-        }).execute()
+        report_result = (
+            supabase.table("advisor_reports")
+            .insert(
+                {
+                    "portfolio_id": body.portfolio_id,
+                    "advisor_id": user.id,
+                    "pdf_url": pdf_url,
+                    "is_paid": False,
+                }
+            )
+            .execute()
+        )
         report_id = report_result.data[0]["id"] if report_result.data else None
     except Exception as e:
         print(f"Failed to save report record: {e}")
         report_id = None
 
     return {
-        "report_id":      report_id,
-        "pdf_url":        pdf_url,
+        "report_id": report_id,
+        "pdf_url": pdf_url,
         "pdf_size_bytes": len(pdf_bytes),
-        "analysis":       analysis,
-        "pages":          10,
+        "analysis": analysis,
+        "pages": 10,
     }
 
 

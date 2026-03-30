@@ -26,6 +26,7 @@ stripe.api_key = STRIPE_SECRET_KEY
 
 # ── History ────────────────────────────────────────────────────────────────────
 
+
 @router.get("/history")
 async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: int = 50):
     """
@@ -36,7 +37,9 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
     try:
         result = (
             supabase.table("dna_scores")
-            .select("id, dna_score, investor_type, recommendation, share_token, total_value, created_at")
+            .select(
+                "id, dna_score, investor_type, recommendation, share_token, total_value, created_at"
+            )
             .eq("user_id", uid)
             .order("created_at", desc=True)
             .limit(limit)
@@ -48,6 +51,7 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
 
 
 # ── Claim anonymous record (single, by record_id) ──────────────────────────────
+
 
 class ClaimRequest(BaseModel):
     record_id: str
@@ -88,12 +92,15 @@ async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get
 
 # ── Bulk-claim by session_id (Guest → Authenticated) ───────────────────────────
 
+
 class SessionClaimRequest(BaseModel):
-    session_id: str   # localStorage key generated client-side before auth
+    session_id: str  # localStorage key generated client-side before auth
 
 
 @router.post("/claim-session")
-async def claim_session_portfolios(body: SessionClaimRequest, user: JWTUser = Depends(get_current_user)):
+async def claim_session_portfolios(
+    body: SessionClaimRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Re-assign ALL unclaimed portfolios, dna_scores, and swarm_reports that share
     a guest session_id to the now-authenticated user.
@@ -115,14 +122,15 @@ async def claim_session_portfolios(body: SessionClaimRequest, user: JWTUser = De
     claimed = claim_guest_data(session_id=sid, user_id=uid)
 
     return {
-        "claimed":    claimed,
-        "total":      sum(claimed.values()),
-        "user_id":    uid,
+        "claimed": claimed,
+        "total": sum(claimed.values()),
+        "user_id": uid,
         "session_id": sid,
     }
 
 
 # ── Subscription ───────────────────────────────────────────────────────────────
+
 
 @router.get("/subscription")
 async def get_subscription(user: JWTUser = Depends(get_current_user)):
@@ -148,6 +156,7 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
 
 
 # ── Stripe Customer Portal ─────────────────────────────────────────────────────
+
 
 class PortalRequest(BaseModel):
     return_url: str = f"{APP_BASE_URL}/vault"
@@ -187,10 +196,13 @@ async def create_stripe_portal(body: PortalRequest, user: JWTUser = Depends(get_
             )
             customer_id = customer.id
             # Persist for next time
-            supabase.table("user_profiles").upsert({
-                "id": uid,
-                "stripe_customer_id": customer_id,
-            }, on_conflict="id").execute()
+            supabase.table("user_profiles").upsert(
+                {
+                    "id": uid,
+                    "stripe_customer_id": customer_id,
+                },
+                on_conflict="id",
+            ).execute()
         except Exception as e:
             raise HTTPException(500, f"Could not create Stripe customer: {e}") from e
 

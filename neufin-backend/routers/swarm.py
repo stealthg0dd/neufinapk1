@@ -26,9 +26,9 @@ _INJECTION_PATTERNS = re.compile(
     r"|jailbreak"
     r"|DAN\s+mode"
     # Generic credential patterns — prevents echoing any API key or token shape
-    r"|sk-[A-Za-z0-9\-_]{20,}"   # Generic API key (Anthropic, OpenAI, Stripe, etc.)
-    r"|eyJ[A-Za-z0-9+/]{10,}"    # JWT / Supabase session token (base64 JSON header)
-    r"|AKIA[A-Z0-9]{16}",        # AWS access key ID format
+    r"|sk-[A-Za-z0-9\-_]{20,}"  # Generic API key (Anthropic, OpenAI, Stripe, etc.)
+    r"|eyJ[A-Za-z0-9+/]{10,}"  # JWT / Supabase session token (base64 JSON header)
+    r"|AKIA[A-Z0-9]{16}",  # AWS access key ID format
     re.IGNORECASE,
 )
 
@@ -48,6 +48,7 @@ def _sanitize_message(message: str) -> str | None:
         return None
     return message
 
+
 from database import supabase  # noqa: E402
 from services.agent_swarm import chat_with_swarm, run_swarm  # noqa: E402
 from services.ai_router import get_ai_analysis  # noqa: E402
@@ -59,34 +60,34 @@ router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
 # ── Request / Response models ──────────────────────────────────────────────────
 class Position(BaseModel):
-    symbol:     str
-    shares:     float
-    price:      float = 0.0
-    value:      float = 0.0
-    weight:     float = 0.0
+    symbol: str
+    shares: float
+    price: float = 0.0
+    value: float = 0.0
+    weight: float = 0.0
     cost_basis: float | None = None
 
 
 class SwarmAnalyzeRequest(BaseModel):
-    positions:   list[Position]
+    positions: list[Position]
     total_value: float
-    user_id:     str | None = None
+    user_id: str | None = None
 
 
 class ChatRequest(BaseModel):
-    message:       str  = Field(..., min_length=3, max_length=500)
+    message: str = Field(..., min_length=3, max_length=500)
     # Portfolio context — used when no record_id is available (guest mode)
-    positions:     list[Position] | None = None
-    total_value:   float | None          = None
+    positions: list[Position] | None = None
+    total_value: float | None = None
     # Preferred context path — tie this chat to a persisted swarm report
-    record_id:     str  | None           = None
+    record_id: str | None = None
     # Full thesis blob passed from frontend (avoids a DB round-trip for record_id)
-    thesis_context: dict | None          = None
+    thesis_context: dict | None = None
 
 
 class GlobalChatRequest(BaseModel):
-    message:    str  = Field(..., min_length=3, max_length=500)
-    agent_type: str  = "general"   # quant | macro | sentiment | trend | general
+    message: str = Field(..., min_length=3, max_length=500)
+    agent_type: str = "general"  # quant | macro | sentiment | trend | general
 
 
 # ── Background persistence helper ──────────────────────────────────────────────
@@ -98,33 +99,34 @@ async def _persist_swarm_result(report_id: str, user_id: str | None, result: dic
     user_id is None for anonymous/guest users — saved as NULL in Supabase.
     """
     import asyncio
+
     try:
         thesis = result.get("investment_thesis", {})
         row = {
-            "id":                   report_id,
-            "user_id":              user_id,   # NULL for anonymous — allowed by schema
-            "dna_score":            thesis.get("dna_score") or thesis.get("health_score"),
-            "headline":             thesis.get("headline"),
-            "briefing":             thesis.get("briefing"),
-            "top_risks":            thesis.get("top_risks"),
-            "macro_advice":         thesis.get("macro_advice"),
-            "tax_recommendation":   thesis.get("tax_recommendation"),
-            "stress_results":       thesis.get("stress_results"),
-            "risk_factors":         thesis.get("risk_factors"),
-            "score_breakdown":      thesis.get("score_breakdown"),
-            "weighted_beta":        thesis.get("weighted_beta"),
-            "sharpe_ratio":         thesis.get("sharpe_ratio"),
-            "regime":               thesis.get("regime"),
-            "agent_trace":          result.get("agent_trace", []),
+            "id": report_id,
+            "user_id": user_id,  # NULL for anonymous — allowed by schema
+            "dna_score": thesis.get("dna_score") or thesis.get("health_score"),
+            "headline": thesis.get("headline"),
+            "briefing": thesis.get("briefing"),
+            "top_risks": thesis.get("top_risks"),
+            "macro_advice": thesis.get("macro_advice"),
+            "tax_recommendation": thesis.get("tax_recommendation"),
+            "stress_results": thesis.get("stress_results"),
+            "risk_factors": thesis.get("risk_factors"),
+            "score_breakdown": thesis.get("score_breakdown"),
+            "weighted_beta": thesis.get("weighted_beta"),
+            "sharpe_ratio": thesis.get("sharpe_ratio"),
+            "regime": thesis.get("regime"),
+            "agent_trace": result.get("agent_trace", []),
             # ── Rich nested agent outputs ─────────────────────────────────────
             # These fields are populated by the synthesizer and stored as JSONB
             # so that /api/swarm/report/latest can return fully structured data.
-            "market_regime":        thesis.get("market_regime"),
-            "quant_analysis":       thesis.get("quant_analysis"),
-            "tax_report":           thesis.get("tax_report"),
-            "risk_sentinel":        thesis.get("risk_sentinel"),
-            "alpha_scout":          thesis.get("alpha_scout"),
-            "strategist_intel":     thesis.get("strategist_intel"),
+            "market_regime": thesis.get("market_regime"),
+            "quant_analysis": thesis.get("quant_analysis"),
+            "tax_report": thesis.get("tax_report"),
+            "risk_sentinel": thesis.get("risk_sentinel"),
+            "alpha_scout": thesis.get("alpha_scout"),
+            "strategist_intel": thesis.get("strategist_intel"),
         }
         # Run the synchronous Supabase call in a thread so we don't block the event loop
         await asyncio.to_thread(
@@ -140,9 +142,20 @@ def _build_md_context(thesis: dict) -> str:
     """Serialize the most decision-relevant thesis fields for the MD prompt."""
     ctx: dict = {}
     for key in (
-        "headline", "briefing", "top_risks", "macro_advice", "tax_recommendation",
-        "stress_results", "risk_factors", "regime", "dna_score", "health_score",
-        "weighted_beta", "sharpe_ratio", "avg_correlation", "score_breakdown",
+        "headline",
+        "briefing",
+        "top_risks",
+        "macro_advice",
+        "tax_recommendation",
+        "stress_results",
+        "risk_factors",
+        "regime",
+        "dna_score",
+        "health_score",
+        "weighted_beta",
+        "sharpe_ratio",
+        "avg_correlation",
+        "score_breakdown",
     ):
         if thesis.get(key) is not None:
             ctx[key] = thesis[key]
@@ -182,25 +195,25 @@ Return ONLY valid JSON (no markdown):
 }}"""
 
     try:
-        result      = await get_ai_analysis(prompt)
-        reply       = result.get("reply", "Analysis complete.")
-        key_numbers = result.get("key_numbers") or {}   # FIXED: never None
-        action      = result.get("action", "")
+        result = await get_ai_analysis(prompt)
+        reply = result.get("reply", "Analysis complete.")
+        key_numbers = result.get("key_numbers") or {}  # FIXED: never None
+        action = result.get("action", "")
     except Exception as e:
-        reply       = f"IC system error: {e}. Please run the full swarm analysis first."
-        key_numbers = {}   # FIXED: always present
-        action      = "Re-run swarm analysis for fresh context."
+        reply = f"IC system error: {e}. Please run the full swarm analysis first."
+        key_numbers = {}  # FIXED: always present
+        action = "Re-run swarm analysis for fresh context."
 
     return {
         # Flat shape (SlidingChatPane / AgentChat)
-        "reply":       reply,
-        "key_numbers": key_numbers,   # FIXED: always present
-        "action":      action,
-        "agent":       "MD",
+        "reply": reply,
+        "key_numbers": key_numbers,  # FIXED: always present
+        "action": action,
+        "agent": "MD",
         # Nested shape (CommandPalette legacy)
         "response": {
-            "answer":             reply,
-            "key_numbers":        key_numbers,
+            "answer": reply,
+            "key_numbers": key_numbers,
             "recommended_action": action,
         },
     }
@@ -233,13 +246,13 @@ async def analyze_with_swarm(
         print(f"[Swarm] analyze exception: {e}", file=sys.stderr)
         return {
             "investment_thesis": {"error": str(e), "status": "failed"},
-            "risk_metrics":      {},
-            "tax_analysis":      {},
-            "macro_context":     "",
-            "critique":          "",
-            "agent_trace":       [f"ERROR: {e}"],
+            "risk_metrics": {},
+            "tax_analysis": {},
+            "macro_context": "",
+            "critique": "",
+            "agent_trace": [f"ERROR: {e}"],
             # FIXED: key_numbers always present so frontend never crashes on undefined
-            "key_numbers":       {"score": 0, "status": "unavailable"},
+            "key_numbers": {"score": 0, "status": "unavailable"},
         }
 
     report_id = str(uuid.uuid4())
@@ -251,17 +264,17 @@ async def analyze_with_swarm(
 
     return {
         "investment_thesis": thesis,
-        "risk_metrics":      result.get("risk_metrics", {}),
-        "tax_analysis":      result.get("tax_estimates", {}),
-        "macro_context":     result.get("macro_context", ""),
-        "critique":          result.get("critique", ""),
-        "agent_trace":       result.get("agent_trace", []),
+        "risk_metrics": result.get("risk_metrics", {}),
+        "tax_analysis": result.get("tax_estimates", {}),
+        "macro_context": result.get("macro_context", ""),
+        "critique": result.get("critique", ""),
+        "agent_trace": result.get("agent_trace", []),
         # FIXED: key_numbers always present — extracted from thesis for convenience
-        "key_numbers":       {
-            "dna_score":      str(thesis.get("dna_score") or thesis.get("health_score") or ""),
-            "weighted_beta":  str(thesis.get("weighted_beta") or ""),
-            "sharpe_ratio":   str(thesis.get("sharpe_ratio") or ""),
-            "regime":         str(thesis.get("regime") or ""),
+        "key_numbers": {
+            "dna_score": str(thesis.get("dna_score") or thesis.get("health_score") or ""),
+            "weighted_beta": str(thesis.get("weighted_beta") or ""),
+            "sharpe_ratio": str(thesis.get("sharpe_ratio") or ""),
+            "regime": str(thesis.get("regime") or ""),
         },
     }
 
@@ -308,62 +321,60 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
     # For reports persisted before the schema update we reconstruct the nested
     # objects from the flat scalars so old records remain readable.
 
-    score_bd    = row.get("score_breakdown") or {}
-    hhi_pts     = score_bd.get("hhi_concentration")
+    score_bd = row.get("score_breakdown") or {}
+    hhi_pts = score_bd.get("hhi_concentration")
 
     # market_regime — use stored object if present, else reconstruct minimum
     market_regime = row.get("market_regime") or {
-        "regime":     row.get("regime"),
+        "regime": row.get("regime"),
         "confidence": None,
-        "cpi_yoy":    None,
+        "cpi_yoy": None,
         "portfolio_implication": row.get("macro_advice"),
     }
 
     # quant_analysis — use stored object if present, else reconstruct from flat fields
     quant_analysis = row.get("quant_analysis") or {
-        "hhi_pts":        hhi_pts,
-        "weighted_beta":  row.get("weighted_beta"),
-        "sharpe_ratio":   row.get("sharpe_ratio"),
-        "avg_corr":       None,
-        "beta_map":       {},
+        "hhi_pts": hhi_pts,
+        "weighted_beta": row.get("weighted_beta"),
+        "sharpe_ratio": row.get("sharpe_ratio"),
+        "avg_corr": None,
+        "beta_map": {},
     }
 
     # tax_report — use stored object if present, else reconstruct from flat recommendation
     tax_report = row.get("tax_report") or {
-        "available":             bool(row.get("tax_recommendation")),
-        "total_liability":       None,
+        "available": bool(row.get("tax_recommendation")),
+        "total_liability": None,
         "harvest_opportunities": [],
-        "tax_drag_pct":          None,
-        "narrative":             row.get("tax_recommendation"),
+        "tax_drag_pct": None,
+        "narrative": row.get("tax_recommendation"),
     }
 
     # risk_sentinel — use stored object if present, else reconstruct from flat lists
-    primary_risks = (
-        row.get("risk_factors") or row.get("top_risks") or []
-    )
+    primary_risks = row.get("risk_factors") or row.get("top_risks") or []
     risk_sentinel = row.get("risk_sentinel") or {
-        "risk_level":    "medium",
-        "risk_score":    None,
+        "risk_level": "medium",
+        "risk_score": None,
         "primary_risks": primary_risks,
-        "mitigations":   [],
+        "mitigations": [],
     }
 
     # alpha_scout / strategist_intel — stored directly after schema update
-    alpha_scout     = row.get("alpha_scout")     or {"opportunities": [], "watchlist": []}
+    alpha_scout = row.get("alpha_scout") or {"opportunities": [], "watchlist": []}
     strategist_intel = row.get("strategist_intel") or {}
 
     return {
-        "swarm_report_id":  row["id"],
-        "briefing":         row.get("briefing") or row.get("headline"),
-        "regime":           row.get("regime"),
-        "dna_score":        row.get("dna_score"),
-        "market_regime":    market_regime,
-        "quant_analysis":   quant_analysis,
-        "tax_report":       tax_report,
-        "risk_sentinel":    risk_sentinel,
-        "alpha_scout":      alpha_scout,
+        "swarm_report_id": row["id"],
+        "briefing": row.get("briefing") or row.get("headline"),
+        "regime": row.get("regime"),
+        "dna_score": row.get("dna_score"),
+        "market_regime": market_regime,
+        "quant_analysis": quant_analysis,
+        "tax_report": tax_report,
+        "risk_sentinel": risk_sentinel,
+        "alpha_scout": alpha_scout,
         "strategist_intel": strategist_intel,
-        "created_at":       row.get("created_at"),
+        "created_at": row.get("created_at"),
     }
 
 
@@ -374,13 +385,7 @@ async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional
     Used by the frontend to restore thesis state on page refresh.
     """
     try:
-        row = (
-            supabase.table("swarm_reports")
-            .select("*")
-            .eq("id", report_id)
-            .single()
-            .execute()
-        )
+        row = supabase.table("swarm_reports").select("*").eq("id", report_id).single().execute()
         if not row.data:
             raise HTTPException(status_code=404, detail="Report not found.")
         report_user_id = row.data.get("user_id")
@@ -411,10 +416,10 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
     clean_message = _sanitize_message(body.message)
     if clean_message is None:
         return {
-            "reply":       _MD_REJECTION,
+            "reply": _MD_REJECTION,
             "key_numbers": {},
-            "action":      "Please ask a question about your portfolio's risk or performance.",
-            "agent":       "MD",
+            "action": "Please ask a question about your portfolio's risk or performance.",
+            "agent": "MD",
         }
 
     # ── 1. thesis_context passed directly ─────────────────────────────────────
@@ -455,30 +460,30 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
             # FIXED: return 200 with error payload instead of 503
             print(f"[Swarm] chat exception: {e}", file=sys.stderr)
             return {
-                "reply":         f"Analysis error: {e}. Please try again.",
-                "key_numbers":   {},
-                "action":        "Re-run analysis.",
-                "agent":         "MD",
+                "reply": f"Analysis error: {e}. Please try again.",
+                "key_numbers": {},
+                "action": "Re-run analysis.",
+                "agent": "MD",
                 "thinking_steps": [],
             }
 
         # Normalise response — support both flat {reply} and nested {response:{answer}} shapes
         # FIXED: always emit both shapes so CommandPalette and SlidingChatPane both work
-        resp        = result.get("response", {})
-        answer      = resp.get("answer") or result.get("reply", "Analysis complete.")
+        resp = result.get("response", {})
+        answer = resp.get("answer") or result.get("reply", "Analysis complete.")
         key_numbers = resp.get("key_numbers") or result.get("key_numbers") or {}
-        action      = resp.get("recommended_action") or result.get("action", "")
+        action = resp.get("recommended_action") or result.get("action", "")
         return {
             # Flat shape (SlidingChatPane / AgentChat)
-            "reply":          answer,
-            "key_numbers":    key_numbers,   # FIXED: always present
-            "action":         action,
-            "agent":          result.get("agent", "synthesis"),
+            "reply": answer,
+            "key_numbers": key_numbers,  # FIXED: always present
+            "action": action,
+            "agent": result.get("agent", "synthesis"),
             "thinking_steps": result.get("thinking_steps", []),
             # Nested shape (CommandPalette legacy)
             "response": {
-                "answer":             answer,
-                "key_numbers":        key_numbers,   # FIXED: always present
+                "answer": answer,
+                "key_numbers": key_numbers,  # FIXED: always present
                 "recommended_action": action,
             },
         }
@@ -536,14 +541,18 @@ async def global_chat(body: GlobalChatRequest):
     clean = _sanitize_message(body.message)
     if clean is None:
         return {
-            "reply":      "I can only discuss markets, trends, and investment concepts.",
+            "reply": "I can only discuss markets, trends, and investment concepts.",
             "key_numbers": {},  # FIXED: always present
-            "action":     "",
-            "agent":      body.agent_type,
-            "response":   {"answer": "I can only discuss markets, trends, and investment concepts.", "key_numbers": {}, "recommended_action": ""},
+            "action": "",
+            "agent": body.agent_type,
+            "response": {
+                "answer": "I can only discuss markets, trends, and investment concepts.",
+                "key_numbers": {},
+                "recommended_action": "",
+            },
         }
 
-    agent_type   = body.agent_type.lower().strip() if body.agent_type else "general"
+    agent_type = body.agent_type.lower().strip() if body.agent_type else "general"
     system_prose = _GLOBAL_AGENT_PROMPTS.get(agent_type, _GLOBAL_AGENT_PROMPTS["general"])
 
     prompt = f"""{system_prose}
@@ -558,34 +567,38 @@ Return ONLY valid JSON (no markdown fences):
 }}"""
 
     try:
-        data        = await get_ai_analysis(prompt)
-        reply       = data.get("reply", "Analysis complete.")
-        raw_kn      = data.get("key_numbers") or {}
-        action      = data.get("action", "")
+        data = await get_ai_analysis(prompt)
+        reply = data.get("reply", "Analysis complete.")
+        raw_kn = data.get("key_numbers") or {}
+        action = data.get("action", "")
     except Exception as e:
         print(f"[GlobalChat] AI error: {e}", file=sys.stderr)
-        reply       = "Analysis temporarily unavailable. Please try again shortly."
-        raw_kn      = {}
-        action      = ""
+        reply = "Analysis temporarily unavailable. Please try again shortly."
+        raw_kn = {}
+        action = ""
 
     # Round any numeric values in key_numbers to 2 decimal places for readability
     key_numbers: dict[str, str] = {}
     for k, v in raw_kn.items():
         try:
-            key_numbers[k] = f"{float(v):.2f}" if str(v).replace('.', '', 1).replace('-', '', 1).isdigit() else str(v)
+            key_numbers[k] = (
+                f"{float(v):.2f}"
+                if str(v).replace(".", "", 1).replace("-", "", 1).isdigit()
+                else str(v)
+            )
         except (ValueError, TypeError):
             key_numbers[k] = str(v)
 
     return {
         # Flat shape
-        "reply":          reply,
-        "key_numbers":    key_numbers,   # FIXED: always present
-        "action":         action,
-        "agent":          agent_type,
+        "reply": reply,
+        "key_numbers": key_numbers,  # FIXED: always present
+        "action": action,
+        "agent": agent_type,
         # Nested shape (CommandPalette compatibility)
         "response": {
-            "answer":             reply,
-            "key_numbers":        key_numbers,
+            "answer": reply,
+            "key_numbers": key_numbers,
             "recommended_action": action,
         },
     }

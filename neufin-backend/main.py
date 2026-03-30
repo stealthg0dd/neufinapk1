@@ -13,6 +13,7 @@ try:
     from requests.packages.urllib3.exceptions import (
         RequestsDependencyWarning,  # type: ignore[import]
     )
+
     warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
 except ImportError:
     pass
@@ -100,9 +101,9 @@ PUBLIC_PREFIXES = [
     "/api/advisors/",
     "/api/market/",
     "/api/analytics/track",
-    "/api/swarm/",          # Swarm endpoints are public (demo-accessible)
-    "/api/admin/health",    # Health diagnostics — no auth required
-    "/api/auth/status",     # Auth status probe — unauthenticated callers get authenticated=false
+    "/api/swarm/",  # Swarm endpoints are public (demo-accessible)
+    "/api/admin/health",  # Health diagnostics — no auth required
+    "/api/auth/status",  # Auth status probe — unauthenticated callers get authenticated=false
 ]
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -118,6 +119,7 @@ app = FastAPI(
 # PUBLIC_PATHS above.
 try:
     from prometheus_fastapi_instrumentator import Instrumentator
+
     Instrumentator(
         should_group_status_codes=True,
         should_ignore_untemplated=True,
@@ -129,22 +131,20 @@ except ImportError:
 
 # ── CORS origins — dynamic: base set + optional ALLOWED_ORIGINS env var ─────────
 # Add production domains to Railway env: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
-_extra_origins = [
-    o.strip()
-    for o in os.environ.get("ALLOWED_ORIGINS", "").split(",")
-    if o.strip()
-]
-origins = list({
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:5173",   # Vite dev server
-    "https://neufin-web.vercel.app",
-    "https://neufinapk1.vercel.app",
-    "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
-    "https://neufin.ai",
-    "https://www.neufin.ai",
-    *_extra_origins,
-})
+_extra_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+origins = list(
+    {
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",  # Vite dev server
+        "https://neufin-web.vercel.app",
+        "https://neufinapk1.vercel.app",
+        "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
+        "https://neufin.ai",
+        "https://www.neufin.ai",
+        *_extra_origins,
+    }
+)
 # Regex covers all Vercel preview deployments (https://*.vercel.app)
 # Starlette does not support glob wildcards in allow_origins — use allow_origin_regex instead.
 _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
@@ -243,6 +243,7 @@ app.include_router(alerts.router)
 @app.options("/{full_path:path}", include_in_schema=False)
 async def global_options_handler(full_path: str):
     from fastapi.responses import Response
+
     return Response(status_code=200)
 
 
@@ -259,7 +260,10 @@ async def analyze_dna(
     """
     # ── 0. Diagnostics ─────────────────────────────────────────────────────────
     print(f"[DIAG] content-type: {request.headers.get('content-type', 'MISSING')}", file=sys.stderr)
-    print(f"[DIAG] file.filename={file.filename!r}  content_type={file.content_type!r}", file=sys.stderr)
+    print(
+        f"[DIAG] file.filename={file.filename!r}  content_type={file.content_type!r}",
+        file=sys.stderr,
+    )
 
     # ── 1. Read + parse CSV ────────────────────────────────────────────────────
     try:
@@ -320,12 +324,12 @@ async def analyze_dna(
         )
 
     prices_available = bool(price_map)
-    df["symbol"]        = df["symbol"].str.upper()
+    df["symbol"] = df["symbol"].str.upper()
     df["current_price"] = df["symbol"].map(price_map).fillna(0.0)
-    df["value"]         = (df["shares"] * df["current_price"]).round(2)
-    total_value         = float(df["value"].sum())
-    df["weight"]        = df["value"] / total_value if total_value > 0 else 0.0
-    max_pos             = float(df["weight"].max() * 100) if total_value > 0 else 0.0
+    df["value"] = (df["shares"] * df["current_price"]).round(2)
+    total_value = float(df["value"].sum())
+    df["weight"] = df["value"] / total_value if total_value > 0 else 0.0
+    max_pos = float(df["weight"].max() * 100) if total_value > 0 else 0.0
 
     # ── 6. Scoring — 4-component model ────────────────────────────────────────
     # HHI concentration (25 pts)
@@ -336,29 +340,30 @@ async def analyze_dna(
         *[asyncio.to_thread(fetch_beta, sym) for sym in df["symbol"].tolist()],
         return_exceptions=True,
     )
-    df["beta"]     = [b if isinstance(b, float) else 1.0 for b in beta_results]
-    weighted_beta  = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
-    beta_pts       = _beta_score(weighted_beta)
+    df["beta"] = [b if isinstance(b, float) else 1.0 for b in beta_results]
+    weighted_beta = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
+    beta_pts = _beta_score(weighted_beta)
 
     # Tax alpha (20 pts)
     tax_pts = _tax_alpha_score(df)
 
     # Correlation factor (30 pts) — top-5 holdings via Alpha Vantage TIME_SERIES_DAILY
-    top5_symbols    = (
+    top5_symbols = (
         df.nlargest(5, "weight")["symbol"].tolist()
-        if total_value > 0 else df["symbol"].tolist()[:5]
+        if total_value > 0
+        else df["symbol"].tolist()[:5]
     )
-    weights_dict    = dict(zip(df["symbol"].tolist(), df["weight"].tolist(), strict=False))
-    corr_matrix     = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
-    clusters        = find_correlation_clusters(corr_matrix, weights_dict)
+    weights_dict = dict(zip(df["symbol"].tolist(), df["weight"].tolist(), strict=False))
+    corr_matrix = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
+    clusters = find_correlation_clusters(corr_matrix, weights_dict)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
 
     dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
     score_breakdown = {
         "hhi_concentration": hhi_pts,
-        "beta_risk":         beta_pts,
-        "tax_alpha":         tax_pts,
-        "correlation":       corr_pts,
+        "beta_risk": beta_pts,
+        "tax_alpha": tax_pts,
+        "correlation": corr_pts,
     }
 
     # ── 7. AI analysis ─────────────────────────────────────────────────────────
@@ -367,12 +372,12 @@ async def analyze_dna(
     else:
         price_note = "\nNote: Live market prices are currently unavailable. Analyze based on share quantities and symbol weights only; do not reference dollar values.\n"
 
-    tax_analysis     = get_tax_impact_analysis(df)
-    tax_narrative    = tax_analysis.get("narrative", "")
+    tax_analysis = get_tax_impact_analysis(df)
+    tax_narrative = tax_analysis.get("narrative", "")
     cluster_narrative = format_clusters_for_ai(clusters)
 
     prompt = f"""You are a behavioral finance expert.{price_note}
-Portfolio: {df[['symbol', 'shares', 'current_price', 'value']].to_dict(orient='records')}
+Portfolio: {df[["symbol", "shares", "current_price", "value"]].to_dict(orient="records")}
 Total value: ${total_value:,.2f}
 Max position: {max_pos:.1f}%
 Weighted beta: {weighted_beta:.2f}
@@ -400,37 +405,41 @@ Return ONLY valid JSON:
     positions_out = []
     for _, row in df[["symbol", "shares", "current_price", "value"]].iterrows():
         weight = round(float(row["value"]) / total_value * 100, 2) if total_value > 0 else 0.0
-        positions_out.append({
-            "symbol": row["symbol"],
-            "shares": row["shares"],
-            "price":  row["current_price"],
-            "value":  row["value"],
-            "weight": weight,
-        })
+        positions_out.append(
+            {
+                "symbol": row["symbol"],
+                "shares": row["shares"],
+                "price": row["current_price"],
+                "value": row["value"],
+                "weight": weight,
+            }
+        )
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
     print(
-        f"[Score] dna_score={dna_score}  max_pos={round(max_pos,1)}%  "
+        f"[Score] dna_score={dna_score}  max_pos={round(max_pos, 1)}%  "
         f"hhi={hhi_pts}  beta={beta_pts}  tax={tax_pts}  corr={corr_pts}  "
-        f"weighted_beta={round(weighted_beta,2)}  avg_corr={round(avg_corr,3)}",
+        f"weighted_beta={round(weighted_beta, 2)}  avg_corr={round(avg_corr, 3)}",
         file=sys.stderr,
     )
 
     share_token = uuid.uuid4().hex[:8]
     record_id = None
     db_payload = {
-        "user_id":        user_id,
-        "dna_score":      dna_score,
-        "investor_type":  analysis.get("investor_type"),
-        "summary":        analysis.get("summary"),
-        "strengths":      analysis.get("strengths", []),
-        "weaknesses":     analysis.get("weaknesses", []),
+        "user_id": user_id,
+        "dna_score": dna_score,
+        "investor_type": analysis.get("investor_type"),
+        "summary": analysis.get("summary"),
+        "strengths": analysis.get("strengths", []),
+        "weaknesses": analysis.get("weaknesses", []),
         "recommendation": analysis.get("recommendation"),
-        "share_token":    share_token,
-        "total_value":    round(total_value, 2),
+        "share_token": share_token,
+        "total_value": round(total_value, 2),
     }
     # Drop None values (except user_id and summary which may legitimately be null)
-    db_payload = {k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")}
+    db_payload = {
+        k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")
+    }
 
     try:
         res = supabase.table("dna_scores").insert(db_payload).execute()
@@ -451,23 +460,26 @@ Return ONLY valid JSON:
     # ── 11. Response ───────────────────────────────────────────────────────────
     # IMPORTANT: **analysis is spread FIRST so that our explicitly computed values
     # (dna_score, total_value, etc.) always override any keys the AI may return.
-    print(f"[Final] Payload being sent: dna_score={dna_score}, record_id={record_id}, "
-          f"investor_type={analysis.get('investor_type')}", file=sys.stderr)
+    print(
+        f"[Final] Payload being sent: dna_score={dna_score}, record_id={record_id}, "
+        f"investor_type={analysis.get('investor_type')}",
+        file=sys.stderr,
+    )
     return {
         **analysis,
-        "dna_score":                  dna_score,           # computed — always wins
-        "score_breakdown":            score_breakdown,
-        "total_value":                round(total_value, 2),
-        "num_positions":              len(df),
-        "max_position_pct":           round(max_pos, 2),
-        "weighted_beta":              round(weighted_beta, 3),
-        "avg_correlation":            round(avg_corr, 3),
+        "dna_score": dna_score,  # computed — always wins
+        "score_breakdown": score_breakdown,
+        "total_value": round(total_value, 2),
+        "num_positions": len(df),
+        "max_position_pct": round(max_pos, 2),
+        "weighted_beta": round(weighted_beta, 3),
+        "avg_correlation": round(avg_corr, 3),
         "hidden_correlation_clusters": clusters,
-        "tax_analysis":               tax_analysis,
-        "positions":                  positions_out,
-        "share_token":                share_token,
-        "share_url":                  f"{APP_BASE_URL}/share/{share_token}",
-        "record_id":                  record_id,
+        "tax_analysis": tax_analysis,
+        "positions": positions_out,
+        "share_token": share_token,
+        "share_url": f"{APP_BASE_URL}/share/{share_token}",
+        "record_id": record_id,
     }
 
 
@@ -498,46 +510,49 @@ async def auth_status(request: Request):
     if not auth_header.startswith("Bearer "):
         return {
             "authenticated": False,
-            "user_id":       None,
-            "expires_at":    None,
-            "error":         "No Bearer token supplied",
+            "user_id": None,
+            "expires_at": None,
+            "error": "No Bearer token supplied",
         }
 
     token = auth_header.split(" ", 1)[1]
     try:
         from jose import jwt as _jwt
+
         # Parse unverified claims first so we can always return expires_at
         raw_claims = _jwt.get_unverified_claims(token)
-        exp_ts     = raw_claims.get("exp")
+        exp_ts = raw_claims.get("exp")
         expires_at = (
             datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%dT%H:%M:%SZ")
-            if exp_ts else None
+            if exp_ts
+            else None
         )
 
         user = await verify_jwt(token)
         return {
             "authenticated": True,
-            "user_id":       user.id,
-            "expires_at":    expires_at,
-            "error":         None,
+            "user_id": user.id,
+            "expires_at": expires_at,
+            "error": None,
         }
     except Exception as exc:
         # Parse expires_at even on failure so callers know whether to refresh
         try:
-            raw_claims = _jwt.get_unverified_claims(token)   # type: ignore[possibly-undefined]
-            exp_ts     = raw_claims.get("exp")
+            raw_claims = _jwt.get_unverified_claims(token)  # type: ignore[possibly-undefined]
+            exp_ts = raw_claims.get("exp")
             expires_at = (
                 datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%dT%H:%M:%SZ")
-                if exp_ts else None
+                if exp_ts
+                else None
             )
         except Exception:
             expires_at = None
 
         return {
             "authenticated": False,
-            "user_id":       None,
-            "expires_at":    expires_at,
-            "error":         str(exc),
+            "user_id": None,
+            "expires_at": expires_at,
+            "error": str(exc),
         }
 
 
@@ -562,34 +577,34 @@ def admin_health():
         return bool(val and val.strip())
 
     ai_models = {
-        "claude":  _has(ANTHROPIC_API_KEY),
-        "openai":  _has(OPENAI_KEY),
-        "gemini":  _has(GEMINI_KEY),
-        "groq":    _has(GROQ_KEY),
+        "claude": _has(ANTHROPIC_API_KEY),
+        "openai": _has(OPENAI_KEY),
+        "gemini": _has(GEMINI_KEY),
+        "groq": _has(GROQ_KEY),
     }
     market_providers = {
-        "polygon":     _has(POLYGON_API_KEY),
-        "fmp":         _has(FMP_API_KEY),
-        "twelvedata":  _has(TWELVEDATA_API_KEY),
+        "polygon": _has(POLYGON_API_KEY),
+        "fmp": _has(FMP_API_KEY),
+        "twelvedata": _has(TWELVEDATA_API_KEY),
         "marketstack": _has(MARKETSTACK_API_KEY),
     }
     features = {
-        "swarm_engine":      True,
-        "stress_testing":    True,
-        "price_verifier":    True,
-        "alpha_gap":         True,
-        "agent_chat":        True,
-        "paywall":           True,
-        "pdf_reports":       bool(importlib.util.find_spec("reportlab")),
+        "swarm_engine": True,
+        "stress_testing": True,
+        "price_verifier": True,
+        "alpha_gap": True,
+        "agent_chat": True,
+        "paywall": True,
+        "pdf_reports": bool(importlib.util.find_spec("reportlab")),
         "fernet_encryption": bool(importlib.util.find_spec("cryptography")),
     }
     return {
-        "status":           "ok",
-        "service":          "neufin-api",
-        "ai_models":        ai_models,
+        "status": "ok",
+        "service": "neufin-api",
+        "ai_models": ai_models,
         "market_providers": market_providers,
-        "features":         features,
-        "active_ai":        next((k for k, v in ai_models.items() if v), "none"),
+        "features": features,
+        "active_ai": next((k for k, v in ai_models.items() if v), "none"),
     }
 
 
@@ -597,7 +612,9 @@ def admin_health():
 def root():
     return {"message": "Neufin AI Portfolio Intelligence API", "docs": "/docs"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

@@ -36,9 +36,13 @@ if not ALPHA_VANTAGE_API_KEY:
 try:
     from services.market_cache import get_closes as _cache_get
     from services.market_cache import set_closes as _cache_set
+
     _MARKET_CACHE_AVAILABLE = True
 except Exception as _mc_err:
-    print(f"[RiskEngine] market_cache unavailable ({_mc_err}) — using in-process cache", file=sys.stderr)
+    print(
+        f"[RiskEngine] market_cache unavailable ({_mc_err}) — using in-process cache",
+        file=sys.stderr,
+    )
     _MARKET_CACHE_AVAILABLE = False
     # Legacy in-process fallback
     _CLOSES_CACHE: dict[str, tuple[pd.Series, float]] = {}
@@ -86,26 +90,27 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
     Finnhub /stock/candle daily closes — used when AV is rate-limited or premium-blocked.
     Returns an empty Series on any failure.
     """
-    if not FINNHUB_API_KEY or _is_blacklisted('finnhub'):
+    if not FINNHUB_API_KEY or _is_blacklisted("finnhub"):
         return pd.Series(dtype=float, name=sym.upper())
     sym_upper = sym.upper()
     try:
         import datetime as _dt
-        unix_to   = int(_dt.datetime.utcnow().timestamp())
-        unix_from = unix_to - int(days * 1.8 * 86_400)   # generous window to cover weekends
+
+        unix_to = int(_dt.datetime.utcnow().timestamp())
+        unix_from = unix_to - int(days * 1.8 * 86_400)  # generous window to cover weekends
         r = requests.get(
             "https://finnhub.io/api/v1/stock/candle",
             params={
-                "symbol":     sym_upper.replace(".", "-"),
+                "symbol": sym_upper.replace(".", "-"),
                 "resolution": "D",
-                "from":       unix_from,
-                "to":         unix_to,
-                "token":      FINNHUB_API_KEY,
+                "from": unix_from,
+                "to": unix_to,
+                "token": FINNHUB_API_KEY,
             },
             timeout=8.0,
         )
         if r.status_code == 429:
-            _blacklist('finnhub')
+            _blacklist("finnhub")
             return pd.Series(dtype=float, name=sym_upper)
         data = r.json()
         if data.get("s") != "ok" or not data.get("c"):
@@ -130,12 +135,13 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
     Polygon /v2/aggs compact daily closes — second-tier fallback after Finnhub.
     Returns an empty Series on any failure.
     """
-    if not POLYGON_API_KEY or _is_blacklisted('polygon'):
+    if not POLYGON_API_KEY or _is_blacklisted("polygon"):
         return pd.Series(dtype=float, name=sym.upper())
     sym_upper = sym.upper()
     try:
         import datetime as _dt
-        date_to   = _dt.date.today().isoformat()
+
+        date_to = _dt.date.today().isoformat()
         date_from = (_dt.date.today() - _dt.timedelta(days=int(days * 1.8))).isoformat()
         r = requests.get(
             f"https://api.polygon.io/v2/aggs/ticker/{sym_upper}/range/1/day/{date_from}/{date_to}",
@@ -143,18 +149,15 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
             timeout=10.0,
         )
         if r.status_code == 429:
-            _blacklist('polygon')
+            _blacklist("polygon")
             return pd.Series(dtype=float, name=sym_upper)
         if r.status_code != 200:
             return pd.Series(dtype=float, name=sym_upper)
-        data    = r.json()
+        data = r.json()
         results = data.get("results") or []
         if not results:
             return pd.Series(dtype=float, name=sym_upper)
-        closes = {
-            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
-            for bar in results
-        }
+        closes = {_dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"] for bar in results}
         series = pd.Series(closes, dtype=float).sort_index().tail(days)
         series.name = sym_upper
         if _MARKET_CACHE_AVAILABLE:
@@ -198,7 +201,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
             return _cached[0]
 
     # ── Batch blacklist check: skip AV entirely if it was rate-limited earlier ──
-    if _is_blacklisted('av'):
+    if _is_blacklisted("av"):
         series = _fetch_daily_closes_finnhub(sym_upper, days)
         return series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
 
@@ -213,10 +216,10 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         r = requests.get(
             "https://www.alphavantage.co/query",
             params={
-                "function":   "TIME_SERIES_DAILY_ADJUSTED",
-                "symbol":     _av_ticker(sym_upper),
-                "outputsize": "compact",   # last 100 trading days
-                "apikey":     ALPHA_VANTAGE_API_KEY,
+                "function": "TIME_SERIES_DAILY_ADJUSTED",
+                "symbol": _av_ticker(sym_upper),
+                "outputsize": "compact",  # last 100 trading days
+                "apikey": ALPHA_VANTAGE_API_KEY,
             },
             timeout=20.0,
         )
@@ -227,8 +230,11 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
             _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            print(f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon", file=sys.stderr)
-            _blacklist('av')
+            print(
+                f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon",
+                file=sys.stderr,
+            )
+            _blacklist("av")
             series = _fetch_daily_closes_finnhub(sym_upper, days)
             if not series.empty:
                 return series
@@ -352,31 +358,34 @@ def build_risk_report(
     failed: list[str] = []
     for sym in symbols_upper:
         s = _fetch_daily_closes_av(sym, days=days)
-        if len(s) >= max(10, days // 6):   # need at least 1/6 of window
+        if len(s) >= max(10, days // 6):  # need at least 1/6 of window
             price_series[sym] = s
         else:
             failed.append(sym)
             if sym not in [s.upper() for s in symbols]:
-                print(f"[RiskEngine] {sym} dropped — insufficient data ({len(s)} rows)", file=sys.stderr)
+                print(
+                    f"[RiskEngine] {sym} dropped — insufficient data ({len(s)} rows)",
+                    file=sys.stderr,
+                )
 
     symbols_used: list[str] = list(price_series.keys())
 
     # 2. Build aligned price DataFrame → returns → correlation matrix
     if len(symbols_used) < 2:
         return {
-            "symbols_requested":        symbols_upper,
-            "symbols_used":             symbols_used,
-            "symbols_failed":           failed,
-            "correlation_matrix":       {},
-            "risk_clusters":            [],
-            "diversification_index":    0.0,
+            "symbols_requested": symbols_upper,
+            "symbols_used": symbols_used,
+            "symbols_failed": failed,
+            "correlation_matrix": {},
+            "risk_clusters": [],
+            "diversification_index": 0.0,
             "avg_pairwise_correlation": 0.0,
             "metadata": {"error": "Fewer than 2 symbols had sufficient data."},
         }
 
-    price_df   = pd.DataFrame(price_series).dropna()
+    price_df = pd.DataFrame(price_series).dropna()
     returns_df = _compute_returns(price_df)
-    corr_df    = _pearson_matrix(returns_df)
+    corr_df = _pearson_matrix(returns_df)
 
     # 3. Flatten correlation matrix to nested dict
     corr_dict: dict[str, dict[str, float]] = {}
@@ -393,12 +402,14 @@ def build_risk_report(
         for j in range(i + 1, len(cols)):
             rho = corr_df.iloc[i, j]
             if not np.isnan(rho) and abs(rho) > threshold:
-                risk_clusters.append({
-                    "symbol_a":    cols[i],
-                    "symbol_b":    cols[j],
-                    "correlation": round(float(rho), 4),
-                    "risk_flag":   "HIGH_POSITIVE" if rho > 0 else "HIGH_NEGATIVE",
-                })
+                risk_clusters.append(
+                    {
+                        "symbol_a": cols[i],
+                        "symbol_b": cols[j],
+                        "correlation": round(float(rho), 4),
+                        "risk_flag": "HIGH_POSITIVE" if rho > 0 else "HIGH_NEGATIVE",
+                    }
+                )
 
     # Sort descending by absolute correlation
     risk_clusters.sort(key=lambda x: abs(x["correlation"]), reverse=True)
@@ -418,17 +429,17 @@ def build_risk_report(
     n_eff = _effective_number_of_bets(corr_df, used_weights)
 
     return {
-        "symbols_requested":        symbols_upper,
-        "symbols_used":             symbols_used,
-        "symbols_failed":           failed,
-        "correlation_matrix":       corr_dict,
-        "risk_clusters":            risk_clusters,
-        "diversification_index":    n_eff,
+        "symbols_requested": symbols_upper,
+        "symbols_used": symbols_used,
+        "symbols_failed": failed,
+        "correlation_matrix": corr_dict,
+        "risk_clusters": risk_clusters,
+        "diversification_index": n_eff,
         "avg_pairwise_correlation": avg_pairwise,
         "metadata": {
-            "lookback_days":       days,
-            "threshold":           threshold,
-            "num_risk_pairs":      len(risk_clusters),
+            "lookback_days": days,
+            "threshold": threshold,
+            "num_risk_pairs": len(risk_clusters),
             "returns_observations": len(returns_df),
         },
     }
@@ -450,7 +461,7 @@ def build_correlation_matrix(symbols: list[str]) -> pd.DataFrame:
     if len(all_series) < 2:
         return pd.DataFrame()
 
-    price_df   = pd.DataFrame(all_series).dropna()
+    price_df = pd.DataFrame(all_series).dropna()
     returns_df = _compute_returns(price_df)
     return _pearson_matrix(returns_df)
 
@@ -467,7 +478,7 @@ def build_correlation_matrix_from_series(
     valid = {sym: s for sym, s in price_series.items() if len(s) >= min_rows}
     if len(valid) < 2:
         return pd.DataFrame()
-    price_df   = pd.DataFrame(valid).dropna()
+    price_df = pd.DataFrame(valid).dropna()
     returns_df = _compute_returns(price_df)
     return _pearson_matrix(returns_df)
 
@@ -488,10 +499,9 @@ async def fetch_all_closes(
     Returns a dict mapping upper-case symbol → pd.Series (may be empty on failure).
     """
     syms_upper = [s.upper() for s in symbols]
-    results: list[pd.Series] = await asyncio.gather(*[
-        asyncio.to_thread(_fetch_daily_closes_av, sym, days)
-        for sym in syms_upper
-    ])
+    results: list[pd.Series] = await asyncio.gather(
+        *[asyncio.to_thread(_fetch_daily_closes_av, sym, days) for sym in syms_upper]
+    )
     return dict(zip(syms_upper, results, strict=False))
 
 
@@ -564,7 +574,7 @@ def correlation_penalty_score(
 
     total_clustered = sum(len(c) for c in clusters)
     penalty = min(30.0, total_clustered * 5.0)
-    score   = round(max(0.0, 30.0 - penalty), 2)
+    score = round(max(0.0, 30.0 - penalty), 2)
     return score, round(avg_corr, 3)
 
 

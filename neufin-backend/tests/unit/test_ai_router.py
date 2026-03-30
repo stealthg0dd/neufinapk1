@@ -1,4 +1,5 @@
 """Unit tests for services/ai_router.py — multi-provider fallback chain."""
+
 import asyncio
 from unittest.mock import MagicMock, patch
 
@@ -46,7 +47,9 @@ class TestAIRouter:
     @patch("services.ai_router.call_gemini", side_effect=Exception("Gemini down"))
     @patch("services.ai_router.OpenAI")
     @patch("services.ai_router.Anthropic")
-    def test_raises_when_all_providers_fail(self, mock_anthropic, mock_openai, mock_call_gemini, mock_groq):
+    def test_raises_when_all_providers_fail(
+        self, mock_anthropic, mock_openai, mock_call_gemini, mock_groq
+    ):
         claude_client = MagicMock()
         claude_client.messages.create.side_effect = Exception("Claude down")
         mock_anthropic.return_value = claude_client

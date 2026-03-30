@@ -23,6 +23,7 @@ import pandas as pd
 # ── Optional Redis ─────────────────────────────────────────────────────────────
 try:
     import redis as _redis_lib
+
     _REDIS_AVAILABLE = True
 except ImportError:
     _REDIS_AVAILABLE = False
@@ -31,6 +32,7 @@ except ImportError:
 # ── Optional Supabase ──────────────────────────────────────────────────────────
 try:
     from database import get_supabase_client
+
     _SUPABASE_AVAILABLE = True
 except Exception:
     _SUPABASE_AVAILABLE = False
@@ -43,17 +45,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REDIS_URL        = os.environ.get("REDIS_URL", "")
-_REDIS_TTL       = 86_400        # 24 hours
-_SUPABASE_TTL    = 86_400        # 24 hours
-_MEMORY_TTL      = 3_600         # 1 hour  (in-process tier)
-_TABLE           = "market_data_cache"
+REDIS_URL = os.environ.get("REDIS_URL", "")
+_REDIS_TTL = 86_400  # 24 hours
+_SUPABASE_TTL = 86_400  # 24 hours
+_MEMORY_TTL = 3_600  # 1 hour  (in-process tier)
+_TABLE = "market_data_cache"
 
 # ── In-process fallback ────────────────────────────────────────────────────────
-_MEMORY: dict[str, tuple[pd.Series, float]] = {}   # key → (series, epoch_ts)
+_MEMORY: dict[str, tuple[pd.Series, float]] = {}  # key → (series, epoch_ts)
 
 # ── Redis singleton ────────────────────────────────────────────────────────────
 _redis_client: object | None = None
+
 
 def _get_redis():
     global _redis_client
@@ -96,6 +99,7 @@ def _key(symbol: str, days: int) -> str:
 # Public API
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def get_closes(symbol: str, days: int) -> pd.Series | None:
     """
     Return cached daily closes or None if not found / expired.
@@ -127,7 +131,9 @@ def get_closes(symbol: str, days: int) -> pd.Series | None:
                 .maybe_single()
                 .execute()
             )
-            if row is not None and row.data:  # FIXED: guard against None response from maybe_single()
+            if (
+                row is not None and row.data
+            ):  # FIXED: guard against None response from maybe_single()
                 series = _json_to_series(row.data["payload"])
                 print(f"[MarketCache] Supabase HIT {k}", file=sys.stderr)
                 # Backfill Redis so the next hit is faster
@@ -149,7 +155,7 @@ def set_closes(symbol: str, days: int, series: pd.Series) -> None:
     """
     Persist daily closes to all available cache tiers.
     """
-    k   = _key(symbol, days)
+    k = _key(symbol, days)
     raw = _series_to_json(series)
 
     # Tier-1: Redis
@@ -158,8 +164,10 @@ def set_closes(symbol: str, days: int, series: pd.Series) -> None:
     # Tier-2: Supabase
     if _SUPABASE_AVAILABLE:
         try:
-            sb  = get_supabase_client()
-            exp = (datetime.datetime.utcnow() + datetime.timedelta(seconds=_SUPABASE_TTL)).isoformat()
+            sb = get_supabase_client()
+            exp = (
+                datetime.datetime.utcnow() + datetime.timedelta(seconds=_SUPABASE_TTL)
+            ).isoformat()
             sb.table(_TABLE).upsert(
                 {"cache_key": k, "payload": raw, "expires_at": exp},
                 on_conflict="cache_key",
@@ -184,7 +192,8 @@ def _redis_set(k: str, raw: str) -> None:
 # ══════════════════════════════════════════════════════════════════════════════
 # MarketCache singleton — object-oriented interface used by StressTester
 # ══════════════════════════════════════════════════════════════════════════════
-_FULL_HIST_SENTINEL = 3650   # cache key sentinel for full AV history
+_FULL_HIST_SENTINEL = 3650  # cache key sentinel for full AV history
+
 
 class MarketCache:
     """
@@ -200,6 +209,7 @@ class MarketCache:
         Returns an empty Series on any failure — never raises.
         """
         import asyncio
+
         sym = ticker.upper()
 
         def _slice(s: pd.Series) -> pd.Series:
@@ -212,7 +222,7 @@ class MarketCache:
                 mask = (idx >= start) & (idx <= end)
                 return s.iloc[mask.values]
             except Exception:
-                return s   # index cannot be compared — return unsliced
+                return s  # index cannot be compared — return unsliced
 
         # 1. Try the cache first (full-history key)
         cached = get_closes(sym, _FULL_HIST_SENTINEL)
@@ -239,7 +249,9 @@ class MarketCache:
 
         import requests as _req
 
-        av_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "") or os.getenv("ALPHA_VANTAGE_API_KEY", "")
+        av_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "") or os.getenv(
+            "ALPHA_VANTAGE_API_KEY", ""
+        )
 
         # ── 1. Alpha Vantage ──────────────────────────────────────────────────
         if av_key:
@@ -247,10 +259,10 @@ class MarketCache:
                 r = _req.get(
                     "https://www.alphavantage.co/query",
                     params={
-                        "function":   "TIME_SERIES_DAILY_ADJUSTED",
-                        "symbol":     sym.replace("-", "."),
+                        "function": "TIME_SERIES_DAILY_ADJUSTED",
+                        "symbol": sym.replace("-", "."),
                         "outputsize": "full",
-                        "apikey":     av_key,
+                        "apikey": av_key,
                     },
                     timeout=20.0,
                 )
@@ -270,7 +282,10 @@ class MarketCache:
                         return series
                 else:
                     _reason = "premium" if "premium" in _av_msg.lower() else "rate-limit"
-                    print(f"[MarketCache] AV {_reason} for {sym} — trying Finnhub→Polygon", file=sys.stderr)
+                    print(
+                        f"[MarketCache] AV {_reason} for {sym} — trying Finnhub→Polygon",
+                        file=sys.stderr,
+                    )
             except Exception as e:
                 print(f"[MarketCache] AV fetch error for {sym}: {e}", file=sys.stderr)
 
@@ -278,13 +293,19 @@ class MarketCache:
         fh_key = os.environ.get("FINNHUB_API_KEY", "") or os.getenv("FINNHUB_API_KEY", "")
         if fh_key:
             try:
-                start_5y  = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
+                start_5y = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
                 unix_from = int(_dt.datetime.strptime(start_5y, "%Y-%m-%d").timestamp())
-                unix_to   = int(_dt.datetime.now(_dt.UTC).timestamp())
-                fh_sym    = sym.replace(".", "-")
+                unix_to = int(_dt.datetime.now(_dt.UTC).timestamp())
+                fh_sym = sym.replace(".", "-")
                 r = _req.get(
                     "https://finnhub.io/api/v1/stock/candle",
-                    params={"symbol": fh_sym, "resolution": "D", "from": unix_from, "to": unix_to, "token": fh_key},
+                    params={
+                        "symbol": fh_sym,
+                        "resolution": "D",
+                        "from": unix_from,
+                        "to": unix_to,
+                        "token": fh_key,
+                    },
                     timeout=10.0,
                 )
                 data = r.json()
@@ -295,7 +316,10 @@ class MarketCache:
                     }
                     series = pd.Series(closes, dtype=float).sort_index()
                     series.name = sym
-                    print(f"[MarketCache] Finnhub supplied full history for {sym} ({len(series)} rows)", file=sys.stderr)
+                    print(
+                        f"[MarketCache] Finnhub supplied full history for {sym} ({len(series)} rows)",
+                        file=sys.stderr,
+                    )
                     return series
             except Exception as e:
                 print(f"[MarketCache] Finnhub fallback error for {sym}: {e}", file=sys.stderr)
@@ -304,7 +328,7 @@ class MarketCache:
         pg_key = os.environ.get("POLYGON_API_KEY", "") or os.getenv("POLYGON_API_KEY", "")
         if pg_key:
             try:
-                start_5y  = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
+                start_5y = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
                 end_today = _dt.date.today().isoformat()
                 r = _req.get(
                     f"https://api.polygon.io/v2/aggs/ticker/{sym}/range/1/day/{start_5y}/{end_today}",
@@ -320,7 +344,10 @@ class MarketCache:
                         }
                         series = pd.Series(closes, dtype=float).sort_index()
                         series.name = sym
-                        print(f"[MarketCache] Polygon supplied full history for {sym} ({len(series)} rows)", file=sys.stderr)
+                        print(
+                            f"[MarketCache] Polygon supplied full history for {sym} ({len(series)} rows)",
+                            file=sys.stderr,
+                        )
                         return series
             except Exception as e:
                 print(f"[MarketCache] Polygon fallback error for {sym}: {e}", file=sys.stderr)

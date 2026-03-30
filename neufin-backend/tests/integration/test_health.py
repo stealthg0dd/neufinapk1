@@ -1,4 +1,5 @@
 """Integration tests — require a running backend (localhost:8000 or TEST_BASE_URL)."""
+
 import os
 
 import httpx

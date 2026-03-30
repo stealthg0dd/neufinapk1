@@ -1,4 +1,5 @@
 """Unit tests for services/calculator.py — portfolio metrics calculation."""
+
 from unittest.mock import patch
 
 import pytest
@@ -26,21 +27,25 @@ MOCK_PRICES = {
 
 # ── HHI concentration ─────────────────────────────────────────────────────────
 
+
 class TestHHI:
     def test_single_stock_hhi_is_one(self):
         """A portfolio with one stock has HHI = 1.0."""
         from services.calculator import _hhi
+
         assert _hhi([1.0]) == pytest.approx(1.0)
 
     def test_equal_weights_minimize_hhi(self):
         """N equal weights → HHI = 1/N."""
         from services.calculator import _hhi
+
         n = 10
         weights = [1 / n] * n
         assert _hhi(weights) == pytest.approx(1 / n)
 
     def test_hhi_between_zero_and_one(self):
         from services.calculator import _hhi
+
         weights = [0.5, 0.3, 0.2]
         result = _hhi(weights)
         assert 0.0 < result <= 1.0
@@ -48,39 +53,46 @@ class TestHHI:
 
 # ── DNA score components ──────────────────────────────────────────────────────
 
+
 class TestDNAScoreComponents:
     def test_hhi_score_max_for_perfect_diversification(self):
         """25 positions of equal weight → HHI score should approach 25."""
         from services.calculator import _score_hhi
+
         weights = [1 / 25] * 25
         score = _score_hhi(weights)
         assert score == pytest.approx(25, abs=2)
 
     def test_hhi_score_min_for_single_stock(self):
         from services.calculator import _score_hhi
+
         score = _score_hhi([1.0])
         assert score == pytest.approx(0, abs=2)
 
     def test_beta_score_optimal_near_one(self):
         """Portfolio beta of ~1.0 should score close to maximum (25 pts)."""
         from services.calculator import _score_beta
+
         score = _score_beta(1.0)
         assert score >= 20
 
     def test_beta_score_penalty_for_high_beta(self):
         from services.calculator import _score_beta
+
         score_high = _score_beta(2.0)
         score_optimal = _score_beta(1.0)
         assert score_high < score_optimal
 
     def test_beta_score_penalty_for_low_beta(self):
         from services.calculator import _score_beta
+
         score_low = _score_beta(0.2)
         score_optimal = _score_beta(1.0)
         assert score_low < score_optimal
 
 
 # ── Price fetching ────────────────────────────────────────────────────────────
+
 
 class TestPriceFetching:
     @patch("services.calculator._polygon_batch")
@@ -89,6 +101,7 @@ class TestPriceFetching:
         # Clear any existing blacklist state
         import services.calculator as calc
         from services.calculator import _fetch_prices_batch
+
         calc._BLACKLIST.clear()
         result = _fetch_prices_batch(["AAPL"])
         assert "AAPL" in result
@@ -98,13 +111,16 @@ class TestPriceFetching:
         import time
 
         import services.calculator as calc
+
         calc._PRICE_CACHE["TEST"] = (99.0, time.time())
         from services.calculator import _get_cached_price
+
         price = _get_cached_price("TEST")
         assert price == 99.0
 
 
 # ── Integration-style unit test (mocked network) ─────────────────────────────
+
 
 class TestCalculatePortfolioMetrics:
     @patch("services.calculator._fetch_prices_batch")
@@ -116,6 +132,7 @@ class TestCalculatePortfolioMetrics:
         mock_hist.return_value = None  # correlation skipped if no history
 
         from services.calculator import calculate_portfolio_metrics
+
         result = calculate_portfolio_metrics(SAMPLE_POSITIONS)
 
         assert "total_value" in result
@@ -132,6 +149,7 @@ class TestCalculatePortfolioMetrics:
         mock_hist.return_value = None
 
         from services.calculator import calculate_portfolio_metrics
+
         result = calculate_portfolio_metrics(SAMPLE_POSITIONS)
 
         expected = 10 * 185.0 + 5 * 415.0 + 3 * 175.0
@@ -146,6 +164,7 @@ class TestCalculatePortfolioMetrics:
         mock_hist.return_value = None
 
         from services.calculator import calculate_portfolio_metrics
+
         result = calculate_portfolio_metrics(SAMPLE_POSITIONS_WITH_COST)
 
         assert "tax_alpha_score" in result

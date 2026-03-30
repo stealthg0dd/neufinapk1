@@ -4,6 +4,7 @@ Never returns 422 just because the field name differs.
 
 Run:  pytest tests/test_analyze_dna_multipart.py
 """
+
 import io
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,6 +30,7 @@ def client():
         # yfinance returns a DataFrame; ["Close"] gives a DataFrame (rows=dates, cols=tickers).
         # main.py uses isinstance(raw, pd.DataFrame) to detect this case.
         import pandas as pd
+
         mock_close_df = pd.DataFrame([{"AAPL": 180.0, "MSFT": 370.0}])
         mock_yf.return_value = {"Close": mock_close_df}
 
@@ -47,6 +49,7 @@ def client():
         mock_supabase.auth.get_user.side_effect = Exception("no token")
 
         from main import app
+
         yield TestClient(app)
 
 
@@ -57,9 +60,7 @@ def test_any_field_name_accepted(client, field_name):
         "/api/analyze-dna",
         files={field_name: ("portfolio.csv", io.BytesIO(SAMPLE_CSV), "text/csv")},
     )
-    assert response.status_code != 422, (
-        f"Field name '{field_name}' returned 422: {response.text}"
-    )
+    assert response.status_code != 422, f"Field name '{field_name}' returned 422: {response.text}"
 
 
 def test_no_file_returns_422(client):

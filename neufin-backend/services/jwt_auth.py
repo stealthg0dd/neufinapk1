@@ -29,19 +29,19 @@ from config import SUPABASE_KEY, SUPABASE_URL
 
 # ── JWKS endpoint ──────────────────────────────────────────────────────────────
 # Standard OIDC path — more reliable than the short alias /auth/v1/jwks
-_JWKS_URL         = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
-_JWKS_TTL         = 3600.0   # seconds between cache refreshes (1 hour)
-_JWKS_RETRY_AFTER = 60.0     # backoff after a failed fetch
-_JWT_LEEWAY       = 60       # seconds of clock-skew tolerance (Railway ↔ Supabase)
+_JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+_JWKS_TTL = 3600.0  # seconds between cache refreshes (1 hour)
+_JWKS_RETRY_AFTER = 60.0  # backoff after a failed fetch
+_JWT_LEEWAY = 60  # seconds of clock-skew tolerance (Railway ↔ Supabase)
 
 # Prefer the anon key for JWKS — some Supabase instances reject service_role here
 _SUPABASE_ANON_KEY = (
     os.environ.get("SUPABASE_ANON_KEY")
     or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    or SUPABASE_KEY   # last resort: fall back to whatever key we have
+    or SUPABASE_KEY  # last resort: fall back to whatever key we have
 )
 
-_ALGORITHMS = ["ES256", "HS256"]   # accept both during key-type transition
+_ALGORITHMS = ["ES256", "HS256"]  # accept both during key-type transition
 
 # ── Fallback secrets / keys ────────────────────────────────────────────────────
 # HS256 secret — only attempted for tokens that declare alg=HS256
@@ -76,7 +76,8 @@ class JWTUser:
     Attribute names match the Supabase Python SDK's User object so existing
     code (vault.py `user.id`, `user.email`) continues to work without changes.
     """
-    id:    str
+
+    id: str
     email: str | None = None
 
 
@@ -93,9 +94,9 @@ def _static_key_list() -> list[dict]:
     try:
         parsed = json.loads(raw)
         if isinstance(parsed, list):
-            return parsed          # already a keys array
+            return parsed  # already a keys array
         if isinstance(parsed, dict):
-            return [parsed]        # single JWK object
+            return [parsed]  # single JWK object
     except json.JSONDecodeError:
         pass
     # Treat as PEM — wrap in a minimal dict that python-jose can handle
@@ -112,8 +113,9 @@ async def _fetch_jwks() -> list[dict]:
     age = now - _cache["fetched_at"]
 
     if _cache["keys"] is not None and age < _JWKS_TTL:
-        _log(f"JWKS cache HIT  — {len(_cache['keys'])} key(s), "
-             f"age={age:.0f}s, ttl={_JWKS_TTL:.0f}s")
+        _log(
+            f"JWKS cache HIT  — {len(_cache['keys'])} key(s), age={age:.0f}s, ttl={_JWKS_TTL:.0f}s"
+        )
         return _cache["keys"]
 
     # Respect retry backoff — don't hammer a failing endpoint on every request
@@ -123,8 +125,9 @@ async def _fetch_jwks() -> list[dict]:
         # Try static fallback before giving up
         static = _static_key_list()
         if static:
-            _log(f"JWKS in backoff; using SUPABASE_PUBLIC_KEY static fallback "
-                 f"({len(static)} key(s))")
+            _log(
+                f"JWKS in backoff; using SUPABASE_PUBLIC_KEY static fallback ({len(static)} key(s))"
+            )
             return static
         raise RuntimeError(f"JWKS endpoint in backoff until {_cache['fail_until']:.0f}")
 
@@ -152,13 +155,14 @@ async def _fetch_jwks() -> list[dict]:
     except Exception as exc:
         _cache["fail_until"] = now + _JWKS_RETRY_AFTER
         if _cache["keys"]:
-            _log(f"JWKS refresh FAILED ({exc}); serving stale cache "
-                 f"({len(_cache['keys'])} key(s))")
+            _log(f"JWKS refresh FAILED ({exc}); serving stale cache ({len(_cache['keys'])} key(s))")
             return _cache["keys"]
         static = _static_key_list()
         if static:
-            _log(f"JWKS unavailable ({exc}); using SUPABASE_PUBLIC_KEY static "
-                 f"fallback ({len(static)} key(s))")
+            _log(
+                f"JWKS unavailable ({exc}); using SUPABASE_PUBLIC_KEY static "
+                f"fallback ({len(static)} key(s))"
+            )
             return static
         raise RuntimeError(f"JWKS unavailable and no cached keys: {exc}") from exc
 
@@ -177,22 +181,25 @@ async def _get_signing_key(kid: str | None, cached_kids: list[str]) -> dict:
     def _find(keys: list[dict]) -> dict | None:
         if kid:
             return next((k for k in keys if k.get("kid") == kid), None)
-        return keys[0] if keys else None   # no kid header → use first key
+        return keys[0] if keys else None  # no kid header → use first key
 
     key = _find(await _fetch_jwks())
     if key is None:
-        _log(f"kid={kid!r} NOT FOUND in cache (kids={cached_kids}); "
-             f"flushing and retrying — possible key rotation")
+        _log(
+            f"kid={kid!r} NOT FOUND in cache (kids={cached_kids}); "
+            f"flushing and retrying — possible key rotation"
+        )
         _cache["keys"] = None
         keys = await _fetch_jwks()
         new_kids = [k.get("kid", "<no-kid>") for k in keys]
         key = _find(keys)
         if key is None:
-            _log(f"kid={kid!r} still NOT FOUND after refresh "
-                 f"(available kids={new_kids}) — token cannot be verified")
+            _log(
+                f"kid={kid!r} still NOT FOUND after refresh "
+                f"(available kids={new_kids}) — token cannot be verified"
+            )
             raise ValueError(
-                f"No public key found for kid={kid!r}. "
-                f"Available kids after refresh: {new_kids}"
+                f"No public key found for kid={kid!r}. Available kids after refresh: {new_kids}"
             )
         _log(f"kid={kid!r} found after cache refresh ✓")
 
@@ -237,8 +244,7 @@ async def verify_jwt(token: str) -> JWTUser:
         # HS256 fallback — only attempted when the token itself declares HS256,
         # so we never try a symmetric secret against an ES256 token.
         if alg == "HS256" and _JWT_SECRET:
-            _log(f"JWKS unavailable ({jwks_exc}); token is HS256 — "
-                 f"attempting JWT_SECRET fallback")
+            _log(f"JWKS unavailable ({jwks_exc}); token is HS256 — attempting JWT_SECRET fallback")
             try:
                 payload = jwt.decode(
                     token,
@@ -256,12 +262,16 @@ async def verify_jwt(token: str) -> JWTUser:
             except Exception as hs_exc:
                 _log(f"HS256 fallback also failed: {hs_exc}")
         elif alg != "HS256":
-            _log(f"JWKS unavailable ({jwks_exc}) and token is {alg!r} — "
-                 f"HS256 fallback skipped (algorithm mismatch)")
+            _log(
+                f"JWKS unavailable ({jwks_exc}) and token is {alg!r} — "
+                f"HS256 fallback skipped (algorithm mismatch)"
+            )
         raise ValueError(str(jwks_exc)) from jwks_exc
 
-    _log(f"Signing key resolved — kid={key.get('kid')!r}  "
-         f"kty={key.get('kty')!r}  crv={key.get('crv', 'N/A')!r}")
+    _log(
+        f"Signing key resolved — kid={key.get('kid')!r}  "
+        f"kty={key.get('kty')!r}  crv={key.get('crv', 'N/A')!r}"
+    )
 
     # ── 4. Verify signature + claims ──────────────────────────────────────────
     try:
@@ -277,10 +287,8 @@ async def verify_jwt(token: str) -> JWTUser:
     except ExpiredSignatureError as exc:
         try:
             raw = jwt.get_unverified_claims(token)
-            exp_ts  = raw.get("exp", 0)
-            exp_utc = datetime.datetime.utcfromtimestamp(exp_ts).strftime(
-                "%Y-%m-%d %H:%M:%S UTC"
-            )
+            exp_ts = raw.get("exp", 0)
+            exp_utc = datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%d %H:%M:%S UTC")
             now_utc = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
             _log(f"REJECT — token EXPIRED  exp={exp_utc}  now={now_utc}")
         except Exception:
@@ -291,8 +299,10 @@ async def verify_jwt(token: str) -> JWTUser:
         try:
             raw = jwt.get_unverified_claims(token)
             actual_aud = raw.get("aud", "<missing>")
-            _log(f"REJECT — claims error: expected aud='authenticated', "
-                 f"got aud={actual_aud!r} | detail={exc}")
+            _log(
+                f"REJECT — claims error: expected aud='authenticated', "
+                f"got aud={actual_aud!r} | detail={exc}"
+            )
         except Exception:
             _log(f"REJECT — claims error: {exc}")
         raise ValueError(f"Token claims invalid: {exc}") from exc
@@ -307,11 +317,13 @@ async def verify_jwt(token: str) -> JWTUser:
         _log("REJECT — token missing 'sub' claim")
         raise ValueError("Token missing 'sub' claim")
 
-    role    = payload.get("role", "<none>")
-    exp_ts  = payload.get("exp", 0)
-    exp_utc = datetime.datetime.utcfromtimestamp(exp_ts).strftime(
-        "%Y-%m-%d %H:%M:%S UTC"
-    ) if exp_ts else "<no exp>"
+    role = payload.get("role", "<none>")
+    exp_ts = payload.get("exp", 0)
+    exp_utc = (
+        datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%d %H:%M:%S UTC")
+        if exp_ts
+        else "<no exp>"
+    )
 
     _log(f"ACCEPT — sub={user_id[:8]}…  role={role!r}  exp={exp_utc}")
     return JWTUser(id=user_id, email=payload.get("email"))

@@ -67,14 +67,21 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     share_token = str(uuid.uuid4())[:8]
 
     try:
-        result = supabase.table("dna_scores").insert({
-            "dna_score": analysis["dna_score"],
-            "investor_type": analysis["investor_type"],
-            "strengths": analysis["strengths"],
-            "weaknesses": analysis["weaknesses"],
-            "recommendation": analysis["recommendation"],
-            "share_token": share_token,
-        }, returning="representation").execute()
+        result = (
+            supabase.table("dna_scores")
+            .insert(
+                {
+                    "dna_score": analysis["dna_score"],
+                    "investor_type": analysis["investor_type"],
+                    "strengths": analysis["strengths"],
+                    "weaknesses": analysis["weaknesses"],
+                    "recommendation": analysis["recommendation"],
+                    "share_token": share_token,
+                },
+                returning="representation",
+            )
+            .execute()
+        )
         record_id = result.data[0]["id"] if result.data else None
     except Exception as e:
         print(f"Supabase insert failed: {e}")
@@ -93,7 +100,9 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
 async def get_shared_dna(token: str):
     """Fetch a shared DNA score by token (increments view count)."""
     try:
-        result = supabase.table("dna_scores").select("*").eq("share_token", token).single().execute()
+        result = (
+            supabase.table("dna_scores").select("*").eq("share_token", token).single().execute()
+        )
     except Exception:
         raise HTTPException(status_code=404, detail="Share not found.") from None
 
@@ -103,9 +112,9 @@ async def get_shared_dna(token: str):
 
     # Increment view count
     try:
-        supabase.table("dna_scores").update(
-            {"view_count": (record.get("view_count") or 0) + 1}
-        ).eq("share_token", token).execute()
+        supabase.table("dna_scores").update({"view_count": (record.get("view_count") or 0) + 1}).eq(
+            "share_token", token
+        ).execute()
     except Exception:
         logger.warning("Failed to update view count", exc_info=True)
 

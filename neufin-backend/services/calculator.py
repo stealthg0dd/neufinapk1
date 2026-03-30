@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
-POLYGON_API_KEY       = os.environ.get("POLYGON_API_KEY")
-FINNHUB_API_KEY       = os.environ.get("FINNHUB_API_KEY")
-FMP_API_KEY           = os.environ.get("FMP_API_KEY")
-TWELVEDATA_API_KEY    = os.environ.get("TWELVEDATA_API_KEY")
-MARKETSTACK_API_KEY   = os.environ.get("MARKETSTACK_API_KEY")
+POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
+FMP_API_KEY = os.environ.get("FMP_API_KEY")
+TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY")
+MARKETSTACK_API_KEY = os.environ.get("MARKETSTACK_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
 
 _KEY_MAP = {
@@ -30,15 +30,15 @@ for _k, _v in _KEY_MAP.items():
     print(f"[calculator] {_k:25s} = {'FOUND ✓' if _v else 'MISSING ✗'}", file=sys.stderr)
 
 # ── In-process caches (1-hour TTL) ────────────────────────────────────────────
-_PRICE_CACHE:   dict[str, tuple[float, float]] = {}  # sym → (price, ts)
-_BETA_CACHE:    dict[str, tuple[float, float]] = {}  # sym → (beta, ts)
-_HISTORY_CACHE: dict = {}                             # key → {"data": df, "ts": float}
+_PRICE_CACHE: dict[str, tuple[float, float]] = {}  # sym → (price, ts)
+_BETA_CACHE: dict[str, tuple[float, float]] = {}  # sym → (beta, ts)
+_HISTORY_CACHE: dict = {}  # key → {"data": df, "ts": float}
 _CACHE_TTL = 3600  # seconds
 
 _PERIOD_DAYS = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
 
 # ── Circuit breaker ────────────────────────────────────────────────────────────
-_BLACKLIST: dict[str, float] = {}   # provider_name → expiry epoch
+_BLACKLIST: dict[str, float] = {}  # provider_name → expiry epoch
 
 
 def _get_cached_price(sym: str) -> float | None:
@@ -102,13 +102,16 @@ def _fh_ticker(sym: str) -> str:
     """Finnhub: BRK.B → BRK-B."""
     return sym.replace(".", "-").upper()
 
+
 def _polygon_sym(sym: str) -> str:
     """Polygon / FMP: BRK-B → BRK.B."""
     return sym.replace("-", ".").upper()
 
+
 def _td_sym(sym: str) -> str:
     """TwelveData: BRK-B → BRK/B."""
     return sym.replace("-", "/").upper()
+
 
 def _av_ticker(sym: str) -> str:
     """Alpha Vantage: BRK-B → BRK.B."""
@@ -116,6 +119,7 @@ def _av_ticker(sym: str) -> str:
 
 
 # ── Provider implementations ───────────────────────────────────────────────────
+
 
 def _polygon_batch(symbols: list[str]) -> dict[str, float]:
     """
@@ -142,9 +146,12 @@ def _polygon_batch(symbols: list[str]) -> dict[str, float]:
         results: dict[str, float] = {}
         for entry in data.get("tickers", []):
             raw_sym = entry.get("ticker", "")
-            price = float((entry.get("day") or {}).get("c") or
-                          (entry.get("lastTrade") or {}).get("p") or
-                          (entry.get("prevDay") or {}).get("c") or 0)
+            price = float(
+                (entry.get("day") or {}).get("c")
+                or (entry.get("lastTrade") or {}).get("p")
+                or (entry.get("prevDay") or {}).get("c")
+                or 0
+            )
             if price > 0 and raw_sym in norm:
                 results[norm[raw_sym]] = price
         return results
@@ -268,7 +275,7 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
             _blacklist("marketstack", secs=3600)
             return {}
         results: dict[str, float] = {}
-        for entry in (data.get("data") or []):
+        for entry in data.get("data") or []:
             raw = entry.get("symbol", "")
             price = float(entry.get("close") or 0)
             if price > 0:
@@ -478,15 +485,17 @@ def verify_price_integrity(positions: list) -> list[dict]:
         # Need both prices to compare
         if p_polygon <= 0 or p_finnhub <= 0:
             price_used = p_polygon or p_finnhub or float(row["current_price"])
-            results.append({
-                "symbol":          sym,
-                "weight_pct":      round(float(row["weight"]) * 100, 1),
-                "price_polygon":   p_polygon or None,
-                "price_finnhub":   p_finnhub or None,
-                "price_used":      round(price_used, 4),
-                "discrepancy_pct": 0.0,
-                "warned":          False,
-            })
+            results.append(
+                {
+                    "symbol": sym,
+                    "weight_pct": round(float(row["weight"]) * 100, 1),
+                    "price_polygon": p_polygon or None,
+                    "price_finnhub": p_finnhub or None,
+                    "price_used": round(price_used, 4),
+                    "discrepancy_pct": 0.0,
+                    "warned": False,
+                }
+            )
             continue
 
         discrepancy = abs(p_polygon - p_finnhub) / ((p_polygon + p_finnhub) / 2) * 100
@@ -501,15 +510,17 @@ def verify_price_integrity(positions: list) -> list[dict]:
                 file=sys.stderr,
             )
 
-        results.append({
-            "symbol":          sym,
-            "weight_pct":      round(float(row["weight"]) * 100, 1),
-            "price_polygon":   round(p_polygon, 4),
-            "price_finnhub":   round(p_finnhub, 4),
-            "price_used":      round(price_used, 4),
-            "discrepancy_pct": round(discrepancy, 2),
-            "warned":          warned,
-        })
+        results.append(
+            {
+                "symbol": sym,
+                "weight_pct": round(float(row["weight"]) * 100, 1),
+                "price_polygon": round(p_polygon, 4),
+                "price_finnhub": round(p_finnhub, 4),
+                "price_used": round(price_used, 4),
+                "discrepancy_pct": round(discrepancy, 2),
+                "warned": warned,
+            }
+        )
 
     return results
 
@@ -552,7 +563,7 @@ def _hhi_score(weights: "pd.Series") -> float:
     Lower HHI (more diversified) → higher score.
     """
     w = weights / weights.sum() if weights.sum() > 0 else weights
-    hhi = float((w ** 2).sum())          # [1/n, 1]
+    hhi = float((w**2).sum())  # [1/n, 1]
     return round(25.0 * (1.0 - hhi), 2)
 
 
@@ -598,19 +609,19 @@ def _tax_alpha_score(df: "pd.DataFrame") -> float:
         return 10.0
 
     df = df.copy()
-    df["cost_basis"]    = pd.to_numeric(df["cost_basis"],    errors="coerce").fillna(0)
+    df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce").fillna(0)
     df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce").fillna(0)
-    df["shares"]        = pd.to_numeric(df["shares"],        errors="coerce").fillna(0)
+    df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
 
     total_value = float((df["shares"] * df["current_price"]).sum())
     if total_value <= 0:
         return 10.0
 
     df["unrealised_gain"] = (df["current_price"] - df["cost_basis"]) * df["shares"]
-    harvest_value  = float(df.loc[df["unrealised_gain"] < 0, "unrealised_gain"].abs().sum())
+    harvest_value = float(df.loc[df["unrealised_gain"] < 0, "unrealised_gain"].abs().sum())
     liability_value = float(df.loc[df["unrealised_gain"] > 0, "unrealised_gain"].sum())
 
-    harvest_ratio   = harvest_value   / total_value
+    harvest_ratio = harvest_value / total_value
     liability_ratio = liability_value / total_value
 
     score = 10.0 + (harvest_ratio * 30.0) - (liability_ratio * 10.0)
@@ -630,37 +641,39 @@ def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
 
     if "cost_basis" not in df.columns or "current_price" not in df.columns:
         return {
-            "available":  False,
-            "positions":  [],
-            "narrative":  "Cost basis not provided — tax analysis unavailable.",
+            "available": False,
+            "positions": [],
+            "narrative": "Cost basis not provided — tax analysis unavailable.",
         }
 
     df = df.copy()
-    df["cost_basis"]    = pd.to_numeric(df["cost_basis"],    errors="coerce").fillna(0)
+    df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce").fillna(0)
     df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce").fillna(0)
-    df["shares"]        = pd.to_numeric(df["shares"],        errors="coerce").fillna(0)
+    df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
 
     positions = []
-    total_liability   = 0.0
+    total_liability = 0.0
     total_harvest_opp = 0.0
 
     for _, row in df.iterrows():
         gain = (row["current_price"] - row["cost_basis"]) * row["shares"]
         if gain > 0:
-            tax_liability  = round(gain * CGT_RATE, 2)
+            tax_liability = round(gain * CGT_RATE, 2)
             harvest_credit = 0.0
             total_liability += tax_liability
         else:
-            tax_liability  = 0.0
+            tax_liability = 0.0
             harvest_credit = round(abs(gain) * CGT_RATE, 2)
             total_harvest_opp += harvest_credit
 
-        positions.append({
-            "symbol":          row["symbol"],
-            "unrealised_gain": round(gain, 2),
-            "tax_liability":   tax_liability,
-            "harvest_credit":  harvest_credit,
-        })
+        positions.append(
+            {
+                "symbol": row["symbol"],
+                "unrealised_gain": round(gain, 2),
+                "tax_liability": tax_liability,
+                "harvest_credit": harvest_credit,
+            }
+        )
 
     narrative = (
         f"Estimated deferred tax liability: ${total_liability:,.0f} "
@@ -669,11 +682,11 @@ def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
     )
 
     return {
-        "available":         True,
-        "positions":         positions,
-        "total_liability":   round(total_liability, 2),
+        "available": True,
+        "positions": positions,
+        "total_liability": round(total_liability, 2),
         "total_harvest_opp": round(total_harvest_opp, 2),
-        "narrative":         narrative,
+        "narrative": narrative,
     }
 
 
@@ -703,12 +716,14 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
     for col in ("cost_basis", "current_price", "shares"):
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    df["unrealised_gain"]        = (df["current_price"] - df["cost_basis"]) * df["shares"]
-    df["tax_liability"]          = df["unrealised_gain"].clip(lower=0) * CGT_RATE
-    df["credit_per_share"]       = (df["cost_basis"] - df["current_price"]).clip(lower=0) * CGT_RATE
+    df["unrealised_gain"] = (df["current_price"] - df["cost_basis"]) * df["shares"]
+    df["tax_liability"] = df["unrealised_gain"].clip(lower=0) * CGT_RATE
+    df["credit_per_share"] = (df["cost_basis"] - df["current_price"]).clip(lower=0) * CGT_RATE
 
     gainers = df[df["unrealised_gain"] > 0].nlargest(2, "tax_liability")
-    losers_pool = df[df["unrealised_gain"] < 0].sort_values("unrealised_gain")  # most negative first
+    losers_pool = df[df["unrealised_gain"] < 0].sort_values(
+        "unrealised_gain"
+    )  # most negative first
 
     if gainers.empty or losers_pool.empty:
         return []
@@ -716,7 +731,7 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
     pairs: list[dict] = []
 
     for _, gainer in gainers.iterrows():
-        target = float(gainer["tax_liability"])   # total $ tax to offset
+        target = float(gainer["tax_liability"])  # total $ tax to offset
         remaining = target
         loser_instructions: list[dict] = []
 
@@ -728,18 +743,22 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
                 continue
 
             shares_available = float(loser["shares"])
-            shares_needed    = remaining / cps
-            shares_to_sell   = round(min(shares_needed, shares_available), 2)
-            loss_usd         = round(shares_to_sell * abs(float(loser["current_price"] - loser["cost_basis"])), 2)
-            credit_achieved  = round(shares_to_sell * cps, 2)
-            remaining        = round(remaining - credit_achieved, 2)
+            shares_needed = remaining / cps
+            shares_to_sell = round(min(shares_needed, shares_available), 2)
+            loss_usd = round(
+                shares_to_sell * abs(float(loser["current_price"] - loser["cost_basis"])), 2
+            )
+            credit_achieved = round(shares_to_sell * cps, 2)
+            remaining = round(remaining - credit_achieved, 2)
 
-            loser_instructions.append({
-                "symbol":         loser["symbol"],
-                "shares_to_sell": shares_to_sell,
-                "loss_usd":       loss_usd,
-                "credit_usd":     credit_achieved,
-            })
+            loser_instructions.append(
+                {
+                    "symbol": loser["symbol"],
+                    "shares_to_sell": shares_to_sell,
+                    "loss_usd": loss_usd,
+                    "credit_usd": credit_achieved,
+                }
+            )
 
         if not loser_instructions:
             continue
@@ -755,16 +774,18 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
             f"for a net tax impact of ${net_tax:,.0f}."
         )
 
-        pairs.append({
-            "winner_symbol":             gainer["symbol"],
-            "winner_shares":             int(gainer["shares"]),
-            "winner_gain_usd":           round(float(gainer["unrealised_gain"]), 2),
-            "winner_tax_liability_usd":  round(float(gainer["tax_liability"]), 2),
-            "loser_instructions":        loser_instructions,
-            "net_tax_impact_usd":        round(net_tax, 2),
-            "fully_offset":              net_tax <= 1.0,
-            "recommendation_text":       rec,
-        })
+        pairs.append(
+            {
+                "winner_symbol": gainer["symbol"],
+                "winner_shares": int(gainer["shares"]),
+                "winner_gain_usd": round(float(gainer["unrealised_gain"]), 2),
+                "winner_tax_liability_usd": round(float(gainer["tax_liability"]), 2),
+                "loser_instructions": loser_instructions,
+                "net_tax_impact_usd": round(net_tax, 2),
+                "fully_offset": net_tax <= 1.0,
+                "recommendation_text": rec,
+            }
+        )
 
     return pairs
 
@@ -777,11 +798,11 @@ def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series 
             r = requests.get(
                 "https://finnhub.io/api/v1/stock/candle",
                 params={
-                    "symbol":     _fh_ticker(sym),
+                    "symbol": _fh_ticker(sym),
                     "resolution": "D",
-                    "from":       unix_from,
-                    "to":         unix_to,
-                    "token":      FINNHUB_API_KEY,
+                    "from": unix_from,
+                    "to": unix_to,
+                    "token": FINNHUB_API_KEY,
                 },
                 timeout=8.0,
             )
@@ -797,10 +818,10 @@ def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series 
             r = requests.get(
                 "https://www.alphavantage.co/query",
                 params={
-                    "function":   "TIME_SERIES_DAILY",
-                    "symbol":     _av_ticker(sym),
+                    "function": "TIME_SERIES_DAILY",
+                    "symbol": _av_ticker(sym),
                     "outputsize": "compact",
-                    "apikey":     ALPHA_VANTAGE_API_KEY,
+                    "apikey": ALPHA_VANTAGE_API_KEY,
                 },
                 timeout=10.0,
             )
@@ -825,7 +846,7 @@ def _fetch_prices(symbols: list[str], period: str) -> pd.DataFrame:
         return entry["data"]
 
     period_days = _PERIOD_DAYS.get(period, 30)
-    unix_to   = int(time.time())
+    unix_to = int(time.time())
     unix_from = unix_to - period_days * 86400
 
     all_series: dict[str, pd.Series] = {}
@@ -874,7 +895,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     weighted_beta = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
     beta_pts = _beta_score(weighted_beta)
 
-    tax_pts  = _tax_alpha_score(df)
+    tax_pts = _tax_alpha_score(df)
     corr_pts = 15.0  # neutral placeholder — risk_engine fills this in the DNA flow
 
     dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
@@ -882,8 +903,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     # Annualised volatility (requires historical price DataFrame)
     volatility = 0.0
     if returns is not None and not returns.empty:
-        weights_series   = df.set_index("symbol")["weight"]
-        aligned_weights  = weights_series.reindex(returns.columns).fillna(0)
+        weights_series = df.set_index("symbol")["weight"]
+        aligned_weights = weights_series.reindex(returns.columns).fillna(0)
         portfolio_returns = (returns * aligned_weights).sum(axis=1)
         volatility = float(portfolio_returns.std() * np.sqrt(252) * 100)
 
@@ -894,22 +915,24 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         pnl_pct = float((total_value - total_cost) / total_cost * 100) if total_cost > 0 else None
 
     result = {
-        "total_value":           float(total_value),
-        "hhi":                   round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
-        "num_positions":         len(df),
-        "dna_score":             dna_score,
-        "tax_alpha_score":       tax_pts,
+        "total_value": float(total_value),
+        "hhi": round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
+        "num_positions": len(df),
+        "dna_score": dna_score,
+        "tax_alpha_score": tax_pts,
         "score_breakdown": {
             "hhi_concentration": hhi_pts,
-            "beta_risk":         beta_pts,
-            "tax_alpha":         tax_pts,
-            "correlation":       corr_pts,
+            "beta_risk": beta_pts,
+            "tax_alpha": tax_pts,
+            "correlation": corr_pts,
         },
-        "weighted_beta":         round(weighted_beta, 3),
-        "max_position_pct":      round(float(df["weight"].max()) * 100, 2),
+        "weighted_beta": round(weighted_beta, 3),
+        "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
-        "pnl_pct":               round(pnl_pct, 2) if pnl_pct is not None else None,
-        "positions":             df[["symbol", "shares", "current_price", "current_value", "weight"]].to_dict("records"),
+        "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
+        "positions": df[["symbol", "shares", "current_price", "current_value", "weight"]].to_dict(
+            "records"
+        ),
     }
     if failed_tickers:
         result["price_warnings"] = [

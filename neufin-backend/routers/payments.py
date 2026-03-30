@@ -46,23 +46,26 @@ stripe.api_key = STRIPE_SECRET_KEY
 
 # ── Request models ─────────────────────────────────────────────────────────────
 
+
 class CheckoutRequest(BaseModel):
-    plan: str                          # "single" | "unlimited"
+    plan: str  # "single" | "unlimited"
     positions: list[dict] | None = None  # anonymous flow: pass positions directly
-    portfolio_id: str | None = None     # authenticated flow: existing portfolio
+    portfolio_id: str | None = None  # authenticated flow: existing portfolio
     advisor_id: str = "anonymous"
-    ref_token: str | None = None        # referral token → apply 20% coupon
+    ref_token: str | None = None  # referral token → apply 20% coupon
     success_url: str = f"{APP_BASE_URL}/results?checkout_success=1"
-    cancel_url:  str = f"{APP_BASE_URL}/results"
+    cancel_url: str = f"{APP_BASE_URL}/results"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _upload_pdf(pdf_bytes: bytes, report_id: str) -> str | None:
     filename = f"{datetime.datetime.utcnow().strftime('%Y/%m/%d')}/report-{report_id[:8]}.pdf"
     try:
         supabase.storage.from_("advisor-reports").upload(
-            path=filename, file=pdf_bytes,
+            path=filename,
+            file=pdf_bytes,
             file_options={"content-type": "application/pdf"},
         )
         return supabase.storage.from_("advisor-reports").get_public_url(filename)
@@ -104,7 +107,9 @@ Return ONLY valid JSON:
         pdf_url = _upload_pdf(pdf_bytes, report_id)
 
         if pdf_url:
-            supabase.table("advisor_reports").update({"pdf_url": pdf_url}).eq("id", report_id).execute()
+            supabase.table("advisor_reports").update({"pdf_url": pdf_url}).eq(
+                "id", report_id
+            ).execute()
 
         return pdf_url
     except Exception as e:
@@ -134,6 +139,7 @@ def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+
 @router.post("/api/reports/checkout")
 async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(get_optional_user)):
     """
@@ -158,7 +164,7 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
         raise HTTPException(401, "Authentication required for advisor checkout.")
 
     portfolio_id = body.portfolio_id
-    report_id    = None
+    report_id = None
 
     # ── For single-report plan: ensure we have a portfolio + pending report ───
     if plan == "single":
@@ -169,20 +175,28 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
         if not portfolio_id and body.positions:
             try:
                 metrics = calculate_portfolio_metrics(body.positions)
-                port_result = supabase.table("portfolios").insert({
-                    "user_id":     user.id if user else None,
-                    "name":        f"Report Portfolio {datetime.datetime.utcnow().strftime('%Y-%m-%d')}",
-                    "total_value": metrics["total_value"],
-                }).execute()
+                port_result = (
+                    supabase.table("portfolios")
+                    .insert(
+                        {
+                            "user_id": user.id if user else None,
+                            "name": f"Report Portfolio {datetime.datetime.utcnow().strftime('%Y-%m-%d')}",
+                            "total_value": metrics["total_value"],
+                        }
+                    )
+                    .execute()
+                )
                 portfolio_id = port_result.data[0]["id"]
 
                 for pos in metrics["positions"]:
-                    supabase.table("portfolio_positions").insert({
-                        "portfolio_id": portfolio_id,
-                        "symbol":       pos["symbol"],
-                        "shares":       pos["shares"],
-                        "cost_basis":   pos.get("cost_basis"),
-                    }).execute()
+                    supabase.table("portfolio_positions").insert(
+                        {
+                            "portfolio_id": portfolio_id,
+                            "symbol": pos["symbol"],
+                            "shares": pos["shares"],
+                            "cost_basis": pos.get("cost_basis"),
+                        }
+                    ).execute()
             except Exception as e:
                 raise HTTPException(422, f"Could not create portfolio: {e}") from e
 
@@ -191,11 +205,19 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
 
         # Create pending advisor_report record
         try:
-            report_result = supabase.table("advisor_reports").insert({
-                "portfolio_id": portfolio_id,
-                "advisor_id":   None if effective_advisor_id == "anonymous" else effective_advisor_id,
-                "is_paid":      False,
-            }).execute()
+            report_result = (
+                supabase.table("advisor_reports")
+                .insert(
+                    {
+                        "portfolio_id": portfolio_id,
+                        "advisor_id": None
+                        if effective_advisor_id == "anonymous"
+                        else effective_advisor_id,
+                        "is_paid": False,
+                    }
+                )
+                .execute()
+            )
             report_id = report_result.data[0]["id"]
         except Exception as e:
             raise HTTPException(500, f"Could not create report record: {e}") from e
@@ -224,11 +246,11 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
             "success_url": body.success_url + "&session_id={CHECKOUT_SESSION_ID}",
             "cancel_url": body.cancel_url,
             "metadata": {
-                "plan":         plan,
+                "plan": plan,
                 "portfolio_id": portfolio_id or "",
-                "report_id":    report_id or "",
-                "advisor_id":   effective_advisor_id,
-                "ref_token":    body.ref_token or "",
+                "report_id": report_id or "",
+                "advisor_id": effective_advisor_id,
+                "ref_token": body.ref_token or "",
             },
             "allow_promotion_codes": not bool(discounts),  # no promo codes if coupon applied
         }
@@ -241,11 +263,14 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
         raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
     # Funnel event: checkout initiated
-    await track("checkout_initiated", {
-        "plan":       plan,
-        "has_referral": bool(discounts),
-        "ref_token":  body.ref_token or "",
-    })
+    await track(
+        "checkout_initiated",
+        {
+            "plan": plan,
+            "has_referral": bool(discounts),
+            "ref_token": body.ref_token or "",
+        },
+    )
 
     # Log referral use
     if discounts and body.ref_token:
@@ -253,8 +278,8 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
 
     return {
         "checkout_url": session.url,
-        "session_id":   session.id,
-        "report_id":    report_id,
+        "session_id": session.id,
+        "report_id": report_id,
         "referral_discount": bool(discounts),
     }
 
@@ -267,7 +292,7 @@ async def stripe_webhook(request: Request):
       - single plan  → marks report as paid, triggers PDF generation
       - unlimited    → upgrades user subscription_tier to 'pro'
     """
-    payload   = await request.body()
+    payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
@@ -278,22 +303,27 @@ async def stripe_webhook(request: Request):
         raise HTTPException(400, f"Webhook error: {e}") from e
 
     if event["type"] == "checkout.session.completed":
-        session  = event["data"]["object"]
-        meta     = session.get("metadata", {})
-        plan     = meta.get("plan")
+        session = event["data"]["object"]
+        meta = session.get("metadata", {})
+        plan = meta.get("plan")
         # Funnel event: payment confirmed
-        await track("payment_completed", {
-            "plan":        plan,
-            "amount_total": session.get("amount_total"),
-            "ref_token":   meta.get("ref_token", ""),
-        })
-        report_id    = meta.get("report_id") or None
+        await track(
+            "payment_completed",
+            {
+                "plan": plan,
+                "amount_total": session.get("amount_total"),
+                "ref_token": meta.get("ref_token", ""),
+            },
+        )
+        report_id = meta.get("report_id") or None
         portfolio_id = meta.get("portfolio_id") or None
-        advisor_id   = meta.get("advisor_id")
+        advisor_id = meta.get("advisor_id")
 
         if plan == "single" and report_id:
             # Mark paid
-            supabase.table("advisor_reports").update({"is_paid": True}).eq("id", report_id).execute()
+            supabase.table("advisor_reports").update({"is_paid": True}).eq(
+                "id", report_id
+            ).execute()
             # Generate PDF asynchronously (Stripe timeout is 30s — PDF gen is ~3-8s)
             if portfolio_id:
                 await _generate_and_store_pdf(portfolio_id, report_id)
@@ -301,10 +331,12 @@ async def stripe_webhook(request: Request):
         elif plan == "unlimited" and advisor_id and advisor_id != "anonymous":
             # Upgrade subscription tier
             try:
-                supabase.table("user_profiles").update({
-                    "subscription_tier": "pro",
-                    "trial_ends_at":     None,
-                }).eq("id", advisor_id).execute()
+                supabase.table("user_profiles").update(
+                    {
+                        "subscription_tier": "pro",
+                        "trial_ends_at": None,
+                    }
+                ).eq("id", advisor_id).execute()
             except Exception as e:
                 sentry_sdk.set_tag("stripe_event_type", "subscription_upgrade")
                 sentry_sdk.capture_exception(e)
@@ -318,9 +350,11 @@ async def stripe_webhook(request: Request):
             customer = stripe.Customer.retrieve(customer_id)
             advisor_id = customer.get("metadata", {}).get("advisor_id")
             if advisor_id:
-                supabase.table("user_profiles").update({
-                    "subscription_tier": "free",
-                }).eq("id", advisor_id).execute()
+                supabase.table("user_profiles").update(
+                    {
+                        "subscription_tier": "free",
+                    }
+                ).eq("id", advisor_id).execute()
         except Exception as e:
             sentry_sdk.set_tag("stripe_event_type", "subscription_deleted")
             sentry_sdk.capture_exception(e)
@@ -374,36 +408,52 @@ async def get_plans():
     return {
         "plans": [
             {
-                "id":          "free",
-                "name":        "DNA Score",
-                "price":       0,
-                "currency":    "usd",
-                "interval":    None,
+                "id": "free",
+                "name": "DNA Score",
+                "price": 0,
+                "currency": "usd",
+                "interval": None,
                 "description": "Behavioral investor profile, strengths, weaknesses, recommendation",
-                "features":    ["Investor DNA Score (0-100)", "Investor type classification",
-                                "3 key strengths", "2 risk areas", "Shareable card"],
+                "features": [
+                    "Investor DNA Score (0-100)",
+                    "Investor type classification",
+                    "3 key strengths",
+                    "2 risk areas",
+                    "Shareable card",
+                ],
             },
             {
-                "id":          "single",
-                "name":        "Advisor Report",
-                "price":       2900,
-                "currency":    "usd",
-                "interval":    "one_time",
+                "id": "single",
+                "name": "Advisor Report",
+                "price": 2900,
+                "currency": "usd",
+                "interval": "one_time",
                 "description": "Full 10-page professional PDF report",
-                "features":    ["Everything in Free", "10-page PDF report", "AI risk assessment",
-                                "Sector allocation analysis", "Market outlook",
-                                "Action plan", "White-label branding"],
+                "features": [
+                    "Everything in Free",
+                    "10-page PDF report",
+                    "AI risk assessment",
+                    "Sector allocation analysis",
+                    "Market outlook",
+                    "Action plan",
+                    "White-label branding",
+                ],
             },
             {
-                "id":          "unlimited",
-                "name":        "Pro Advisor",
-                "price":       9900,
-                "currency":    "usd",
-                "interval":    "month",
+                "id": "unlimited",
+                "name": "Pro Advisor",
+                "price": 9900,
+                "currency": "usd",
+                "interval": "month",
                 "description": "Unlimited reports for advisor teams",
-                "features":    ["Everything in Single Report", "Unlimited reports/month",
-                                "Custom logo & colours", "Priority AI (Claude primary)",
-                                "API access", "Client dashboard"],
+                "features": [
+                    "Everything in Single Report",
+                    "Unlimited reports/month",
+                    "Custom logo & colours",
+                    "Priority AI (Claude primary)",
+                    "API access",
+                    "Client dashboard",
+                ],
             },
         ]
     }

@@ -40,23 +40,24 @@ def _store(key: str, value: object):
 
 # ── Investor type metadata ─────────────────────────────────────────────────────
 _TYPE_META = {
-    "Diversified Strategist": {"sector": "Balanced",    "color": "#3b82f6"},
-    "Conviction Growth":      {"sector": "Growth",      "color": "#8b5cf6"},
-    "Momentum Trader":        {"sector": "Momentum",    "color": "#f59e0b"},
-    "Defensive Allocator":    {"sector": "Defensive",   "color": "#22c55e"},
-    "Speculative Investor":   {"sector": "Speculative", "color": "#ef4444"},
+    "Diversified Strategist": {"sector": "Balanced", "color": "#3b82f6"},
+    "Conviction Growth": {"sector": "Growth", "color": "#8b5cf6"},
+    "Momentum Trader": {"sector": "Momentum", "color": "#f59e0b"},
+    "Defensive Allocator": {"sector": "Defensive", "color": "#22c55e"},
+    "Speculative Investor": {"sector": "Speculative", "color": "#ef4444"},
 }
 
 _SCORE_BANDS = [
-    {"range": "0-20",  "label": "High Risk"},
+    {"range": "0-20", "label": "High Risk"},
     {"range": "21-40", "label": "Below Avg"},
     {"range": "41-60", "label": "Average"},
     {"range": "61-80", "label": "Good"},
-    {"range": "81-100","label": "Excellent"},
+    {"range": "81-100", "label": "Excellent"},
 ]
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/market/health")
 async def market_health():
@@ -115,10 +116,10 @@ async def market_health():
     strategy_mix = sorted(
         [
             {
-                "type":   t,
-                "count":  cnt,
-                "pct":    round(cnt / total * 100, 1),
-                "color":  _TYPE_META.get(t, {}).get("color", "#6b7280"),
+                "type": t,
+                "count": cnt,
+                "pct": round(cnt / total * 100, 1),
+                "color": _TYPE_META.get(t, {}).get("color", "#6b7280"),
                 "sector": _TYPE_META.get(t, {}).get("sector", t),
             }
             for t, cnt in type_counts.items()
@@ -136,12 +137,14 @@ async def market_health():
     )
 
     payload = {
-        "total_portfolios":  total,
-        "avg_dna_score":     round(sum(scores) / len(scores), 1),
-        "median_dna_score":  round(median, 1),
-        "avg_concentration": round(sum(concentrations) / len(concentrations), 1) if concentrations else 0,
+        "total_portfolios": total,
+        "avg_dna_score": round(sum(scores) / len(scores), 1),
+        "median_dna_score": round(median, 1),
+        "avg_concentration": round(sum(concentrations) / len(concentrations), 1)
+        if concentrations
+        else 0,
         "score_distribution": score_distribution,
-        "strategy_mix":       strategy_mix,
+        "strategy_mix": strategy_mix,
     }
     _store("market_health", payload)
     return payload
@@ -179,9 +182,9 @@ async def score_trend():
 
     trend = [
         {
-            "date":      day,
+            "date": day,
             "avg_score": round(sum(scores) / len(scores), 1),
-            "count":     len(scores),
+            "count": len(scores),
         }
         for day, scores in sorted(daily.items())
     ]
@@ -192,6 +195,7 @@ async def score_trend():
 
 
 # ── Client-side analytics ingestion ───────────────────────────────────────────
+
 
 class TrackRequest(BaseModel):
     event: str
@@ -207,11 +211,13 @@ async def track_event(body: TrackRequest):
     Silently ignores failures so it never breaks the UI.
     """
     try:
-        supabase.table("analytics_events").insert({
-            "event":      body.event,
-            "session_id": body.session_id,
-            "properties": body.properties or {},
-        }).execute()
+        supabase.table("analytics_events").insert(
+            {
+                "event": body.event,
+                "session_id": body.session_id,
+                "properties": body.properties or {},
+            }
+        ).execute()
     except Exception:
         logger.warning("Failed to track analytics event", exc_info=True)  # fire-and-forget
     return {"ok": True}

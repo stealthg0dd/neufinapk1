@@ -25,17 +25,17 @@ import pytest
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 BASE_URL = os.environ.get("NEUFIN_BASE_URL", "http://localhost:8000")
-TIMEOUT  = httpx.Timeout(60.0)          # swarm can take up to ~45s
+TIMEOUT = httpx.Timeout(60.0)  # swarm can take up to ~45s
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "") or os.environ.get("SUPABASE_KEY", "")
 
 # ── Demo portfolio (mirrors swarm/page.tsx DEMO_POSITIONS) ────────────────────
 POSITIONS = [
-    {"symbol": "AAPL",  "shares": 50,  "price": 195.0, "value": 9750,  "weight": 0.19},
-    {"symbol": "MSFT",  "shares": 30,  "price": 415.0, "value": 12450, "weight": 0.25},
-    {"symbol": "NVDA",  "shares": 20,  "price": 875.0, "value": 17500, "weight": 0.35},
-    {"symbol": "XOM",   "shares": 40,  "price": 115.0, "value": 4600,  "weight": 0.09},
-    {"symbol": "BRK-B", "shares": 15,  "price": 405.0, "value": 6075,  "weight": 0.12},
+    {"symbol": "AAPL", "shares": 50, "price": 195.0, "value": 9750, "weight": 0.19},
+    {"symbol": "MSFT", "shares": 30, "price": 415.0, "value": 12450, "weight": 0.25},
+    {"symbol": "NVDA", "shares": 20, "price": 875.0, "value": 17500, "weight": 0.35},
+    {"symbol": "XOM", "shares": 40, "price": 115.0, "value": 4600, "weight": 0.09},
+    {"symbol": "BRK-B", "shares": 15, "price": 405.0, "value": 6075, "weight": 0.12},
 ]
 TOTAL_VALUE = sum(p["value"] for p in POSITIONS)
 
@@ -68,11 +68,8 @@ def test_portfolio_create(client: httpx.Client) -> None:
         "/api/portfolio/create",
         json={
             "user_id": "",
-            "name":    "Smoke Test Portfolio",
-            "positions": [
-                {"symbol": p["symbol"], "shares": p["shares"]}
-                for p in POSITIONS
-            ],
+            "name": "Smoke Test Portfolio",
+            "positions": [{"symbol": p["symbol"], "shares": p["shares"]} for p in POSITIONS],
         },
     )
     assert resp.status_code == 200, f"Portfolio create failed: {resp.text[:400]}"
@@ -87,7 +84,7 @@ def test_portfolio_create(client: httpx.Client) -> None:
 def test_swarm_analyze_ok(swarm_result: dict) -> None:
     """Swarm response has the expected top-level keys."""
     required = {"investment_thesis", "agent_trace"}
-    missing  = required - swarm_result.keys()
+    missing = required - swarm_result.keys()
     assert not missing, f"Swarm response missing keys: {missing}"
     assert len(swarm_result["agent_trace"]) > 0, "agent_trace should not be empty"
 
@@ -95,29 +92,31 @@ def test_swarm_analyze_ok(swarm_result: dict) -> None:
 # ── Step 3: RiskMatrix data is present ────────────────────────────────────────
 def test_risk_matrix_stress_results(swarm_result: dict) -> None:
     """investment_thesis.stress_results has ≥1 scenario with required fields."""
-    thesis        = swarm_result["investment_thesis"]
+    thesis = swarm_result["investment_thesis"]
     stress_results = thesis.get("stress_results") or []
     assert len(stress_results) >= 1, (
         f"Expected at least 1 stress scenario, got {len(stress_results)}. "
         f"thesis keys: {list(thesis.keys())}"
     )
     for sr in stress_results:
-        assert "scenario" in sr or "scenario_name" in sr or "label" in sr, \
+        assert "scenario" in sr or "scenario_name" in sr or "label" in sr, (
             f"Stress result missing scenario label: {sr}"
-        assert "impact" in sr or "portfolio_return_pct" in sr or "impact_pct" in sr, \
+        )
+        assert "impact" in sr or "portfolio_return_pct" in sr or "impact_pct" in sr, (
             f"Stress result missing portfolio impact: {sr}"
+        )
 
 
 def test_risk_matrix_cluster_data(swarm_result: dict) -> None:
     """investment_thesis.risk_factors has ≥1 entry with beta + spy_correlation."""
-    thesis      = swarm_result["investment_thesis"]
+    thesis = swarm_result["investment_thesis"]
     risk_factors = thesis.get("risk_factors") or []
     assert len(risk_factors) >= 1, (
         f"Expected ≥1 risk_factor cluster entry, got {len(risk_factors)}. "
         f"thesis keys: {list(thesis.keys())}"
     )
     for rf in risk_factors:
-        assert "beta" in rf,            f"risk_factor missing 'beta': {rf}"
+        assert "beta" in rf, f"risk_factor missing 'beta': {rf}"
         assert "spy_correlation" in rf, f"risk_factor missing 'spy_correlation': {rf}"
 
 
@@ -132,7 +131,7 @@ def test_simulate_payment(swarm_result: dict) -> None:
     (if a report_id was returned by the swarm). Falls back to a direct Supabase
     patch if the backend doesn't expose a simulate endpoint.
     """
-    thesis    = swarm_result["investment_thesis"]
+    thesis = swarm_result["investment_thesis"]
     report_id = thesis.get("swarm_report_id") or swarm_result.get("report_id")
 
     if not report_id:
@@ -142,16 +141,17 @@ def test_simulate_payment(swarm_result: dict) -> None:
     patch_resp = httpx.patch(
         f"{SUPABASE_URL}/rest/v1/swarm_reports?id=eq.{report_id}",
         headers={
-            "apikey":        SUPABASE_KEY,
+            "apikey": SUPABASE_KEY,
             "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type":  "application/json",
-            "Prefer":        "return=representation",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation",
         },
         json={"has_paid_report": True},
         timeout=10.0,
     )
-    assert patch_resp.status_code in (200, 204), \
+    assert patch_resp.status_code in (200, 204), (
         f"Payment simulation patch failed {patch_resp.status_code}: {patch_resp.text}"
+    )
 
 
 # ── Step 5: 90-Day Directive is in the briefing ───────────────────────────────
@@ -160,7 +160,7 @@ def test_ninety_day_directive_present(swarm_result: dict) -> None:
     The IC briefing markdown must contain a 90-day directive section.
     Accepts any of the common header variations.
     """
-    thesis   = swarm_result["investment_thesis"]
+    thesis = swarm_result["investment_thesis"]
     briefing = thesis.get("briefing") or ""
 
     # Also check the agent_trace for a 90-day directive line
@@ -189,8 +189,9 @@ def test_price_integrity_endpoint_exists(client: httpx.Client) -> None:
         pytest.skip("POST /api/portfolio/verify-prices not yet registered — skipping")
     assert resp.status_code == 200, f"Verify-prices failed: {resp.text[:400]}"
     data = resp.json()
-    assert isinstance(data.get("integrity_checks"), list), \
+    assert isinstance(data.get("integrity_checks"), list), (
         f"Expected list at 'integrity_checks', got: {data}"
+    )
 
 
 # ── Step 7: Failover trace is parseable ────────────────────────────────────────
@@ -199,12 +200,14 @@ def test_agent_trace_parseable(swarm_result: dict) -> None:
     traces = swarm_result.get("agent_trace", [])
     assert len(traces) > 0, "agent_trace should not be empty after a successful run"
     for i, line in enumerate(traces):
-        assert isinstance(line, str) and line.strip(), \
+        assert isinstance(line, str) and line.strip(), (
             f"Trace line {i} is empty or not a string: {line!r}"
+        )
 
 
 if __name__ == "__main__":
     # Quick manual run: python scripts/smoke_test.py
     import subprocess
     import sys
+
     sys.exit(subprocess.call(["pytest", __file__, "-v", "--tb=short"]))  # noqa: S603, S607

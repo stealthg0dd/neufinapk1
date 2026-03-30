@@ -41,6 +41,7 @@ async def validate_referral(ref_token: str):
 
 # ── Email subscription ─────────────────────────────────────────────────────────
 
+
 class SubscribeRequest(BaseModel):
     email: str
     user_id: str | None = None
@@ -50,11 +51,14 @@ class SubscribeRequest(BaseModel):
 async def subscribe_email(body: SubscribeRequest):
     """Subscribe an email to the weekly portfolio digest."""
     try:
-        supabase.table("email_subscribers").upsert({
-            "email":     body.email,
-            "user_id":   body.user_id,
-            "subscribed": True,
-        }, on_conflict="email").execute()
+        supabase.table("email_subscribers").upsert(
+            {
+                "email": body.email,
+                "user_id": body.user_id,
+                "subscribed": True,
+            },
+            on_conflict="email",
+        ).execute()
         return {"subscribed": True}
     except Exception as e:
         raise HTTPException(500, f"Subscription failed: {e}") from e

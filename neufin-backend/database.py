@@ -6,9 +6,11 @@ from supabase import Client, create_client
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
-SUPABASE_URL              = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY              = os.environ.get("SUPABASE_KEY")              # anon key
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") # service role (bypasses RLS)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")  # anon key
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get(
+    "SUPABASE_SERVICE_ROLE_KEY"
+)  # service role (bypasses RLS)
 
 # Use service role key if available — bypasses RLS for all backend operations.
 # Without this, RLS policies would block the backend from reading/writing
@@ -18,7 +20,10 @@ _key = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_KEY
 # Log presence only — never log key values
 print(f"[DB] SUPABASE_URL          = {'SET ✓' if SUPABASE_URL else 'MISSING ✗'}", file=sys.stderr)
 print(f"[DB] SUPABASE_KEY          = {'SET ✓' if SUPABASE_KEY else 'MISSING ✗'}", file=sys.stderr)
-print(f"[DB] SERVICE_ROLE_KEY      = {'SET ✓ (RLS bypassed)' if SUPABASE_SERVICE_ROLE_KEY else 'MISSING — using anon key (RLS applies)'}", file=sys.stderr)
+print(
+    f"[DB] SERVICE_ROLE_KEY      = {'SET ✓ (RLS bypassed)' if SUPABASE_SERVICE_ROLE_KEY else 'MISSING — using anon key (RLS applies)'}",
+    file=sys.stderr,
+)
 
 # Synchronous Supabase client — compatible with all routers and sync SDK calls.
 # All routers (dna.py, portfolio.py, reports.py, etc.) use sync .execute() calls.
@@ -48,6 +53,7 @@ def get_supabase_client() -> Client:
 
 try:
     from cryptography.fernet import Fernet
+
     _FERNET_AVAILABLE = True
 except ImportError:
     _FERNET_AVAILABLE = False
@@ -63,13 +69,17 @@ _fernet: "Fernet | None" = None
 if _FERNET_AVAILABLE and _FERNET_KEY_RAW:
     try:
         _fernet = Fernet(_FERNET_KEY_RAW.encode())
-        print("[DB/Fernet] Field encryption = Fernet (AES-128-CBC + HMAC-SHA256) ✓", file=sys.stderr)
+        print(
+            "[DB/Fernet] Field encryption = Fernet (AES-128-CBC + HMAC-SHA256) ✓", file=sys.stderr
+        )
     except Exception as e:
-        print(f"[DB/Fernet] Invalid FERNET_MASTER_KEY ({e}) — encryption disabled ✗", file=sys.stderr)
+        print(
+            f"[DB/Fernet] Invalid FERNET_MASTER_KEY ({e}) — encryption disabled ✗", file=sys.stderr
+        )
 elif _FERNET_AVAILABLE:
     print(
         "[DB/Fernet] FERNET_MASTER_KEY not set — field encryption disabled. "
-        "Generate: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"",
+        'Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"',
         file=sys.stderr,
     )
 else:
@@ -135,6 +145,7 @@ def decrypt_value(token: "str | float | int | None") -> float:
 
 # ── Guest session claim helper ─────────────────────────────────────────────────
 
+
 def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
     """
     Bulk-assign all unclaimed rows that share *session_id* to *user_id*.
@@ -165,9 +176,9 @@ def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
         )
         port_ids = [r["id"] for r in (port_res.data or [])]
         if port_ids:
-            supabase.table("portfolios").update(
-                {"user_id": user_id, "session_id": None}
-            ).in_("id", port_ids).execute()
+            supabase.table("portfolios").update({"user_id": user_id, "session_id": None}).in_(
+                "id", port_ids
+            ).execute()
             claimed["portfolios"] = len(port_ids)
     except Exception as e:
         print(f"[claim_guest_data] portfolios error: {e}", file=sys.stderr)
@@ -183,9 +194,9 @@ def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
         )
         dna_ids = [r["id"] for r in (dna_res.data or [])]
         if dna_ids:
-            supabase.table("dna_scores").update(
-                {"user_id": user_id, "session_id": None}
-            ).in_("id", dna_ids).execute()
+            supabase.table("dna_scores").update({"user_id": user_id, "session_id": None}).in_(
+                "id", dna_ids
+            ).execute()
             claimed["dna_scores"] = len(dna_ids)
     except Exception as e:
         print(f"[claim_guest_data] dna_scores error: {e}", file=sys.stderr)
@@ -201,9 +212,9 @@ def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
         )
         swarm_ids = [r["id"] for r in (swarm_res.data or [])]
         if swarm_ids:
-            supabase.table("swarm_reports").update(
-                {"user_id": user_id, "session_id": None}
-            ).in_("id", swarm_ids).execute()
+            supabase.table("swarm_reports").update({"user_id": user_id, "session_id": None}).in_(
+                "id", swarm_ids
+            ).execute()
             claimed["swarm_reports"] = len(swarm_ids)
     except Exception as e:
         print(f"[claim_guest_data] swarm_reports error: {e}", file=sys.stderr)

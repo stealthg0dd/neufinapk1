@@ -6,7 +6,6 @@ GET  /api/advisors/{advisor_id}            → public profile by user UUID
 PUT  /api/advisors/me                      → upsert own profile (requires Bearer token)
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -24,7 +23,6 @@ class AdvisorProfileRequest(BaseModel):
     logo_base64: str | None = None
     brand_color: str = "#1A56DB"
     white_label: bool = False
-
 
 
 @router.get("/by-token/{share_token}")
@@ -54,7 +52,9 @@ async def get_advisor_by_share_token(share_token: str):
     try:
         result = (
             supabase.table("user_profiles")
-            .select("id, advisor_name, firm_name, calendar_link, logo_base64, brand_color, white_label, subscription_tier")
+            .select(
+                "id, advisor_name, firm_name, calendar_link, logo_base64, brand_color, white_label, subscription_tier"
+            )
             .eq("id", user_id)
             .single()
             .execute()
@@ -75,7 +75,9 @@ async def get_advisor_profile(advisor_id: str):
     try:
         result = (
             supabase.table("user_profiles")
-            .select("id, advisor_name, firm_name, calendar_link, logo_base64, brand_color, white_label, subscription_tier")
+            .select(
+                "id, advisor_name, firm_name, calendar_link, logo_base64, brand_color, white_label, subscription_tier"
+            )
             .eq("id", advisor_id)
             .single()
             .execute()
@@ -90,26 +92,24 @@ async def get_advisor_profile(advisor_id: str):
 
 
 @router.put("/me")
-async def upsert_advisor_profile(body: AdvisorProfileRequest, user: JWTUser = Depends(get_current_user)):
+async def upsert_advisor_profile(
+    body: AdvisorProfileRequest, user: JWTUser = Depends(get_current_user)
+):
     """Upsert the authenticated user's advisor profile."""
     user_id = user.id
 
     payload = {
-        "id":            user_id,
-        "advisor_name":  body.advisor_name,
-        "firm_name":     body.firm_name,
+        "id": user_id,
+        "advisor_name": body.advisor_name,
+        "firm_name": body.firm_name,
         "calendar_link": body.calendar_link,
-        "logo_base64":   body.logo_base64,
-        "brand_color":   body.brand_color,
-        "white_label":   body.white_label,
+        "logo_base64": body.logo_base64,
+        "brand_color": body.brand_color,
+        "white_label": body.white_label,
     }
 
     try:
-        result = (
-            supabase.table("user_profiles")
-            .upsert(payload, on_conflict="id")
-            .execute()
-        )
+        result = supabase.table("user_profiles").upsert(payload, on_conflict="id").execute()
         return result.data[0] if result.data else payload
     except Exception as e:
         raise HTTPException(500, f"Could not save profile: {e}") from e

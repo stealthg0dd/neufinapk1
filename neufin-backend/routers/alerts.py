@@ -28,17 +28,18 @@ from database import get_supabase_client
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
 _EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
-_MAX_BATCH     = 100   # Expo recommends ≤ 100 messages per request
+_MAX_BATCH = 100  # Expo recommends ≤ 100 messages per request
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Pydantic models
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class RegisterRequest(BaseModel):
     expo_push_token: str
-    symbols:         list[str]
-    user_label:      str | None = "Mobile User"
+    symbols: list[str]
+    user_label: str | None = "Mobile User"
 
     @field_validator("symbols", mode="before")
     @classmethod
@@ -62,6 +63,7 @@ class TestPushRequest(BaseModel):
 # Routes
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 @router.post("/register", status_code=201)
 async def register_push_token(req: RegisterRequest):
     """
@@ -72,9 +74,9 @@ async def register_push_token(req: RegisterRequest):
     sb.table("push_alert_subscriptions").upsert(
         {
             "expo_push_token": req.expo_push_token,
-            "symbols":         req.symbols,
-            "user_label":      req.user_label,
-            "updated_at":      datetime.datetime.utcnow().isoformat(),
+            "symbols": req.symbols,
+            "user_label": req.user_label,
+            "updated_at": datetime.datetime.utcnow().isoformat(),
         },
         on_conflict="expo_push_token",
     ).execute()
@@ -84,7 +86,7 @@ async def register_push_token(req: RegisterRequest):
 @router.get("/recent")
 async def get_recent_alerts(limit: int = 20):
     """Return the last *limit* macro-shift alert records."""
-    sb   = get_supabase_client()
+    sb = get_supabase_client()
     rows = (
         sb.table("macro_shift_alerts")
         .select("*")
@@ -109,10 +111,11 @@ async def test_push(req: TestPushRequest, bg: BackgroundTasks):
 # Public helper — called by strategist_node when a regime shift is detected
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 async def notify_macro_shift(
-    regime:     str,
-    cpi_yoy:    str,
-    body_text:  str,
+    regime: str,
+    cpi_yoy: str,
+    body_text: str,
     affected_symbols: list[str],
 ) -> None:
     """
@@ -124,17 +127,17 @@ async def notify_macro_shift(
     Called from agent_swarm.py strategist_node as a fire-and-forget background task.
     """
     try:
-        sb  = get_supabase_client()
+        sb = get_supabase_client()
         now = datetime.datetime.utcnow().isoformat()
 
         # Persist alert record
         alert_row = {
-            "title":            f"Regime Shift: {regime}",
-            "body":             body_text,
-            "regime":           regime,
-            "cpi_yoy":          cpi_yoy,
+            "title": f"Regime Shift: {regime}",
+            "body": body_text,
+            "regime": regime,
+            "cpi_yoy": cpi_yoy,
             "affected_symbols": affected_symbols,
-            "created_at":       now,
+            "created_at": now,
         }
         sb.table("macro_shift_alerts").insert(alert_row).execute()
 
@@ -157,10 +160,10 @@ async def notify_macro_shift(
 
         messages = [
             {
-                "to":    token,
+                "to": token,
                 "title": f"⚠ Swarm Alert: {regime}",
-                "body":  body_text[:200],
-                "data":  {"regime": regime, "cpi_yoy": cpi_yoy, "symbols": affected_symbols},
+                "body": body_text[:200],
+                "data": {"regime": regime, "cpi_yoy": cpi_yoy, "symbols": affected_symbols},
                 "sound": "default",
                 "channelId": "swarm-alerts",
             }
@@ -168,7 +171,10 @@ async def notify_macro_shift(
         ]
 
         await _send_expo_messages_async(messages)
-        print(f"[Alerts] Sent {len(messages)} push notification(s) for regime '{regime}'.", file=sys.stderr)
+        print(
+            f"[Alerts] Sent {len(messages)} push notification(s) for regime '{regime}'.",
+            file=sys.stderr,
+        )
 
     except Exception as e:
         print(f"[Alerts] notify_macro_shift failed: {e}", file=sys.stderr)
@@ -177,6 +183,7 @@ async def notify_macro_shift(
 # ══════════════════════════════════════════════════════════════════════════════
 # Expo delivery helpers
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def _send_expo_messages(messages: list[dict]) -> None:
     """Synchronous batch send to Expo Push API (for BackgroundTasks)."""
@@ -187,7 +194,7 @@ def _send_expo_messages(messages: list[dict]) -> None:
                 _EXPO_PUSH_URL,
                 json=batch,
                 headers={
-                    "Accept":       "application/json",
+                    "Accept": "application/json",
                     "Content-Type": "application/json",
                     "Accept-Encoding": "gzip, deflate",
                 },
@@ -202,4 +209,5 @@ def _send_expo_messages(messages: list[dict]) -> None:
 async def _send_expo_messages_async(messages: list[dict]) -> None:
     """Async wrapper — runs the sync sender in a thread pool."""
     import asyncio
+
     await asyncio.to_thread(_send_expo_messages, messages)

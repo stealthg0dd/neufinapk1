@@ -46,19 +46,15 @@ celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
     accept_content=["json"],
-
     # Timezone
     timezone="UTC",
     enable_utc=True,
-
     # Worker behaviour — LLM calls are heavy; process one task at a time.
     worker_prefetch_multiplier=1,
-    task_acks_late=True,            # re-queue if the worker crashes mid-task
+    task_acks_late=True,  # re-queue if the worker crashes mid-task
     task_reject_on_worker_lost=True,
-
     # Startup — retry broker connection on startup instead of crashing immediately.
     broker_connection_retry_on_startup=True,
-
     # Result expiry — keep results for 1 hour.
     result_expires=3600,
 )

@@ -1,4 +1,5 @@
 """Unit tests for routers/dna.py — DNA score generation and sharing."""
+
 import io
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -36,11 +37,13 @@ def client():
     with patch("database.create_client") as mock_supabase:
         mock_supabase.return_value = MagicMock()
         from main import app
+
         with TestClient(app) as c:
             yield c
 
 
 # ── POST /api/dna/generate ────────────────────────────────────────────────────
+
 
 class TestGenerateDNA:
     @patch("routers.dna.calculate_portfolio_metrics", return_value=MOCK_METRICS)
@@ -76,11 +79,17 @@ class TestGenerateDNA:
 
 # ── GET /api/dna/share/{token} ────────────────────────────────────────────────
 
+
 class TestShareEndpoint:
     @patch("routers.dna.supabase")
     def test_returns_shared_result(self, mock_db, client):
         mock_db.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = MagicMock(
-            data={"dna_score": 74, "investor_type": "Balanced Growth", "share_token": "abc12345", "view_count": 5}
+            data={
+                "dna_score": 74,
+                "investor_type": "Balanced Growth",
+                "share_token": "abc12345",
+                "view_count": 5,
+            }
         )
         response = client.get("/api/dna/share/abc12345")
         assert response.status_code == 200
@@ -96,6 +105,7 @@ class TestShareEndpoint:
 
 
 # ── GET /api/dna/leaderboard ──────────────────────────────────────────────────
+
 
 class TestLeaderboard:
     @patch("routers.dna.supabase")
