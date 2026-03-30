@@ -19,8 +19,8 @@ reportlab==4.2.5
 # AI providers
 anthropic
 google-genai
-openai==1.55.3
-groq==0.13.1
+openai==2.30.0
+groq==1.1.2
 
 # Payments
 stripe==11.4.1
