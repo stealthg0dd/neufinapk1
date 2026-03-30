@@ -15,7 +15,7 @@ GET  /api/reports/fulfill   → After payment, generate PDF and return URL
 import asyncio
 import stripe
 import sentry_sdk
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from database import supabase
@@ -23,6 +23,8 @@ from services.calculator import calculate_portfolio_metrics
 from services.pdf_generator import generate_advisor_report
 from services.ai_router import get_ai_analysis
 from services.analytics import track
+from services.auth_dependency import get_current_user, get_optional_user
+from services.jwt_auth import JWTUser
 from config import (
     STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
     STRIPE_PRICE_SINGLE, STRIPE_PRICE_UNLIMITED,
@@ -105,10 +107,30 @@ Return ONLY valid JSON:
         return None
 
 
+def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
+    try:
+        portfolio_result = (
+            supabase.table("portfolios")
+            .select("id, user_id")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(404, f"Portfolio not found: {exc}")
+
+    portfolio = portfolio_result.data
+    if not portfolio:
+        raise HTTPException(404, "Portfolio not found.")
+
+    if portfolio.get("user_id") and portfolio.get("user_id") != user.id:
+        raise HTTPException(403, "You do not have access to this portfolio.")
+
+
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
 @router.post("/api/reports/checkout")
-async def create_checkout(body: CheckoutRequest):
+async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(get_optional_user)):
     """
     Create a Stripe Checkout session.
     Returns { checkout_url, report_id } for the frontend to redirect.
@@ -124,17 +146,26 @@ async def create_checkout(body: CheckoutRequest):
     if not price_id:
         raise HTTPException(503, f"Stripe price ID for plan '{plan}' is not configured.")
 
+    effective_advisor_id = "anonymous"
+    if user:
+        effective_advisor_id = user.id
+    elif body.advisor_id != "anonymous":
+        raise HTTPException(401, "Authentication required for advisor checkout.")
+
     portfolio_id = body.portfolio_id
     report_id    = None
 
     # ── For single-report plan: ensure we have a portfolio + pending report ───
     if plan == "single":
+        if portfolio_id and user:
+            _ensure_portfolio_access(portfolio_id, user)
+
         # If no portfolio_id but positions provided, create a temp portfolio
         if not portfolio_id and body.positions:
             try:
                 metrics = calculate_portfolio_metrics(body.positions)
                 port_result = supabase.table("portfolios").insert({
-                    "user_id":     body.advisor_id if body.advisor_id != "anonymous" else None,
+                    "user_id":     user.id if user else None,
                     "name":        f"Report Portfolio {datetime.datetime.utcnow().strftime('%Y-%m-%d')}",
                     "total_value": metrics["total_value"],
                 }).execute()
@@ -157,7 +188,7 @@ async def create_checkout(body: CheckoutRequest):
         try:
             report_result = supabase.table("advisor_reports").insert({
                 "portfolio_id": portfolio_id,
-                "advisor_id":   body.advisor_id if body.advisor_id != "anonymous" else None,
+                "advisor_id":   None if effective_advisor_id == "anonymous" else effective_advisor_id,
                 "is_paid":      False,
             }).execute()
             report_id = report_result.data[0]["id"]
@@ -191,7 +222,7 @@ async def create_checkout(body: CheckoutRequest):
                 "plan":         plan,
                 "portfolio_id": portfolio_id or "",
                 "report_id":    report_id or "",
-                "advisor_id":   body.advisor_id,
+                "advisor_id":   effective_advisor_id,
                 "ref_token":    body.ref_token or "",
             },
             allow_promotion_codes=not bool(discounts),  # no promo codes if coupon applied
@@ -293,7 +324,7 @@ async def stripe_webhook(request: Request):
 
 
 @router.get("/api/reports/fulfill")
-async def fulfill_report(report_id: str):
+async def fulfill_report(report_id: str, user: JWTUser | None = Depends(get_optional_user)):
     """
     Called from the frontend success page.
     If the report is paid but has no PDF yet, generates it now.
@@ -302,7 +333,7 @@ async def fulfill_report(report_id: str):
     try:
         result = (
             supabase.table("advisor_reports")
-            .select("id, portfolio_id, is_paid, pdf_url")
+            .select("id, portfolio_id, advisor_id, is_paid, pdf_url")
             .eq("id", report_id)
             .single()
             .execute()
@@ -313,6 +344,11 @@ async def fulfill_report(report_id: str):
     record = result.data
     if not record:
         raise HTTPException(404, "Report not found.")
+    if record.get("advisor_id"):
+        if not user:
+            raise HTTPException(401, "Authentication required for this report.")
+        if record.get("advisor_id") != user.id:
+            raise HTTPException(404, "Report not found.")
     if not record["is_paid"]:
         raise HTTPException(402, "Payment not yet confirmed. Please wait a moment and retry.")
 

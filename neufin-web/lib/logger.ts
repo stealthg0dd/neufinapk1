@@ -1,3 +1,5 @@
+/* eslint-disable no-console */
+
 /**
  * Centralised logger for the Neufin web frontend.
  *

@@ -68,7 +68,7 @@ def test_portfolio_create(client: httpx.Client) -> None:
     resp = client.post(
         "/api/portfolio/create",
         json={
-            "user_id": None,
+            "user_id": "",
             "name":    "Smoke Test Portfolio",
             "positions": [
                 {"symbol": p["symbol"], "shares": p["shares"]}
@@ -78,9 +78,10 @@ def test_portfolio_create(client: httpx.Client) -> None:
     )
     assert resp.status_code == 200, f"Portfolio create failed: {resp.text[:400]}"
     body = resp.json()
+    metrics = body.get("metrics") or {}
     assert "portfolio_id" in body, "Missing portfolio_id"
-    assert body.get("total_value", 0) > 0, "total_value should be > 0"
-    assert body.get("dna_score", 0) > 0, "dna_score should be > 0"
+    assert metrics.get("total_value", 0) > 0, "metrics.total_value should be > 0"
+    assert metrics.get("dna_score", 0) > 0, "metrics.dna_score should be > 0"
 
 
 # ── Step 2: Swarm runs without error ──────────────────────────────────────────

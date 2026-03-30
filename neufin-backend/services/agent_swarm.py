@@ -188,7 +188,7 @@ def _get_fred_cpi_analysis() -> dict:
             print(f"[Swarm/FRED] Raw request also failed: {e}", file=sys.stderr)
             return _EMPTY
 
-    if len(values) < 12:
+    if len(values) < 13:
         return _EMPTY
 
     yoy_pct     = round((values[-1] / values[-13] - 1.0) * 100, 2)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
@@ -184,9 +185,12 @@ export default function AdvisorSettingsPage() {
                 <label className="block text-xs text-gray-400 mb-2">Firm Logo</label>
                 <div className="flex items-center gap-4">
                   {logoPreview ? (
-                    <img
+                    <Image
                       src={logoPreview}
                       alt="Logo preview"
+                      width={64}
+                      height={64}
+                      unoptimized
                       className="w-16 h-16 object-contain rounded-lg border border-gray-700 bg-gray-900 p-1"
                     />
                   ) : (
@@ -282,7 +286,14 @@ export default function AdvisorSettingsPage() {
                 style={{ borderColor: `${form.brand_color}40`, background: `${form.brand_color}10` }}
               >
                 {logoPreview ? (
-                  <img src={logoPreview} alt="" className="w-12 h-12 object-contain rounded-lg bg-white/10 p-1" />
+                  <Image
+                    src={logoPreview}
+                    alt="Logo preview"
+                    width={48}
+                    height={48}
+                    unoptimized
+                    className="w-12 h-12 object-contain rounded-lg bg-white/10 p-1"
+                  />
                 ) : (
                   <div
                     className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"

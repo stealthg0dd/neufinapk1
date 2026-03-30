@@ -46,6 +46,22 @@ const AGENT_META: Record<string, { color: string; label: string }> = {
   synthesizer: { color: '#c084fc', label: 'Synthesizer'   },
 }
 
+function getAgentMeta(agent: string | null): { color: string; label: string } | null {
+  if (!agent) return null
+  switch (agent) {
+    case 'tax':
+      return AGENT_META.tax
+    case 'quant':
+      return AGENT_META.quant
+    case 'macro':
+      return AGENT_META.macro
+    case 'synthesizer':
+      return AGENT_META.synthesizer
+    default:
+      return null
+  }
+}
+
 // ── Keyword router (mirrors backend) ──────────────────────────────────────────
 function classifyQuestion(msg: string): string {
   const m = msg.toLowerCase()
@@ -63,8 +79,10 @@ async function callSwarmChat(
   token:       string | null,
 ): Promise<ChatResult> {
   const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
 
   const res = await fetch(`${apiBase}/api/swarm/chat`, {
     method:  'POST',
@@ -133,7 +151,7 @@ export default function CommandPalette({
     }
     if (e.key === 'Enter') {
       e.preventDefault()
-      const text = query.trim() || filtered[activeIdx]?.label || ''
+      const text = query.trim() || filtered.at(activeIdx)?.label || ''
       if (text) submit(text)
     }
   }
@@ -161,7 +179,7 @@ export default function CommandPalette({
   }, [loading, positions, total_value, onResponse])
 
   const routedAgent = query ? classifyQuestion(query) : null
-  const agentMeta   = routedAgent ? AGENT_META[routedAgent] : null
+  const agentMeta   = getAgentMeta(routedAgent)
 
   if (!open) {
     return (

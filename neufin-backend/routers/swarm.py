@@ -50,7 +50,7 @@ def _sanitize_message(message: str) -> str | None:
 
 from services.agent_swarm import run_swarm, chat_with_swarm
 from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_optional_user
 from services.jwt_auth import JWTUser
 from database import supabase
 
@@ -368,7 +368,7 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
 
 
 @router.get("/report/{report_id}")
-async def get_report(report_id: str):
+async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional_user)):
     """
     Fetch a persisted swarm report by ID from Supabase.
     Used by the frontend to restore thesis state on page refresh.
@@ -383,6 +383,9 @@ async def get_report(report_id: str):
         )
         if not row.data:
             raise HTTPException(status_code=404, detail="Report not found.")
+        report_user_id = row.data.get("user_id")
+        if report_user_id and (not user or report_user_id != user.id):
+            raise HTTPException(status_code=404, detail="Report not found.")
         return {"investment_thesis": row.data, "found": True}
     except HTTPException:
         raise
@@ -391,7 +394,7 @@ async def get_report(report_id: str):
 
 
 @router.post("/chat")
-async def chat(body: ChatRequest):
+async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_user)):
     """
     Bloomberg-style Managing Director chat.
 
@@ -430,9 +433,15 @@ async def chat(body: ChatRequest):
                 .execute()
             )
             if row.data:
+                report_user_id = row.data.get("user_id")
+                if report_user_id and (not user or report_user_id != user.id):
+                    raise HTTPException(status_code=404, detail="Report not found.")
                 thesis = {k: row.data[k] for k in row.data if row.data[k] is not None}
                 result = await _md_reply(clean_message, thesis, body.record_id)
                 return result
+            raise HTTPException(status_code=404, detail="Report not found.")
+        except HTTPException:
+            raise
         except Exception as e:
             print(f"[Chat] Supabase fetch failed for {body.record_id}: {e}", file=sys.stderr)
         # Fall through to positions fallback if DB lookup fails

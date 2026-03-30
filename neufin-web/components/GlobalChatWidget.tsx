@@ -32,6 +32,21 @@ const STARTERS: Record<AgentValue, string[]> = {
   technical: ['What are key support levels for SPY?', 'How do I identify a breakout pattern?'],
 }
 
+function startersForAgent(agent: AgentValue): string[] {
+  switch (agent) {
+    case 'general':
+      return STARTERS.general
+    case 'quant':
+      return STARTERS.quant
+    case 'macro':
+      return STARTERS.macro
+    case 'technical':
+      return STARTERS.technical
+    default:
+      return []
+  }
+}
+
 interface Message {
   role:        'user' | 'assistant'
   text:        string
@@ -161,7 +176,7 @@ export default function GlobalChatWidget() {
             {/* Suggested starters — only shown on greeting */}
             {messages.length === 1 && (
               <div className="flex flex-wrap gap-1.5 mb-1">
-                {STARTERS[agent].map((s, i) => (
+                {startersForAgent(agent).map((s, i) => (
                   <button
                     key={i}
                     onClick={() => send(s)}

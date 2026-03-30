@@ -94,7 +94,7 @@ function cpiSparkline(yoy: number | null | undefined): { t: string; v: number }[
   const startOffset = 1.4
   return months.map((m, i) => ({
     t: m,
-    v: Math.round((val + startOffset - (startOffset * i) / 11 + seasonal[i]) * 10) / 10,
+    v: Math.round((val + startOffset - (startOffset * i) / 11 + (seasonal.at(i) ?? 0)) * 10) / 10,
   }))
 }
 
@@ -113,6 +113,23 @@ const REGIME_META: Record<string, { label: string; color: string; bg: string }> 
   stagflation: { label: 'STAGFLATION REGIME', color: '#f97316', bg: 'rgba(249,115,22,0.15)' },
   recession:   { label: 'RECESSION REGIME',   color: '#6b7280', bg: 'rgba(107,114,128,0.15)'},
   'risk-off':  { label: 'RISK-OFF REGIME',    color: '#FFB900', bg: 'rgba(255,185,0,0.15)'  },
+}
+
+function regimeMeta(regime: string) {
+  switch (regime) {
+    case 'growth':
+      return REGIME_META.growth
+    case 'inflation':
+      return REGIME_META.inflation
+    case 'stagflation':
+      return REGIME_META.stagflation
+    case 'recession':
+      return REGIME_META.recession
+    case 'risk-off':
+      return REGIME_META['risk-off']
+    default:
+      return REGIME_META.growth
+  }
 }
 
 // ── Base card wrapper ──────────────────────────────────────────────────────────
@@ -146,7 +163,7 @@ function IntelCard({
 // ── Card 1: Market Regime ──────────────────────────────────────────────────────
 function MarketRegimeCard({ data }: { data: Record<string, any> }) {
   const regime  = (data.regime ?? 'growth').toLowerCase().replace(/\s+/g, '-')
-  const meta    = REGIME_META[regime] ?? REGIME_META.growth
+  const meta    = regimeMeta(regime)
   const conf    = Math.round((data.confidence ?? 0.82) * 100)
   const cpiYoy  = data.cpi_yoy ?? null
   const cpiStr  = typeof cpiYoy === 'number' ? `${cpiYoy.toFixed(1)}%` : 'N/A'
@@ -388,16 +405,18 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
               style={{ gridTemplateColumns: `40px repeat(${cmData.symbols.length}, 1fr)` }}
             >
               <div className="text-[8px] text-[#444] font-mono flex items-center pr-1 justify-end">
-                {cmData.symbols[i]}
+                {cmData.symbols.at(i) ?? ''}
               </div>
               {row.map((v, j) => {
                 const { bg, text } = corrCellStyle(v, i === j)
+                const rowSym = cmData.symbols.at(i) ?? ''
+                const colSym = cmData.symbols.at(j) ?? ''
                 return (
                   <div
                     key={j}
                     className="aspect-square flex items-center justify-center rounded-sm text-[7px] font-mono cursor-default"
                     style={{ background: bg, color: text }}
-                    title={`${cmData.symbols[i]} × ${cmData.symbols[j]}: ρ=${v.toFixed(2)}`}
+                    title={`${rowSym} × ${colSym}: ρ=${v.toFixed(2)}`}
                   >
                     {i === j ? '—' : v.toFixed(2)}
                   </div>
@@ -841,7 +860,7 @@ export default function SwarmPage() {
     setIsRunning(true)
 
     try {
-      const headers: Record<string, string> = {
+      const headers = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       }
@@ -1203,13 +1222,28 @@ const META_TIPS: Record<string, string> = {
   'ρ avg': 'Average pairwise Pearson correlation between holdings. High correlation = limited diversification',
 }
 
+function metaTip(label: string): string | undefined {
+  switch (label) {
+    case 'REGIME':
+      return META_TIPS.REGIME
+    case 'β':
+      return META_TIPS['β']
+    case 'SHARPE':
+      return META_TIPS.SHARPE
+    case 'ρ avg':
+      return META_TIPS['ρ avg']
+    default:
+      return undefined
+  }
+}
+
 function MetaItem({ label, value, color }: { label: string; value: string; color: string }) {
   const cls = color === 'green' ? 'text-[#00FF00]'
             : color === 'amber' ? 'text-[#FFB900]'
             : color === 'blue'  ? 'text-blue-400'
             : color === 'red'   ? 'text-red-400'
             : 'text-[#888]'
-  const tip = META_TIPS[label]
+  const tip = metaTip(label)
   const inner = (
     <div className="flex items-center gap-1 text-[10px] cursor-help">
       <span className="text-[#444] uppercase border-b border-dotted border-[#333]">{label}:</span>

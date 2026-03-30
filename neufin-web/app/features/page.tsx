@@ -162,7 +162,7 @@ export default function FeaturesPage() {
             <h2 className="text-xl font-bold mb-4">The 6 Biases NeuFin Detects</h2>
             <p className="text-gray-400 text-sm mb-6">
               Based on research by Daniel Kahneman (Nobel Prize 2002), Richard Thaler (Nobel
-              Prize 2017), and NeuFin's own analysis of Singapore SME portfolios.
+              Prize 2017), and NeuFin&apos;s own analysis of Singapore SME portfolios.
             </p>
             <div className="grid sm:grid-cols-2 gap-4">
               {[

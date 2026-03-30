@@ -64,10 +64,16 @@ jobs:
         run: npm ci
 
       - name: Run Jest tests
-        run: npm test -- --coverage --watchAll=false
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.scripts?.test ? 0 : 1)"; then
+            npm test -- --coverage --watchAll=false
+          else
+            echo "No frontend test script configured; skipping unit tests."
+          fi
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
+        if: hashFiles('neufin-web/coverage/**') != ''
         with:
           flags: frontend
 
@@ -131,14 +137,24 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.devDependencies?.['@playwright/test'] || pkg.dependencies?.['@playwright/test'] ? 0 : 1)"; then
+            npx playwright install --with-deps chromium
+          else
+            echo "Playwright not configured; skipping browser install."
+          fi
 
       - name: Run E2E tests
-        run: npx playwright test
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.devDependencies?.['@playwright/test'] || pkg.dependencies?.['@playwright/test'] ? 0 : 1)"; then
+            npx playwright test
+          else
+            echo "Playwright not configured; skipping E2E tests."
+          fi
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && hashFiles('neufin-web/playwright-report/**') != ''
         with:
           name: playwright-report
           path: neufin-web/playwright-report/

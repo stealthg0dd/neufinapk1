@@ -88,7 +88,9 @@ const COMPANY_LABELS: Record<string, string> = {
 }
 
 function displayName(slug: string): string {
-  return COMPANY_LABELS[slug] ?? slug.replace(/_/g, " ")
+  const label = Object.entries(COMPANY_LABELS).find(([key]) => key === slug)?.[1]
+  if (label) return label
+  return slug.replace(/_/g, " ")
 }
 
 function pct(val: number, cap: number): number {
@@ -264,6 +266,26 @@ const COMPANY_COLORS: Record<string, string> = {
   ctech_corporate: "from-gray-600/20 to-gray-800/10 border-gray-600/30",
 }
 
+function companyColor(company: string): string {
+  const color = Object.entries(COMPANY_COLORS).find(([key]) => key === company)?.[1]
+  if (color) return color
+  return "from-gray-600/20 to-gray-800/10 border-gray-600/30"
+}
+
+function providerRateLimit(
+  limits: Record<string, RateLimitStats>,
+  name: string,
+): RateLimitStats | undefined {
+  return Object.entries(limits).find(([key]) => key === name)?.[1]
+}
+
+function companyAgents(
+  allAgents: Record<string, Record<string, AgentDef>>,
+  company: string,
+): Record<string, AgentDef> {
+  return Object.entries(allAgents).find(([key]) => key === company)?.[1] ?? {}
+}
+
 function CompanyStatusCard({
   company,
   agentRoles,
@@ -278,7 +300,7 @@ function CompanyStatusCard({
   isExpanded: boolean
 }) {
   const agentCount  = Object.keys(agentRoles).length
-  const colorClass  = COMPANY_COLORS[company] ?? "from-gray-600/20 to-gray-800/10 border-gray-600/30"
+  const colorClass  = companyColor(company)
   const hasBrief    = Boolean(brief)
 
   return (
@@ -606,7 +628,7 @@ export default function AgentOSDashboard() {
                 key={name}
                 name={name}
                 stats={stats}
-                rl={rateLimits[name]}
+                rl={providerRateLimit(rateLimits, name)}
               />
             ))}
             {sortedProviders.length === 0 && (
@@ -625,7 +647,7 @@ export default function AgentOSDashboard() {
                 <CompanyStatusCard
                   key={company}
                   company={company}
-                  agentRoles={agents[company] ?? {}}
+                  agentRoles={companyAgents(agents, company)}
                   brief={brief}
                   isExpanded={expandedCard === company}
                   onExpand={() => {
@@ -644,10 +666,10 @@ export default function AgentOSDashboard() {
           </div>
         </section>
 
-        {/* ── ROW 4 — Today's briefs accordion ───────────────────────────── */}
+        {/* ── ROW 4 — Today&apos;s briefs accordion ───────────────────────────── */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className={`${SL} mb-0`}>Today's Briefs</h2>
+            <h2 className={`${SL} mb-0`}>Today&apos;s Briefs</h2>
             <button
               onClick={() => {
                 const allOpen = companies.every((c) => openBriefs.has(c))

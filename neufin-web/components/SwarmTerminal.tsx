@@ -44,6 +44,25 @@ const AGENT_LABELS: Record<AgentName, string> = {
   System:     'SYS',
 }
 
+function agentLabel(name: AgentName): string {
+  switch (name) {
+    case 'Strategist':
+      return AGENT_LABELS.Strategist
+    case 'Quant':
+      return AGENT_LABELS.Quant
+    case 'Tax':
+      return AGENT_LABELS.Tax
+    case 'Critic':
+      return AGENT_LABELS.Critic
+    case 'Synthesizer':
+      return AGENT_LABELS.Synthesizer
+    case 'Router':
+      return AGENT_LABELS.Router
+    default:
+      return AGENT_LABELS.System
+  }
+}
+
 /** Parse "[AgentName] message" → SwarmTrace */
 function parseTrace(raw: string): SwarmTrace {
   const match = raw.match(/^\[([^\]]+)\]\s*(.*)$/)
@@ -77,7 +96,7 @@ function deriveAgentStatuses(parsed: SwarmTrace[], isRunning: boolean): AgentSta
     if (seenSet.has(name)) {
       status = (isRunning && name === lastAgent) ? 'active' : 'done'
     }
-    return { name, label: AGENT_LABELS[name], status }
+    return { name, label: agentLabel(name), status }
   })
 }
 
@@ -107,19 +126,50 @@ function deriveProviderStatuses(
     }
   }
 
-  const statuses: Record<DataProvider, ProviderStatus> = {
-    POLY: 'standby', FMP: 'standby', '12D': 'standby', FRED: 'standby',
+  if (!hasTraces) {
+    return { POLY: 'standby', FMP: 'standby', '12D': 'standby', FRED: 'standby' }
   }
-  if (!hasTraces) return statuses
 
-  // All providers start active once the swarm has run
-  for (const k of Object.keys(statuses) as DataProvider[]) {
-    statuses[k] = 'active'
+  const resolveStatus = (provider: DataProvider): ProviderStatus => {
+    if (throttled.has(provider) && !recovered.has(provider)) return 'throttled'
+    return 'active'
   }
-  Array.from(throttled).forEach(p => {
-    if (!recovered.has(p)) statuses[p] = 'throttled'
-  })
-  return statuses
+
+  return {
+    POLY: resolveStatus('POLY'),
+    FMP: resolveStatus('FMP'),
+    '12D': resolveStatus('12D'),
+    FRED: resolveStatus('FRED'),
+  }
+}
+
+function providerStatusFor(
+  statuses: Record<DataProvider, ProviderStatus>,
+  provider: DataProvider,
+): ProviderStatus {
+  switch (provider) {
+    case 'POLY':
+      return statuses.POLY
+    case 'FMP':
+      return statuses.FMP
+    case '12D':
+      return statuses['12D']
+    default:
+      return statuses.FRED
+  }
+}
+
+function providerLabelFor(provider: DataProvider): string {
+  switch (provider) {
+    case 'POLY':
+      return 'Polygon'
+    case 'FMP':
+      return 'FMP'
+    case '12D':
+      return 'TwelveData'
+    default:
+      return 'FRED'
+  }
 }
 
 
@@ -129,21 +179,18 @@ function DataSourcesBar({ statuses, isRunning }: {
   isRunning: boolean
 }) {
   const PROVIDERS: DataProvider[] = ['POLY', 'FMP', '12D', 'FRED']
-  const LABELS: Record<DataProvider, string> = {
-    POLY: 'Polygon', FMP: 'FMP', '12D': 'TwelveData', FRED: 'FRED',
-  }
 
   return (
     <div className="bg-[#0a0a0a] border-t border-[#1a1a1a] px-4 py-1.5 flex items-center gap-1 shrink-0">
       <span className="text-[#333] text-[9px] uppercase tracking-widest mr-2 shrink-0">Data:</span>
       {PROVIDERS.map(p => {
-        const st = statuses[p]
+        const st = providerStatusFor(statuses, p)
         const isActive    = st === 'active'
         const isThrottled = st === 'throttled'
         const dotColor    = isThrottled ? '#FFB900' : isActive ? '#00FF00' : '#2a2a2a'
         const textColor   = isThrottled ? '#FFB900' : isActive ? '#00FF00' : '#333'
         return (
-          <div key={p} className="flex items-center gap-1 px-2 py-0.5" title={LABELS[p]}>
+          <div key={p} className="flex items-center gap-1 px-2 py-0.5" title={providerLabelFor(p)}>
             <span
               style={{
                 display: 'inline-block',

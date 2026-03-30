@@ -17,6 +17,7 @@
 import { useReportWebVitals } from 'next/web-vitals'
 import { useEffect } from 'react'
 import posthog from 'posthog-js'
+import { logger } from '@/lib/logger'
 
 /** Performance budget thresholds (Good / Needs Improvement / Poor) */
 const BUDGET: Record<string, { good: number; poor: number }> = {
@@ -29,7 +30,9 @@ const BUDGET: Record<string, { good: number; poor: number }> = {
 }
 
 function rating(name: string, value: number): 'good' | 'needs-improvement' | 'poor' {
-  const b = BUDGET[name]
+  const b = Object.prototype.hasOwnProperty.call(BUDGET, name)
+    ? BUDGET[name as keyof typeof BUDGET]
+    : undefined
   if (!b) return 'good'
   if (value <= b.good) return 'good'
   if (value <= b.poor) return 'needs-improvement'
@@ -48,8 +51,7 @@ export function WebVitals() {
 
     // ── Development: verbose console output ──────────────────────────────────
     if (process.env.NODE_ENV !== 'production') {
-      const colour = r === 'good' ? '✅' : r === 'needs-improvement' ? '⚠️' : '❌'
-      console.log(`[WebVitals] ${colour} ${name}: ${value.toFixed(2)} (${r})`)
+      logger.debug({ name, value: Number(value.toFixed(2)), rating: r }, 'web_vitals.metric')
     }
 
     // ── PostHog: structured web-vitals event ─────────────────────────────────

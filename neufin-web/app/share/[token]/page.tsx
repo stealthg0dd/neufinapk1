@@ -31,9 +31,10 @@ async function getDNAData(token: string): Promise<DNAShare | null> {
 export async function generateMetadata({
   params,
 }: {
-  params: { token: string }
+  params: Promise<{ token: string }>
 }): Promise<Metadata> {
-  const data = await getDNAData(params.token)
+  const { token } = await params
+  const data = await getDNAData(token)
 
   if (!data) {
     return {
@@ -68,9 +69,10 @@ export async function generateMetadata({
 export default async function SharePage({
   params,
 }: {
-  params: { token: string }
+  params: Promise<{ token: string }>
 }) {
-  const data = await getDNAData(params.token)
+  const { token } = await params
+  const data = await getDNAData(token)
 
   if (!data) {
     return (

@@ -95,6 +95,17 @@ function relativeTime(iso: string): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
+function getVentureMeta(id: string): VentureMeta {
+  if (Object.prototype.hasOwnProperty.call(VENTURE_META, id)) {
+    return VENTURE_META[id as VentureId]
+  }
+  return { name: id, businessHead: "-", status: "dormant", hasRepo: false }
+}
+
+function getCommitList(commits: Record<string, GitCommit[]>, id: string): GitCommit[] {
+  return Object.entries(commits).find(([key]) => key === id)?.[1] ?? []
+}
+
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 
 function Skeleton({ className = "" }: { className?: string }) {
@@ -162,7 +173,7 @@ function BriefPanel({
       >
         <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${panelOpen ? "bg-blue-400" : "bg-gray-600"}`} />
         <div className="flex-1 text-left">
-          <span className="text-xs font-semibold text-gray-300">Daily Brief — Ror's Triage</span>
+          <span className="text-xs font-semibold text-gray-300">Daily Brief — Ror&apos;s Triage</span>
           {!panelOpen && (
             <span className="ml-3 text-xs text-gray-500 truncate hidden sm:inline">
               {preview.slice(0, 120)}{preview.length > 120 ? "…" : ""}
@@ -193,7 +204,7 @@ function BriefPanel({
           {VENTURE_ORDER.map((ventureId) => {
             const brief   = briefs.find((b) => b.company_id === ventureId)
             const open    = openVentures.has(ventureId)
-            const meta    = VENTURE_META[ventureId]
+            const meta    = getVentureMeta(ventureId)
             const actions = brief?.actions_required ?? []
 
             return (
@@ -353,7 +364,7 @@ export default function ChiefOfStaffDashboard() {
 
   // ── Fetch GitHub commits per venture with repo ─────────────────────────────
   const fetchCommits = useCallback(async () => {
-    const repoVentures = VENTURE_ORDER.filter((v) => VENTURE_META[v].hasRepo)
+    const repoVentures = VENTURE_ORDER.filter((v) => getVentureMeta(v).hasRepo)
     const results = await Promise.allSettled(
       repoVentures.map(async (v) => {
         const res = await fetch(`/api/github/${v}`, { cache: "no-store" })
@@ -362,13 +373,13 @@ export default function ChiefOfStaffDashboard() {
         return { venture: v, commits: d.commits ?? [] }
       })
     )
-    const map: Record<string, GitCommit[]> = {}
+    const map = new Map<string, GitCommit[]>()
     for (const r of results) {
       if (r.status === "fulfilled") {
-        map[r.value.venture] = r.value.commits
+        map.set(r.value.venture, r.value.commits)
       }
     }
-    setCommits(map)
+    setCommits(Object.fromEntries(map))
   }, [])
 
   // ── Refresh activity feed independently every 30s ──────────────────────────
@@ -425,9 +436,11 @@ export default function ChiefOfStaffDashboard() {
   // ── Build venture card data ────────────────────────────────────────────────
   const buildVentureCards = (): VentureCardData[] => {
     return VENTURE_ORDER.map((id) => {
-      const meta  = VENTURE_META[id]
+      const meta  = getVentureMeta(id)
       const brief = data?.briefs.find((b) => b.company_id === id)
       const ventureTasks = tasks.filter((t) => t.company_id === id)
+      const ventureCommits = getCommitList(commits, id)
+      const latestCommit = ventureCommits.at(0)
 
       return {
         id,
@@ -437,11 +450,11 @@ export default function ChiefOfStaffDashboard() {
         briefExcerpt:   (brief?.content ?? "").slice(0, 120),
         briefFull:      brief?.content ?? "",
         actionsRequired: brief?.actions_required ?? [],
-        lastCommit:     (commits[id] ?? [])[0]
+        lastCommit:     latestCommit
           ? {
-              message: commits[id][0].message,
-              author:  commits[id][0].author,
-              timeAgo: commits[id][0].date,
+              message: latestCommit.message,
+              author:  latestCommit.author,
+              timeAgo: latestCommit.date,
             }
           : null,
         taskCounts: {

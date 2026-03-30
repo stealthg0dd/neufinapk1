@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getAdvisorProfile, type AdvisorProfile } from '@/lib/api'
 
@@ -59,9 +60,12 @@ export default function AdvisorCTA({ refToken }: Props) {
           {/* Header */}
           <div className="flex items-center gap-3">
             {profile.logo_base64 ? (
-              <img
+              <Image
                 src={profile.logo_base64}
                 alt={`${profile.firm_name} logo`}
+                width={40}
+                height={40}
+                unoptimized
                 className="w-10 h-10 object-contain rounded-lg bg-white/10 p-0.5 shrink-0"
               />
             ) : (

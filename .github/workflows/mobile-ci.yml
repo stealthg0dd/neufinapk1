@@ -6,13 +6,12 @@ on:
     paths:
       - 'neufin-mobile/**'
       - '.github/workflows/mobile-ci.yml'
+    tags:
+      - 'mobile-v*'   # trigger EAS build on release tags
   pull_request:
     branches: [main]
     paths:
       - 'neufin-mobile/**'
-  push:
-    tags:
-      - 'mobile-v*'   # trigger EAS build on release tags
 
 concurrency:
   group: mobile-${{ github.ref }}
@@ -42,8 +41,12 @@ jobs:
         run: npm ci
 
       - name: ESLint
-        run: npx eslint . --ext .ts,.tsx --max-warnings=0
-        continue-on-error: true
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.devDependencies?.eslint || pkg.dependencies?.eslint ? 0 : 1)"; then
+            npx eslint . --ext .ts,.tsx --max-warnings=0
+          else
+            echo "ESLint not configured; skipping mobile lint step."
+          fi
 
       - name: TypeScript type check
         run: npx tsc --noEmit
@@ -68,10 +71,16 @@ jobs:
         run: npm ci
 
       - name: Run Jest tests
-        run: npm test -- --watchAll=false --coverage
+        run: |
+          if node -e "const pkg=require('./package.json'); process.exit(pkg.scripts?.test ? 0 : 1)"; then
+            npm test -- --watchAll=false --coverage
+          else
+            echo "No mobile test script configured; skipping unit tests."
+          fi
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
+        if: hashFiles('neufin-mobile/coverage/**') != ''
         with:
           flags: mobile
 

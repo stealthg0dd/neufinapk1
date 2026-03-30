@@ -5,6 +5,7 @@ import { supabase, attachSupabaseAuthDebug, type AuthUser } from './supabase'
 import { debugAuth } from './auth-debug'
 import { syncAuthCookie } from './sync-auth-cookie'
 import * as Sentry from '@sentry/nextjs'
+import { logger } from './logger'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -38,11 +39,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Hydrate from current session on mount
     supabase.auth.getSession().then(({ data }) => {
-      console.log('[AuthContext] Initial getSession:', {
+      logger.debug({
         hasSession: Boolean(data.session),
         hasToken: Boolean(data.session?.access_token),
         userId: data.session?.user?.id ?? null,
-      })
+      }, 'auth.initial_session')
       setUser(data.session?.user ?? null)
       setToken(data.session?.access_token ?? null)
       setLoading(false)
@@ -52,9 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Keep token in sync on every auth event, including TOKEN_REFRESHED
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[AuthContext] User state:', session?.user ?? null)
-      console.log('[AuthContext] Token:', session?.access_token ?? null)
-      console.log('[AuthContext] Auth event:', event)
+      logger.debug({
+        event,
+        hasSession: Boolean(session),
+        hasToken: Boolean(session?.access_token),
+        userId: session?.user?.id ?? null,
+      }, 'auth.state_change')
       setUser(session?.user ?? null)
       setToken(session?.access_token ?? null)
       setLoading(false)
@@ -82,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshInterval = setInterval(async () => {
       const { data } = await supabase.auth.getSession()
       if (data.session) {
-        console.log('[AuthContext] Proactive session refresh — syncing cookie')
+        logger.debug({ userId: data.session.user?.id ?? null }, 'auth.proactive_refresh')
         syncAuthCookie(data.session)
         setToken(data.session.access_token)
       }

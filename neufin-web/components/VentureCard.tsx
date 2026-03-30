@@ -20,11 +20,20 @@ const DEFAULT_COLOR = { border: "border-gray-700/40", glow: "hover:border-gray-5
 // ── Status badge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: VentureCardData["status"] }) {
-  const cfg = {
-    active:      "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-    maintenance: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
-    dormant:     "bg-gray-500/15 text-gray-400 border-gray-600/30",
-  }[status]
+  let cfg = "bg-gray-500/15 text-gray-400 border-gray-600/30"
+  switch (status) {
+    case "active":
+      cfg = "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+      break
+    case "maintenance":
+      cfg = "bg-yellow-500/15 text-yellow-300 border-yellow-500/30"
+      break
+    case "dormant":
+      cfg = "bg-gray-500/15 text-gray-400 border-gray-600/30"
+      break
+    default:
+      break
+  }
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cfg}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${

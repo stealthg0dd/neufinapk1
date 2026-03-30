@@ -8,6 +8,8 @@ LAYER="${1:-all}"
 FAILED=()
 
 run_backend_tests() {
+  local status=0
+
   echo "==> Backend tests (pytest)"
   cd "$REPO_ROOT/neufin-backend"
 
@@ -19,53 +21,85 @@ run_backend_tests() {
   source .venv/bin/activate
 
   echo "  Running linters..."
-  ruff check . --quiet
-  mypy . --ignore-missing-imports --quiet
+  ruff check . --quiet || status=1
+  mypy . --ignore-missing-imports --quiet || status=1
 
   echo "  Running unit tests..."
   pytest tests/unit/ \
     --cov=. \
     --cov-report=term-missing \
     --cov-fail-under=60 \
-    -q
+    -q || status=1
 
   if [ "${CI:-}" = "true" ]; then
     echo "  Running integration tests (CI only)..."
-    pytest tests/integration/ -q
+    pytest tests/integration/ -q || status=1
   fi
 
   deactivate
+  if [ "$status" -ne 0 ]; then
+    return 1
+  fi
+
   echo "  Backend: PASS"
 }
 
 run_frontend_tests() {
+  local status=0
+
   echo "==> Frontend tests (jest + eslint)"
   cd "$REPO_ROOT/neufin-web"
 
-  echo "  Running ESLint..."
-  npx eslint . --ext .ts,.tsx --quiet
+  if node -e 'const pkg=require("./package.json"); process.exit(pkg.devDependencies?.eslint || pkg.dependencies?.eslint ? 0 : 1)'; then
+    echo "  Running ESLint..."
+    npx eslint . --ext .ts,.tsx --quiet || status=1
+  else
+    echo "  ESLint not configured; skipping."
+  fi
 
   echo "  Running TypeScript check..."
-  npx tsc --noEmit --quiet
+  npx tsc --noEmit || status=1
 
-  echo "  Running Jest..."
-  npx jest --passWithNoTests --coverage --silent
+  if node -e 'const pkg=require("./package.json"); process.exit(pkg.scripts?.test ? 0 : 1)'; then
+    echo "  Running npm test..."
+    npm test -- --passWithNoTests --coverage --silent || status=1
+  else
+    echo "  Test runner not configured; skipping."
+  fi
+
+  if [ "$status" -ne 0 ]; then
+    return 1
+  fi
 
   echo "  Frontend: PASS"
 }
 
 run_mobile_tests() {
+  local status=0
+
   echo "==> Mobile tests (jest + eslint)"
   cd "$REPO_ROOT/neufin-mobile"
 
-  echo "  Running ESLint..."
-  npx eslint . --ext .ts,.tsx --quiet
+  if node -e 'const pkg=require("./package.json"); process.exit(pkg.devDependencies?.eslint || pkg.dependencies?.eslint ? 0 : 1)'; then
+    echo "  Running ESLint..."
+    npx eslint . --ext .ts,.tsx --quiet || status=1
+  else
+    echo "  ESLint not configured; skipping."
+  fi
 
   echo "  Running TypeScript check..."
-  npx tsc --noEmit --quiet
+  npx tsc --noEmit || status=1
 
-  echo "  Running Jest..."
-  npx jest --passWithNoTests --coverage --silent
+  if node -e 'const pkg=require("./package.json"); process.exit(pkg.scripts?.test ? 0 : 1)'; then
+    echo "  Running npm test..."
+    npm test -- --passWithNoTests --coverage --silent || status=1
+  else
+    echo "  Test runner not configured; skipping."
+  fi
+
+  if [ "$status" -ne 0 ]; then
+    return 1
+  fi
 
   echo "  Mobile: PASS"
 }

@@ -2,20 +2,45 @@ from fastapi import Request, HTTPException, status
 from services.jwt_auth import verify_jwt, JWTUser
 
 
-async def get_current_user(request: Request) -> JWTUser:
+def _extract_bearer_token(request: Request) -> str | None:
     auth = request.headers.get("Authorization")
+    if not auth:
+        return None
 
-    if not auth or not auth.startswith("Bearer "):
+    if not auth.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid auth header",
+        )
+
+    return auth.split(" ", 1)[1]
+
+
+async def get_current_user(request: Request) -> JWTUser:
+    token = _extract_bearer_token(request)
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing auth token",
         )
 
-    token = auth.split(" ")[1]
-
     try:
         user = await verify_jwt(token)
         return user
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+
+async def get_optional_user(request: Request) -> JWTUser | None:
+    token = _extract_bearer_token(request)
+    if not token:
+        return None
+
+    try:
+        return await verify_jwt(token)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

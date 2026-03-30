@@ -202,11 +202,11 @@ export default function Article1() {
                 in gains) while holding losing positions far too long (hoping to break even).
               </p>
               <p className="text-gray-400 leading-relaxed">
-                In NeuFin's Singapore portfolio dataset, investors affected by this bias hold
+                In NeuFin&apos;s Singapore portfolio dataset, investors affected by this bias hold
                 loss-making positions an average of <strong className="text-gray-300">2.3×
                 longer</strong> than their winning positions. Compounded over a 5-year period,
                 this pattern results in a portfolio systematically weighted toward its
-                worst-performing assets. NeuFin's DNA Score includes a Disposition Effect
+                worst-performing assets. NeuFin&apos;s DNA Score includes a Disposition Effect
                 sub-score derived directly from hold-time ratios in your transaction history.
               </p>
             </div>
@@ -255,7 +255,7 @@ export default function Article1() {
               <p className="text-gray-400 leading-relaxed mb-3">
                 Herding occurs when investors follow the crowd — buying trending assets or
                 following institutional flows — rather than conducting independent analysis.
-                In Singapore's tightly networked business community, herding is especially
+                In Singapore&apos;s tightly networked business community, herding is especially
                 visible in IPO participation (where subscription rates are publicly visible),
                 sector rotation into AI and semiconductor names in 2023–2024, and REIT
                 accumulation during low-rate periods.

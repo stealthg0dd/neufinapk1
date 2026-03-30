@@ -40,17 +40,38 @@ const SECTOR_COLORS: Record<string, string> = {
   Energy: '#f59e0b', Consumer: '#ec4899', ETF: '#06b6d4', Other: '#6b7280',
 }
 
+const SECTOR_LOOKUP = new Map<string, string>(Object.entries(SECTOR_MAP))
+const SECTOR_COLOR_LOOKUP = new Map<string, string>(Object.entries(SECTOR_COLORS))
+
 function getSector(symbol: string): string {
-  return SECTOR_MAP[symbol.toUpperCase()] ?? 'Other'
+  const key = symbol.toUpperCase()
+  return SECTOR_LOOKUP.get(key) ?? 'Other'
 }
 
 function buildSectorData(positions: Position[]) {
-  const sectors: Record<string, number> = {}
+  const sectors = new Map<string, number>()
   for (const p of positions) {
     const s = getSector(p.symbol)
-    sectors[s] = (sectors[s] ?? 0) + p.value
+    sectors.set(s, (sectors.get(s) ?? 0) + p.value)
   }
-  return Object.entries(sectors).map(([name, value]) => ({ name, value: Math.round(value) }))
+  return Array.from(sectors.entries()).map(([name, value]) => ({ name, value: Math.round(value) }))
+}
+
+function signalClass(type: string): string {
+  switch (type) {
+    case 'BUY':
+      return 'bg-green-500/15 text-green-400 border-green-500/30'
+    case 'SELL':
+      return 'bg-red-500/15 text-red-400 border-red-500/30'
+    case 'HOLD':
+      return 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+    default:
+      return 'bg-gray-700 text-gray-300'
+  }
+}
+
+function sectorColor(sector: string): string {
+  return SECTOR_COLOR_LOOKUP.get(sector) ?? '#6b7280'
 }
 
 // ── Score badge ────────────────────────────────────────────────────────────────
@@ -63,12 +84,7 @@ function ScoreBadge({ score }: { score: number }) {
 
 // ── Signal badge ───────────────────────────────────────────────────────────────
 function SignalBadge({ type }: { type: string }) {
-  const classes: Record<string, string> = {
-    BUY: 'bg-green-500/15 text-green-400 border-green-500/30',
-    SELL: 'bg-red-500/15 text-red-400 border-red-500/30',
-    HOLD: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-  }
-  return <span className={`badge border ${classes[type] ?? 'bg-gray-700 text-gray-300'}`}>{type}</span>
+  return <span className={`badge border ${signalClass(type)}`}>{type}</span>
 }
 
 // ── Tooltip formatter ──────────────────────────────────────────────────────────
@@ -309,7 +325,7 @@ export default function DashboardPage() {
                           className="h-full rounded-full"
                           style={{
                             width: `${Math.min(p.weight, 100)}%`,
-                            background: SECTOR_COLORS[sector] ?? '#6b7280',
+                            background: sectorColor(sector),
                           }}
                         />
                       </div>

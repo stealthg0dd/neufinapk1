@@ -176,6 +176,13 @@ interface ProviderHealthStripProps {
   rateLimits: Record<string, RateLimitEntry>
 }
 
+function providerRateLimit(
+  rateLimits: Record<string, RateLimitEntry>,
+  name: string,
+): RateLimitEntry | undefined {
+  return Object.entries(rateLimits).find(([key]) => key === name)?.[1]
+}
+
 export default function ProviderHealthStrip({ providers, rateLimits }: ProviderHealthStripProps) {
   const entries = Object.entries(providers).sort(([an, av], [bn, bv]) => {
     // Unhealthy first, then cooldown, then healthy
@@ -204,7 +211,7 @@ export default function ProviderHealthStrip({ providers, rateLimits }: ProviderH
         </div>
         <div className="flex flex-wrap gap-1.5">
           {entries.map(([name, stats]) => (
-            <ProviderChip key={name} name={name} stats={stats} rl={rateLimits[name]} />
+            <ProviderChip key={name} name={name} stats={stats} rl={providerRateLimit(rateLimits, name)} />
           ))}
         </div>
       </div>

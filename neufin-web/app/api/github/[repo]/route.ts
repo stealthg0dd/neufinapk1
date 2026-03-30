@@ -22,6 +22,14 @@ const REPO_MAP: Record<string, string | undefined> = {
   neumas:    process.env.NEUMAS_REPO,
 }
 
+function getMappedRepo(repo: string): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(REPO_MAP, repo)) {
+    return undefined
+  }
+
+  return REPO_MAP[repo as keyof typeof REPO_MAP]
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
   if (diff < 60)    return `${diff}s ago`
@@ -35,7 +43,7 @@ export async function GET(
   { params }: { params: Promise<{ repo: string }> }
 ) {
   const { repo } = await params
-  const fullRepo = REPO_MAP[repo]
+  const fullRepo = getMappedRepo(repo)
 
   if (!fullRepo) {
     return NextResponse.json({ commits: [], error: `Unknown repo slug: ${repo}` }, { status: 404 })

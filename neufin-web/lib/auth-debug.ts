@@ -2,9 +2,11 @@
  * Logs current auth state for debugging.
  * Checks both localStorage (Supabase SDK v2 format) and the neufin-auth HTTP cookie.
  */
+import { logger } from './logger'
+
 export function debugAuth(location: string): void {
   if (typeof window === 'undefined') {
-    console.log(`[AUTH DEBUG ${location}]`, { source: 'server', timestamp: new Date().toISOString() })
+    logger.debug({ location, source: 'server', timestamp: new Date().toISOString() }, 'auth.debug')
     return
   }
 
@@ -21,7 +23,8 @@ export function debugAuth(location: string): void {
   const cookieNames = document.cookie.split(';').map(c => c.trim().split('=')[0])
   const hasCookie   = cookieNames.includes('neufin-auth')
 
-  console.log(`[AUTH DEBUG ${location}]`, {
+  logger.debug({
+    location,
     hasToken:    !!accessToken,
     hasCookie,
     hasUser:     !!user,
@@ -31,5 +34,5 @@ export function debugAuth(location: string): void {
     expiresAt:   expiresAt   ? new Date((expiresAt as number) * 1000).toISOString() : null,
     isExpired:   expiresAt   ? Date.now() / 1000 > (expiresAt as number) : null,
     timestamp:   new Date().toISOString(),
-  })
+  }, 'auth.debug')
 }

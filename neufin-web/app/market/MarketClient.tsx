@@ -245,7 +245,7 @@ export default function MarketClient({ health, trend }: Props) {
                 <Tooltip content={<DistTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {health.score_distribution.map((_, i) => (
-                    <Cell key={i} fill={scoreColors[i]} />
+                    <Cell key={i} fill={scoreColors.at(i) ?? '#6b7280'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -253,7 +253,7 @@ export default function MarketClient({ health, trend }: Props) {
             <div className="flex gap-3 flex-wrap">
               {health.score_distribution.map((b, i) => (
                 <div key={b.range} className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: scoreColors[i] }} />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: scoreColors.at(i) ?? '#6b7280' }} />
                   <span className="text-xs text-gray-500">{b.label} <span className="text-gray-600">{b.pct}%</span></span>
                 </div>
               ))}

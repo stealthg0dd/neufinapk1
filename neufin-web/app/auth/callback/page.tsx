@@ -29,6 +29,7 @@ import { supabase } from '@/lib/supabase'
 import { debugAuth } from '@/lib/auth-debug'
 import { syncAuthCookie } from '@/lib/sync-auth-cookie'
 import { claimAnonymousRecord } from '@/lib/api'
+import { logger } from '@/lib/logger'
 
 const TAG = '[AuthCallback]'
 
@@ -62,7 +63,7 @@ function AuthCallbackContent() {
     const urlError       = searchParams.get('error')
     const urlErrorDesc   = searchParams.get('error_description')
     if (urlError) {
-      console.error(`${TAG} Provider error in URL: ${urlError} — ${urlErrorDesc}`)
+      logger.error({ tag: TAG, urlError, urlErrorDesc }, 'auth.callback_provider_error')
       setError(urlErrorDesc ?? urlError)
       return
     }
@@ -73,7 +74,7 @@ function AuthCallbackContent() {
     async function finishAndRedirect(accessToken: string | undefined, expiresIn?: number | null) {
       if (done) return
       done = true
-      console.log(`${TAG} finishAndRedirect — token present: ${Boolean(accessToken)}, next: ${next}`)
+      logger.info({ tag: TAG, hasToken: Boolean(accessToken), next, expiresIn }, 'auth.callback_finish_redirect')
       debugAuth('auth/callback:finishAndRedirect:start')
 
       // ── Sync token to cookie BEFORE navigating so middleware can read it ──
@@ -87,16 +88,16 @@ function AuthCallbackContent() {
           try {
             const parsed = JSON.parse(raw)
             if (parsed?.record_id && !parsed?.user_id_claimed) {
-              console.log(`${TAG} Claiming anonymous record: ${parsed.record_id}`)
+              logger.info({ tag: TAG, recordId: parsed.record_id }, 'auth.callback_claim_start')
               await claimAnonymousRecord(parsed.record_id, accessToken)
               localStorage.setItem(
                 'dnaResult',
                 JSON.stringify({ ...parsed, user_id_claimed: true }),
               )
-              console.log(`${TAG} Anonymous record claimed ✓`)
+              logger.info({ tag: TAG, recordId: parsed.record_id }, 'auth.callback_claim_complete')
             }
           } catch (claimErr) {
-            console.warn(`${TAG} claimAnonymousRecord failed (non-fatal):`, claimErr)
+            logger.warn({ tag: TAG, error: claimErr }, 'auth.callback_claim_failed')
           }
         }
       }
@@ -104,15 +105,15 @@ function AuthCallbackContent() {
       // ── User routing ───────────────────────────────────────────────────────
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        console.log('[Callback] User:', user)
+        logger.debug({ tag: TAG, userId: user?.id ?? null, userType: user?.user_metadata?.user_type ?? null }, 'auth.callback_user_loaded')
 
         if (user && !user.user_metadata?.onboarding_complete) {
           // New user: run onboarding flow first, then send to original destination.
-          console.log(`${TAG} New user — redirecting to onboarding`)
+          logger.info({ tag: TAG, next }, 'auth.callback_redirect_onboarding')
           localStorage.setItem('onboarding_next', next)
           const userTypeHint = searchParams.get('user_type')
           const qs = userTypeHint ? `?user_type=${userTypeHint}` : ''
-          console.log('[Callback] Redirecting to:', `/onboarding${qs}`)
+          logger.info({ tag: TAG, target: `/onboarding${qs}` }, 'auth.callback_redirect')
           debugAuth('auth/callback:before-onboarding-redirect')
           // Full page reload so middleware cookie check passes immediately.
           window.location.href = `/onboarding${qs}`
@@ -124,16 +125,16 @@ function AuthCallbackContent() {
           user?.user_metadata?.user_type === 'advisor' &&
           (next === '/dashboard' || next === '/vault')
         ) {
-          console.log(`${TAG} Returning advisor — redirecting to /advisor/dashboard`)
+          logger.info({ tag: TAG }, 'auth.callback_redirect_advisor_dashboard')
           debugAuth('auth/callback:before-advisor-redirect')
           window.location.href = '/advisor/dashboard'
           return
         }
       } catch (checkErr) {
-        console.warn(`${TAG} User routing check failed (non-fatal):`, checkErr)
+        logger.warn({ tag: TAG, error: checkErr }, 'auth.callback_routing_check_failed')
       }
 
-      console.log(`${TAG} Redirecting to: ${next}`)
+      logger.info({ tag: TAG, target: next }, 'auth.callback_redirect_final')
       debugAuth('auth/callback:before-final-redirect')
       // Full page reload ensures the neufin-auth cookie is sent with the next
       // HTTP request so the Edge middleware validates the session correctly.
@@ -143,13 +144,13 @@ function AuthCallbackContent() {
     // ── 1. Primary path: onAuthStateChange ────────────────────────────────
     // Supabase fires SIGNED_IN once the PKCE code has been successfully
     // exchanged for a session.  This is the canonical moment to proceed.
-    console.log(`${TAG} Registering onAuthStateChange listener`)
+    logger.debug({ tag: TAG }, 'auth.callback_listener_register')
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`${TAG} onAuthStateChange: event=${event} session=${Boolean(session)}`)
+        logger.debug({ tag: TAG, event, hasSession: Boolean(session) }, 'auth.callback_state_change')
 
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-          console.log(`${TAG} ${event} — proceeding to redirect`)
+          logger.info({ tag: TAG, event }, 'auth.callback_ready')
           subscription.unsubscribe()
           await finishAndRedirect(session.access_token, session.expires_in)
           return
@@ -159,7 +160,7 @@ function AuthCallbackContent() {
         // If it arrives with no session AND no SIGNED_IN has fired, the code
         // exchange either failed or was already consumed — show error state.
         if (event === 'INITIAL_SESSION' && !session && !done) {
-          console.warn(`${TAG} INITIAL_SESSION with no session — code exchange may have failed`)
+          logger.warn({ tag: TAG }, 'auth.callback_initial_session_missing')
           subscription.unsubscribe()
           setError('Sign-in could not be completed. The link may have already been used or expired.')
         }
@@ -167,17 +168,17 @@ function AuthCallbackContent() {
     )
 
     // ── 2. Fast path: session already established (e.g. page refresh) ─────
-    console.log(`${TAG} Checking existing session (fast path)`)
+    logger.debug({ tag: TAG }, 'auth.callback_fast_path_check')
     supabase.auth.getSession().then(async ({ data, error: sessionErr }) => {
       if (sessionErr) {
-        console.error(`${TAG} getSession error:`, sessionErr.message)
+        logger.error({ tag: TAG, message: sessionErr.message }, 'auth.callback_session_error')
       }
       if (data.session) {
-        console.log(`${TAG} Fast path — existing session found, redirecting`)
+        logger.info({ tag: TAG }, 'auth.callback_fast_path_ready')
         subscription.unsubscribe()
         await finishAndRedirect(data.session.access_token, data.session.expires_in)
       } else {
-        console.log(`${TAG} Fast path — no session yet, waiting for SIGNED_IN event`)
+        logger.debug({ tag: TAG }, 'auth.callback_fast_path_waiting')
       }
     })
 

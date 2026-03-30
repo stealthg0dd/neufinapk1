@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -43,12 +44,12 @@ function isJwtExpired(token: string): boolean {
 
 async function hasValidSupabaseSession(token: string): Promise<boolean> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn('[Middleware] Supabase env missing; denying protected request')
+    logger.warn({}, 'middleware.supabase_env_missing')
     return false
   }
 
   if (isJwtExpired(token)) {
-    console.log('[Middleware] Token is expired or malformed')
+    logger.debug({}, 'middleware.token_expired_or_malformed')
     return false
   }
 
@@ -63,13 +64,13 @@ async function hasValidSupabaseSession(token: string): Promise<boolean> {
     })
 
     if (!response.ok) {
-      console.log('[Middleware] Supabase session validation failed:', response.status)
+      logger.warn({ status: response.status }, 'middleware.supabase_session_invalid')
       return false
     }
 
     return true
   } catch (error) {
-    console.error('[Middleware] Supabase session validation error:', error)
+    logger.error({ error }, 'middleware.supabase_session_error')
     return false
   }
 }
@@ -99,27 +100,26 @@ export async function middleware(request: NextRequest) {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next()
 
   // ── Protected path — check cookie ─────────────────────────────────────────
-  console.log('[Middleware] Path:', pathname)
-  console.log('[Middleware] All cookies:', request.cookies.getAll().map(c => c.name))
+  logger.debug({ pathname, cookies: request.cookies.getAll().map(c => c.name) }, 'middleware.protected_path')
 
   const authCookie = request.cookies.get('neufin-auth')
-  console.log('[Middleware] neufin-auth cookie:', {
+  logger.debug({
     exists: !!authCookie,
     value: authCookie?.value ? `${authCookie.value.substring(0, 20)}...` : null,
-  })
+  }, 'middleware.auth_cookie')
 
   if (!authCookie?.value) {
-    console.log('[Middleware] No auth cookie — redirecting to /auth')
+    logger.info({ pathname }, 'middleware.redirect_no_cookie')
     return redirectToAuth(request, pathname)
   }
 
   const isValid = await hasValidSupabaseSession(authCookie.value)
   if (!isValid) {
-    console.log('[Middleware] Invalid auth cookie — clearing and redirecting to /auth')
+    logger.info({ pathname }, 'middleware.redirect_invalid_cookie')
     return redirectToAuth(request, pathname, true)
   }
 
-  console.log('[Middleware] Token found, allowing access')
+  logger.info({ pathname }, 'middleware.allow_request')
   return NextResponse.next()
 }
 

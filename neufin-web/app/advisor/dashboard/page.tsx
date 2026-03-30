@@ -310,7 +310,7 @@ export default function AdvisorDashboardPage() {
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-white mb-1">Unlock White-Label Reports</h3>
                 <p className="text-gray-400 text-sm mb-3">
-                  Replace Neufin branding with your firm's logo and colors. Impress clients with fully branded advisor PDFs.
+                  Replace Neufin branding with your firm&apos;s logo and colors. Impress clients with fully branded advisor PDFs.
                 </p>
                 <div className="flex items-center gap-3">
                   <Link href="/advisor/settings" className="btn-primary text-sm px-4 py-2">
