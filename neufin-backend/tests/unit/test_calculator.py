@@ -83,7 +83,7 @@ class TestDNAScoreComponents:
 # ── Price fetching ────────────────────────────────────────────────────────────
 
 class TestPriceFetching:
-    @patch("services.calculator._fetch_price_polygon")
+    @patch("services.calculator._polygon_batch")
     def test_uses_polygon_first(self, mock_polygon):
         mock_polygon.return_value = {"AAPL": 185.0}
         # Clear any existing blacklist state

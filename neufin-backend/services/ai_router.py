@@ -15,8 +15,16 @@ from openai import OpenAI
 
 from config import ANTHROPIC_API_KEY, GEMINI_KEY, GROQ_KEY, OPENAI_KEY
 
-# Initialize Google Client
-_gemini = google_genai.Client(api_key=GEMINI_KEY)
+# Initialize Google Client lazily to avoid startup failures when GEMINI_KEY is absent
+_gemini: google_genai.Client | None = None
+
+
+def _get_gemini_client() -> google_genai.Client:
+    """Lazily initialize and return the Gemini client."""
+    global _gemini
+    if _gemini is None:
+        _gemini = google_genai.Client(api_key=GEMINI_KEY)
+    return _gemini
 
 # Centralized Gemini model config — single source of truth for main.py and ai_router.py
 GEMINI_PRIMARY_MODEL = "gemini-3.1-pro-preview"
@@ -25,7 +33,7 @@ GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.0-flash")
 # Print available Gemini models at startup so the correct model ID can be confirmed.
 # Check your Railway/local stderr logs and update GEMINI_PRIMARY_MODEL to match.
 try:
-    _available = [m.name for m in _gemini.models.list() if "gemini" in m.name.lower()]
+    _available = [m.name for m in _get_gemini_client().models.list() if "gemini" in m.name.lower()]
     print(f"[Gemini] Available: {_available}", file=sys.stderr)
     print(f"[Gemini] Primary: {GEMINI_PRIMARY_MODEL} | Fallback: {GEMINI_FALLBACK_MODEL}", file=sys.stderr)
 except Exception as _e:
@@ -71,7 +79,7 @@ def call_gemini(prompt: str) -> dict:
     """
     for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
         try:
-            response = _gemini.models.generate_content(model=model, contents=prompt)
+            response = _get_gemini_client().models.generate_content(model=model, contents=prompt)
             result = _parse(response.text)
             print(f"[AI] {model} ✓", file=sys.stderr)
             return result
@@ -196,7 +204,7 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
     for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
         try:
             full_prompt = f"SYSTEM INSTRUCTIONS:\n{system_prompt}\n\n---\n\nUSER:\n{user_content}"
-            response = _gemini.models.generate_content(model=model, contents=full_prompt)
+            response = _get_gemini_client().models.generate_content(model=model, contents=full_prompt)
             text = response.text
             print(f"[AI/Briefing] {model} ✓ ({time.monotonic()-t2:.1f}s)", file=sys.stderr)
             return text
