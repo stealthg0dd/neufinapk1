@@ -168,9 +168,13 @@ jobs:
 
       - name: Deploy to Railway (production)
         working-directory: neufin-backend
-        run: railway up --service neufin101 --detach
+        run: |
+          SERVICE_NAME="${RAILWAY_SERVICE:-neufin101-production}"
+          echo "Deploying Railway service: ${SERVICE_NAME}"
+          railway up --service "${SERVICE_NAME}" --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE_PRODUCTION }}
 
       - name: Notify Sentry of deployment
         uses: getsentry/action-release@v1
