@@ -13,12 +13,10 @@ Tier-2 returns the serialised pandas Series immediately — no Alpha Vantage cal
 
 from __future__ import annotations
 
-import io
+import datetime
 import json
 import sys
 import time
-import datetime
-from typing import Optional
 
 import pandas as pd
 
@@ -40,7 +38,9 @@ except Exception:
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 import os
+
 from dotenv import load_dotenv
+
 load_dotenv()
 
 REDIS_URL        = os.environ.get("REDIS_URL", "")
@@ -53,7 +53,7 @@ _TABLE           = "market_data_cache"
 _MEMORY: dict[str, tuple[pd.Series, float]] = {}   # key → (series, epoch_ts)
 
 # ── Redis singleton ────────────────────────────────────────────────────────────
-_redis_client: Optional[object] = None
+_redis_client: object | None = None
 
 def _get_redis():
     global _redis_client
@@ -96,7 +96,7 @@ def _key(symbol: str, days: int) -> str:
 # Public API
 # ══════════════════════════════════════════════════════════════════════════════
 
-def get_closes(symbol: str, days: int) -> Optional[pd.Series]:
+def get_closes(symbol: str, days: int) -> pd.Series | None:
     """
     Return cached daily closes or None if not found / expired.
     Checks Tier-1 (Redis) → Tier-2 (Supabase) → Tier-3 (memory).
@@ -235,8 +235,9 @@ class MarketCache:
           3. Polygon /v2/aggs       (5-year window)          — when Finnhub also fails
         Returns an empty Series on complete failure — never raises.
         """
-        import requests as _req
         import datetime as _dt
+
+        import requests as _req
 
         av_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "") or os.getenv("ALPHA_VANTAGE_API_KEY", "")
 
@@ -279,7 +280,7 @@ class MarketCache:
             try:
                 start_5y  = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
                 unix_from = int(_dt.datetime.strptime(start_5y, "%Y-%m-%d").timestamp())
-                unix_to   = int(_dt.datetime.now(_dt.timezone.utc).timestamp())
+                unix_to   = int(_dt.datetime.now(_dt.UTC).timestamp())
                 fh_sym    = sym.replace(".", "-")
                 r = _req.get(
                     "https://finnhub.io/api/v1/stock/candle",
@@ -290,7 +291,7 @@ class MarketCache:
                 if data.get("s") == "ok" and data.get("c"):
                     closes = {
                         _dt.date.fromtimestamp(ts).isoformat(): c
-                        for ts, c in zip(data["t"], data["c"])
+                        for ts, c in zip(data["t"], data["c"], strict=False)
                     }
                     series = pd.Series(closes, dtype=float).sort_index()
                     series.name = sym

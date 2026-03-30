@@ -5,12 +5,14 @@ Claude Sonnet 4.6 → OpenAI GPT-4o → Gemini 3.1 Pro (→ 1.5 Flash) → Groq 
 import json
 import os
 import re
-import time
 import sys
+import time
+
 from anthropic import Anthropic
 from google import genai as google_genai
 from groq import Groq
 from openai import OpenAI
+
 from config import ANTHROPIC_API_KEY, GEMINI_KEY, GROQ_KEY, OPENAI_KEY
 
 # Initialize Google Client
@@ -48,6 +50,11 @@ def _parse(text: str) -> dict:
         if match:
             return json.loads(match.group(1))
         raise
+
+
+def _parse_ai_response(text: str) -> dict:
+    """Backward-compatible alias for test and legacy call sites."""
+    return _parse(text)
 
 
 def _is_model_not_found(exc: Exception) -> bool:

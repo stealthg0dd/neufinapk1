@@ -1,10 +1,9 @@
 """Unit tests for routers/dna.py — DNA score generation and sharing."""
 import io
-import json
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
-from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from fastapi.testclient import TestClient
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -106,4 +105,6 @@ class TestLeaderboard:
         )
         response = client.get("/api/dna/leaderboard")
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        body = response.json()
+        assert isinstance(body, dict)
+        assert isinstance(body.get("leaderboard"), list)

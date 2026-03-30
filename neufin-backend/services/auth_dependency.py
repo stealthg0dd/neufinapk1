@@ -1,5 +1,6 @@
-from fastapi import Request, HTTPException, status
-from services.jwt_auth import verify_jwt, JWTUser
+from fastapi import HTTPException, Request, status
+
+from services.jwt_auth import JWTUser, verify_jwt
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -27,11 +28,11 @@ async def get_current_user(request: Request) -> JWTUser:
     try:
         user = await verify_jwt(token)
         return user
-    except Exception:
+    except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
-        )
+        ) from err
 
 
 async def get_optional_user(request: Request) -> JWTUser | None:
@@ -41,8 +42,8 @@ async def get_optional_user(request: Request) -> JWTUser | None:
 
     try:
         return await verify_jwt(token)
-    except Exception:
+    except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
-        )
+        ) from err

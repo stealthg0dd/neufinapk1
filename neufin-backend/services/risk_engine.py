@@ -19,10 +19,11 @@ import asyncio
 import os
 import sys
 import time
-import requests
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Any
+import requests
 from dotenv import load_dotenv
 
 # ── API key ────────────────────────────────────────────────────────────────────
@@ -33,7 +34,8 @@ if not ALPHA_VANTAGE_API_KEY:
 
 # ── Multi-tier cache (Redis 24h → Supabase 24h → in-process 1h) ───────────────
 try:
-    from services.market_cache import get_closes as _cache_get, set_closes as _cache_set
+    from services.market_cache import get_closes as _cache_get
+    from services.market_cache import set_closes as _cache_set
     _MARKET_CACHE_AVAILABLE = True
 except Exception as _mc_err:
     print(f"[RiskEngine] market_cache unavailable ({_mc_err}) — using in-process cache", file=sys.stderr)
@@ -110,7 +112,7 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
             return pd.Series(dtype=float, name=sym_upper)
         closes = {
             _dt.date.fromtimestamp(ts).isoformat(): c
-            for ts, c in zip(data["t"], data["c"])
+            for ts, c in zip(data["t"], data["c"], strict=False)
         }
         series = pd.Series(closes, dtype=float).sort_index().tail(days)
         series.name = sym_upper
@@ -284,9 +286,9 @@ def _effective_number_of_bets(
     """
     Effective Number of Bets (diversification index):
 
-        N_eff = 1 / Σ_i Σ_j  w_i * w_j * ρ_ij
+        N_eff = 1 / Σ_i Σ_j  w_i * w_j * rho_ij
 
-    where the sum runs over all i, j (including i == j where ρ_ii = 1).
+    where the sum runs over all i, j (including i == j where rho_ii = 1).
 
     Interpretation:
         N_eff = 1   → single undiversified bet
@@ -306,7 +308,7 @@ def _effective_number_of_bets(
     w = w / total  # normalise
 
     rho = corr_matrix.values.astype(float)
-    denominator = float(w @ rho @ w)  # scalar: Σ_ij w_i ρ_ij w_j
+    denominator = float(w @ rho @ w)  # scalar: Σ_ij w_i rho_ij w_j
     if denominator <= 0:
         return 0.0
     return round(1.0 / denominator, 4)
@@ -327,7 +329,7 @@ def build_risk_report(
     symbols   : list of ticker strings (e.g. ["AAPL", "MSFT", "BRK-B"])
     weights   : {symbol: portfolio_weight} — used for N_eff and cluster ranking.
                 Weights need not sum to 1; they are normalised internally.
-    threshold : Pearson ρ above which a pair is flagged as a risk cluster (default 0.70).
+    threshold : Pearson rho above which a pair is flagged as a risk cluster (default 0.70).
     days      : lookback window in trading days (default 60).
 
     Returns
@@ -337,9 +339,9 @@ def build_risk_report(
       "symbols_used":       list[str],      # subset with sufficient data
       "symbols_failed":     list[str],      # tickers dropped due to fetch errors
       "correlation_matrix": dict,           # nested dict of all (i, j) correlations
-      "risk_clusters":      list[dict],     # pairs with |ρ| > threshold
+      "risk_clusters":      list[dict],     # pairs with |rho| > threshold
       "diversification_index": float,       # Effective Number of Bets
-      "avg_pairwise_correlation": float,    # mean |ρ| off-diagonal
+      "avg_pairwise_correlation": float,    # mean |rho| off-diagonal
       "metadata": dict,
     }
     """
@@ -384,7 +386,7 @@ def build_risk_report(
             val = corr_df.loc[row_sym, col_sym]
             corr_dict[row_sym][col_sym] = round(float(val), 4) if not np.isnan(val) else None
 
-    # 4. Identify risk clusters: all unique pairs with |ρ| > threshold
+    # 4. Identify risk clusters: all unique pairs with |rho| > threshold
     risk_clusters: list[dict[str, Any]] = []
     cols = list(corr_df.columns)
     for i in range(len(cols)):
@@ -401,7 +403,7 @@ def build_risk_report(
     # Sort descending by absolute correlation
     risk_clusters.sort(key=lambda x: abs(x["correlation"]), reverse=True)
 
-    # 5. Average off-diagonal |ρ|
+    # 5. Average off-diagonal |rho|
     n = len(cols)
     off_diag_values = [
         abs(corr_df.iloc[i, j])
@@ -490,7 +492,7 @@ async def fetch_all_closes(
         asyncio.to_thread(_fetch_daily_closes_av, sym, days)
         for sym in syms_upper
     ])
-    return dict(zip(syms_upper, results))
+    return dict(zip(syms_upper, results, strict=False))
 
 
 def find_correlation_clusters(
@@ -501,7 +503,7 @@ def find_correlation_clusters(
 ) -> list[list[str]]:
     """
     Union-Find clustering of the top-N holdings (by weight) where
-    pairwise |ρ| ≥ threshold.
+    pairwise |rho| >= threshold.
 
     Returns a list of clusters; each cluster is a sorted list of tickers.
     """
@@ -535,7 +537,7 @@ def find_correlation_clusters(
                 if not merged:
                     clusters.append({a, b})
 
-    return [sorted(list(c)) for c in clusters]
+    return [sorted(c) for c in clusters]
 
 
 def correlation_penalty_score(
@@ -543,7 +545,7 @@ def correlation_penalty_score(
     corr_matrix: pd.DataFrame,
 ) -> tuple[float, float]:
     """
-    Compute the DNA correlation score component (0–30 pts) and mean |ρ|.
+    Compute the DNA correlation score component (0-30 pts) and mean |rho|.
 
     Penalty: 5 pts per symbol that belongs to a correlated cluster, max 30.
     Returns (score, avg_corr).
@@ -571,7 +573,7 @@ def format_clusters_for_ai(clusters: list[list[str]]) -> str:
     if not clusters:
         return "No significant correlation clusters detected among the top 5 holdings."
 
-    lines = ["High-correlation risk clusters detected (Pearson r ≥ 0.75):"]
+    lines = ["High-correlation risk clusters detected (Pearson r >= 0.75):"]
     for i, cluster in enumerate(clusters, 1):
         tickers = ", ".join(cluster)
         lines.append(

@@ -25,44 +25,47 @@ Fallback: if langgraph is not installed the same nodes run sequentially.
 
 from __future__ import annotations
 
+import asyncio
+import datetime
+import json
+import operator
 import os
 import sys
-import json
-import time
-import asyncio
-import operator
-import datetime
-import requests
+from typing import Annotated, TypedDict
+
 import numpy as np
 import pandas as pd
-from typing import TypedDict, Annotated, Any
+import requests
 from dotenv import load_dotenv
 
 # ── LangGraph (optional — graceful fallback) ───────────────────────────────────
 try:
-    from langgraph.graph import StateGraph, START, END
+    from langgraph.graph import END, START, StateGraph
     _LANGGRAPH = True
 except ImportError:
     _LANGGRAPH = False
     print("[Swarm] langgraph not installed — running in sequential fallback mode", file=sys.stderr)
 
 # ── Service imports ────────────────────────────────────────────────────────────
-from services.risk_engine import (
-    fetch_all_closes,
-    build_correlation_matrix,
-    build_correlation_matrix_from_series,
-    find_correlation_clusters,
-    correlation_penalty_score,
-    format_clusters_for_ai,
-)
+from services.ai_router import get_ai_analysis, get_ai_briefing
 from services.calculator import (
+    _beta_score,
+    _hhi_score,
+    _tax_alpha_score,
     fetch_beta,
-    _hhi_score, _beta_score, _tax_alpha_score,
     get_tax_impact_analysis,
     get_tax_neutral_pairs,
 )
-from services.ai_router import get_ai_analysis, get_ai_briefing
-from services.stress_tester import run_stress_tests, compute_factor_metrics, StressTester
+from services.risk_engine import (
+    _fetch_daily_closes_av,
+    build_correlation_matrix_from_series,
+    correlation_penalty_score,
+    fetch_all_closes,
+    find_correlation_clusters,
+    format_clusters_for_ai,
+)
+from services.stress_tester import StressTester, compute_factor_metrics
+
 
 # alerts router is in routers/ — import lazily to avoid circular dependency at
 # module load time (routers import services, not the other way around normally).
@@ -329,7 +332,7 @@ async def strategist_node(state: SwarmState) -> dict:
         asyncio.gather(*news_tasks),
         cpi_task,
     )
-    news_map = dict(zip(top3, news_lists))
+    news_map = dict(zip(top3, news_lists, strict=False))
 
     regime   = cpi_data["regime"]
     yoy_str  = f"{cpi_data['yoy_pct']:.1f}%" if cpi_data["yoy_pct"] is not None else "N/A"
@@ -394,13 +397,15 @@ Return ONLY valid JSON — no markdown:
                 f"Portfolio exposure: {', '.join(affected[:5])}. "
                 "Run Swarm for full IC Briefing."
             )
-            asyncio.create_task(notify_fn(
+            notify_task = asyncio.create_task(notify_fn(
                 regime=regime,
                 cpi_yoy=yoy_str,
                 body_text=body,
                 affected_symbols=affected,
             ))
-            trace.append(f"[Strategist] ▲ Push alert queued for {len(affected)} symbol(s) — Regime: {regime}")
+            trace.append(
+                f"[Strategist] ▲ Push alert queued for {len(affected)} symbol(s) — Regime: {regime} (task={id(notify_task)})"
+            )
 
     return {"macro_context": macro_context, "agent_trace": trace}
 
@@ -413,14 +418,11 @@ async def quant_node(state: SwarmState) -> dict:
     trace.append("[Quant] Building quantitative risk model...")
 
     ticker_data  = state["ticker_data"]
-    total_value  = state["total_value"]
     revision     = state.get("revision_count", 0)
     corr_threshold = 0.65 if revision > 0 else 0.75   # stricter on revision
 
     symbols  = [t["symbol"] for t in ticker_data]
     weights  = {t["symbol"]: t.get("weight", 0.0) for t in ticker_data}
-    df = pd.DataFrame(ticker_data)
-
     # ── HHI concentration ─────────────────────────────────────────────────────
     weight_series = pd.Series([t.get("weight", 0.0) for t in ticker_data])
     hhi_pts = _hhi_score(weight_series)
@@ -429,7 +431,7 @@ async def quant_node(state: SwarmState) -> dict:
     # ── Weighted beta ─────────────────────────────────────────────────────────
     trace.append(f"[Quant] Fetching beta for {len(symbols)} symbols...")
     betas = await asyncio.gather(*[asyncio.to_thread(fetch_beta, s) for s in symbols])
-    beta_map = dict(zip(symbols, [b if isinstance(b, float) else 1.0 for b in betas]))
+    beta_map = dict(zip(symbols, [b if isinstance(b, float) else 1.0 for b in betas], strict=False))
     weighted_beta = sum(weights.get(s, 0.0) * beta_map.get(s, 1.0) for s in symbols)
     beta_pts = _beta_score(weighted_beta)
     trace.append(f"[Quant] Weighted beta: {weighted_beta:.3f} → beta_score: {beta_pts}/25")
@@ -449,7 +451,7 @@ async def quant_node(state: SwarmState) -> dict:
     trace.append(f"[Quant] Annualised Sharpe ratio: {sharpe} ({sharpe_rating})")
 
     # ── Correlation clusters (from pre-fetched data — no extra HTTP calls) ───────
-    trace.append(f"[Quant] Building 60-day Pearson correlation matrix (threshold ρ>{corr_threshold})...")
+    trace.append(f"[Quant] Building 60-day Pearson correlation matrix (threshold rho>{corr_threshold})...")
     corr_matrix = build_correlation_matrix_from_series(price_series)
     clusters    = find_correlation_clusters(corr_matrix, weights, threshold=corr_threshold)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
@@ -491,11 +493,11 @@ async def quant_node(state: SwarmState) -> dict:
         trace.append(
             f"[Quant] {sr['label']}: portfolio={sr['portfolio_return_pct']:+.1f}% "
             f"vs SPY={sr['spy_return_pct']:+.1f}% "
-            f"(α={sr['outperformance_vs_spy_pct']:+.1f}%){fragility}"
+            f"(alpha={sr['outperformance_vs_spy_pct']:+.1f}%){fragility}"
         )
     high_risk = [f["symbol"] for f in factor_metrics if f.get("risk_tier") == "HIGH"]
     if high_risk:
-        trace.append(f"[Quant] ⚠ High-risk factor cluster: {', '.join(high_risk)} (β>1.5 + SPY ρ>0.80)")
+        trace.append(f"[Quant] ⚠ High-risk factor cluster: {', '.join(high_risk)} (beta>1.5 + SPY rho>0.80)")
 
     # ── Assemble risk_metrics ─────────────────────────────────────────────────
     risk_metrics = {
@@ -594,14 +596,12 @@ async def critic_node(state: SwarmState) -> dict:
 
     risk    = state.get("risk_metrics", {})
     tax     = state.get("tax_estimates", {})
-    macro   = state.get("macro_context", "")
     rev     = state.get("revision_count", 0)
 
     issues: list[str] = []
 
     # 1. High correlation flag
     avg_corr = risk.get("avg_corr", 0.0)
-    clusters = risk.get("clusters", [])
     if avg_corr > _CORR_REVISION_THRESHOLD and rev == 0:
         issues.append(
             f"Average portfolio correlation {avg_corr:.3f} exceeds {_CORR_REVISION_THRESHOLD} "
@@ -660,7 +660,7 @@ async def market_regime_node(state: SwarmState) -> dict:
     five regimes using FRED CPI data, then AI-enriches with confidence + drivers.
 
     Regime taxonomy:
-      growth       CPI ≤ 2%, or near-target + positive trend
+      growth       CPI <= 2%, or near-target + positive trend
       inflation    CPI > 3% and accelerating or stable
       stagflation  CPI > 3% but decelerating (growth fading while inflation persists)
       recession    CPI < 0% or sharply decelerating with deflation risk
@@ -802,7 +802,6 @@ async def risk_sentinel_node(state: SwarmState) -> dict:
     risk = state.get("risk_metrics", {})
 
     hhi_pts       = risk.get("hhi_pts", 0.0)
-    beta_pts      = risk.get("beta_pts", 0.0)
     weighted_beta = risk.get("weighted_beta", 1.0)
     sharpe        = risk.get("sharpe_ratio", 0.0)
     avg_corr      = risk.get("avg_corr", 0.0)
@@ -810,43 +809,43 @@ async def risk_sentinel_node(state: SwarmState) -> dict:
 
     primary_risks: list[str] = []
     mitigations:   list[str] = []
-    risk_score     = 0.0  # 0–10 scale; ≥6 → high, ≥3 → medium, <3 → low
+    risk_score     = 0.0  # 0-10 scale; >=6 → high, >=3 → medium, <3 → low
 
     # ── HHI concentration (max 3 pts) ─────────────────────────────────────────
     if hhi_pts < 8:
         risk_score += 3.0
         primary_risks.append(f"Extreme concentration — HHI score {hhi_pts:.0f}/25 signals portfolio dominated by few names")
-        mitigations.append("Add 3–5 uncorrelated positions; target HHI score > 15/25")
+        mitigations.append("Add 3-5 uncorrelated positions; target HHI score > 15/25")
     elif hhi_pts < 15:
         risk_score += 1.5
         primary_risks.append(f"Moderate concentration — HHI score {hhi_pts:.0f}/25")
-        mitigations.append("Introduce 2–3 positions in sectors absent from current portfolio")
+        mitigations.append("Introduce 2-3 positions in sectors absent from current portfolio")
 
     # ── Beta exposure (max 3 pts) ──────────────────────────────────────────────
     if weighted_beta > 1.8:
         risk_score += 3.0
-        primary_risks.append(f"Aggressive beta exposure (β={weighted_beta:.2f}) — portfolio amplifies market moves by {weighted_beta:.1f}×")
-        mitigations.append(f"Trim highest-beta names to bring portfolio beta below 1.4; consider defensive allocation")
+        primary_risks.append(f"Aggressive beta exposure (beta={weighted_beta:.2f}) — portfolio amplifies market moves by {weighted_beta:.1f}x")
+        mitigations.append("Trim highest-beta names to bring portfolio beta below 1.4; consider defensive allocation")
     elif weighted_beta > 1.4:
         risk_score += 1.5
-        primary_risks.append(f"Elevated beta (β={weighted_beta:.2f}) — above-market volatility profile")
-        mitigations.append("Rotate 10–15% into utilities, consumer staples, or low-vol ETFs to dampen beta")
+        primary_risks.append(f"Elevated beta (beta={weighted_beta:.2f}) — above-market volatility profile")
+        mitigations.append("Rotate 10-15% into utilities, consumer staples, or low-vol ETFs to dampen beta")
 
     # ── Correlation clusters (max 3 pts) ──────────────────────────────────────
     if avg_corr > 0.80:
         risk_score += 3.0
-        primary_risks.append(f"Critical correlation (avg ρ={avg_corr:.3f}) — true diversification absent; {len(clusters)} cluster(s) detected")
-        mitigations.append(f"Exit or reduce at least 2 positions in the highest-ρ cluster; diversification is illusory above ρ=0.80")
+        primary_risks.append(f"Critical correlation (avg rho={avg_corr:.3f}) — true diversification absent; {len(clusters)} cluster(s) detected")
+        mitigations.append("Exit or reduce at least 2 positions in the highest-rho cluster; diversification is illusory above rho=0.80")
     elif avg_corr > 0.65:
         risk_score += 1.5
-        primary_risks.append(f"Elevated pairwise correlation (avg ρ={avg_corr:.3f})")
+        primary_risks.append(f"Elevated pairwise correlation (avg rho={avg_corr:.3f})")
         mitigations.append("Introduce negatively-correlated assets (bonds, gold, commodities, inverse-sector ETFs)")
 
     # ── Sharpe ratio (max 2 pts) ───────────────────────────────────────────────
     if sharpe < 0:
         risk_score += 2.0
         primary_risks.append(f"Negative Sharpe ({sharpe:.3f}) — risk-adjusted returns below risk-free rate; capital being eroded")
-        mitigations.append("Rebalance toward higher-quality names or de-risk 15–20% into short-duration Treasuries")
+        mitigations.append("Rebalance toward higher-quality names or de-risk 15-20% into short-duration Treasuries")
     elif sharpe < 0.5:
         risk_score += 1.0
         primary_risks.append(f"Weak Sharpe ({sharpe:.3f}) — insufficient return per unit of risk taken")
@@ -882,7 +881,7 @@ async def alpha_scout_node(state: SwarmState) -> dict:
     """
     Alpha Scout Agent — AI-driven opportunity discovery outside the current portfolio.
 
-    Uses market regime + macro context + current exposure to identify 3–5 symbols
+    Uses market regime + macro context + current exposure to identify 3-5 symbols
     that complement or hedge the portfolio given the prevailing regime.
     Calls get_ai_analysis() for reasoning.
 
@@ -920,7 +919,7 @@ All existing symbols (never include in output): {', '.join(sorted(existing_symbo
 Macro context: {macro_snippet or 'N/A'}
 Risk sentinel mitigations: {risk_sentinel.get('mitigations', [])[:2]}
 
-Identify exactly 3–5 specific investment opportunities that:
+Identify exactly 3-5 specific investment opportunities that:
 1. Are NOT in the existing portfolio (check the exclusion list above)
 2. Either complement or defensively hedge the {regime} regime
 3. Improve diversification relative to existing top holdings
@@ -935,7 +934,7 @@ Return ONLY valid JSON — no markdown:
     }}
   ]
 }}
-confidence must be between 0.0 and 1.0. Return 3–5 opportunities."""
+confidence must be between 0.0 and 1.0. Return 3-5 opportunities."""
 
     try:
         result = await get_ai_analysis(prompt)
@@ -982,7 +981,7 @@ One paragraph. What is the portfolio's core identity and its single biggest thre
 ## 2. Quantitative Risk Attribution
 Summarize the Quant Agent's findings. Specifically address the Effective Number of Bets
 vs. the raw ticker count. Cite exact figures (HHI score, weighted beta, Sharpe ratio,
-correlation clusters with ρ values).
+correlation clusters with rho values).
 
 ## 3. Macro Regime Alignment
 Use the Strategist Agent's FRED/CPI data. State the regime explicitly (e.g., "Inflationary
@@ -1006,26 +1005,26 @@ Reduce position size by 20% to build a cash buffer."
 For each scenario use the `md_narrative` field verbatim as the opening sentence, then
 add one forward-looking sentence:
 
-- **2022 Rate Shock — Inflationary Trap** (S&P −25.4%, Jan–Oct 2022):
+- **2022 Rate Shock — Inflationary Trap** (S&P -25.4%, Jan-Oct 2022):
   Quote `md_narrative` from `2022_RATE_SHOCK`. Identify the Weakest Link and its
   weighted contribution. Flag if loss > 20% as **Structural Fragility**.
 
-- **2020 COVID Crash — Pandemic Liquidity Trap** (S&P −20%, Feb–Apr 2020):
+- **2020 COVID Crash — Pandemic Liquidity Trap** (S&P -20%, Feb-Apr 2020):
   Quote `md_narrative` from `2020_LIQUIDITY`. Name the sector that would have saved or
   sunk this portfolio. All correlations go to 1.0 in liquidity crises — state this.
   Flag if loss > 20% as **Structural Fragility**.
 
-- **2024 AI Correction — Growth Rotation** (S&P −8.5%, Jul–Aug 2024):
+- **2024 AI Correction — Growth Rotation** (S&P -8.5%, Jul-Aug 2024):
   Quote `md_narrative` from `2024_AI_CORRECTION`. Assess whether current AI/tech
   concentration amplifies or hedges this specific scenario.
   Flag if loss > 20% as **Structural Fragility**.
 
-State a final verdict: **"Stress-Resilient"** (no scenario > −15%), **"Market-Correlated"**
-(worst scenario within 5% of SPY), or **"Fragile"** (any scenario > −20% loss).
+State a final verdict: **"Stress-Resilient"** (no scenario > -15%), **"Market-Correlated"**
+(worst scenario within 5% of SPY), or **"Fragile"** (any scenario > -20% loss).
 Always cite the single worst scenario return explicitly.
 
 ## 5. The 90-Day Directive
-3–4 bulleted, non-negotiable actions. Include tax-adjusted sizing where applicable
+3-4 bulleted, non-negotiable actions. Include tax-adjusted sizing where applicable
 (e.g., "Trim [Ticker] by 15% — the $X capital gain is offset by [Ticker] losses of $Y").
 
 **CRITICAL — TAX-NEUTRAL PAIRS RULE:**

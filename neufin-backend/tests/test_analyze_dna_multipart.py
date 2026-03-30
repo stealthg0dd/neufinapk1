@@ -5,8 +5,9 @@ Never returns 422 just because the field name differs.
 Run:  pytest tests/test_analyze_dna_multipart.py
 """
 import io
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 # Minimal CSV that satisfies column requirements

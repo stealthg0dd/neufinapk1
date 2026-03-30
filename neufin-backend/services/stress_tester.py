@@ -3,35 +3,35 @@ stress_tester.py — Historical regime stress-testing for the Neufin Swarm.
 
 Three hardcoded scenarios with precise date ranges:
 
-  2022_RATE_SHOCK    Inflationary Trap       Jan 2022 – Oct 2022    S&P −25.4%
-  2020_LIQUIDITY     Pandemic Crash          Feb 2020 – Apr 2020    S&P −33.9%
-  2024_AI_ROTATION   Growth Correction       Jul 2024 – Aug 2024    S&P  −8.5%
+  2022_RATE_SHOCK    Inflationary Trap       Jan 2022 - Oct 2022    S&P -25.4%
+  2020_LIQUIDITY     Pandemic Crash          Feb 2020 - Apr 2020    S&P -33.9%
+  2024_AI_ROTATION   Growth Correction       Jul 2024 - Aug 2024    S&P  -8.5%
                      (Japan Carry Trade Unwind + AI valuation reset)
 
 For each scenario:
   - Fetch start/end prices using market_cache (full AV history, 24h TTL).
-  - Compute weighted portfolio return: Σ(weight_i × return_i).
+  - Compute weighted portfolio return: Σ(weight_i x return_i).
   - Identify the 'Weakest Link': the position with the largest negative
-    weighted contribution (weight_i × return_i, most negative).
+    weighted contribution (weight_i x return_i, most negative).
   - Build a MD-ready narrative string for the IC Briefing.
 
 compute_factor_metrics() returns per-symbol 60-day:
   - beta        (from AV OVERVIEW via fetch_beta — same values quant_node uses)
-  - spy_correlation (Pearson ρ to SPY daily returns)
+  - spy_correlation (Pearson rho to SPY daily returns)
   - risk_tier   HIGH | MEDIUM | LOW
 Used by the frontend RiskMatrix Cluster Map (X=Beta, Y=SPY Correlation).
 """
 
 from __future__ import annotations
 
+import asyncio
+import datetime
 import os
 import sys
 import time
-import datetime
-import requests
-import asyncio
-import numpy as np
+
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
@@ -41,7 +41,8 @@ POLYGON_API_KEY       = os.environ.get("POLYGON_API_KEY")
 FINNHUB_API_KEY       = os.environ.get("FINNHUB_API_KEY")
 
 try:
-    from services.market_cache import get_closes as _cache_get, set_closes as _cache_set
+    from services.market_cache import get_closes as _cache_get
+    from services.market_cache import set_closes as _cache_set
     _CACHE_AVAILABLE = True
 except Exception:
     _CACHE_AVAILABLE = False
@@ -327,7 +328,7 @@ def compute_factor_metrics(
     [{
       symbol, weight_pct,
       beta,              # AV OVERVIEW beta (passed in or fetched)
-      spy_correlation,   # 60-day Pearson ρ to SPY daily returns
+      spy_correlation,   # 60-day Pearson rho to SPY daily returns
       risk_tier,         # "HIGH" | "MEDIUM" | "LOW"
     }]
     """
@@ -337,10 +338,10 @@ def compute_factor_metrics(
             from services.calculator import fetch_beta
             beta_map = {s: fetch_beta(s) for s in symbols}
         except Exception:
-            beta_map = {s: 1.0 for s in symbols}
+            beta_map = dict.fromkeys(symbols, 1.0)
 
     # Fetch 60-day closes for SPY correlation
-    all_syms = list(set(symbols + ["SPY"]))
+    all_syms = list({*symbols, "SPY"})
     series_map: dict[str, pd.Series] = {}
     try:
         from services.risk_engine import _fetch_daily_closes_av
@@ -367,7 +368,7 @@ def compute_factor_metrics(
         beta       = round(float(beta_map.get(sym, 1.0)), 2)
         spy_corr   = spy_corr_map.get(sym, 0.0)
 
-        # Risk tier: X=Beta (>1.5 is high), Y=SPY ρ (>0.80 is high)
+        # Risk tier: X=Beta (>1.5 is high), Y=SPY rho (>0.80 is high)
         if spy_corr > 0.80 and beta > 1.5:
             tier = "HIGH"
         elif spy_corr > 0.65 or beta > 1.2:
@@ -448,7 +449,7 @@ def _fetch_history_finnhub(sym: str, start: str, end: str) -> pd.Series:
             return pd.Series(dtype=float, name=sym)
         closes = {
             datetime.date.fromtimestamp(ts).isoformat(): c
-            for ts, c in zip(data["t"], data["c"])
+            for ts, c in zip(data["t"], data["c"], strict=False)
         }
         series = pd.Series(closes, dtype=float)
         series.name = sym
@@ -509,8 +510,8 @@ async def get_index_performance(stress_dict: dict) -> dict[str, dict]:
       "spy_return_pct":      float,
       "qqq_return_pct":      float,
       "portfolio_return_pct": float,
-      "alpha_gap_spy":       float,   # portfolio − SPY
-      "alpha_gap_qqq":       float,   # portfolio − QQQ
+      "alpha_gap_spy":       float,   # portfolio - SPY
+      "alpha_gap_qqq":       float,   # portfolio - QQQ
       "alpha_gap_narrative": str,
     }
     """
@@ -631,7 +632,7 @@ class StressTester:
 
         return out
 
-    async def run_stress_test(self, portfolio_df: "pd.DataFrame") -> dict:
+    async def run_stress_test(self, portfolio_df: pd.DataFrame) -> dict:
         from services.market_cache import market_cache as _mc
 
         tickers = portfolio_df["ticker"].tolist()
@@ -654,7 +655,7 @@ class StressTester:
                 benchmark_task,
             )
 
-            for ticker, prices in zip(tickers, all_prices):
+            for ticker, prices in zip(tickers, all_prices, strict=False):
                 if prices is not None and not prices.empty:
                     start_p = float(prices.iloc[0])
                     end_p   = float(prices.iloc[-1])
@@ -689,7 +690,7 @@ class StressTester:
 
         return results
 
-    async def run_stress_test_with_alpha(self, portfolio_df: "pd.DataFrame") -> dict:
+    async def run_stress_test_with_alpha(self, portfolio_df: pd.DataFrame) -> dict:
         """
         Runs run_stress_test then enriches each result with get_index_performance
         so callers get alpha_gap_narrative, alpha_gap_spy, alpha_gap_qqq.

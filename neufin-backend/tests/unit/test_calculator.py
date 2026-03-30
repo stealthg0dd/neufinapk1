@@ -1,7 +1,7 @@
 """Unit tests for services/calculator.py — portfolio metrics calculation."""
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
+import pytest
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -86,17 +86,18 @@ class TestPriceFetching:
     @patch("services.calculator._fetch_price_polygon")
     def test_uses_polygon_first(self, mock_polygon):
         mock_polygon.return_value = {"AAPL": 185.0}
-        from services.calculator import _fetch_prices_batch
         # Clear any existing blacklist state
         import services.calculator as calc
+        from services.calculator import _fetch_prices_batch
         calc._BLACKLIST.clear()
         result = _fetch_prices_batch(["AAPL"])
         assert "AAPL" in result
 
     def test_price_cache_prevents_duplicate_calls(self):
         """Cached prices should not trigger another network call."""
-        import services.calculator as calc
         import time
+
+        import services.calculator as calc
         calc._PRICE_CACHE["TEST"] = (99.0, time.time())
         from services.calculator import _get_cached_price
         price = _get_cached_price("TEST")

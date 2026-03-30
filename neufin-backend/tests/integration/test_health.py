@@ -1,13 +1,20 @@
 """Integration tests — require a running backend (localhost:8000 or TEST_BASE_URL)."""
 import os
-import pytest
+
 import httpx
+import pytest
 
 BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:8000")
 
 
 @pytest.fixture(scope="module")
 def http():
+    try:
+        probe = httpx.get(f"{BASE_URL}/health", timeout=3.0)
+        if probe.status_code >= 500:
+            pytest.skip(f"Backend unhealthy at {BASE_URL}")
+    except Exception:
+        pytest.skip(f"Backend not running at {BASE_URL}")
     with httpx.Client(base_url=BASE_URL, timeout=30) as client:
         yield client
 

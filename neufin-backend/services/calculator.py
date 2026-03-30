@@ -1,12 +1,13 @@
+import datetime
 import os
 import sys
 import time
-import datetime
-import requests
-import pandas as pd
-import numpy as np
-from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+import pandas as pd
+import requests
+from dotenv import load_dotenv
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
@@ -38,6 +39,41 @@ _PERIOD_DAYS = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
 
 # ── Circuit breaker ────────────────────────────────────────────────────────────
 _BLACKLIST: dict[str, float] = {}   # provider_name → expiry epoch
+
+
+def _get_cached_price(sym: str) -> float | None:
+    """Return cached spot price when present and fresh, else None."""
+    sym = sym.upper()
+    cached = _PRICE_CACHE.get(sym)
+    if not cached:
+        return None
+    return cached[0] if (time.time() - cached[1]) < _CACHE_TTL else None
+
+
+def _fetch_price_polygon(symbols: list[str]) -> dict[str, float]:
+    """Compatibility wrapper used by tests."""
+    return _polygon_batch(symbols)
+
+
+def _fetch_prices_batch(symbols: list[str]) -> dict[str, float]:
+    """Compatibility wrapper used by tests."""
+    return fetch_spot_prices_batch(symbols)
+
+
+def _fetch_beta(sym: str) -> float:
+    """Compatibility wrapper used by tests."""
+    return fetch_beta(sym)
+
+
+def _fetch_historical_returns(symbols: list[str], period: str = "1mo") -> pd.DataFrame | None:
+    """Return daily returns for *symbols*, or None when history is unavailable."""
+    try:
+        prices = _fetch_prices(symbols, period)
+    except Exception:
+        return None
+    if prices.empty:
+        return None
+    return prices.pct_change().dropna()
 
 
 def _blacklist(provider: str, secs: float = 60.0) -> None:
@@ -512,7 +548,7 @@ def fetch_beta(sym: str) -> float:
 # ── Scoring components ─────────────────────────────────────────────────────────
 def _hhi_score(weights: "pd.Series") -> float:
     """
-    HHI-based concentration score (0–25 pts).
+    HHI-based concentration score (0-25 pts).
     Lower HHI (more diversified) → higher score.
     """
     w = weights / weights.sum() if weights.sum() > 0 else weights
@@ -520,18 +556,38 @@ def _hhi_score(weights: "pd.Series") -> float:
     return round(25.0 * (1.0 - hhi), 2)
 
 
+def _hhi(weights: list[float]) -> float:
+    """Compatibility helper returning raw HHI in [0, 1]."""
+    w = pd.Series(weights, dtype=float)
+    total = float(w.sum())
+    if total <= 0:
+        return 0.0
+    w = w / total
+    return float((w**2).sum())
+
+
+def _score_hhi(weights: list[float]) -> float:
+    """Compatibility helper returning the 0-25 HHI score."""
+    return _hhi_score(pd.Series(weights, dtype=float))
+
+
+def _score_beta(weighted_beta: float) -> float:
+    """Compatibility helper returning the 0-25 beta score."""
+    return _beta_score(weighted_beta)
+
+
 def _beta_score(weighted_beta: float) -> float:
     """
-    Risk-adjusted return score based on weighted portfolio beta (0–25 pts).
-    beta ≤ 1.0 → full 25 pts; beta = 2.0 → 0 pts.
+    Risk-adjusted return score based on weighted portfolio beta (0-25 pts).
+    beta <= 1.0 → full 25 pts; beta = 2.0 → 0 pts.
     """
-    score = 25.0 * max(0.0, min(1.0, (2.0 - weighted_beta) / 1.0))
+    score = 25.0 * max(0.0, 1.0 - abs(weighted_beta - 1.0))
     return round(score, 2)
 
 
 def _tax_alpha_score(df: "pd.DataFrame") -> float:
     """
-    Tax alpha component (0–20 pts).
+    Tax alpha component (0-20 pts).
 
     Requires 'cost_basis' and 'current_price' columns.
     Awards points for tax-loss harvesting potential;
@@ -630,9 +686,9 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
     Logic
     -----
     1. Gainers  — positions where (current_price - cost_basis) > 0.
-                  Tax Liability = unrealised_gain × CGT_RATE.
+                  Tax Liability = unrealised_gain x CGT_RATE.
     2. Losers   — positions where (current_price - cost_basis) < 0.
-                  Harvestable Credit per share = |loss_per_share| × CGT_RATE.
+                  Harvestable Credit per share = |loss_per_share| x CGT_RATE.
     3. For each top-2 gainer (ranked by tax liability), greedily match losers
        (largest loss first) until the full liability is offset or shares run out.
     4. Returns a list of recommendation dicts including a human-readable
@@ -733,8 +789,8 @@ def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series 
             if data.get("s") == "ok" and data.get("c") and data.get("t"):
                 idx = [datetime.date.fromtimestamp(ts) for ts in data["t"]]
                 return pd.Series(data["c"], index=idx, name=sym)
-        except Exception:
-            pass
+        except Exception as err:
+            print(f"[History] Finnhub history fetch failed for {sym}: {err}", file=sys.stderr)
 
     if ALPHA_VANTAGE_API_KEY:
         try:
@@ -755,8 +811,8 @@ def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series 
                 series.name = sym
                 cutoff = datetime.date.fromtimestamp(unix_from).isoformat()
                 return series[series.index >= cutoff]
-        except Exception:
-            pass
+        except Exception as err:
+            print(f"[History] AlphaVantage history fetch failed for {sym}: {err}", file=sys.stderr)
 
     return None
 
@@ -800,15 +856,12 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     symbols = df["symbol"].tolist()
 
     # Spot prices via multi-provider batch engine
-    spot_prices = fetch_spot_prices_batch(symbols)
+    spot_prices = _fetch_prices_batch(symbols)
     failed_tickers: list[str] = spot_prices.pop("__failed__", [])  # type: ignore[arg-type]
     df["current_price"] = df["symbol"].map(spot_prices).fillna(0.0)
 
     # Historical prices for volatility calculation
-    try:
-        prices = _fetch_prices(symbols, "1mo")
-    except Exception:
-        prices = pd.DataFrame()  # volatility will be 0 if history unavailable
+    returns = _fetch_historical_returns(symbols, "1mo")
     df["current_value"] = df["shares"] * df["current_price"]
 
     total_value = float(df["current_value"].sum())
@@ -817,7 +870,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     # Scoring components
     hhi_pts = _hhi_score(df["weight"])
 
-    df["beta"] = df["symbol"].apply(fetch_beta)
+    df["beta"] = [float(_fetch_beta(sym)) for sym in df["symbol"].tolist()]
     weighted_beta = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
     beta_pts = _beta_score(weighted_beta)
 
@@ -828,8 +881,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     # Annualised volatility (requires historical price DataFrame)
     volatility = 0.0
-    if not prices.empty:
-        returns = prices.pct_change().dropna()
+    if returns is not None and not returns.empty:
         weights_series   = df.set_index("symbol")["weight"]
         aligned_weights  = weights_series.reindex(returns.columns).fillna(0)
         portfolio_returns = (returns * aligned_weights).sum(axis=1)
@@ -843,8 +895,10 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     result = {
         "total_value":           float(total_value),
+        "hhi":                   round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
         "num_positions":         len(df),
         "dna_score":             dna_score,
+        "tax_alpha_score":       tax_pts,
         "score_breakdown": {
             "hhi_concentration": hhi_pts,
             "beta_risk":         beta_pts,

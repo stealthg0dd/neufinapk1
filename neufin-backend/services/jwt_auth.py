@@ -14,18 +14,18 @@ Key design:
 
 from __future__ import annotations
 
-import json
-import time
-import sys
 import datetime
+import json
+import os
+import sys
+import time
 from dataclasses import dataclass
 
 import httpx
-from jose import jwt, JWTError
+from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
-import os
-from config import SUPABASE_URL, SUPABASE_KEY
+from config import SUPABASE_KEY, SUPABASE_URL
 
 # ── JWKS endpoint ──────────────────────────────────────────────────────────────
 # Standard OIDC path — more reliable than the short alias /auth/v1/jwks
@@ -101,7 +101,7 @@ def _static_key_list() -> list[dict]:
     # Treat as PEM — wrap in a minimal dict that python-jose can handle
     if "BEGIN" in raw:
         return [{"kty": "EC", "pem": raw}]
-    _log(f"SUPABASE_PUBLIC_KEY could not be parsed — ignored")
+    _log("SUPABASE_PUBLIC_KEY could not be parsed — ignored")
     return []
 
 
@@ -138,7 +138,7 @@ async def _fetch_jwks() -> list[dict]:
             if resp.status_code == 404:
                 # Some Supabase instances also serve JWKS at the short alias —
                 # try it as a one-shot secondary attempt before giving up.
-                _log(f"/.well-known/jwks.json returned 404; retrying /auth/v1/jwks")
+                _log("/.well-known/jwks.json returned 404; retrying /auth/v1/jwks")
                 resp2 = await client.get(
                     f"{SUPABASE_URL}/auth/v1/jwks",
                     headers={"apikey": _SUPABASE_ANON_KEY},

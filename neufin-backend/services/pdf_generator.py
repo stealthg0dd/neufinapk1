@@ -5,21 +5,25 @@ Neufin White-Label PDF Report Generator
 from __future__ import annotations
 
 import base64
-import io
 import datetime
-from typing import Optional
+import io
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, PageTemplate, Paragraph, Spacer, Table,
-    TableStyle, HRFlowable, PageBreak, KeepTogether,
+    BaseDocTemplate,
+    Frame,
+    HRFlowable,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
 )
-from reportlab.platypus import Image as RLImage
-
 
 # ── Default brand palette ──────────────────────────────────────────────────────
 DEFAULTS = {
@@ -38,7 +42,7 @@ def _hex(h: str) -> colors.HexColor:
 
 
 class BrandColors:
-    def __init__(self, scheme: Optional[dict] = None):
+    def __init__(self, scheme: dict | None = None):
         s = {**DEFAULTS, **(scheme or {})}
         self.primary   = _hex(s["primary"])
         self.secondary = _hex(s["secondary"])
@@ -114,7 +118,6 @@ def _colored_table(data, col_widths, bc: BrandColors, header=True) -> Table:
 def _bar_row(label: str, pct: float, bc: BrandColors, bar_width: float = 3.5) -> Table:
     """Inline text + colour bar for allocation charts."""
     filled = max(0.01, min(pct / 100, 1)) * bar_width
-    empty  = bar_width - filled
     inner  = Table(
         [[""]],
         colWidths=[filled * inch],
@@ -191,8 +194,8 @@ def generate_advisor_report(
     portfolio_data: dict,
     analysis: dict,
     advisor_name: str = "Neufin Advisor",
-    logo_base64: Optional[str] = None,
-    color_scheme: Optional[dict] = None,
+    logo_base64: str | None = None,
+    color_scheme: dict | None = None,
 ) -> bytes:
     """
     Generate a 10-page white-label advisor PDF.
@@ -374,7 +377,7 @@ def generate_advisor_report(
     E.append(Spacer(1, 14))
     perf_rows = [["Metric", "Value", "Interpretation"]]
     perf_rows.append(["Annualised Volatility", f"{vol:.1f}%",
-                      "Low < 10% · Med 10–25% · High > 25%"])
+                      "Low < 10% · Med 10-25% · High > 25%"])
     if pnl is not None:
         perf_rows.append(["Unrealised P&L", f"{pnl:+.2f}%",
                           "vs. average cost basis across all positions"])
