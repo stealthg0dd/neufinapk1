@@ -1,8 +1,9 @@
 'use client'
+export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
+import dynamicImport from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
 import { debugAuth } from '@/lib/auth-debug'
@@ -21,7 +22,7 @@ import {
 import { getChartData, getPortfolioHistory, createCheckout, type DNAResult, type CandleData, type LinePoint, type Position } from '@/lib/api'
 
 // CandlestickChart is client-only (lightweight-charts touches DOM)
-const CandlestickChart = dynamic(() => import('@/components/CandlestickChart'), { ssr: false })
+const CandlestickChart = dynamicImport(() => import('@/components/CandlestickChart'), { ssr: false })
 
 // ── Sector classification ──────────────────────────────────────────────────────
 const SECTOR_MAP: Record<string, string> = {
