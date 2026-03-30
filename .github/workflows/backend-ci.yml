@@ -35,7 +35,7 @@ jobs:
           cache: pip
 
       - name: Install lint dependencies
-        run: pip install ruff mypy types-requests
+        run: pip install "ruff==0.15.8" mypy types-requests
 
       - name: Ruff lint
         run: ruff check . --output-format=github
