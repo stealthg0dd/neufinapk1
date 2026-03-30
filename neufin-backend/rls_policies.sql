@@ -46,10 +46,17 @@ CREATE POLICY "dna_scores: users update own"
 
 -- ── 3. user_profiles ───────────────────────────────────────
 
--- Users can read any advisor profile (needed for AdvisorCTA public lookup)
-CREATE POLICY "user_profiles: public read"
+-- Users can always read their own profile
+CREATE POLICY "user_profiles: users read own"
   ON user_profiles FOR SELECT
-  USING (true);
+  USING (auth.uid() = id);
+
+-- Public can read advisor profiles only (needed for AdvisorCTA public lookup).
+-- IMPORTANT: This must NOT expose investor profiles — only user_type='advisor'
+-- rows are visible to unauthenticated clients.
+CREATE POLICY "user_profiles: public read advisors only"
+  ON user_profiles FOR SELECT
+  USING (user_type = 'advisor');
 
 -- Users can only insert/update their own profile
 CREATE POLICY "user_profiles: users insert own"
@@ -62,6 +69,14 @@ CREATE POLICY "user_profiles: users update own"
 
 
 -- ── 4. advisor_reports ─────────────────────────────────────
+
+-- NOTE: advisor_id is stored as TEXT but auth.uid() returns UUID.
+-- The cast auth.uid()::text is safe but fragile — consider migrating
+-- advisor_id to UUID type in a future migration. The index below
+-- ensures the cast does not cause sequential scans.
+
+-- Index to ensure the auth.uid()::text = advisor_id lookup is not a full scan
+CREATE INDEX IF NOT EXISTS idx_advisor_reports_advisor_id ON advisor_reports (advisor_id);
 
 -- Advisors can read their own reports
 CREATE POLICY "advisor_reports: advisors read own"

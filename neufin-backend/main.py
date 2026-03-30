@@ -194,7 +194,7 @@ async def auth_middleware(request: Request, call_next):
         try:
             request.state.user = await verify_jwt(token)
             # Attach user identity to all Sentry events for this request
-            sentry_sdk.set_user({"id": request.state.user.user_id})
+            sentry_sdk.set_user({"id": request.state.user.id})
             sentry_sdk.set_tag("endpoint", request.url.path)
         except Exception as exc:
             logger.warning("auth.token_rejected", path=request.url.path, reason=str(exc))

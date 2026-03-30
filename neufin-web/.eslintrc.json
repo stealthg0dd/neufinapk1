@@ -3,7 +3,7 @@
     "next/core-web-vitals",
     "plugin:security/recommended-legacy"
   ],
-  "plugins": ["security"],
+  "plugins": ["security", "@typescript-eslint"],
   "rules": {
     "security/detect-object-injection":          "warn",
     "security/detect-non-literal-regexp":        "warn",

@@ -50,6 +50,10 @@ web-build/
 .idea/
 *.swp
 *.swo
+
+# ── Session/agent logs ────────────────────────────────────────
+*_session_log.md
+*_agent_session_log.md
 .vscode/settings.json
 
 # ── Logs / DB ─────────────────────────────────────────────────
@@ -60,3 +64,11 @@ logs/
 
 # ── Vercel ────────────────────────────────────────────────────
 .vercel
+
+# Mobile builds
+neufin-mobile/*.apk
+neufin-mobile/*.aab
+neufin-mobile/build-*/
+*.apk
+*.aab
+expo-go-sdk51.apk

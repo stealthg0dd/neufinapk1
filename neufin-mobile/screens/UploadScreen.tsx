@@ -6,6 +6,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker'
 import type { StackNavigationProp } from '@react-navigation/stack'
 import { analyzeDNA } from '@/lib/api'
+import { supabase } from '@/lib/supabase'
 import type { RootStackParamList } from '@/App'
 
 type Props = {
@@ -127,7 +128,8 @@ export default function UploadScreen({ navigation }: Props) {
     setLoading(true)
     setError('')
     try {
-      const result = await analyzeDNA(file.uri, file.name)
+      const { data: { session } } = await supabase.auth.getSession()
+      const result = await analyzeDNA(file.uri, file.name, session?.access_token)
       navigation.navigate('Results', { result })
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Analysis failed. Please try again.')

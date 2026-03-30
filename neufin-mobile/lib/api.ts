@@ -23,7 +23,11 @@ export interface DNAResult {
   record_id: string | null
 }
 
-export async function analyzeDNA(fileUri: string, fileName: string): Promise<DNAResult> {
+export async function analyzeDNA(
+  fileUri: string,
+  fileName: string,
+  token?: string | null,
+): Promise<DNAResult> {
   const form = new FormData()
   // React Native's fetch accepts this object shape for multipart file uploads.
   // Do NOT set Content-Type manually — the runtime adds the correct boundary.
@@ -36,6 +40,7 @@ export async function analyzeDNA(fileUri: string, fileName: string): Promise<DNA
   const res = await fetch(`${API}/api/analyze-dna`, {
     method: 'POST',
     body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
   })
 
   if (!res.ok) {

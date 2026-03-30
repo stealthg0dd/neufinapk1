@@ -71,14 +71,16 @@ CREATE POLICY "swarm_reports: owner full access"
 -- The backend writes these with the service_role key, but this policy covers
 -- any path where only the anon key is available (e.g. local dev without
 -- SUPABASE_SERVICE_ROLE_KEY set).
-CREATE POLICY IF NOT EXISTS "swarm_reports: anon insert guest"
+DROP POLICY IF EXISTS "swarm_reports: anon insert guest" ON public.swarm_reports;
+CREATE POLICY "swarm_reports: anon insert guest"
   ON public.swarm_reports
   FOR INSERT
   WITH CHECK (user_id IS NULL);
 
 -- Policy C: allow read of own guest reports by session_id match
 -- (Useful if you ever query swarm_reports from the frontend directly)
-CREATE POLICY IF NOT EXISTS "swarm_reports: session read"
+DROP POLICY IF EXISTS "swarm_reports: session read" ON public.swarm_reports;
+CREATE POLICY "swarm_reports: session read"
   ON public.swarm_reports
   FOR SELECT
   USING (

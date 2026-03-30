@@ -20,7 +20,7 @@ export interface DNAAnalysisResponse {
   recommendation: string
   share_token: string
   share_url: string
-  record_id: string
+  record_id: string | null
 }
 
 // Alias kept for backward compatibility with other pages
