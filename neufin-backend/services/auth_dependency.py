@@ -67,11 +67,18 @@ def _extract_bearer_token(request: Request) -> str | None:
 
 
 async def get_current_user(request: Request) -> JWTUser:
-    token = _extract_bearer_token(request)
+    # Enterprise fix: Check BOTH Authorization Header AND Cookies
+    auth_header = request.headers.get("Authorization")
+    auth_cookie = request.cookies.get("sb-access-token")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+    elif auth_cookie:
+        token = auth_cookie
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing auth token",
+            detail="Missing authentication token",
         )
     try:
         user = await verify_jwt(token)
