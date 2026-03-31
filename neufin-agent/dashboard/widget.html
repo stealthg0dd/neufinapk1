@@ -239,7 +239,8 @@
   </div>
   <script>
     // --- API base for Railway ---
-    const API_BASE = window.location.origin;
+    // Use Railway backend API base for all dashboard API calls
+    const API_BASE = "https://neufin101-production.up.railway.app";
     function scoreColor(score) {
       if (score < 50) return '#ef4444';
       if (score < 75) return '#fbbf24';
@@ -324,7 +325,7 @@
     }
     // --- API ---
     async function fetchHealth() {
-      const res = await fetch('/api/health');
+      const res = await fetch(`${API_BASE}/api/health`);
       if (!res.ok) return;
       const data = await res.json();
       renderScores(data);
@@ -332,13 +333,13 @@
       renderIssues();
     }
     async function fetchFixes() {
-      const res = await fetch('/api/fixes');
+      const res = await fetch(`${API_BASE}/api/fixes`);
       if (!res.ok) return;
       fixes = (await res.json()).fixes || [];
       renderFixes();
     }
     async function applyFix(id) {
-      await fetch(`/api/fixes/${id}/apply`, { method: 'POST' });
+      await fetch(`${API_BASE}/api/fixes/${id}/apply`, { method: 'POST' });
       fetchHealth();
       fetchFixes();
     }
