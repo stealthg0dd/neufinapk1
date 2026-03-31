@@ -44,7 +44,7 @@ jobs:
         run: ruff format --check .
 
       - name: mypy type check
-        run: mypy . --ignore-missing-imports --exclude alembic
+        run: mypy . --config-file pyproject.toml --ignore-missing-imports --exclude alembic
         continue-on-error: true
 
   # ── Security Scan ─────────────────────────────────────────────────────────
