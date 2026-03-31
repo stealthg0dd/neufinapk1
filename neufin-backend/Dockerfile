@@ -1,5 +1,4 @@
 # ── Stage 1: dependency builder ───────────────────────────────────────────────
-# Isolated stage so build tools (gcc, make) never reach the runtime image.
 FROM python:3.12-slim AS deps
 
 WORKDIR /app
@@ -21,38 +20,37 @@ FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
-# PYTHONPATH=/app ensures Python resolves top-level modules (main, config,
-# database, routers/, services/) without a package install step.
+# PYTHONPATH=/app ensures Python resolves top-level modules
 # PYTHONUNBUFFERED=1 flushes stdout/stderr instantly into Docker logs.
+# We set hard defaults here so gunicorn always has an integer if the ENV is missing.
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    GUNICORN_WORKERS=4 \
+    PORT=8080
 
 # Carry only the installed packages from the builder — no build tools.
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 
-# Copy application source last (invalidates cache only on code changes,
-# not on dependency changes).
+# Copy application source last
 COPY . .
 
-EXPOSE 8000
+# Match the port shown in your Railway networking settings
+EXPOSE 8080
 
 # ── Production entry point ─────────────────────────────────────────────────────
-# gunicorn + UvicornWorker gives real pre-fork process isolation and graceful
-# shutdown.  timeout=300 is required: the LangGraph swarm (7 AI agents) can
-# legitimately take 60-120 s per request.
+# FIX: We remove the 'sh -c' and the braces from the CMD. 
+# By using the "Shell Form" (no square brackets), Docker automatically 
+# invokes /bin/sh -c, which correctly expands the environment variables 
+# before passing them to gunicorn.
 #
-# Override this CMD in docker-compose for local dev:
-#   command: ["uvicorn", "main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
-#
-# Override for the Celery worker container:
-#   command: ["celery", "-A", "services.celery_app", "worker", "--loglevel=info", "--queues=swarm,default"]
-CMD sh -c 'exec gunicorn main:app \
-     --worker-class uvicorn.workers.UvicornWorker \
-     --workers 2 \
-     --bind 0.0.0.0:${PORT:-8000} \
-     --timeout 300 \
-     --keep-alive 5 \
-     --access-logfile - \
-     --error-logfile -'
+# Note: timeout 300 is kept to support the 7-agent AI swarm processing time.
+
+CMD gunicorn main:app \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --workers $GUNICORN_WORKERS \
+    --bind 0.0.0.0:$PORT \
+    --timeout 300 \
+    --keep-alive 5 \
+    --access-logfile - \
+    --error-logfile -
