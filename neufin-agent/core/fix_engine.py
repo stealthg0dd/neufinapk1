@@ -1,3 +1,21 @@
+# --- CI Fix Templates (auto-fix recurring CI failures) ---
+CI_FIX_TEMPLATES = [
+    {
+        "id": "ruff_format",
+        "trigger": "ruff format --check failed",
+        "command": "cd {repo_root}/neufin-backend && ruff format .",
+        "safe": True,
+        "auto_apply": True,
+    },
+    {
+        "id": "pytest_mock_missing",
+        "trigger": "ValueError: No tickers could be priced",
+        "description": "Unit tests calling live APIs — need price mock",
+        "safe": False,
+        "auto_apply": False,
+        "creates_pr": True,
+    }
+]
 """
 fix_engine.py — Template-first, LLM-fallback fix engine.
 
