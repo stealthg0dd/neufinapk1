@@ -161,9 +161,10 @@ jobs:
 
       - name: Notify Sentry of deployment
         uses: getsentry/action-release@v1
+        continue-on-error: true # Ensure build stays green even if Sentry API fails
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: neufin-aj
-          SENTRY_PROJECT: neufin-backend
+          SENTRY_PROJECT: python-fastapi # Updated to match your Sentry dashboard name
         with:
           environment: production
