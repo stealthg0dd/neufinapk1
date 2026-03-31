@@ -1,9 +1,11 @@
 import re
+import os
 from pathlib import Path
 
 from detectors import Issue
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+# Standardized REPO_ROOT for Railway
+REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
 
 # Each entry: (compiled_regex, message, severity, suggested_fix, auto_fixable, requires_human)
 PATTERNS: list[tuple[re.Pattern, str, str, str, bool, bool]] = [

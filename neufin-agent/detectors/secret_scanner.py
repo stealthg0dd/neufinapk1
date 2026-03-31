@@ -1,3 +1,5 @@
+
+import os
 import re
 from pathlib import Path
 
@@ -8,40 +10,39 @@ except ImportError:
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
 
+# Standardized REPO_ROOT for Railway
+REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
 
-REPO_ROOT = Path(__file__).parent.parent.parent
-
-# Build patterns via concatenation so literal secrets are never present verbatim
-# in this source file (prevents the scanner from flagging itself).
+# Build patterns via concatenation/escaping so literal secrets are never present verbatim
 PATTERN_SPECS: list[tuple[str, tuple[str, ...], str]] = [
     (
         "Anthropic API key",
-        (r"sk-ant-api", r"03-[A-Za-z0-9_\-]{20,}"),
+        ("sk-" + "ant-", "api03-" + "[A-Za-z0-9_\-]{20,}"),
         "Rotate the exposed Anthropic key and load it from environment variables.",
     ),
     (
         "Stripe live secret key",
-        (r"sk_", r"live_[A-Za-z0-9]{20,}"),
+        ("sk_" + "live_", "[A-Za-z0-9]{20,}"),
         "Rotate the Stripe live key and remove it from source control.",
     ),
     (
         "Stripe test secret key",
-        (r"sk_", r"test_[A-Za-z0-9]{20,}"),
+        ("sk_" + "test_", "[A-Za-z0-9]{20,}"),
         "Move Stripe test keys into local-only env files and secrets manager.",
     ),
     (
         "Google API key",
-        (r"AI", r"zaSy[A-Za-z0-9_\-]{30,}"),
+        ("AI" + "zaSy", "[A-Za-z0-9_\-]{30,}"),
         "Regenerate the Google API key and restrict it by domain/IP.",
     ),
     (
         "Hardcoded JWT token",
-        (r"ey", r"J[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
+        ("ey" + "J", "[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
         "Never hardcode JWTs in code; issue tokens at runtime only.",
     ),
     (
         "GitHub personal access token",
-        (r"gh", r"p_[A-Za-z0-9]{36}"),
+        ("gh" + "p_", "[A-Za-z0-9]{36}"),
         "Revoke the leaked GitHub token and create a scoped replacement.",
     ),
 ]

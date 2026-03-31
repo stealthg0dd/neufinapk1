@@ -1,11 +1,13 @@
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 
 from detectors import Issue
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+# Standardized REPO_ROOT for Railway
+REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
 log = logging.getLogger("neufin-agent.python_check")
 
 # ruff codes that can be auto-fixed

@@ -1,9 +1,11 @@
 import re
+import os
 from pathlib import Path
 
 from detectors import Issue
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+# Standardized REPO_ROOT for Railway
+REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
 
 # FastAPI route decorators in backend
 _ROUTER_ROUTE = re.compile(

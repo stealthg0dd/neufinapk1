@@ -1,10 +1,12 @@
 import asyncio
 import re
+import os
 from pathlib import Path
 
 from detectors import Issue
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+# Standardized REPO_ROOT for Railway
+REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
 
 # (error_code, severity, auto_fixable)
 TS_SEVERITY: dict[str, tuple[str, bool]] = {

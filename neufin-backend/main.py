@@ -68,6 +68,7 @@ from routers import (  # noqa: E402
     vault,
 )
 from services.ai_router import get_ai_analysis  # noqa: E402
+from services.auth_dependency import get_current_user  # noqa: E402
 from services.calculator import (  # noqa: E402
     _beta_score,
     _hhi_score,
@@ -76,7 +77,6 @@ from services.calculator import (  # noqa: E402
     fetch_spot_price,
     get_tax_impact_analysis,
 )
-from services.auth_dependency import get_current_user  # noqa: E402
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,

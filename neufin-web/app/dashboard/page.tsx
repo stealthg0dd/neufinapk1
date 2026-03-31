@@ -355,7 +355,7 @@ export default function DashboardPage() {
             {/* Mini-card 2: CONCENTRATION MAP */}
             <div className="bg-[#0D1117] border border-[#1E293B] rounded p-4">
               <div className="text-xs text-slate-400 mb-2">Sector Allocation</div>
-              {/* TODO: Render recharts treemap or bar chart here */}
+              {/* Placeholder until sector chart component is wired */}
               <div className="h-20 bg-slate-800 rounded mb-2 flex items-center justify-center text-slate-500">[Sector Chart]</div>
               <div className="text-amber-400 text-xs">Tech: 45% — 1.8x above recommended threshold</div>
             </div>

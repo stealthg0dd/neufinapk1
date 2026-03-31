@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, UTC
 from pathlib import Path
 
@@ -20,14 +21,23 @@ import detectors.api_drift_detector as api_drift_detector
 
 log = logging.getLogger("neufin-agent.scanner")
 
-REPO_ROOT = Path(__file__).parent.parent.parent
+# ── Dynamic Path Resolution (Railway Fix) ──────────────────────────────────
+# We prioritize the REPO_ROOT set during the git clone in main.py.
+# Defaulting to /app/repo_to_scan for the production container environment.
+REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 REPOS = ("neufin-backend", "neufin-web", "neufin-mobile")
 
 
 async def run_all_detectors() -> dict:
-    run_id = await begin_scan_run()
-    log.info({"action": "detectors_start", "run_id": run_id})
+    # Safety check: if the repo isn't there, we can't scan.
+    if not REPO_ROOT.exists():
+        log.error({"action": "scan_aborted", "reason": f"Directory {REPO_ROOT} not found"})
+        return {"error": "Repository root not found", "path": str(REPO_ROOT)}
 
+    run_id = await begin_scan_run()
+    log.info({"action": "detectors_start", "run_id": run_id, "scanning_path": str(REPO_ROOT)})
+
+    # Gather results from all specialized detectors
     results = await asyncio.gather(
         typescript_check.scan(),
         python_check.scan(),
@@ -41,12 +51,14 @@ async def run_all_detectors() -> dict:
     issues: list[dict] = []
     for r in results:
         if isinstance(r, Exception):
+            # This captures the Errno 2 if a specific detector has a hardcoded path
             log.error({"action": "detector_error", "error": str(r)})
         else:
-            issues.extend([i.to_dict() for i in r])
+            # Ensure we are dealing with a list of issue objects
+            issues.extend([i.to_dict() if hasattr(i, 'to_dict') else i for i in r])
 
     counts = {
-        sev: sum(1 for i in issues if i["severity"] == sev)
+        sev: sum(1 for i in issues if i.get("severity") == sev)
         for sev in ("critical", "high", "medium", "low")
     }
 
@@ -63,15 +75,20 @@ async def run_all_detectors() -> dict:
         "issues": issues,
     }
 
+    # Save the report to the agent's local storage (sibling to core/)
     report_path = Path(__file__).parent.parent / "health_report.json"
-    report_path.write_text(json.dumps(report, indent=2))
-    log.info({"action": "report_written", "issues": len(issues), "run_id": run_id})
+    try:
+        report_path.write_text(json.dumps(report, indent=2))
+        log.info({"action": "report_written", "issues": len(issues), "run_id": run_id})
+    except Exception as e:
+        log.error({"action": "report_write_failed", "error": str(e)})
 
+    # Persistence and Notifications
     await upsert_issues(issues)
     await complete_scan_run(run_id, scores, counts)
 
     for issue in issues:
-        if issue["severity"] == "critical":
+        if issue.get("severity") == "critical":
             await notify_critical(issue)
 
     await notify_scan_complete(report)

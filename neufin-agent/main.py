@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+import subprocess
 from contextlib import asynccontextmanager
 from datetime import datetime, UTC
 from pathlib import Path
@@ -10,7 +11,7 @@ from pathlib import Path
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from mcp.server.fastmcp import FastMCP
 
@@ -50,6 +51,30 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(JSONFormatter())
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), handlers=[handler])
 log = logging.getLogger("neufin-agent")
+
+# ── Git Sync Logic (Railway Fix) ──────────────────────────────────────────
+def sync_repository():
+    """Clones the target repo into the container at startup to avoid Errno 2."""
+    repo = os.getenv("GITHUB_REPO", "stealthg0dd/neufinapk1")
+    token = os.getenv("GITHUB_TOKEN", "")
+    repo_path = Path("/app/repo_to_scan")
+    
+    # Ensure parent dir exists
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    if not repo_path.exists() or not any(repo_path.iterdir()):
+        log.info({"action": "repo_clone_start", "repo": repo})
+        try:
+            clone_url = f"https://{token}@github.com/{repo}.git" if token else f"https://github.com/{repo}.git"
+            subprocess.run(["git", "clone", clone_url, str(repo_path)], check=True)
+            log.info({"action": "repo_clone_success", "path": str(repo_path)})
+        except subprocess.CalledProcessError as e:
+            log.error({"action": "repo_clone_failed", "error": str(e)})
+    else:
+        log.info({"action": "repo_exists", "path": str(repo_path)})
+    
+    # Set the environment variable so core.scanner knows where to look
+    os.environ["REPO_ROOT"] = str(repo_path.absolute())
 
 # ── MCP Server ─────────────────────────────────────────────────────────────
 mcp = FastMCP("neufin-code-health")
@@ -118,6 +143,12 @@ async def get_health_score() -> dict:
 scheduler = AsyncIOScheduler()
 
 async def scheduled_scan():
+    # Safety check for repository presence
+    repo_path = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
+    if not repo_path.exists():
+        log.warning({"action": "scan_skip", "reason": "Repository not cloned yet"})
+        return
+
     log.info({"action": "scheduled_scan_start"})
     try:
         await run_all_detectors()
@@ -148,6 +179,9 @@ async def weekly_trend_job():
 # ── App lifespan ───────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Railway/Deployment Sync
+    sync_repository()
+    
     await init_db()
     await init_runtime_db()
     log.info({"action": "db_init_complete"})
@@ -180,7 +214,11 @@ app.mount("/mcp", mcp.streamable_http_app())
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "ts": datetime.now(UTC).isoformat()}
+    return {
+        "status": "ok", 
+        "ts": datetime.now(UTC).isoformat(),
+        "repo_root": os.getenv("REPO_ROOT")
+    }
 
 @app.get("/scan")
 async def trigger_scan():
@@ -228,4 +266,6 @@ async def dashboard():
     return widget.read_text()
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("AGENT_PORT", "8001")), reload=False)
+    # Priority for Railway's dynamic $PORT
+    port = int(os.getenv("PORT", os.getenv("AGENT_PORT", "8001")))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
