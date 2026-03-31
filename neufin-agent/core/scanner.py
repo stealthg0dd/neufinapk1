@@ -48,13 +48,19 @@ async def run_all_detectors() -> dict:
         return_exceptions=True,
     )
 
+    detector_names = [
+        "typescript",
+        "python",
+        "auth",
+        "secrets",
+        "mock",
+        "api",
+    ]
     issues: list[dict] = []
-    for r in results:
+    for i, r in enumerate(results):
         if isinstance(r, Exception):
-            # This captures the Errno 2 if a specific detector has a hardcoded path
-            log.error({"action": "detector_error", "error": str(r)})
+            log.error({"action": "detector_fail", "detector": detector_names[i], "error": str(r)})
         else:
-            # Ensure we are dealing with a list of issue objects
             issues.extend([i.to_dict() if hasattr(i, 'to_dict') else i for i in r])
 
     counts = {

@@ -37,7 +37,9 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
 
 async def _post_slack(payload: dict) -> None:
     if not SLACK_WEBHOOK:
-        log.warning({"action": "slack_skip", "reason": "SLACK_WEBHOOK_URL not set"})
+        if not getattr(_post_slack, "_warned", False):
+            log.warning({"action": "slack_skip", "reason": "SLACK_WEBHOOK_URL not set"})
+            _post_slack._warned = True
         return
     try:
         async with httpx.AsyncClient(timeout=10) as client:
@@ -56,7 +58,9 @@ def _sev_emoji(sev: str) -> str:
 
 def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
     if not all([SMTP_HOST, SMTP_USER, SMTP_PASS, ALERT_EMAIL]):
-        log.warning({"action": "email_skip", "reason": "SMTP not fully configured"})
+        if not getattr(_send_email, "_warned", False):
+            log.warning({"action": "email_skip", "reason": "SMTP not fully configured"})
+            _send_email._warned = True
         return
     try:
         msg = MIMEMultipart("alternative")
