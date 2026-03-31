@@ -45,7 +45,7 @@ jobs:
 
       - name: mypy type check
         run: mypy . --ignore-missing-imports --exclude alembic
-        continue-on-error: true   # warn only until full type coverage added
+        continue-on-error: true
 
   # ── Security Scan ─────────────────────────────────────────────────────────
   security:
@@ -135,24 +135,6 @@ jobs:
       - name: Run integration tests
         run: pytest tests/integration -v --timeout=30
 
-  # ── Deploy to Staging ─────────────────────────────────────────────────────
-  # Disabled until a staging service is created in the Railway dashboard.
-  # deploy-staging:
-  #   name: Deploy to Staging
-  #   runs-on: ubuntu-latest
-  #   needs: [lint, unit-tests]
-  #   if: github.event_name == 'pull_request'
-  #   environment: staging
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Install Railway CLI
-  #       run: npm install -g @railway/cli
-  #     - name: Deploy to Railway (staging)
-  #       working-directory: neufin-backend
-  #       run: railway up --service neufin-backend-staging --detach
-  #       env:
-  #         RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
   # ── Deploy to Production ──────────────────────────────────────────────────
   deploy-production:
     name: Deploy to Production
@@ -166,15 +148,15 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway (production)
+      - name: Deploy to Railway
         working-directory: neufin-backend
+        # Hardcoding the service 'neufin101' as confirmed by your dashboard
+        # This resolves the "Service not found" error caused by empty vars
         run: |
-          SERVICE_NAME="${RAILWAY_SERVICE:-neufin101-production}"
-          echo "Deploying Railway service: ${SERVICE_NAME}"
-          railway up --service "${SERVICE_NAME}" --detach
+          echo "Deploying Railway service: neufin101"
+          railway up --service neufin101 --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE_PRODUCTION }}
 
       - name: Notify Sentry of deployment
         uses: getsentry/action-release@v1
