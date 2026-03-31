@@ -100,26 +100,37 @@ export async function middleware(request: NextRequest) {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next()
 
   // ── Protected path — check cookie ─────────────────────────────────────────
-  logger.debug({ pathname, cookies: request.cookies.getAll().map(c => c.name) }, 'middleware.protected_path')
+  logger.debug({ pathname, cookies: request.cookies.getAll().map(c => c.name) }, '[Middleware] protected_path')
 
-  const authCookie = request.cookies.get('neufin-auth')
+  // Read neufin-auth cookie (must match syncAuthCookie)
+  let authCookie = request.cookies.get('neufin-auth')
   logger.debug({
     exists: !!authCookie,
     value: authCookie?.value ? `${authCookie.value.substring(0, 20)}...` : null,
-  }, 'middleware.auth_cookie')
+  }, '[Middleware] auth_cookie')
 
-  if (!authCookie?.value) {
-    logger.info({ pathname }, 'middleware.redirect_no_cookie')
+  // Fallback: check Authorization header for API routes if no cookie
+  let token = authCookie?.value
+  if (!token && pathname.startsWith('/api/')) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.slice(7)
+      logger.debug({ pathname }, '[Middleware] using Authorization header fallback')
+    }
+  }
+
+  if (!token) {
+    logger.info({ pathname }, '[Middleware] redirect_no_cookie')
     return redirectToAuth(request, pathname)
   }
 
-  const isValid = await hasValidSupabaseSession(authCookie.value)
+  const isValid = await hasValidSupabaseSession(token)
   if (!isValid) {
-    logger.info({ pathname }, 'middleware.redirect_invalid_cookie')
+    logger.info({ pathname }, '[Middleware] redirect_invalid_cookie')
     return redirectToAuth(request, pathname, true)
   }
 
-  logger.info({ pathname }, 'middleware.allow_request')
+  logger.info({ pathname }, '[Middleware] allow_request')
   return NextResponse.next()
 }
 

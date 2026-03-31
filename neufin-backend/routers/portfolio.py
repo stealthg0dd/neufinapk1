@@ -9,7 +9,12 @@ from config import ALPHA_VANTAGE_API_KEY, FINNHUB_API_KEY
 from database import decrypt_value, encrypt_value, supabase
 from services.ai_router import get_ai_analysis
 from services.auth_dependency import get_current_user
-from services.calculator import _fetch_prices, calculate_portfolio_metrics, verify_price_integrity
+from services.calculator import (
+    _fetch_prices,
+    calculate_portfolio_metrics,
+    get_price_with_fallback,
+    verify_price_integrity,
+)
 from services.jwt_auth import JWTUser
 from services.risk_engine import build_risk_report
 
@@ -19,6 +24,10 @@ router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
 # ─── Models ────────────────────────────────────────────────────────────────────
+
+
+class PortfolioClaimRequest(BaseModel):
+    portfolio_id: str
 
 
 class PortfolioCreate(BaseModel):
@@ -110,6 +119,29 @@ def _candle(symbol: str, period_days: int) -> dict | None:
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
+
+
+@router.post("/claim")
+async def claim_portfolio(
+    body: PortfolioClaimRequest,
+    user: JWTUser = Depends(get_current_user),
+):
+    """Claim an anonymous portfolio (user_id IS NULL) and assign it to the authenticated user."""
+    try:
+        result = (
+            supabase.table("portfolios")
+            .update({"user_id": user.id})
+            .eq("id", body.portfolio_id)
+            .is_("user_id", None)
+            .execute()
+        )
+        if result.data and len(result.data) > 0:
+            return {"claimed": True, "portfolio_id": body.portfolio_id}
+        raise HTTPException(status_code=404, detail="Portfolio not found or already claimed.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not claim portfolio: {e}") from e
 
 
 @router.post("/create")
@@ -482,9 +514,62 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
 # ── Price integrity verification ───────────────────────────────────────────────
 
 
+class ValidateTickersRequest(BaseModel):
+    symbols: list[str]
+
+
 class VerifyPricesRequest(BaseModel):
     positions: list[dict]
     total_value: float = 0.0
+
+
+@router.post("/validate-tickers")
+async def validate_tickers(body: ValidateTickersRequest):
+    """
+    Pre-flight check: resolve prices for a list of symbols before full analysis.
+    Call this on CSV upload to surface per-ticker warnings inline.
+
+    Returns:
+      valid    — symbols with a live price
+      stale    — symbols priced from last-known cache (with age)
+      aliases  — symbol → alias used for resolution
+      invalid  — symbols that could not be priced at all
+      results  — full PriceResult per symbol
+    """
+    if not body.symbols:
+        raise HTTPException(status_code=400, detail="symbols list must not be empty.")
+    if len(body.symbols) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 symbols per request.")
+
+    import asyncio
+
+    symbols = [s.strip().upper() for s in body.symbols]
+
+    def _resolve(sym: str) -> dict:
+        r = get_price_with_fallback(sym)
+        return {
+            "symbol": r.symbol,
+            "price": r.price,
+            "status": r.status,
+            "warning": r.warning,
+            "alias_used": r.alias_used,
+            "stale_age_hours": round(r.stale_age_hours, 1) if r.stale_age_hours else None,
+        }
+
+    results = await asyncio.to_thread(lambda: [_resolve(s) for s in symbols])
+
+    valid = [r["symbol"] for r in results if r["status"] == "live"]
+    stale = [r["symbol"] for r in results if r["status"] == "stale"]
+    invalid = [r["symbol"] for r in results if r["status"] == "unresolvable"]
+    aliases = {r["symbol"]: r["alias_used"] for r in results if r["alias_used"]}
+
+    return {
+        "valid": valid,
+        "stale": stale,
+        "invalid": invalid,
+        "aliases": aliases,
+        "results": results,
+    }
 
 
 @router.post("/verify-prices")

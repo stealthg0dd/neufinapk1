@@ -268,6 +268,10 @@ export default function LandingPage() {
                 <Link href="/upload" className="btn-primary text-sm text-center py-3">
                   Get My DNA Score — Free →
                 </Link>
+                {/* Updated: direct to onboarding */}
+                <Link href="/onboarding" className="btn-primary text-sm text-center py-3 mt-2">
+                  Start Onboarding →
+                </Link>
                 <p className="text-xs text-gray-500 text-center">No account required · results in &lt; 10 s</p>
               </div>
             </motion.div>
@@ -318,6 +322,10 @@ export default function LandingPage() {
           <p className="text-gray-400 mb-6">No account required. Upload a CSV, get results in seconds.</p>
           <Link href="/upload" className="btn-primary inline-block">
             Start for free →
+          </Link>
+          {/* Updated: direct to onboarding */}
+          <Link href="/onboarding" className="btn-primary inline-block mt-2">
+            Start Onboarding →
           </Link>
         </motion.div>
       </section>

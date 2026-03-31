@@ -7,12 +7,14 @@ import nextDynamic from 'next/dynamic'
 import { motion } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { fulfillReport, createCheckoutSession } from '@/lib/api'
+import { getSubscriptionStatus } from '@/lib/api'
 import SocialProof from '@/components/SocialProof'
 import AdvisorCTA from '@/components/AdvisorCTA'
 import { trackEvent, EVENTS } from '@/components/Analytics'
 import { useAuth } from '@/lib/auth-context'
 import { useAnalytics } from '@/lib/posthog'
 import type { DNAAnalysisResponse } from '@/lib/api'
+import PaywallOverlay from '@/components/PaywallOverlay'
 
 const PortfolioPie = nextDynamic(() => import('@/components/PortfolioPie'), { ssr: false })
 
@@ -96,6 +98,7 @@ function ScoreLabel({ score }: { score: number }) {
 
 // ── Results content (client component) ────────────────────────────────────────
 export default function ResultsContent() {
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'trial' | 'active' | 'expired'>('active')
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { user, token } = useAuth()
@@ -108,6 +111,7 @@ export default function ResultsContent() {
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [refToken, setRefToken]           = useState<string | null>(null)
   const [refDiscount, setRefDiscount]     = useState(false)
+  const [daysRemaining, setDaysRemaining] = useState<number | undefined>()
 
   useEffect(() => {
     const stored = localStorage.getItem('dnaResult')
@@ -149,6 +153,17 @@ export default function ResultsContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams, token])
+
+  // Fetch subscription status on mount
+  useEffect(() => {
+    if (!token) return
+    getSubscriptionStatus(token)
+      .then((res) => {
+        setSubscriptionStatus(res.status)
+        setDaysRemaining(res.days_remaining)
+      })
+      .catch(() => setSubscriptionStatus('active'))
+  }, [token])
 
   const shareUrl = result?.share_token
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.share_token}`
@@ -211,10 +226,43 @@ export default function ResultsContent() {
 
   const typeClass = TYPE_COLORS[result.investor_type] || 'bg-gray-700 text-gray-300 border-gray-600'
 
+  // Price warnings from backend (stale/alias/unresolvable tickers)
+  const priceWarnings: string[] = result.warnings ?? []
+  const failedTickers: string[] = result.failed_tickers ?? []
+
   return (
     <>
       <SocialProof />
       <div className="min-h-screen flex flex-col">
+
+        {/* Ticker warning banner — non-blocking, shown above results */}
+        {(priceWarnings.length > 0 || failedTickers.length > 0) && (
+          <div className="bg-yellow-950/60 border-b border-yellow-700/40">
+            <div className="max-w-4xl mx-auto px-6 py-3 flex items-start gap-3">
+              <span className="text-yellow-400 text-lg leading-none mt-0.5" aria-hidden>⚠</span>
+              <div className="text-sm text-yellow-200">
+                {failedTickers.length > 0 && (
+                  <p className="font-medium mb-1">
+                    Some tickers were excluded:{' '}
+                    {failedTickers.map((t, i) => (
+                      <span key={t}>
+                        <code className="bg-yellow-900/60 px-1 rounded text-yellow-300">{t}</code>
+                        {i < failedTickers.length - 1 ? ', ' : ''}
+                      </span>
+                    ))}
+                    {' '}(price unavailable). Analysis is based on your remaining holdings.
+                  </p>
+                )}
+                {priceWarnings
+                  .filter(w => !failedTickers.some(t => w.startsWith(t + ' could not')))
+                  .map((w, i) => (
+                    <p key={i} className="text-yellow-300/80">{w}</p>
+                  ))
+                }
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">

@@ -1,0 +1,11 @@
+{
+  "id": "missing_type_annotation",
+  "description": "Add explicit TypeScript parameter type to resolve implicit any",
+  "matches": {
+    "type": "type_error",
+    "pattern": "TS7006"
+  },
+  "patch_template": "// Add ': <Type>' annotation to the flagged parameter.\n// Example: function foo(x) → function foo(x: unknown)",
+  "auto_apply": false,
+  "requires_human": false
+}

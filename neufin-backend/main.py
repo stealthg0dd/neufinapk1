@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import io
 import os
 import sys
@@ -423,10 +424,45 @@ Return ONLY valid JSON:
         file=sys.stderr,
     )
 
+
+    # ── 9.1. Create Portfolio ─────────────────────────────────────────────
+    portfolio_id = None
+    try:
+        # Portfolio name: 'Uploaded {date}'
+        portfolio_name = f"Uploaded {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        port_row = {
+            "user_id": user_id,
+            "name": portfolio_name,
+            "total_value": round(total_value, 2),
+        }
+        port_result = supabase.table("portfolios").insert(port_row).execute()
+        if port_result.data and len(port_result.data) > 0:
+            portfolio_id = port_result.data[0]["id"]
+            print(f"[DB] portfolios insert ok id={portfolio_id}", file=sys.stderr)
+            # Insert positions
+            for pos in positions_out:
+                try:
+                    supabase.table("portfolio_positions").insert({
+                        "portfolio_id": portfolio_id,
+                        "symbol": pos["symbol"],
+                        "shares": pos["shares"],
+                        "cost_basis": None,
+                    }).execute()
+                except Exception:
+                    print(f"[DB] portfolio_positions insert failed for {pos['symbol']}", file=sys.stderr)
+        else:
+            print("[DB] portfolios insert returned empty data", file=sys.stderr)
+            portfolio_id = None
+    except Exception as e:
+        print(f"[DB] portfolios insert failed: {e}", file=sys.stderr)
+        portfolio_id = None
+
+    # ── 9.2. Persist DNA record, link to portfolio ──────────────────────
     share_token = uuid.uuid4().hex[:8]
     record_id = None
     db_payload = {
         "user_id": user_id,
+        "portfolio_id": portfolio_id,
         "dna_score": dna_score,
         "investor_type": analysis.get("investor_type"),
         "summary": analysis.get("summary"),
@@ -436,11 +472,9 @@ Return ONLY valid JSON:
         "share_token": share_token,
         "total_value": round(total_value, 2),
     }
-    # Drop None values (except user_id and summary which may legitimately be null)
     db_payload = {
         k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")
     }
-
     try:
         res = supabase.table("dna_scores").insert(db_payload).execute()
         if res.data and len(res.data) > 0:
@@ -461,7 +495,7 @@ Return ONLY valid JSON:
     # IMPORTANT: **analysis is spread FIRST so that our explicitly computed values
     # (dna_score, total_value, etc.) always override any keys the AI may return.
     print(
-        f"[Final] Payload being sent: dna_score={dna_score}, record_id={record_id}, "
+        f"[Final] Payload being sent: dna_score={dna_score}, record_id={record_id}, portfolio_id={portfolio_id}, "
         f"investor_type={analysis.get('investor_type')}",
         file=sys.stderr,
     )
@@ -480,6 +514,7 @@ Return ONLY valid JSON:
         "share_token": share_token,
         "share_url": f"{APP_BASE_URL}/share/{share_token}",
         "record_id": record_id,
+        "portfolio_id": portfolio_id,
     }
 
 
@@ -504,8 +539,6 @@ async def auth_status(request: Request):
       - Debug auth issues from the frontend/mobile app.
       - Gate protected UI sections before attempting protected API calls.
     """
-    import datetime
-
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return {
@@ -554,6 +587,66 @@ async def auth_status(request: Request):
             "expires_at": expires_at,
             "error": str(exc),
         }
+
+
+@app.get("/api/auth/subscription-status", tags=["auth"])
+async def subscription_status(request: Request):
+    """
+    Return the authenticated user's subscription status.
+
+    Returns:
+      status:         'trial' | 'active' | 'expired'
+      days_remaining: days left in trial (only when status='trial')
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(401, "Authentication required")
+
+    token = auth_header.split(" ", 1)[1]
+    try:
+        user = await verify_jwt(token)
+    except Exception as exc:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(401, str(exc)) from exc
+
+    try:
+        result = (
+            supabase.table("user_profiles")
+            .select("subscription_status, trial_started_at")
+            .eq("id", user.id)
+            .single()
+            .execute()
+        )
+        data = result.data or {}
+    except Exception:
+        data = {}
+
+    raw_status = data.get("subscription_status", "trial")
+    trial_started_at = data.get("trial_started_at")
+
+    if raw_status == "active":
+        return {"status": "active"}
+
+    if raw_status == "expired":
+        return {"status": "expired", "days_remaining": 0}
+
+    # Trial: calculate days remaining (14-day trial)
+    TRIAL_DAYS = 14
+    if trial_started_at:
+        try:
+            started = datetime.datetime.fromisoformat(trial_started_at.replace("Z", "+00:00"))
+            elapsed = (datetime.datetime.now(datetime.UTC) - started).days
+            days_remaining = max(0, TRIAL_DAYS - elapsed)
+        except Exception:
+            days_remaining = TRIAL_DAYS
+    else:
+        days_remaining = TRIAL_DAYS
+
+    if days_remaining == 0:
+        return {"status": "expired", "days_remaining": 0}
+
+    return {"status": "trial", "days_remaining": days_remaining}
 
 
 @app.get("/api/admin/health", tags=["system"])

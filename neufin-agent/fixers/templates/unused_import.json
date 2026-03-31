@@ -1,0 +1,11 @@
+{
+  "id": "unused_import",
+  "description": "Remove unused Python import via ruff autofix",
+  "matches": {
+    "type": "type_error",
+    "pattern": "F401"
+  },
+  "command": "ruff check --select F401 --fix {file}",
+  "auto_apply": true,
+  "requires_human": false
+}

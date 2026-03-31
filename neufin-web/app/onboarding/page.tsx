@@ -35,7 +35,11 @@ function OnboardingContent() {
   const searchParams = useSearchParams()
   const { token, loading: authLoading } = useAuth()
 
-  const [step, setStep]         = useState<1 | 2>(1)
+  const [step, setStep]         = useState<1 | 2 | 3>(1)
+    // For portfolio upload (step 3)
+    const [csvFile, setCsvFile] = useState<File | null>(null)
+    const [uploading, setUploading] = useState(false)
+    const [uploadError, setUploadError] = useState<string | null>(null)
   const [userType, setUserType] = useState<UserType | null>(null)
   const [firmName, setFirmName] = useState('')
   const [logoB64, setLogoB64]   = useState<string | null>(null)
@@ -73,11 +77,19 @@ function OnboardingContent() {
     reader.readAsDataURL(file)
   }
 
-  async function handleInvestorContinue() {
-    if (!token) return
-    setSaving(true)
-    setError(null)
+  async function handlePortfolioUpload() {
+    if (!token || !csvFile) return
+    setUploading(true)
+    setUploadError(null)
     try {
+      const formData = new FormData()
+      formData.append('file', csvFile)
+      const res = await fetch('/api/portfolio/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      if (!res.ok) throw new Error('Upload failed')
       await supabase.auth.updateUser({
         data: { user_type: 'investor', onboarding_complete: true },
       })
@@ -85,10 +97,15 @@ function OnboardingContent() {
       localStorage.removeItem('onboarding_next')
       router.replace(dest)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setUploadError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
-      setSaving(false)
+      setUploading(false)
     }
+  }
+
+  async function handleInvestorContinue() {
+    if (!token) return
+    setStep(3)
   }
 
   async function handleAdvisorContinue() {
@@ -271,6 +288,38 @@ function OnboardingContent() {
               {saving ? 'Creating profile…' : 'Launch Advisor Dashboard →'}
             </button>
             <p className="text-xs text-gray-600 text-center mt-3">You can update these settings any time in your profile.</p>
+          </motion.div>
+        )}
+
+        {/* ── Step 3: Portfolio upload for investors ─────────────────── */}
+        {step === 3 && userType === 'investor' && (
+          <motion.div
+            key="step3"
+            variants={fadeUp}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="w-full max-w-lg"
+          >
+            <h1 className="text-2xl font-bold text-white mb-1">Upload Your Portfolio</h1>
+            <p className="text-gray-400 text-sm mb-8">Upload your portfolio CSV to receive your DNA score and analysis.</p>
+
+            <input
+              type="file"
+              accept=".csv"
+              onChange={e => setCsvFile(e.target.files?.[0] || null)}
+              className="mb-4"
+            />
+            {uploadError && <p className="text-red-400 text-sm mb-4">{uploadError}</p>}
+
+            <button
+              disabled={!csvFile || uploading}
+              onClick={handlePortfolioUpload}
+              className="btn-primary w-full py-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {uploading ? 'Uploading…' : 'Analyze Portfolio →'}
+            </button>
+            <p className="text-xs text-gray-600 text-center mt-3">CSV format only. Example: symbol,shares,price</p>
           </motion.div>
         )}
       </AnimatePresence>

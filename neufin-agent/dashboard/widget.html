@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Neufin Code Health</title>
+  <style>
+    html, body {
+      background: #0F172A;
+      color: #F1F5F9;
+      font-family: 'Inter', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .dashboard {
+      max-width: 700px;
+      margin: 32px auto;
+      background: #1E293B;
+      border-radius: 18px;
+      box-shadow: 0 2px 16px #0008;
+      padding: 0 0 24px 0;
+      border: 2px solid transparent;
+      transition: border 0.2s;
+    }
+    .dashboard.critical {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 2px #ef4444, 0 2px 16px #0008;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 32px 8px 32px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-bottom: 1px solid #334155;
+    }
+    .scores {
+      display: flex;
+      justify-content: space-between;
+      padding: 24px 32px 8px 32px;
+      gap: 16px;
+    }
+    .score-card {
+      background: #0F172A;
+      border-radius: 12px;
+      flex: 1;
+      margin: 0 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 18px 0 10px 0;
+      min-width: 120px;
+    }
+    .score-label {
+      font-size: 1.1rem;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+      letter-spacing: 0.5px;
+    }
+    .score-ring {
+      width: 54px;
+      height: 54px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .score-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 18px 0 8px 32px;
+      letter-spacing: 0.5px;
+      color: #f1f5f9;
+    }
+    .issues-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0 32px 0 32px;
+    }
+    .filter-select {
+      background: #1E293B;
+      color: #f1f5f9;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 1rem;
+    }
+    .issues-list {
+      margin: 0 32px 0 32px;
+      background: #0F172A;
+      border-radius: 10px;
+      padding: 0;
+      list-style: none;
+      font-size: 0.98rem;
+      min-height: 60px;
+    }
+    .issue {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      padding: 8px 0 8px 0;
+      gap: 10px;
+    }
+    .issue:last-child {
+      border-bottom: none;
+    }
+    .issue .sev {
+      font-size: 1.2em;
+      width: 28px;
+      text-align: center;
+    }
+    .issue .file {
+      color: #fbbf24;
+      font-family: monospace;
+      font-size: 0.97em;
+      margin-right: 4px;
+    }
+    .issue .desc {
+      flex: 1;
+      color: #f1f5f9;
+    }
+    .issue .action-btn {
+      background: #334155;
+      color: #f1f5f9;
+      border: none;
+      border-radius: 6px;
+      padding: 2px 10px;
+      margin-left: 6px;
+      cursor: pointer;
+      font-size: 0.97em;
+      transition: background 0.2s;
+    }
+    .issue .action-btn:hover {
+      background: #64748b;
+    }
+    .fixes-list {
+      margin: 0 32px 0 32px;
+      background: #0F172A;
+      border-radius: 10px;
+      padding: 0;
+      list-style: none;
+      font-size: 0.98rem;
+      min-height: 40px;
+    }
+    .fix {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #334155;
+      padding: 8px 0 8px 0;
+      gap: 10px;
+    }
+    .fix:last-child {
+      border-bottom: none;
+    }
+    .fix .status {
+      font-size: 1.2em;
+      width: 28px;
+      text-align: center;
+    }
+    .fix .file {
+      color: #38bdf8;
+      font-family: monospace;
+      font-size: 0.97em;
+      margin-right: 4px;
+    }
+    .fix .desc {
+      flex: 1;
+      color: #f1f5f9;
+    }
+    .fix .action-btn {
+      background: #334155;
+      color: #f1f5f9;
+      border: none;
+      border-radius: 6px;
+      padding: 2px 10px;
+      margin-left: 6px;
+      cursor: pointer;
+      font-size: 0.97em;
+      transition: background 0.2s;
+    }
+    .fix .action-btn:hover {
+      background: #64748b;
+    }
+    @media (max-width: 600px) {
+      .dashboard { max-width: 99vw; }
+      .scores { flex-direction: column; gap: 0; }
+      .score-card { margin: 8px 0; }
+      .issues-header, .section-title { margin-left: 8px; margin-right: 8px; }
+      .issues-list, .fixes-list { margin-left: 8px; margin-right: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard" id="dashboard">
+    <div class="header">
+      <span>NEUFIN CODE HEALTH</span>
+      <span id="timestamp">--:--:--</span>
+    </div>
+    <div class="scores">
+      <div class="score-card">
+        <div class="score-label">Backend</div>
+        <div class="score-ring" id="score-backend"></div>
+        <div class="score-value" id="score-backend-value">--</div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">Web</div>
+        <div class="score-ring" id="score-web"></div>
+        <div class="score-value" id="score-web-value">--</div>
+      </div>
+      <div class="score-card">
+        <div class="score-label">Mobile</div>
+        <div class="score-ring" id="score-mobile"></div>
+        <div class="score-value" id="score-mobile-value">--</div>
+      </div>
+    </div>
+    <div class="section-title">ACTIVE ISSUES</div>
+    <div class="issues-header">
+      <span></span>
+      <select class="filter-select" id="issue-filter">
+        <option value="all">All</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <ul class="issues-list" id="issues-list"></ul>
+    <div class="section-title">RECENT FIXES</div>
+    <ul class="fixes-list" id="fixes-list"></ul>
+  </div>
+  <script>
+    // --- Color helpers ---
+    function scoreColor(score) {
+      if (score < 50) return '#ef4444';
+      if (score < 75) return '#fbbf24';
+      return '#22c55e';
+    }
+    function ringSVG(score) {
+      const color = scoreColor(score);
+      const pct = Math.max(0, Math.min(100, score));
+      const r = 24, c = 2 * Math.PI * r;
+      const arc = c * (pct / 100);
+      return `<svg width="54" height="54"><circle cx="27" cy="27" r="24" stroke="#334155" stroke-width="6" fill="none"/><circle cx="27" cy="27" r="24" stroke="${color}" stroke-width="6" fill="none" stroke-dasharray="${arc},${c-arc}" stroke-linecap="round" transform="rotate(-90 27 27)"/></svg>`;
+    }
+    function sevIcon(sev) {
+      if (sev === 'critical') return '🔴';
+      if (sev === 'high') return '🟡';
+      if (sev === 'medium') return '🟠';
+      return '🟢';
+    }
+    function fixStatusIcon(status) {
+      if (status === 'success') return '✅';
+      if (status === 'failed') return '❌';
+      if (status === 'pending_review') return '⏳';
+      return '⬜';
+    }
+    // --- State ---
+    let lastCriticalId = null;
+    let issues = [];
+    let fixes = [];
+    // --- Renderers ---
+    function renderScores(data) {
+      const { backend, web, mobile } = data.scores;
+      document.getElementById('score-backend').innerHTML = ringSVG(backend);
+      document.getElementById('score-web').innerHTML = ringSVG(web);
+      document.getElementById('score-mobile').innerHTML = ringSVG(mobile);
+      document.getElementById('score-backend-value').textContent = backend;
+      document.getElementById('score-web-value').textContent = web;
+      document.getElementById('score-mobile-value').textContent = mobile;
+    }
+    function renderIssues() {
+      const filter = document.getElementById('issue-filter').value;
+      let filtered = issues;
+      if (filter !== 'all') filtered = issues.filter(i => i.severity === filter);
+      const list = document.getElementById('issues-list');
+      list.innerHTML = '';
+      filtered.slice(0, 20).forEach(issue => {
+        const li = document.createElement('li');
+        li.className = 'issue';
+        li.innerHTML = `
+          <span class="sev">${sevIcon(issue.severity)}</span>
+          <span class="file">${issue.file}:${issue.line}</span>
+          <span class="desc">${issue.description}</span>
+          ${issue.fixable ? `<button class="action-btn" onclick="applyFix('${issue.id}')">Fix</button>` : ''}
+          ${issue.pr_url ? `<button class="action-btn" onclick="window.open('${issue.pr_url}','_blank')">PR</button>` : ''}
+          ${issue.status === 'fixed' ? '<span class="action-btn">✓</span>' : ''}
+        `;
+        list.appendChild(li);
+      });
+      // Flash red border if new critical
+      const dashboard = document.getElementById('dashboard');
+      const critical = filtered.find(i => i.severity === 'critical');
+      if (critical && critical.id !== lastCriticalId) {
+        dashboard.classList.add('critical');
+        setTimeout(() => dashboard.classList.remove('critical'), 1200);
+        lastCriticalId = critical.id;
+      }
+    }
+    function renderFixes() {
+      const list = document.getElementById('fixes-list');
+      list.innerHTML = '';
+      fixes.slice(0, 10).forEach(fix => {
+        const li = document.createElement('li');
+        li.className = 'fix';
+        li.innerHTML = `
+          <span class="status">${fixStatusIcon(fix.status)}</span>
+          <span class="file">${fix.file}</span>
+          <span class="desc">${fix.description}</span>
+          <span style="color:#64748b;font-size:0.93em;">${fix.ago}</span>
+          ${fix.pr_url ? `<button class="action-btn" onclick="window.open('${fix.pr_url}','_blank')">View PR</button>` : ''}
+        `;
+        list.appendChild(li);
+      });
+    }
+    // --- API ---
+    async function fetchHealth() {
+      const res = await fetch('/api/health');
+      if (!res.ok) return;
+      const data = await res.json();
+      renderScores(data);
+      issues = data.issues || [];
+      renderIssues();
+    }
+    async function fetchFixes() {
+      const res = await fetch('/api/fixes');
+      if (!res.ok) return;
+      fixes = (await res.json()).fixes || [];
+      renderFixes();
+    }
+    async function applyFix(id) {
+      await fetch(`/api/fixes/${id}/apply`, { method: 'POST' });
+      fetchHealth();
+      fetchFixes();
+    }
+    // --- Polling ---
+    function updateTimestamp() {
+      const now = new Date();
+      document.getElementById('timestamp').textContent = now.toLocaleTimeString();
+    }
+    setInterval(fetchHealth, 30000);
+    setInterval(fetchFixes, 30000);
+    setInterval(updateTimestamp, 1000);
+    document.getElementById('issue-filter').addEventListener('change', renderIssues);
+    // Initial load
+    fetchHealth();
+    fetchFixes();
+    updateTimestamp();
+  </script>
+</body>
+</html>

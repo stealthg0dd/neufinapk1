@@ -32,12 +32,9 @@ const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [token, setToken] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
+  const [isLoading, setIsLoading] = useState(true)
   useEffect(() => {
     debugAuth('AuthProvider:mount')
-
-    // Hydrate from current session on mount
     supabase.auth.getSession().then(({ data }) => {
       logger.debug({
         hasSession: Boolean(data.session),
@@ -46,12 +43,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, 'auth.initial_session')
       setUser(data.session?.user ?? null)
       setToken(data.session?.access_token ?? null)
-      setLoading(false)
+      setIsLoading(false)
       syncAuthCookie(data.session ?? null)
       debugAuth('AuthProvider:getSession')
     })
-
-    // Keep token in sync on every auth event, including TOKEN_REFRESHED
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       logger.debug({
         event,
@@ -61,28 +56,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, 'auth.state_change')
       setUser(session?.user ?? null)
       setToken(session?.access_token ?? null)
-      setLoading(false)
-
+      setIsLoading(false)
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         syncAuthCookie(session ?? null)
       }
-
       if (event === 'SIGNED_OUT') {
         syncAuthCookie(null)
+        setUser(null)
       }
-
       debugAuth(`AuthProvider:${event}`)
-      // Attach user identity to all future Sentry events
       if (session?.user) {
         Sentry.setUser({ id: session.user.id, email: session.user.email })
       } else {
         Sentry.setUser(null)
       }
     })
-
-    // Proactively refresh the session every 5 minutes so the neufin-auth cookie
-    // stays valid for long-lived browser tabs. The Supabase SDK silently rotates
-    // the access token when it's near expiry; we re-sync the cookie each time.
     const refreshInterval = setInterval(async () => {
       const { data } = await supabase.auth.getSession()
       if (data.session) {
@@ -123,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token])
 
   return (
-    <AuthContext.Provider value={{ user, loading, signOut, token, getAccessToken }}>
+    <AuthContext.Provider value={{ user, loading: isLoading, signOut, token, getAccessToken }}>
       {children}
     </AuthContext.Provider>
   )

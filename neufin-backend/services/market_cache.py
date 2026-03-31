@@ -15,10 +15,37 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import sys
 import time
+from dataclasses import dataclass
 
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ── Ticker alias map ───────────────────────────────────────────────────────────
+# When a ticker fails all 6 providers, try these aliases before giving up.
+TICKER_ALIASES: dict[str, list[str]] = {
+    "SQ": ["SQ", "BLOCK"],   # Block Inc (rebranded from Square)
+    "FB": ["META"],           # Meta Platforms
+    "GOOG": ["GOOGL"],        # Alphabet Class A
+    "TWTR": ["X"],            # X Corp (formerly Twitter)
+    "SNAP": ["SNAP"],
+    "BRK-B": ["BRK.B"],
+    "BRK-A": ["BRK.A"],
+}
+
+
+@dataclass
+class PriceResult:
+    symbol: str
+    price: float | None
+    status: str   # live | alias | stale | unresolvable
+    warning: str = ""
+    alias_used: str = ""
+    stale_age_hours: float = 0.0
 
 # ── Optional Redis ─────────────────────────────────────────────────────────────
 try:
@@ -37,13 +64,6 @@ try:
 except Exception:
     _SUPABASE_AVAILABLE = False
     print("[MarketCache] Supabase client unavailable — Supabase tier disabled", file=sys.stderr)
-
-# ── Config ─────────────────────────────────────────────────────────────────────
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 _REDIS_TTL = 86_400  # 24 hours
@@ -357,3 +377,50 @@ class MarketCache:
 
 # Module-level singleton — import as: from services.market_cache import market_cache
 market_cache = MarketCache()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Ticker price cache — last-known-price fallback (Supabase-backed)
+# ══════════════════════════════════════════════════════════════════════════════
+_PRICE_CACHE_TABLE = "ticker_price_cache"
+
+
+def upsert_ticker_price_cache(symbol: str, price: float, source: str = "live") -> None:
+    """Persist a known-good price to Supabase for future stale fallback."""
+    if not _SUPABASE_AVAILABLE:
+        return
+    try:
+        sb = get_supabase_client()
+        sb.table(_PRICE_CACHE_TABLE).upsert(
+            {
+                "symbol": symbol.upper(),
+                "price": price,
+                "source": source,
+                "recorded_at": datetime.datetime.utcnow().isoformat(),
+            },
+            on_conflict="symbol",
+        ).execute()
+    except Exception as e:
+        print(f"[PriceCache] upsert failed for {symbol}: {e}", file=sys.stderr)
+
+
+def get_ticker_price_cache(symbol: str) -> dict | None:
+    """
+    Return the last-known price row for *symbol* from Supabase, or None.
+    Row shape: {symbol, price, source, recorded_at}
+    """
+    if not _SUPABASE_AVAILABLE:
+        return None
+    try:
+        sb = get_supabase_client()
+        row = (
+            sb.table(_PRICE_CACHE_TABLE)
+            .select("symbol, price, source, recorded_at")
+            .eq("symbol", symbol.upper())
+            .maybe_single()
+            .execute()
+        )
+        return row.data if row and row.data else None
+    except Exception as e:
+        print(f"[PriceCache] get failed for {symbol}: {e}", file=sys.stderr)
+        return None

@@ -6,6 +6,8 @@ import { PostHogProvider } from '@/lib/posthog'
 import { WebVitals } from '@/app/components/WebVitals'
 import AuthDebugBoot from '@/app/components/AuthDebugBoot'
 import { AuthDebugPanel } from '@/components/AuthDebugPanel'
+import { Toaster } from 'react-hot-toast'
+import '@/lib/env-check'
 
 // Using `variable` mode avoids the server/client className mismatch that causes
 // Next.js hydration warnings. The CSS variable is applied consistently on both sides.
@@ -161,6 +163,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <WebVitals />
             {children}
             <AuthDebugPanel />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#1f2937',
+                  color: '#f3f4f6',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                },
+                error: { duration: 6000 },
+              }}
+            />
           </AuthProvider>
         </PostHogProvider>
       </body>

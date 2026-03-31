@@ -1,0 +1,12 @@
+{
+  "id": "auth_cookie_sync",
+  "description": "Missing cookie sync after auth state change",
+  "matches": {
+    "type": "auth_bug",
+    "pattern": "onAuthStateChange.*setUser(?!.*syncAuthCookie)"
+  },
+  "fix_type": "insert_after",
+  "insert_code": "syncAuthCookie(session)",
+  "safe_to_auto_apply": true,
+  "requires_human": false
+}

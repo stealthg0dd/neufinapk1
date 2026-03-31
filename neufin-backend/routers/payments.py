@@ -302,6 +302,7 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         raise HTTPException(400, f"Webhook error: {e}") from e
 
+
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         meta = session.get("metadata", {})
@@ -318,6 +319,7 @@ async def stripe_webhook(request: Request):
         report_id = meta.get("report_id") or None
         portfolio_id = meta.get("portfolio_id") or None
         advisor_id = meta.get("advisor_id")
+        stripe_customer_id = session.get("customer")
 
         if plan == "single" and report_id:
             # Mark paid
@@ -329,12 +331,13 @@ async def stripe_webhook(request: Request):
                 await _generate_and_store_pdf(portfolio_id, report_id)
 
         elif plan == "unlimited" and advisor_id and advisor_id != "anonymous":
-            # Upgrade subscription tier
+            # Upgrade subscription status and store Stripe customer ID
             try:
                 supabase.table("user_profiles").update(
                     {
-                        "subscription_tier": "pro",
-                        "trial_ends_at": None,
+                        "subscription_status": "active",
+                        "stripe_customer_id": stripe_customer_id,
+                        "trial_started_at": None,
                     }
                 ).eq("id", advisor_id).execute()
             except Exception as e:
@@ -352,7 +355,7 @@ async def stripe_webhook(request: Request):
             if advisor_id:
                 supabase.table("user_profiles").update(
                     {
-                        "subscription_tier": "free",
+                        "subscription_status": "expired",
                     }
                 ).eq("id", advisor_id).execute()
         except Exception as e:

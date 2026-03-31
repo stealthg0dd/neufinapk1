@@ -1,0 +1,12 @@
+{
+  "id": "remove_client_auth_guard",
+  "description": "Duplicate client-side auth guard conflicts with middleware",
+  "matches": {
+    "type": "auth_bug",
+    "pattern": "useEffect.*router\\.push.*auth.*!user"
+  },
+  "fix_type": "remove_block",
+  "safe_to_auto_apply": false,
+  "requires_human": true,
+  "reason": "Requires verifying middleware.ts covers this route before removing the client guard"
+}

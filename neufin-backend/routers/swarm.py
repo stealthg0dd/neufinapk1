@@ -52,7 +52,11 @@ def _sanitize_message(message: str) -> str | None:
 from database import supabase  # noqa: E402
 from services.agent_swarm import chat_with_swarm, run_swarm  # noqa: E402
 from services.ai_router import get_ai_analysis  # noqa: E402
-from services.auth_dependency import get_current_user, get_optional_user  # noqa: E402
+from services.auth_dependency import (  # noqa: E402
+    get_current_user,
+    get_optional_user,
+    require_active_subscription,
+)
 from services.jwt_auth import JWTUser  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
@@ -223,6 +227,7 @@ Return ONLY valid JSON (no markdown):
 @router.post("/analyze")
 async def analyze_with_swarm(
     body: SwarmAnalyzeRequest,
+    user: JWTUser = Depends(require_active_subscription),
 ):
     """
     Run the full Neufin Agent Swarm on a portfolio.
@@ -379,7 +384,7 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
 
 
 @router.get("/report/{report_id}")
-async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional_user)):
+async def get_report(report_id: str, user: JWTUser = Depends(require_active_subscription)):
     """
     Fetch a persisted swarm report by ID from Supabase.
     Used by the frontend to restore thesis state on page refresh.

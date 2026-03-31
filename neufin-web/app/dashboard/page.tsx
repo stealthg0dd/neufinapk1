@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import dynamicImport from 'next/dynamic'
 import { motion } from 'framer-motion'
@@ -19,7 +19,7 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { getChartData, getPortfolioHistory, createCheckout, type DNAResult, type CandleData, type LinePoint, type Position } from '@/lib/api'
+import { getChartData, getPortfolioHistory, createCheckout, type DNAResult, type CandleData, type LinePoint, type Position, authFetch } from '@/lib/api'
 
 // CandlestickChart is client-only (lightweight-charts touches DOM)
 const CandlestickChart = dynamicImport(() => import('@/components/CandlestickChart'), { ssr: false })
@@ -92,19 +92,83 @@ function SignalBadge({ type }: { type: string }) {
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, signOut, token } = useAuth()
+    // Data for first-time dashboard
+    const [portfolio, setPortfolio] = useState<any>(null)
+    const [market, setMarket] = useState<any>(null)
+    const [dna, setDna] = useState<any>(null)
+    const [regime, setRegime] = useState<any>(null)
+    const [trial, setTrial] = useState<any>(null)
+    const [loadingAll, setLoadingAll] = useState(true)
+    const [alerts, setAlerts] = useState<string[]>([])
+
+    // Fetch all data in parallel for first-time experience
+    useEffect(() => {
+      if (!firstVisit) return
+      setLoadingAll(true)
+      Promise.all([
+        authFetch('/api/portfolio/list', {}, token).then(r => r?.json()),
+        authFetch('/api/market/prices?symbols=SPY,VIX', {}, token).then(r => r?.json()),
+        authFetch('/api/analyze-dna/latest', {}, token).then(r => r?.json()),
+        authFetch('/api/market/regime', {}, token).then(r => r?.json()),
+        authFetch('/api/auth/subscription-status', {}, token).then(r => r?.json()),
+      ]).then(([portfolio, market, dna, regime, trial]) => {
+        setPortfolio(portfolio)
+        setMarket(market)
+        setDna(dna)
+        setRegime(regime)
+        setTrial(trial)
+        // Build alerts from DNA warnings and regime
+        const alertList: string[] = []
+        if (dna?.warnings?.length) alertList.push(...dna.warnings)
+        if (regime?.alerts?.length) alertList.push(...regime.alerts)
+        setAlerts(alertList)
+      }).finally(() => setLoadingAll(false))
+    }, [firstVisit, token])
+  // ...existing code...
+  const { loading: isLoading, token, user } = useAuth()
   const [result, setResult] = useState<DNAResult | null>(null)
   const [selectedSymbol, setSelectedSymbol] = useState<string>('')
   const [candleData, setCandleData] = useState<CandleData[]>([])
   const [portfolioHistory, setPortfolioHistory] = useState<LinePoint[]>([])
   const [candleLoading, setCandleLoading] = useState(false)
   const [histLoading, setHistLoading] = useState(false)
+  const [histError, setHistError] = useState<string | null>(null)
+  const [candleError, setCandleError] = useState<string | null>(null)
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
 
+  // First-time dashboard visit logic
+  const [firstVisit, setFirstVisit] = useState<boolean | null>(null)
+  const hasPatchedVisit = useRef(false)
+
   useEffect(() => {
     debugAuth('dashboard:mount')
-  }, [])
+    // If onboarding is not complete, redirect to onboarding
+    if (!isLoading && user && user.user_metadata && !user.user_metadata.onboarding_complete) {
+      window.location.replace('/onboarding')
+      return
+    }
+    // Check first_dashboard_visit
+    if (!isLoading && user && user.user_metadata) {
+      if (user.user_metadata.first_dashboard_visit === undefined || user.user_metadata.first_dashboard_visit === null) {
+        setFirstVisit(true)
+      } else {
+        setFirstVisit(false)
+      }
+    }
+  }, [isLoading, user])
+
+  // PATCH first_dashboard_visit after first render
+  useEffect(() => {
+    if (firstVisit && token && !hasPatchedVisit.current) {
+      hasPatchedVisit.current = true
+      authFetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ first_dashboard_visit: true }),
+      }, token).catch(() => {})
+    }
+  }, [firstVisit, token])
 
   // Load result from sessionStorage
   useEffect(() => {
@@ -119,34 +183,37 @@ export default function DashboardPage() {
 
   // Fetch portfolio value history
   useEffect(() => {
-    if (!result?.positions?.length) return
+    if (!result?.positions?.length || !token) return
     const symbols = result.positions.map((p) => p.symbol)
     const shares = result.positions.map((p) => p.shares)
     setHistLoading(true)
-    getPortfolioHistory(symbols, shares, '1mo')
+    setHistError(null)
+    getPortfolioHistory(symbols, shares, '1mo', token)
       .then((d) => setPortfolioHistory(d.history))
-      .catch(() => {})
+      .catch((err) => setHistError(err.message || 'Portfolio history unavailable'))
       .finally(() => setHistLoading(false))
-  }, [result])
+  }, [result, token])
 
   // Fetch candlestick data when symbol changes
   const fetchCandle = useCallback(async (symbol: string) => {
-    if (!symbol) return
+    if (!symbol || !token) return
     setCandleLoading(true)
+    setCandleError(null)
     try {
-      const d = await getChartData(symbol, '3mo')
+      const d = await getChartData(symbol, '3mo', token)
       setCandleData(d.data)
-    } catch {
+    } catch (err: any) {
       setCandleData([])
+      setCandleError(err?.message || 'Chart data unavailable')
     } finally {
       setCandleLoading(false)
     }
-  }, [])
+  }, [token])
 
   useEffect(() => { fetchCandle(selectedSymbol) }, [selectedSymbol, fetchCandle])
 
   const handleReportCheckout = async () => {
-    if (!result) return
+    if (!result || !token) return
     setReportLoading(true)
     setReportError('')
     try {
@@ -176,7 +243,7 @@ export default function DashboardPage() {
   const firstHistValue = portfolioHistory[0]?.value ?? lastHistValue
   const pctChange = firstHistValue ? ((lastHistValue - firstHistValue) / firstHistValue) * 100 : 0
 
-  if (authLoading) {
+  if (isLoading || firstVisit === null || (firstVisit && loadingAll)) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
@@ -184,51 +251,169 @@ export default function DashboardPage() {
     )
   }
 
-  if (!result) {
+  // FIRST-TIME DASHBOARD EXPERIENCE
+  if (firstVisit) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        {/* Skeleton loader for empty state */}
-        <div className="w-full max-w-screen-xl px-4 space-y-4">
-          <div className="shimmer rounded-xl h-40 w-full" />
-          <div className="grid grid-cols-3 gap-4">
-            <div className="shimmer rounded-xl h-64" />
-            <div className="shimmer rounded-xl h-64" />
-            <div className="shimmer rounded-xl h-64" />
+      <div className="min-h-screen flex flex-col bg-[#0F172A] text-white">
+        {/* SECTION 1 — COMMAND BAR */}
+        <div className="w-full border-b border-[#1E293B] bg-[#0D1117] px-6 py-2 flex items-center gap-6 text-sm font-sans tracking-tight" style={{minHeight: 48}}>
+          <span className="font-bold tracking-widest text-[#1E88E5]">NEUFIN</span>
+          <span className="border-l border-[#1E293B] h-6 mx-3" />
+          <span className="font-semibold">PORTFOLIO: <span className="font-mono text-white">{portfolio?.name || '—'}</span> ▾</span>
+          <span className="text-slate-400">| Last sync: <span className="font-mono">{portfolio?.last_sync || '--:--'}</span></span>
+          <span className="text-slate-400">| Regime: <span className={`font-semibold ${regime?.regime === 'GROWTH' ? 'text-green-400 animate-pulse' : 'text-red-400 animate-pulse'}`}>{regime?.regime || '—'} ●</span></span>
+          <span className="text-slate-400">| VIX: <span className="font-mono">{market?.VIX?.price ?? '--'}</span></span>
+          <span className="text-slate-400">| SPY: <span className="font-mono">{market?.SPY?.price ?? '--'} ({market?.SPY?.change_pct ?? '--'}%)</span></span>
+          <button className="ml-4 px-4 py-1 rounded bg-[#1E88E5] text-white font-bold shadow-none hover:shadow-[0_0_8px_2px_#1E88E5] transition-all animate-pulse" style={{boxShadow: '0 0 8px 2px #1E88E5'}}>⚡ RUN SWARM</button>
+          <span className="text-yellow-400 ml-4 cursor-pointer">🟡 TRIAL: 14D</span>
+          <span className="ml-auto rounded-full w-8 h-8 bg-slate-800 flex items-center justify-center">{/* avatar */}</span>
+        </div>
+
+        {/* SECTION 2 — ALERT BANNER */}
+        {alerts.length > 0 && (
+          <div className="w-full bg-amber-900 border-b border-amber-500 text-amber-200 font-mono px-6 py-2 overflow-hidden relative" style={{whiteSpace:'nowrap'}}>
+            <div className="animate-marquee" style={{display:'inline-block',animation:'marquee 20s linear infinite'}}>
+              {alerts.map((a, i) => <span key={i} className="mr-10">⚠ {a}</span>)}
+            </div>
+            <style>{`@keyframes marquee { 0%{transform:translateX(100%);} 100%{transform:translateX(-100%);} } .animate-marquee:hover{animation-play-state:paused}`}</style>
+          </div>
+        )}
+
+        {/* SECTION 3 — SWARM CTA HERO */}
+        <div className="w-full bg-gradient-to-br from-[#0D1117] to-[#1E293B] border border-[#1E293B] rounded-none mt-4 mb-2 flex flex-row gap-0 min-h-[220px] relative overflow-hidden">
+          {/* Left: Swarm info */}
+          <div className="flex-1 p-8 flex flex-col justify-center">
+            <div className="font-mono text-slate-400 text-lg mb-1">NEUFIN INTELLIGENCE SWARM</div>
+            <div className="text-2xl font-semibold mb-2">7 AI agents. 6 data providers. 1 institutional-grade analysis.</div>
+            <div className="text-slate-400 mb-4">Market Regime Agent · Quant Strategist · Tax Architect · Risk Sentinel · Alpha Scout<br/>Running simultaneously across your {portfolio?.positions?.length ?? '--'}-position portfolio.</div>
+            <div className="flex flex-row gap-8 mb-6">
+              <div className="flex items-center gap-2"><span>⚡</span><span className="font-mono">&lt; 90 seconds</span><span className="text-slate-400 text-xs ml-1">Full analysis time</span></div>
+              <div className="flex items-center gap-2"><span>📊</span><span className="font-mono">47% more accurate</span><span className="text-slate-400 text-xs ml-1">vs single-model analysis</span></div>
+              <div className="flex items-center gap-2"><span>🏦</span><span className="font-mono">IC-grade output</span><span className="text-slate-400 text-xs ml-1">Investment Committee briefing format</span></div>
+            </div>
+            <button className="w-full max-w-xs py-3 rounded bg-[#1E88E5] text-white font-bold text-lg shadow-none hover:shadow-[0_0_8px_2px_#1E88E5] transition-all animate-pulse">⚡ LAUNCH SWARM ANALYSIS</button>
+            <div className="text-slate-400 text-xs mt-2">Free during your 14-day trial · No rate limits</div>
+          </div>
+          {/* Right: Animated terminal */}
+          <div className="w-[40%] min-w-[320px] bg-[#0D1117] border-l border-[#1E293B] flex flex-col justify-end p-6">
+            <AnimatedTerminal />
           </div>
         </div>
-        <p className="text-gray-500 text-sm mt-4">No portfolio data found.</p>
-        <Link href="/upload" className="btn-primary">Upload Portfolio →</Link>
+
+        {/* SECTION 4 — TRIAL UNLOCK STRIP */}
+        <div className="w-full bg-[#0D1117] border border-[#1E293B] rounded-none flex flex-row mt-2 mb-4 px-6 py-4 gap-4 items-center">
+          <div className="flex-1 flex flex-col items-center"><span>⚡</span><span className="font-mono">Swarm Analysis</span><span className="text-slate-400 text-xs">Unlimited runs</span><button className="text-[#1E88E5] underline">Launch →</button></div>
+          <div className="flex-1 flex flex-col items-center"><span>📄</span><span className="font-mono">Full Reports</span><span className="text-slate-400 text-xs">PDF download, no watermark</span><button className="text-[#1E88E5] underline">Download →</button></div>
+          <div className="flex-1 flex flex-col items-center"><span>🧬</span><span className="font-mono">DNA Vault</span><span className="text-slate-400 text-xs">Save & compare scores</span><button className="text-[#1E88E5] underline">Open Vault →</button></div>
+          <div className="flex-1 flex flex-col items-center"><span>📡</span><span className="font-mono">Market Alerts</span><span className="text-slate-400 text-xs">Regime change notifications</span><button className="text-[#1E88E5] underline">Enable →</button></div>
+          <div className="absolute left-0 right-0 bottom-0 h-1 bg-[#1E88E5]/30">
+            <div className="h-full bg-[#1E88E5]" style={{width:`${trial?.days_remaining ? 100 - (trial.days_remaining/14)*100 : 0}%`}} />
+          </div>
+          <div className="absolute right-6 bottom-2 text-xs text-slate-400">14 days free · Day {trial?.days_remaining ? 15-trial.days_remaining : 1} of 14 <button className="underline ml-2">What happens after 14 days?</button></div>
+        </div>
+
+        {/* SECTION 5 — PORTFOLIO INTELLIGENCE GRID */}
+        <div className="flex flex-row gap-6 px-6 pb-8">
+          {/* LEFT: Holdings Table */}
+          <div className="flex-1 bg-[#0D1117] border border-[#1E293B] rounded p-4 overflow-x-auto">
+            {/* Table header */}
+            <div className="grid grid-cols-8 gap-2 text-xs text-slate-400 font-sans border-b border-[#1E293B] pb-2 mb-2">
+              <div>SYMBOL</div><div>SHARES</div><div>PRICE</div><div>VALUE</div><div>WEIGHT%</div><div>BETA</div><div>30D %</div><div>STATUS</div>
+            </div>
+            {/* Table rows */}
+            {portfolio?.positions?.slice(0,8).map((p:any,i:number) => (
+              <div key={p.symbol} className={`grid grid-cols-8 gap-2 text-xs items-center font-mono border-l-2 ${p.stale ? 'border-amber-400 bg-amber-900/10' : 'border-transparent'} ${i>0?'mt-1':''}`} style={{minHeight:28}}>
+                <div className="font-bold">{p.symbol}</div>
+                <div>{p.shares}</div>
+                <div>${p.price}</div>
+                <div>${p.value}</div>
+                <div className="flex items-center gap-1">{p.weight}% <div className="h-1 w-10 bg-slate-700 rounded"><div className="h-1 rounded bg-[#1E88E5]" style={{width:`${p.weight}%`}} /></div></div>
+                <div className={p.beta > 1.5 ? 'text-red-400' : p.beta > 1.0 ? 'text-yellow-400' : 'text-green-400'}>{p.beta} {p.beta > 1.5 ? '(elevated)' : p.beta > 1.0 ? '(mod)' : '(low)'}</div>
+                <div className={p.change_30d >= 0 ? 'text-green-400' : 'text-red-400'}>{p.change_30d >= 0 ? '▲' : '▼'} {p.change_30d}%</div>
+                <div>{p.stale ? <span className="text-amber-400">⚠ STALE</span> : <span className="text-green-400">● LIVE</span>}</div>
+              </div>
+            ))}
+            {/* Pagination if >8 */}
+            {portfolio?.positions?.length > 8 && <div className="text-xs text-slate-400 mt-2">Showing 8 of {portfolio.positions.length} positions. <button className="underline text-[#1E88E5]">Next page →</button></div>}
+          </div>
+          {/* RIGHT: Mini-cards */}
+          <div className="w-[340px] flex flex-col gap-4">
+            {/* Mini-card 1: DNA SCORE SUMMARY */}
+            <div className="bg-[#0D1117] border border-[#1E293B] rounded p-4 flex flex-col items-center">
+              <div className="w-20 h-20 rounded-full border-4 border-[#1E88E5] flex items-center justify-center text-3xl font-mono mb-2">{dna?.score ?? '--'}</div>
+              <div className="text-slate-400 text-xs mb-1">{dna?.investor_type ?? '—'}</div>
+              <div className="text-white text-sm mb-1">{dna?.insight ?? 'Your behavioral profile'}</div>
+              <button className="text-[#1E88E5] underline text-xs">Full breakdown →</button>
+            </div>
+            {/* Mini-card 2: CONCENTRATION MAP */}
+            <div className="bg-[#0D1117] border border-[#1E293B] rounded p-4">
+              <div className="text-xs text-slate-400 mb-2">Sector Allocation</div>
+              {/* TODO: Render recharts treemap or bar chart here */}
+              <div className="h-20 bg-slate-800 rounded mb-2 flex items-center justify-center text-slate-500">[Sector Chart]</div>
+              <div className="text-amber-400 text-xs">Tech: 45% — 1.8x above recommended threshold</div>
+            </div>
+            {/* Mini-card 3: QUICK METRICS ROW */}
+            <div className="bg-[#0D1117] border border-[#1E293B] rounded p-4 grid grid-cols-2 gap-2">
+              <div>
+                <div className="font-mono text-lg">{dna?.beta ?? '--'}</div>
+                <div className="text-slate-400 text-xs">Portfolio Beta</div>
+              </div>
+              <div>
+                <div className="font-mono text-lg">{dna?.sharpe ?? '--'}</div>
+                <div className="text-slate-400 text-xs">Sharpe (est.)</div>
+              </div>
+              <div>
+                <div className="font-mono text-lg">{dna?.tax_drag ?? '--'}%</div>
+                <div className="text-slate-400 text-xs">Tax Drag %</div>
+              </div>
+              <div>
+                <div className="font-mono text-lg">{dna?.correlation_risk ?? '--'}</div>
+                <div className="text-slate-400 text-xs">Correlation Risk</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* AnimatedTerminal component for hero terminal window */}
+        {/* Place this at the bottom of the file or in a separate file */}
       </div>
     )
   }
+// AnimatedTerminal: typewriter effect for agent activity
+function AnimatedTerminal() {
+  const lines = [
+    '> MARKET_REGIME_AGENT: Fetching FRED macro data...',
+    '> MARKET_REGIME_AGENT: Regime classified → GROWTH (conf: 0.87)',
+    '> QUANT_AGENT: Computing HHI concentration score...',
+    '> QUANT_AGENT: HHI = 0.31 → ELEVATED concentration',
+    '> TAX_AGENT: Scanning cost basis for harvest opportunities...',
+    '> RISK_SENTINEL: Flagging correlated clusters...',
+    '> SYNTHESIZER: Building IC briefing...',
+    '> STATUS: Ready. Awaiting portfolio input.'
+  ]
+  const [displayed, setDisplayed] = useState<string[]>([])
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setDisplayed((d) => {
+        if (d.length === lines.length) return []
+        return [...d, lines[d.length]]
+      })
+      setIdx((i) => (i + 1) % (lines.length + 1))
+    }, 200)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <div className="font-mono text-xs bg-[#0D1117] text-green-400 p-2 rounded h-48 overflow-y-auto" style={{minHeight:192}}>
+      {displayed.map((l, i) => (
+        <div key={i} className={l.includes('ELEVATED') || l.includes('Flagging') ? 'text-amber-400' : l.includes('Ready') ? 'text-white' : l.includes('conf:') ? 'text-green-400' : 'text-white'}>{l}</div>
+      ))}
+    </div>
+  )
+}
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
-      {/* Nav */}
-      <nav className="border-b border-gray-800/60 bg-gray-950/90 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-screen-xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
-            <span className="hidden sm:block text-gray-600">|</span>
-            <span className="hidden sm:block text-sm text-gray-400">Portfolio Dashboard</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-gray-400 hidden sm:block">{result.investor_type}</span>
-            <ScoreBadge score={result.dna_score} />
-            <Link href="/swarm" className="btn-outline py-1.5 text-xs">Swarm Analysis</Link>
-            <Link href="/upload" className="btn-outline py-1.5 text-xs">New Analysis</Link>
-            {user && (
-              <button
-                onClick={signOut}
-                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-              >
-                Sign out
-              </button>
-            )}
-          </div>
-        </div>
-      </nav>
-
+    <div className="flex flex-col">
       <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
 
         {/* ── Top row: Portfolio value line chart ──────────────────────────── */}
@@ -249,6 +434,8 @@ export default function DashboardPage() {
           </div>
           {histLoading ? (
             <div className="shimmer rounded-lg h-32 w-full" />
+          ) : histError ? (
+            <div className="text-red-400 text-sm py-4">{histError}</div>
           ) : (
             <ResponsiveContainer width="100%" height={120}>
               <LineChart data={portfolioHistory} margin={{ top: 0, right: 8, bottom: 0, left: 8 }}>
@@ -350,8 +537,11 @@ export default function DashboardPage() {
                 <span className="text-xs badge bg-gray-800 text-gray-400">3 months</span>
               </div>
               {candleLoading && (
-                <div className="shimmer rounded w-32 h-4" />
-              )}
+                  <div className="shimmer rounded w-32 h-4" />
+                )}
+              {candleError && (
+                  <div className="text-red-400 text-xs py-2">{candleError}</div>
+                )}
             </div>
             <div className="flex-1 min-h-0">
               <CandlestickChart

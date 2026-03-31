@@ -1,0 +1,12 @@
+{
+  "id": "mock_data_warning",
+  "description": "Mock data found in production code",
+  "matches": {
+    "type": "mock_data",
+    "pattern": "(DEMO_|MOCK_|SAMPLE_)[A-Z_]+"
+  },
+  "fix_type": "alert_only",
+  "safe_to_auto_apply": false,
+  "requires_human": true,
+  "reason": "Replacement requires knowing the correct live API endpoint or data source"
+}

@@ -9,6 +9,13 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
+from services.market_cache import (
+    TICKER_ALIASES,
+    PriceResult,
+    get_ticker_price_cache,
+    upsert_ticker_price_cache,
+)
+
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
 POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
@@ -390,16 +397,21 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                     print(f"[Price] AlphaVantage {sym} future error: {e}", file=sys.stderr)
 
     if remaining:
-        # Structured error log — allows log-aggregation tools to alert on this pattern.
         print(
             f"[Price] PRICE_RESOLUTION_FAILURE symbols={remaining} "
             f"resolved={list(results.keys())} "
             f"providers_tried=polygon,fmp,twelvedata,marketstack,finnhub,alphavantage",
             file=sys.stderr,
         )
-        # Attach a sentinel so callers (e.g. calculate_portfolio_metrics) can detect
-        # and surface a warning rather than silently using 0.0 for value calculations.
         results["__failed__"] = [*remaining]  # type: ignore[assignment]
+
+    # Persist resolved prices to last-known-price cache
+    for sym, price in results.items():
+        if sym != "__failed__" and isinstance(price, float) and price > 0:
+            try:
+                upsert_ticker_price_cache(sym, price, source="live")
+            except Exception:  # noqa: S110
+                pass  # non-critical cache write — don't block price fetch
 
     return results
 
@@ -407,26 +419,94 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
 # ── Single spot-price fetcher (public, cache-aware) ───────────────────────────
 def fetch_spot_price(sym: str) -> float:
     """
-    Return the latest price for *sym* (single-symbol convenience wrapper).
+    Return the latest price for *sym*.  Never raises.
+    Returns 0.0 when all providers fail (caller should check for 0 if needed).
 
-    Uses the 1-hour in-process cache; delegates to fetch_spot_prices_batch
-    for the actual provider chain.
+    Use get_price_with_fallback() for the full PriceResult with status/warnings.
+    """
+    result = get_price_with_fallback(sym)
+    return result.price if result.price is not None else 0.0
 
-    Raises ValueError("DATA_INTEGRITY_ERROR: Could not verify price for {sym}")
-    when all providers fail — never silently returns 0.
+
+def get_price_with_fallback(sym: str) -> "PriceResult":
+    """
+    Full price resolution waterfall returning a PriceResult — never raises.
+
+    Step 1: Try all 6 live providers (existing waterfall).
+    Step 2: Try TICKER_ALIASES for the symbol.
+    Step 3: Use last-known cached price from Supabase (marks as stale).
+    Step 4: Return unresolvable — caller decides whether to exclude.
     """
     sym = sym.upper()
+
+    # In-process 1-hour cache hit
     cached = _PRICE_CACHE.get(sym)
     if cached and (time.time() - cached[1]) < _CACHE_TTL:
-        return cached[0]
+        return PriceResult(symbol=sym, price=cached[0], status="live")
 
+    # Step 1: Live providers
     batch = fetch_spot_prices_batch([sym])
+    batch.pop("__failed__", None)
     price = batch.get(sym, 0.0)
-    if price > 0:
+    if price and price > 0:
         _PRICE_CACHE[sym] = (price, time.time())
-        return price
+        return PriceResult(symbol=sym, price=price, status="live")
 
-    raise ValueError(f"DATA_INTEGRITY_ERROR: Could not verify price for {sym}")
+    # Step 2: Try aliases
+    for alias in TICKER_ALIASES.get(sym, []):
+        if alias == sym:
+            continue
+        alias_batch = fetch_spot_prices_batch([alias])
+        alias_batch.pop("__failed__", None)
+        alias_price = alias_batch.get(alias, 0.0)
+        if alias_price and alias_price > 0:
+            _PRICE_CACHE[sym] = (alias_price, time.time())
+            upsert_ticker_price_cache(sym, alias_price, source=f"alias:{alias}")
+            print(f"[Price] {sym} resolved via alias {alias}={alias_price}", file=sys.stderr)
+            return PriceResult(
+                symbol=sym,
+                price=alias_price,
+                status="alias",
+                alias_used=alias,
+                warning=f"{sym} resolved via alias {alias}",
+            )
+
+    # Step 3: Stale cache
+    cached_row = get_ticker_price_cache(sym)
+    if cached_row and cached_row.get("price"):
+        stale_price = float(cached_row["price"])
+        try:
+            recorded = datetime.datetime.fromisoformat(
+                cached_row["recorded_at"].replace("Z", "+00:00")
+            )
+            age_hours = (
+                datetime.datetime.now(datetime.UTC) - recorded
+            ).total_seconds() / 3600
+        except Exception:
+            age_hours = 0.0
+        print(
+            f"[Price] {sym} using stale price ${stale_price} from {age_hours:.0f}h ago",
+            file=sys.stderr,
+        )
+        return PriceResult(
+            symbol=sym,
+            price=stale_price,
+            status="stale",
+            stale_age_hours=age_hours,
+            warning=(
+                f"{sym} using last known price from {int(age_hours)}h ago. "
+                "Live price unavailable — verify this position manually."
+            ),
+        )
+
+    # Step 4: Unresolvable
+    print(f"[Price] {sym} UNRESOLVABLE — all providers and cache exhausted", file=sys.stderr)
+    return PriceResult(
+        symbol=sym,
+        price=None,
+        status="unresolvable",
+        warning=f"{sym} could not be priced and was excluded from analysis.",
+    )
 
 
 # ── Price integrity verifier ──────────────────────────────────────────────────
@@ -876,17 +956,43 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     df["symbol"] = df["symbol"].str.upper()
     symbols = df["symbol"].tolist()
 
-    # Spot prices via multi-provider batch engine
-    spot_prices = _fetch_prices_batch(symbols)
-    failed_tickers: list[str] = spot_prices.pop("__failed__", [])  # type: ignore[arg-type]
+    # Resolve prices using the full waterfall (live → alias → stale → unresolvable)
+    price_results: dict[str, PriceResult] = {
+        sym: get_price_with_fallback(sym) for sym in symbols
+    }
+
+    unresolvable = [sym for sym, r in price_results.items() if r.status == "unresolvable"]
+    resolved = [sym for sym in symbols if sym not in unresolvable]
+
+    if not resolved:
+        raise ValueError(
+            "No tickers could be priced. Check your symbols and try again. "
+            f"Unresolvable: {unresolvable}"
+        )
+
+    # Build warnings list for all non-live tickers
+    price_warnings: list[str] = []
+    for _sym, r in price_results.items():
+        if r.warning:
+            price_warnings.append(r.warning)
+
+    spot_prices = {sym: r.price for sym, r in price_results.items() if r.price is not None}
+    price_status = {sym: r.status for sym, r in price_results.items()}
+
     df["current_price"] = df["symbol"].map(spot_prices).fillna(0.0)
 
-    # Historical prices for volatility calculation
-    returns = _fetch_historical_returns(symbols, "1mo")
+    # Historical prices for volatility (only resolved tickers)
+    returns = _fetch_historical_returns(resolved, "1mo")
     df["current_value"] = df["shares"] * df["current_price"]
 
-    total_value = float(df["current_value"].sum())
-    df["weight"] = df["current_value"] / total_value if total_value > 0 else 0.0
+    # Recalculate weights based only on resolved tickers
+    resolved_mask = df["symbol"].isin(resolved)
+    total_value = float(df.loc[resolved_mask, "current_value"].sum())
+    df["weight"] = 0.0
+    if total_value > 0:
+        df.loc[resolved_mask, "weight"] = (
+            df.loc[resolved_mask, "current_value"] / total_value
+        )
 
     # Scoring components
     hhi_pts = _hhi_score(df["weight"])
@@ -914,10 +1020,14 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         total_cost = float((df["shares"] * df["cost_basis"]).sum())
         pnl_pct = float((total_value - total_cost) / total_cost * 100) if total_cost > 0 else None
 
+    positions_out = df[["symbol", "shares", "current_price", "current_value", "weight"]].copy()
+    positions_out["price_status"] = positions_out["symbol"].map(price_status).fillna("live")
+
     result = {
         "total_value": float(total_value),
         "hhi": round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
         "num_positions": len(df),
+        "num_priced": len(resolved),
         "dna_score": dna_score,
         "tax_alpha_score": tax_pts,
         "score_breakdown": {
@@ -930,15 +1040,10 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
-        "positions": df[["symbol", "shares", "current_price", "current_value", "weight"]].to_dict(
-            "records"
-        ),
+        "positions": positions_out.to_dict("records"),
     }
-    if failed_tickers:
-        result["price_warnings"] = [
-            f"PRICE_RESOLUTION_FAILURE: {sym} — price defaulted to $0.00. "
-            "DNA score may be understated. Check ticker symbol or try again later."
-            for sym in failed_tickers
-        ]
-        result["failed_tickers"] = failed_tickers
+    if price_warnings:
+        result["warnings"] = price_warnings
+    if unresolvable:
+        result["failed_tickers"] = unresolvable
     return result

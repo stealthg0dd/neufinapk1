@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from database import supabase
 from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, require_active_subscription
 from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
 from services.pdf_generator import generate_advisor_report
@@ -199,7 +199,7 @@ Be specific, data-driven, and professional."""
 
 
 @router.get("/{report_id}/download")
-async def download_report(report_id: str, user: JWTUser = Depends(get_current_user)):
+async def download_report(report_id: str, user: JWTUser = Depends(require_active_subscription)):
     """Redirect to the Supabase Storage public URL for this report."""
     record = _load_report_for_advisor(report_id, user)
     pdf_url = record.get("pdf_url")

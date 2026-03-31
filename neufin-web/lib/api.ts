@@ -1,9 +1,105 @@
+// ── Subscription status ─────────────────────────────────────────────────────
+export async function getSubscriptionStatus(token?: string | null): Promise<{ status: 'trial' | 'active' | 'expired', days_remaining?: number }> {
+  const res = await fetch(`${API}/api/auth/subscription-status`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Could not fetch subscription status')
+  return res.json()
+}
+/**
+ * Associate an anonymous portfolio with the now-authenticated user.
+ * Call this after sign-in if localStorage contains a pending_portfolio_id.
+ */
+export async function claimAnonymousPortfolio(
+  portfolioId: string,
+  token: string
+): Promise<{ claimed: boolean; portfolio_id: string }> {
+  const res = await fetch(`${API}/api/portfolio/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ portfolio_id: portfolioId }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Portfolio claim failed')
+  }
+  return res.json()
+}
 const API = process.env.NEXT_PUBLIC_API_URL;
 if (!API) console.warn("WARNING: NEXT_PUBLIC_API_URL is not set!");
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
 function authHeaders(token?: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+// ── authFetch — centralised fetch with status-code handling ───────────────────
+/**
+ * Drop-in fetch wrapper. Handles these status codes globally:
+ *  401 → sign out + redirect to /auth (expired session)
+ *  402 → dispatch 'subscription:required' event
+ *  404 → returns null (caller handles empty state)
+ *  422 → throws with { status, details } for inline field errors
+ *  429 → toast "Too many requests" and throws
+ *  5xx → toast "Server error" + captures to Sentry, then throws
+ *
+ * Returns the raw Response on success (2xx) so callers can call .json() etc.
+ * Returns null for 404 and 401/402 (after side-effects).
+ */
+export async function authFetch(
+  url: string,
+  options: RequestInit = {},
+  token?: string | null,
+): Promise<Response | null> {
+  const headers: Record<string, string> = {
+    ...authHeaders(token),
+    ...(options.headers as Record<string, string> | undefined ?? {}),
+  }
+  const res = await fetch(url, { ...options, headers })
+
+  if (res.ok) return res
+
+  switch (true) {
+    case res.status === 401: {
+      if (typeof window !== 'undefined') {
+        // Lazy-import to avoid circular deps and keep server bundle clean
+        const { supabase } = await import('./supabase')
+        await supabase.auth.signOut()
+        window.location.href = '/auth?reason=session_expired'
+      }
+      return null
+    }
+    case res.status === 402: {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('subscription:required'))
+      }
+      return null
+    }
+    case res.status === 404:
+      return null
+
+    case res.status === 422: {
+      const body = await res.json().catch(() => ({}))
+      const err = Object.assign(new Error('Validation error'), { status: 422, details: body })
+      throw err
+    }
+    case res.status === 429: {
+      const { toast } = await import('react-hot-toast')
+      toast.error('Too many requests — please wait a moment')
+      throw new Error('Rate limited (429)')
+    }
+    default: {
+      if (res.status >= 500) {
+        const { toast } = await import('react-hot-toast')
+        const { captureException } = await import('@sentry/nextjs')
+        const err = new Error(`Server error ${res.status}`)
+        captureException(err, { extra: { url, status: res.status } })
+        toast.error('Server error — our team has been notified')
+        throw err
+      }
+      throw new Error(`Request failed: ${res.status}`)
+    }
+  }
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -13,6 +109,7 @@ export interface DNAAnalysisResponse {
   investor_type: string
   total_value: number
   num_positions: number
+  num_priced?: number
   max_position_pct: number
   positions: Position[]
   strengths: string[]
@@ -21,6 +118,10 @@ export interface DNAAnalysisResponse {
   share_token: string
   share_url: string
   record_id: string | null
+  /** Non-blocking warnings: stale prices, alias resolutions, excluded tickers */
+  warnings?: string[]
+  /** Tickers that could not be priced and were excluded from analysis */
+  failed_tickers?: string[]
 }
 
 // Alias kept for backward compatibility with other pages
