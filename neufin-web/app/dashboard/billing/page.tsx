@@ -20,6 +20,32 @@ const PLAN_COLORS: Record<string, string> = {
   expired: 'text-red-400',
 }
 
+function getPlanLabel(status: 'trial' | 'active' | 'expired'): string {
+  switch (status) {
+    case 'trial':
+      return PLAN_LABELS.trial
+    case 'active':
+      return PLAN_LABELS.active
+    case 'expired':
+      return PLAN_LABELS.expired
+    default:
+      return 'Unknown'
+  }
+}
+
+function getPlanColor(status: 'trial' | 'active' | 'expired'): string {
+  switch (status) {
+    case 'trial':
+      return PLAN_COLORS.trial
+    case 'active':
+      return PLAN_COLORS.active
+    case 'expired':
+      return PLAN_COLORS.expired
+    default:
+      return 'text-gray-400'
+  }
+}
+
 // ── Date formatter ─────────────────────────────────────────────────────────────
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -84,7 +110,7 @@ export default function BillingPage() {
         <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Current Plan</h2>
         <div className="flex items-center justify-between">
           <div>
-            <p className={`text-xl font-bold ${PLAN_COLORS[status]}`}>{PLAN_LABELS[status]}</p>
+            <p className={`text-xl font-bold ${getPlanColor(status)}`}>{getPlanLabel(status)}</p>
             {status === 'trial' && daysRemaining !== undefined && (
               <p className="text-sm text-gray-400 mt-0.5">
                 {daysRemaining > 0

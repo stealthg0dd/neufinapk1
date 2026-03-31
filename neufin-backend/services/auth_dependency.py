@@ -1,4 +1,6 @@
 import datetime
+import json
+from urllib.parse import unquote
 
 from fastapi import HTTPException, Request, status
 
@@ -6,6 +8,7 @@ from database import supabase
 from services.jwt_auth import JWTUser, verify_jwt
 
 # ── Subscription helpers ────────────────────────────────────────────────────────
+
 
 def fetch_user_profile(user_id: str) -> dict:
     try:
@@ -47,34 +50,71 @@ def require_active_subscription(user: JWTUser | None = None) -> JWTUser:
     if sub["status"] == "expired":
         raise HTTPException(
             status_code=402,
-            detail={"code": "SUBSCRIPTION_REQUIRED", "message": "Trial expired. Subscribe to continue."},
+            detail={
+                "code": "SUBSCRIPTION_REQUIRED",
+                "message": "Trial expired. Subscribe to continue.",
+            },
         )
     return user
 
 
 # ── Auth dependencies ───────────────────────────────────────────────────────────
-
-def _extract_bearer_token(request: Request) -> str | None:
-    auth = request.headers.get("Authorization")
-    if not auth:
+def _extract_cookie_token(raw: str | None) -> str | None:
+    """Extract a usable JWT from common Supabase cookie formats."""
+    if not raw:
         return None
-    if not auth.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid auth header",
-        )
-    return auth.split(" ", 1)[1]
+
+    token = unquote(raw).strip().strip('"').strip("'")
+    if not token:
+        return None
+
+    if token.startswith("Bearer "):
+        return token.split(" ", 1)[1].strip() or None
+
+    if token.startswith("{") or token.startswith("["):
+        try:
+            parsed = json.loads(token)
+        except Exception:
+            parsed = None
+
+        if isinstance(parsed, dict):
+            for key in ("access_token", "token"):
+                candidate = parsed.get(key)
+                if isinstance(candidate, str) and candidate.strip():
+                    return candidate.strip()
+        elif isinstance(parsed, list):
+            for item in parsed:
+                if isinstance(item, str) and item.strip():
+                    return item.strip()
+                if isinstance(item, dict):
+                    candidate = item.get("access_token") or item.get("token")
+                    if isinstance(candidate, str) and candidate.strip():
+                        return candidate.strip()
+
+    return token or None
+
+
+def _extract_request_token(request: Request, strict_header: bool) -> str | None:
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        if auth_header.startswith("Bearer "):
+            return auth_header.split(" ", 1)[1].strip() or None
+        if strict_header:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid auth header",
+            )
+
+    for cookie_name in ("sb-access-token", "neufin-auth"):
+        token = _extract_cookie_token(request.cookies.get(cookie_name))
+        if token:
+            return token
+
+    return None
 
 
 async def get_current_user(request: Request) -> JWTUser:
-    # Enterprise fix: Check BOTH Authorization Header AND Cookies
-    auth_header = request.headers.get("Authorization")
-    auth_cookie = request.cookies.get("sb-access-token")
-    token = None
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ", 1)[1]
-    elif auth_cookie:
-        token = auth_cookie
+    token = _extract_request_token(request, strict_header=True)
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -91,7 +131,7 @@ async def get_current_user(request: Request) -> JWTUser:
 
 
 async def get_optional_user(request: Request) -> JWTUser | None:
-    token = _extract_bearer_token(request)
+    token = _extract_request_token(request, strict_header=False)
     if not token:
         return None
     try:

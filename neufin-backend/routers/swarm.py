@@ -227,7 +227,7 @@ Return ONLY valid JSON (no markdown):
 @router.post("/analyze")
 async def analyze_with_swarm(
     body: SwarmAnalyzeRequest,
-    user: JWTUser = Depends(require_active_subscription),
+    user: JWTUser | None = Depends(get_optional_user),
 ):
     """
     Run the full Neufin Agent Swarm on a portfolio.
@@ -242,6 +242,8 @@ async def analyze_with_swarm(
     """
     if not body.positions:
         raise HTTPException(status_code=400, detail="positions list must not be empty.")
+    if user:
+        require_active_subscription(user)
 
     ticker_data = [p.model_dump() for p in body.positions]
 
@@ -384,7 +386,7 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
 
 
 @router.get("/report/{report_id}")
-async def get_report(report_id: str, user: JWTUser = Depends(require_active_subscription)):
+async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional_user)):
     """
     Fetch a persisted swarm report by ID from Supabase.
     Used by the frontend to restore thesis state on page refresh.
@@ -394,6 +396,10 @@ async def get_report(report_id: str, user: JWTUser = Depends(require_active_subs
         if not row.data:
             raise HTTPException(status_code=404, detail="Report not found.")
         report_user_id = row.data.get("user_id")
+        if report_user_id:
+            if not user:
+                raise HTTPException(status_code=401, detail="Authentication required.")
+            require_active_subscription(user)
         if report_user_id and (not user or report_user_id != user.id):
             raise HTTPException(status_code=404, detail="Report not found.")
         return {"investment_thesis": row.data, "found": True}

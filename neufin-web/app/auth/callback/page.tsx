@@ -86,7 +86,7 @@ function AuthCallbackContent() {
       setError('Sign-in failed. No session returned.')
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [next, searchParams])
 
   if (error) {
     return (
@@ -110,4 +110,3 @@ function AuthCallbackContent() {
 
   return <Spinner />
 }
-

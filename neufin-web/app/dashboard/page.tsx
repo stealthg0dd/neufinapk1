@@ -7,6 +7,7 @@ import dynamicImport from 'next/dynamic'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
 import { debugAuth } from '@/lib/auth-debug'
+import DashboardSkeleton from '@/components/skeletons/DashboardSkeleton'
 import {
   ResponsiveContainer,
   LineChart,
@@ -90,6 +91,16 @@ function SignalBadge({ type }: { type: string }) {
 
 // ── Tooltip formatter ──────────────────────────────────────────────────────────
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+const TERMINAL_LINES = [
+  '> MARKET_REGIME_AGENT: Fetching FRED macro data...',
+  '> MARKET_REGIME_AGENT: Regime classified → GROWTH (conf: 0.87)',
+  '> QUANT_AGENT: Computing HHI concentration score...',
+  '> QUANT_AGENT: HHI = 0.31 → ELEVATED concentration',
+  '> TAX_AGENT: Scanning cost basis for harvest opportunities...',
+  '> RISK_SENTINEL: Flagging correlated clusters...',
+  '> SYNTHESIZER: Building IC briefing...',
+  '> STATUS: Ready. Awaiting portfolio input.'
+]
 
 export default function DashboardPage() {
     // Data for first-time dashboard
@@ -244,11 +255,7 @@ export default function DashboardPage() {
   const pctChange = firstHistValue ? ((lastHistValue - firstHistValue) / firstHistValue) * 100 : 0
 
   if (isLoading || firstVisit === null || (firstVisit && loadingAll)) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   // FIRST-TIME DASHBOARD EXPERIENCE
@@ -381,25 +388,15 @@ export default function DashboardPage() {
   }
 // AnimatedTerminal: typewriter effect for agent activity
 function AnimatedTerminal() {
-  const lines = [
-    '> MARKET_REGIME_AGENT: Fetching FRED macro data...',
-    '> MARKET_REGIME_AGENT: Regime classified → GROWTH (conf: 0.87)',
-    '> QUANT_AGENT: Computing HHI concentration score...',
-    '> QUANT_AGENT: HHI = 0.31 → ELEVATED concentration',
-    '> TAX_AGENT: Scanning cost basis for harvest opportunities...',
-    '> RISK_SENTINEL: Flagging correlated clusters...',
-    '> SYNTHESIZER: Building IC briefing...',
-    '> STATUS: Ready. Awaiting portfolio input.'
-  ]
   const [displayed, setDisplayed] = useState<string[]>([])
   const [idx, setIdx] = useState(0)
   useEffect(() => {
     const timer = setInterval(() => {
       setDisplayed((d) => {
-        if (d.length === lines.length) return []
-        return [...d, lines[d.length]]
+        if (d.length === TERMINAL_LINES.length) return []
+        return [...d, TERMINAL_LINES[d.length]]
       })
-      setIdx((i) => (i + 1) % (lines.length + 1))
+      setIdx((i) => (i + 1) % (TERMINAL_LINES.length + 1))
     }, 200)
     return () => clearInterval(timer)
   }, [])

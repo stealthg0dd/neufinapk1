@@ -76,6 +76,7 @@ from services.calculator import (  # noqa: E402
     fetch_spot_price,
     get_tax_impact_analysis,
 )
+from services.auth_dependency import get_current_user  # noqa: E402
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,
@@ -133,6 +134,8 @@ except ImportError:
 # ── CORS origins — dynamic: base set + optional ALLOWED_ORIGINS env var ─────────
 # Add production domains to Railway env: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
 _extra_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_vercel_url = os.environ.get("VERCEL_URL", "").strip()
+_vercel_origin = f"https://{_vercel_url}" if _vercel_url else ""
 origins = list(
     {
         "http://localhost:3000",
@@ -143,9 +146,11 @@ origins = list(
         "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
         "https://neufin.ai",
         "https://www.neufin.ai",
+        _vercel_origin,
         *_extra_origins,
     }
 )
+origins = [o for o in origins if o]
 # Regex covers all Vercel preview deployments (https://*.vercel.app)
 # Starlette does not support glob wildcards in allow_origins — use allow_origin_regex instead.
 _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
@@ -208,8 +213,17 @@ async def auth_middleware(request: Request, call_next):
 
     # ── Soft JWT attachment ────────────────────────────────────────────────────
     auth_header = request.headers.get("Authorization", "")
+    token = None
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ", 1)[1]
+    elif request.cookies.get("sb-access-token"):
+        token = request.cookies.get("sb-access-token")
+    elif request.cookies.get("neufin-auth"):
+        token = request.cookies.get("neufin-auth")
+
+    if token:
+        token = token.strip().strip('"').strip("'")
+    if token:
         try:
             request.state.user = await verify_jwt(token)
             # Attach user identity to all Sentry events for this request
@@ -252,23 +266,30 @@ async def global_options_handler(full_path: str):
 @app.post("/api/analyze-dna", tags=["dna"])
 async def analyze_dna(
     request: Request,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    csv_file: UploadFile | None = File(None),
+    upload: UploadFile | None = File(None),
+    data: UploadFile | None = File(None),
 ):
     """
     Upload CSV → Investor DNA Score.
-    Multipart field name must be 'file'.
+    Accepts common multipart field names: file, csv_file, upload, data.
     Prices fetched concurrently from Finnhub → Alpha Vantage.
     """
+    incoming_file = file or csv_file or upload or data
+    if incoming_file is None:
+        raise HTTPException(status_code=422, detail="File required.")
+
     # ── 0. Diagnostics ─────────────────────────────────────────────────────────
     print(f"[DIAG] content-type: {request.headers.get('content-type', 'MISSING')}", file=sys.stderr)
     print(
-        f"[DIAG] file.filename={file.filename!r}  content_type={file.content_type!r}",
+        f"[DIAG] file.filename={incoming_file.filename!r}  content_type={incoming_file.content_type!r}",
         file=sys.stderr,
     )
 
     # ── 1. Read + parse CSV ────────────────────────────────────────────────────
     try:
-        contents = await file.read()
+        contents = await incoming_file.read()
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
         df.columns = [c.lower().strip() for c in df.columns]
     except Exception as e:
@@ -424,12 +445,13 @@ Return ONLY valid JSON:
         file=sys.stderr,
     )
 
-
     # ── 9.1. Create Portfolio ─────────────────────────────────────────────
     portfolio_id = None
     try:
         # Portfolio name: 'Uploaded {date}'
-        portfolio_name = f"Uploaded {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        portfolio_name = (
+            f"Uploaded {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M')}"
+        )
         port_row = {
             "user_id": user_id,
             "name": portfolio_name,
@@ -442,14 +464,19 @@ Return ONLY valid JSON:
             # Insert positions
             for pos in positions_out:
                 try:
-                    supabase.table("portfolio_positions").insert({
-                        "portfolio_id": portfolio_id,
-                        "symbol": pos["symbol"],
-                        "shares": pos["shares"],
-                        "cost_basis": None,
-                    }).execute()
+                    supabase.table("portfolio_positions").insert(
+                        {
+                            "portfolio_id": portfolio_id,
+                            "symbol": pos["symbol"],
+                            "shares": pos["shares"],
+                            "cost_basis": None,
+                        }
+                    ).execute()
                 except Exception:
-                    print(f"[DB] portfolio_positions insert failed for {pos['symbol']}", file=sys.stderr)
+                    print(
+                        f"[DB] portfolio_positions insert failed for {pos['symbol']}",
+                        file=sys.stderr,
+                    )
         else:
             print("[DB] portfolios insert returned empty data", file=sys.stderr)
             portfolio_id = None
@@ -598,17 +625,10 @@ async def subscription_status(request: Request):
       status:         'trial' | 'active' | 'expired'
       days_remaining: days left in trial (only when status='trial')
     """
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        from fastapi import HTTPException as _HTTPException
-        raise _HTTPException(401, "Authentication required")
-
-    token = auth_header.split(" ", 1)[1]
     try:
-        user = await verify_jwt(token)
-    except Exception as exc:
-        from fastapi import HTTPException as _HTTPException
-        raise _HTTPException(401, str(exc)) from exc
+        user = await get_current_user(request)
+    except HTTPException:
+        raise
 
     try:
         result = (

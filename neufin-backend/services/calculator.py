@@ -473,15 +473,21 @@ def get_price_with_fallback(sym: str) -> "PriceResult":
 
     # Step 3: Stale cache
     cached_row = get_ticker_price_cache(sym)
-    if cached_row and cached_row.get("price"):
-        stale_price = float(cached_row["price"])
+    if cached_row and cached_row.get("price") is not None:
+        try:
+            stale_price = float(cached_row["price"])
+        except (TypeError, ValueError):
+            stale_price = 0.0
+        if stale_price <= 0:
+            stale_price = 0.0
+    else:
+        stale_price = 0.0
+    if stale_price > 0:
         try:
             recorded = datetime.datetime.fromisoformat(
                 cached_row["recorded_at"].replace("Z", "+00:00")
             )
-            age_hours = (
-                datetime.datetime.now(datetime.UTC) - recorded
-            ).total_seconds() / 3600
+            age_hours = (datetime.datetime.now(datetime.UTC) - recorded).total_seconds() / 3600
         except Exception:
             age_hours = 0.0
         print(
@@ -957,9 +963,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     symbols = df["symbol"].tolist()
 
     # Resolve prices using the full waterfall (live → alias → stale → unresolvable)
-    price_results: dict[str, PriceResult] = {
-        sym: get_price_with_fallback(sym) for sym in symbols
-    }
+    price_results: dict[str, PriceResult] = {sym: get_price_with_fallback(sym) for sym in symbols}
 
     unresolvable = [sym for sym, r in price_results.items() if r.status == "unresolvable"]
     resolved = [sym for sym in symbols if sym not in unresolvable]
@@ -990,9 +994,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     total_value = float(df.loc[resolved_mask, "current_value"].sum())
     df["weight"] = 0.0
     if total_value > 0:
-        df.loc[resolved_mask, "weight"] = (
-            df.loc[resolved_mask, "current_value"] / total_value
-        )
+        df.loc[resolved_mask, "weight"] = df.loc[resolved_mask, "current_value"] / total_value
 
     # Scoring components
     hhi_pts = _hhi_score(df["weight"])

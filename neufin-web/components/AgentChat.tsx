@@ -89,10 +89,21 @@ export default function AgentChat({ thesis, positions, totalValue, apiBase, onCl
     setMessages(prev => [...prev, { role: 'assistant', text: '', loading: true }])
 
     try {
+      const savedReportId = typeof window !== 'undefined'
+        ? localStorage.getItem('neufin-swarm-report-id')
+        : null
+      const body: Record<string, unknown> = { message: q }
+      if (positions.length > 0) {
+        body.positions = positions
+        body.total_value = totalValue
+      } else if (savedReportId) {
+        body.record_id = savedReportId
+      }
+
       const res = await fetch(`${apiBase}/api/swarm/chat`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: q, positions, total_value: totalValue }),
+        body:    JSON.stringify(body),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()

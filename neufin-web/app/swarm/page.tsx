@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import React, { Suspense, useState, useCallback, useEffect } from 'react'
+import React, { Suspense, useState, useCallback, useEffect, useMemo } from 'react'
 import SwarmTerminal from '@/components/SwarmTerminal'
 import CommandPalette from '@/components/CommandPalette'
 import RiskMatrix from '@/components/RiskMatrix'
@@ -752,8 +752,16 @@ export default function SwarmPage() {
   const [positions,       setPositions]       = useState<SwarmPosition[]>([])
   const [totalValue,      setTotalValue]      = useState(0)
 
-  const { isPro, token, loading: authLoading } = useUser()
-  const isUnlocked = isPro || unlockedLocally
+  const { isPro, token, loading: authLoading, user } = useUser()
+  const isTrialBypass = useMemo(() => {
+    const createdAt = user?.created_at
+    if (!createdAt) return false
+    const createdTs = new Date(createdAt).getTime()
+    if (!Number.isFinite(createdTs)) return false
+    const ageDays = (Date.now() - createdTs) / (1000 * 60 * 60 * 24)
+    return ageDays < 14
+  }, [user?.created_at])
+  const isUnlocked = isPro || unlockedLocally || isTrialBypass
 
   useEffect(() => {
     debugAuth('swarm:mount')
@@ -817,12 +825,18 @@ export default function SwarmPage() {
   const startCheckout = useCallback(async () => {
     setCheckoutLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/api/payments/checkout`, {
+      const res = await fetch(`${API_BASE}/api/reports/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           plan: 'single',
-          record_id: thesis?.swarm_report_id ?? '',
+          positions: positions.map((p) => ({
+            symbol: p.symbol,
+            shares: p.shares,
+            price: p.price,
+            value: p.value,
+            weight: p.weight,
+          })),
           success_url: `${window.location.origin}/swarm?checkout_success=1`,
           cancel_url: window.location.href,
         }),
@@ -832,7 +846,7 @@ export default function SwarmPage() {
     } catch {
       setCheckoutLoading(false)
     }
-  }, [API_BASE, token, thesis])
+  }, [API_BASE, token, positions])
 
   // Restore last report from localStorage on mount
   useEffect(() => {
@@ -868,7 +882,10 @@ export default function SwarmPage() {
       const res = await fetch(`${API_BASE}/api/swarm/analyze`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ positions, total_value: totalValue }),
+        body: JSON.stringify({
+          positions,
+          total_value: totalValue
+        }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
       const data = await res.json()

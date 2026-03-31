@@ -285,10 +285,22 @@ export async function createCheckoutSession(
 ): Promise<void> {
   const origin       = window.location.origin
   const refToken = localStorage.getItem('ref_token') ?? undefined
+  const parsedResult = (() => {
+    try { return JSON.parse(localStorage.getItem('dnaResult') || 'null') } catch { return null }
+  })()
+  const positions = Array.isArray(parsedResult?.positions)
+    ? parsedResult.positions.map((p: any) => ({
+      symbol: p.symbol,
+      shares: p.shares,
+      price: p.price,
+      value: p.value,
+      weight: p.weight,
+    }))
+    : undefined
   const data = await createCheckout(
     {
       plan:         'single',
-      portfolio_id: recordId,
+      ...(positions?.length ? { positions } : { portfolio_id: recordId }),
       ref_token:    refToken,              // backend field name
       success_url:  `${origin}/reports/success`,
       cancel_url:   `${origin}/results`,

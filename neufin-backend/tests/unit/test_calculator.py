@@ -1,6 +1,7 @@
 """Unit tests for services/calculator.py — portfolio metrics calculation."""
 
-from unittest.mock import patch
+import inspect
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -23,6 +24,32 @@ MOCK_PRICES = {
     "MSFT": 415.0,
     "GOOGL": 175.0,
 }
+
+
+@pytest.fixture
+def mock_prices():
+    """Patch live price resolution with deterministic test prices."""
+    from services import calculator as calc
+    from services.market_cache import PriceResult
+
+    patch_kwargs = {}
+    if inspect.iscoroutinefunction(calc.get_price_with_fallback):
+        patch_kwargs["new_callable"] = AsyncMock
+
+    with patch("services.calculator.get_price_with_fallback", **patch_kwargs) as m:
+        m.side_effect = lambda symbol, **kwargs: PriceResult(
+            symbol=symbol,
+            price={
+                "AAPL": 189.50,
+                "MSFT": 415.20,
+                "GOOGL": 175.80,
+                "NVDA": 875.40,
+                "TSLA": 245.60,
+                "SQ": 68.30,
+            }.get(symbol, 100.0),
+            status="live",
+        )
+        yield m
 
 
 # ── HHI concentration ─────────────────────────────────────────────────────────
@@ -123,11 +150,9 @@ class TestPriceFetching:
 
 
 class TestCalculatePortfolioMetrics:
-    @patch("services.calculator._fetch_prices_batch")
     @patch("services.calculator._fetch_beta")
     @patch("services.calculator._fetch_historical_returns")
     def test_returns_expected_keys(self, mock_hist, mock_beta, mock_prices):
-        mock_prices.return_value = {"AAPL": 185.0, "MSFT": 415.0, "GOOGL": 175.0}
         mock_beta.return_value = 1.1
         mock_hist.return_value = None  # correlation skipped if no history
 
@@ -140,11 +165,9 @@ class TestCalculatePortfolioMetrics:
         assert "weighted_beta" in result
         assert "positions" in result
 
-    @patch("services.calculator._fetch_prices_batch")
     @patch("services.calculator._fetch_beta")
     @patch("services.calculator._fetch_historical_returns")
     def test_total_value_correct(self, mock_hist, mock_beta, mock_prices):
-        mock_prices.return_value = MOCK_PRICES
         mock_beta.return_value = 1.0
         mock_hist.return_value = None
 
@@ -152,14 +175,12 @@ class TestCalculatePortfolioMetrics:
 
         result = calculate_portfolio_metrics(SAMPLE_POSITIONS)
 
-        expected = 10 * 185.0 + 5 * 415.0 + 3 * 175.0
+        expected = 10 * 189.50 + 5 * 415.20 + 3 * 175.80
         assert result["total_value"] == pytest.approx(expected, rel=0.01)
 
-    @patch("services.calculator._fetch_prices_batch")
     @patch("services.calculator._fetch_beta")
     @patch("services.calculator._fetch_historical_returns")
     def test_tax_alpha_present_with_cost_basis(self, mock_hist, mock_beta, mock_prices):
-        mock_prices.return_value = MOCK_PRICES
         mock_beta.return_value = 1.0
         mock_hist.return_value = None
 

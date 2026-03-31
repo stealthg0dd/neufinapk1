@@ -19,6 +19,7 @@ INCLUDE_EXTS=( --include="*.py" --include="*.ts" --include="*.tsx" --include="*.
 EXCLUDE_DIRS=( --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=__pycache__ --exclude-dir=.git --exclude-dir=dist --exclude-dir=build --exclude-dir=.expo )
 EXCLUDE_FILES=( --exclude="*.sh" --exclude=".env" --exclude=".env.*" --exclude="*.env" --exclude="*.env.*" )
 
+
 echo "=== Neufin Pre-Push Secret Scan ==="
 echo "Scanning: .py  .ts  .tsx  .js  .jsx"
 echo "Ignoring: .env* files, node_modules, build artefacts"
@@ -62,6 +63,24 @@ _F1="yU5"; _F1+="K"
 _F2="DZG"; _F2+="9"
 scan "Known-bad fragment (yU5K)"           "${_F1}[A-Za-z0-9]+"
 scan "Known-bad fragment (DZG9)"           "${_F2}[A-Za-z0-9]+"
+
+# ── Auto-format ───────────────────────────────────────────────────────────────
+echo ""
+echo "=== Auto-formatting ==="
+
+if command -v ruff &>/dev/null; then
+    (cd "$REPO_ROOT/neufin-backend" && ruff format . 2>&1)
+    echo -e "${GREEN}✓ Backend formatted (ruff)${NC}"
+else
+    echo "ruff not found — skipping backend format"
+fi
+
+if command -v npx &>/dev/null && [ -d "$REPO_ROOT/neufin-web" ]; then
+    (cd "$REPO_ROOT/neufin-web" && npx prettier --write . --log-level warn 2>&1)
+    echo -e "${GREEN}✓ Web formatted (prettier)${NC}"
+else
+    echo "npx/neufin-web not found — skipping web format"
+fi
 
 # ── Result ────────────────────────────────────────────────────────────────────
 echo ""

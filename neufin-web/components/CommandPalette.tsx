@@ -84,10 +84,21 @@ async function callSwarmChat(
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 
+  const savedReportId = typeof window !== 'undefined'
+    ? localStorage.getItem('neufin-swarm-report-id')
+    : null
+  const body: Record<string, unknown> = { message }
+  if (positions.length > 0) {
+    body.positions = positions
+    body.total_value = total_value
+  } else if (savedReportId) {
+    body.record_id = savedReportId
+  }
+
   const res = await fetch(`${apiBase}/api/swarm/chat`, {
     method:  'POST',
     headers,
-    body: JSON.stringify({ message, positions, total_value }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`Chat API ${res.status}: ${await res.text()}`)
   return res.json()

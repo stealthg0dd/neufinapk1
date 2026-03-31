@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 import os
 import sys
 import time
@@ -28,10 +29,10 @@ load_dotenv()
 # ── Ticker alias map ───────────────────────────────────────────────────────────
 # When a ticker fails all 6 providers, try these aliases before giving up.
 TICKER_ALIASES: dict[str, list[str]] = {
-    "SQ": ["SQ", "BLOCK"],   # Block Inc (rebranded from Square)
-    "FB": ["META"],           # Meta Platforms
-    "GOOG": ["GOOGL"],        # Alphabet Class A
-    "TWTR": ["X"],            # X Corp (formerly Twitter)
+    "SQ": ["SQ", "BLOCK"],  # Block Inc (rebranded from Square)
+    "FB": ["META"],  # Meta Platforms
+    "GOOG": ["GOOGL"],  # Alphabet Class A
+    "TWTR": ["X"],  # X Corp (formerly Twitter)
     "SNAP": ["SNAP"],
     "BRK-B": ["BRK.B"],
     "BRK-A": ["BRK.A"],
@@ -42,10 +43,11 @@ TICKER_ALIASES: dict[str, list[str]] = {
 class PriceResult:
     symbol: str
     price: float | None
-    status: str   # live | alias | stale | unresolvable
+    status: str  # live | alias | stale | unresolvable
     warning: str = ""
     alias_used: str = ""
     stale_age_hours: float = 0.0
+
 
 # ── Optional Redis ─────────────────────────────────────────────────────────────
 try:
@@ -142,7 +144,7 @@ def get_closes(symbol: str, days: int) -> pd.Series | None:
     if _SUPABASE_AVAILABLE:
         try:
             sb = get_supabase_client()
-            now_iso = datetime.datetime.utcnow().isoformat()
+            now_iso = datetime.datetime.now(datetime.UTC).isoformat()
             row = (
                 sb.table(_TABLE)
                 .select("payload")
@@ -186,7 +188,7 @@ def set_closes(symbol: str, days: int, series: pd.Series) -> None:
         try:
             sb = get_supabase_client()
             exp = (
-                datetime.datetime.utcnow() + datetime.timedelta(seconds=_SUPABASE_TTL)
+                datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=_SUPABASE_TTL)
             ).isoformat()
             sb.table(_TABLE).upsert(
                 {"cache_key": k, "payload": raw, "expires_at": exp},
@@ -331,16 +333,18 @@ class MarketCache:
                 data = r.json()
                 if data.get("s") == "ok" and data.get("c"):
                     closes = {
-                        _dt.date.fromtimestamp(ts).isoformat(): c
+                        _dt.date.fromtimestamp(ts).isoformat(): float(c)
                         for ts, c in zip(data["t"], data["c"], strict=False)
+                        if _coerce_price(c) is not None
                     }
-                    series = pd.Series(closes, dtype=float).sort_index()
-                    series.name = sym
-                    print(
-                        f"[MarketCache] Finnhub supplied full history for {sym} ({len(series)} rows)",
-                        file=sys.stderr,
-                    )
-                    return series
+                    if closes:
+                        series = pd.Series(closes, dtype=float).sort_index()
+                        series.name = sym
+                        print(
+                            f"[MarketCache] Finnhub supplied full history for {sym} ({len(series)} rows)",
+                            file=sys.stderr,
+                        )
+                        return series
             except Exception as e:
                 print(f"[MarketCache] Finnhub fallback error for {sym}: {e}", file=sys.stderr)
 
@@ -359,16 +363,18 @@ class MarketCache:
                     results = r.json().get("results") or []
                     if results:
                         closes = {
-                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
+                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): float(bar["c"])
                             for bar in results
+                            if _coerce_price(bar.get("c")) is not None
                         }
-                        series = pd.Series(closes, dtype=float).sort_index()
-                        series.name = sym
-                        print(
-                            f"[MarketCache] Polygon supplied full history for {sym} ({len(series)} rows)",
-                            file=sys.stderr,
-                        )
-                        return series
+                        if closes:
+                            series = pd.Series(closes, dtype=float).sort_index()
+                            series.name = sym
+                            print(
+                                f"[MarketCache] Polygon supplied full history for {sym} ({len(series)} rows)",
+                                file=sys.stderr,
+                            )
+                            return series
             except Exception as e:
                 print(f"[MarketCache] Polygon fallback error for {sym}: {e}", file=sys.stderr)
 
@@ -385,8 +391,22 @@ market_cache = MarketCache()
 _PRICE_CACHE_TABLE = "ticker_price_cache"
 
 
+def _coerce_price(value: object) -> float | None:
+    """Return a positive finite float, else None."""
+    try:
+        price = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(price) or price <= 0:
+        return None
+    return price
+
+
 def upsert_ticker_price_cache(symbol: str, price: float, source: str = "live") -> None:
     """Persist a known-good price to Supabase for future stale fallback."""
+    safe_price = _coerce_price(price)
+    if safe_price is None:
+        return
     if not _SUPABASE_AVAILABLE:
         return
     try:
@@ -394,9 +414,9 @@ def upsert_ticker_price_cache(symbol: str, price: float, source: str = "live") -
         sb.table(_PRICE_CACHE_TABLE).upsert(
             {
                 "symbol": symbol.upper(),
-                "price": price,
+                "price": safe_price,
                 "source": source,
-                "recorded_at": datetime.datetime.utcnow().isoformat(),
+                "recorded_at": datetime.datetime.now(datetime.UTC).isoformat(),
             },
             on_conflict="symbol",
         ).execute()
@@ -420,7 +440,14 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
             .maybe_single()
             .execute()
         )
-        return row.data if row and row.data else None
+        if not row or not row.data:
+            return None
+        safe_price = _coerce_price(row.data.get("price"))
+        if safe_price is None:
+            return None
+        row_data = dict(row.data)
+        row_data["price"] = safe_price
+        return row_data
     except Exception as e:
         print(f"[PriceCache] get failed for {symbol}: {e}", file=sys.stderr)
         return None

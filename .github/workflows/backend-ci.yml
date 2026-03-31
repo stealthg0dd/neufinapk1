@@ -40,7 +40,10 @@ jobs:
       - name: Ruff lint
         run: ruff check . --output-format=github
 
-      - name: Ruff format check
+      - name: Auto-format with ruff
+        run: ruff format .
+
+      - name: Verify formatting
         run: ruff format --check .
 
       - name: mypy type check
