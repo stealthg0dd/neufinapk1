@@ -105,6 +105,7 @@ jobs:
         with:
           file: ./neufin-backend/coverage.xml
           flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   # ── Integration Tests ─────────────────────────────────────────────────────
   integration-tests:
@@ -150,11 +151,11 @@ jobs:
 
       - name: Deploy to Railway
         working-directory: neufin-backend
-        # Hardcoding the service 'neufin101' as confirmed by your dashboard
-        # This resolves the "Service not found" error caused by empty vars
+        # FIX: Matches the case-sensitive 'Neufin101' service name 
+        # as identified by 'railway service' in your terminal.
         run: |
-          echo "Deploying Railway service: neufin101"
-          railway up --service neufin101 --detach
+          echo "Initiating deployment for confirmed service: Neufin101"
+          railway up --service Neufin101 --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
