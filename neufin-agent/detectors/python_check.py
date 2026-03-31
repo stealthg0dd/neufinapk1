@@ -23,7 +23,7 @@ def _ruff_severity(code: str) -> str:
 
 
 async def _run_ruff() -> list[Issue]:
-    backend = REPO_ROOT / "neufin-backend"
+    backend = REPO_ROOT
     proc = await asyncio.create_subprocess_exec(
         "ruff", "check", str(backend), "--output-format=json",
         stdout=asyncio.subprocess.PIPE,
@@ -62,7 +62,7 @@ async def _run_ruff() -> list[Issue]:
 
 
 async def _run_bandit() -> list[Issue]:
-    backend = REPO_ROOT / "neufin-backend"
+    backend = REPO_ROOT
     proc = await asyncio.create_subprocess_exec(
         "bandit", "-r", str(backend), "-f", "json",
         "-x", str(backend / "tests"),
