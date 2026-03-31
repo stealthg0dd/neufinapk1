@@ -55,7 +55,7 @@ def _read_context(issue: dict) -> str:
     lineno = int(issue.get("line", 1))
     start = max(0, lineno - CONTEXT_LINES - 1)
     end = min(len(lines), lineno + CONTEXT_LINES)
-    return "\n".join(f"{i + 1}: {l}" for i, l in enumerate(lines[start:end], start=start))
+    return "\n".join(f"{i + 1}: {line}" for i, line in enumerate(lines[start:end], start=start))
 
 
 def _parse_response(text: str) -> tuple[str, str, str, str, bool]:

@@ -1,3 +1,41 @@
+
+import os
+import asyncio
+import logging
+import textwrap
+from datetime import datetime, UTC
+import httpx
+from fastapi import APIRouter
+
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", "http://localhost:8001/dashboard")
+
+log = logging.getLogger("neufin-agent.notifier")
+
+SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK_URL", "")
+
+router = APIRouter()
+
+async def send_slack(text: str):
+    await _post_slack({"text": text})
+
+# --- GitHub Actions CI Webhook ---
+@router.post("/webhooks/github-actions")
+async def github_actions_webhook(payload: dict):
+    """Receive GitHub Actions failure notifications"""
+    workflow = payload.get("workflow", {})
+    conclusion = workflow.get("conclusion", "")
+    if conclusion == "failure":
+        failed_jobs = payload.get("failed_jobs", [])
+        message = f"❌ CI FAILED — {payload.get('repo')}\n"
+        message += f"Branch: {payload.get('branch')}\n"
+        message += f"Failed jobs: {', '.join(failed_jobs)}\n"
+        message += "→ Triggering agent scan...\n"
+        message += f"View: {payload.get('run_url')}"
+        await send_slack(message)
+        # Auto-trigger a scan to diagnose
+        from core.scanner import run_all_detectors
+        asyncio.create_task(run_all_detectors())
+    return {"received": True}
 """
 notifier.py — Slack webhook alerts + SMTP email for critical issues.
 
@@ -8,20 +46,6 @@ Alert triggers:
   notify_scan_complete(report)    — daily summary (always sent if score < 70)
   send_daily_summary(report)      — called by APScheduler at 08:00 SGT (UTC+8 = 00:00 UTC)
 """
-
-import logging
-import os
-import smtplib
-import textwrap
-from datetime import datetime, UTC
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-
-import httpx
-
-log = logging.getLogger("neufin-agent.notifier")
-
-SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK_URL", "")
 DASHBOARD_URL = os.getenv("DASHBOARD_URL", "http://localhost:8001/dashboard")
 
 # Email / SMTP
@@ -33,28 +57,10 @@ ALERT_EMAIL = os.getenv("ALERT_EMAIL", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
 
 
+
 # ── Internal Slack helpers ────────────────────────────────────────────────
-
-async def _post_slack(payload: dict) -> None:
-    if not SLACK_WEBHOOK:
-        if not getattr(_post_slack, "_warned", False):
-            log.warning({"action": "slack_skip", "reason": "SLACK_WEBHOOK_URL not set"})
-            _post_slack._warned = True
-        return
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.post(SLACK_WEBHOOK, json=payload)
-            r.raise_for_status()
-        log.info({"action": "slack_sent"})
-    except Exception as exc:
-        log.error({"action": "slack_error", "error": str(exc)})
-
-
 def _sev_emoji(sev: str) -> str:
     return {"critical": ":rotating_light:", "high": ":warning:", "medium": ":large_yellow_circle:", "low": ":white_circle:"}.get(sev, ":question:")
-
-
-# ── Email helper ──────────────────────────────────────────────────────────
 
 def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
     if not all([SMTP_HOST, SMTP_USER, SMTP_PASS, ALERT_EMAIL]):
@@ -63,6 +69,9 @@ def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
             _send_email._warned = True
         return
     try:
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        import smtplib
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = FROM_EMAIL
@@ -78,6 +87,20 @@ def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
         log.info({"action": "email_sent", "to": ALERT_EMAIL, "subject": subject})
     except Exception as exc:
         log.error({"action": "email_error", "error": str(exc)})
+
+async def _post_slack(payload: dict) -> None:
+    if not SLACK_WEBHOOK:
+        if not getattr(_post_slack, "_warned", False):
+            log.warning({"action": "slack_skip", "reason": "SLACK_WEBHOOK_URL not set"})
+            _post_slack._warned = True
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(SLACK_WEBHOOK, json=payload)
+            r.raise_for_status()
+        log.info({"action": "slack_sent"})
+    except Exception as exc:
+        log.error({"action": "slack_error", "error": str(exc)})
 
 
 # ── Public API ────────────────────────────────────────────────────────────
@@ -102,7 +125,9 @@ async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") 
     # Email for critical only
     if sev == "critical":
         subject = f"\U0001f6a8 [Neufin Agent] Critical: {message[:80]}"
-        body = textwrap.dedent(f"""\
+        pr_line = f"PR       : {pr_url}\n" if pr_url else ""
+        stack_line = f"Stack trace:\n{stack_trace}\n" if stack_trace else ""
+        body = textwrap.dedent(f"""
             CRITICAL issue detected by Neufin Code Health Agent.
 
             Severity : {sev.upper()}
@@ -110,9 +135,7 @@ async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") 
             File     : {issue.get('file', '?')}:{issue.get('line', 0)}
             Message  : {message}
             Fix hint : {fix_hint}
-            {"PR       : " + pr_url if pr_url else ""}
-            {"Stack trace:\n" + stack_trace if stack_trace else ""}
-
+            {pr_line}{stack_line}
             → Dashboard: {DASHBOARD_URL}
             Issue ID: {issue.get('id', '?')}
             Generated: {datetime.now(UTC).isoformat()}

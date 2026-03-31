@@ -20,7 +20,7 @@ import httpx
 from fastapi import APIRouter, Request
 
 from core.audit_log import DB_PATH, upsert_issues
-from core.notifier import notify_critical, notify_scan_complete
+from core.notifier import notify_critical
 from detectors import Issue
 
 log = logging.getLogger("neufin-agent.runtime_monitor")
@@ -346,7 +346,7 @@ async def check_vercel_analytics() -> None:
         async with httpx.AsyncClient(headers=headers, timeout=15.0) as client:
             # Web Vitals
             vitals_resp = await client.get(
-                f"https://vercel.com/api/web-vitals/timeseries",
+                "https://vercel.com/api/web-vitals/timeseries",
                 params={
                     "projectId": VERCEL_PROJECT_ID,
                     "from": since,

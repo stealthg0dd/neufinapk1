@@ -238,7 +238,8 @@
     <ul class="fixes-list" id="fixes-list"></ul>
   </div>
   <script>
-    // --- Color helpers ---
+    // --- API base for Railway ---
+    const API_BASE = window.location.origin;
     function scoreColor(score) {
       if (score < 50) return '#ef4444';
       if (score < 75) return '#fbbf24';
@@ -346,14 +347,28 @@
       const now = new Date();
       document.getElementById('timestamp').textContent = now.toLocaleTimeString();
     }
-    setInterval(fetchHealth, 30000);
-    setInterval(fetchFixes, 30000);
+    setInterval(fetchHealth, 60000);
+    setInterval(fetchFixes, 60000);
     setInterval(updateTimestamp, 1000);
     document.getElementById('issue-filter').addEventListener('change', renderIssues);
+    // --- Trigger Scan Now button ---
+    const scanBtn = document.createElement('button');
+    scanBtn.textContent = '⚡ Scan Now';
+    scanBtn.style = 'margin:16px 32px 0 32px;padding:8px 18px;font-size:1.1em;background:#22c55e;color:#fff;border:none;border-radius:8px;cursor:pointer;float:right;';
+    scanBtn.onclick = async function triggerScan() {
+      const res = await fetch(`${API_BASE}/api/scan/trigger`, {method: 'POST'});
+      const data = await res.json();
+      alert(`Scan started. Check back in 30 seconds.`);
+    };
+    document.querySelector('.dashboard').prepend(scanBtn);
     // Initial load
     fetchHealth();
     fetchFixes();
     updateTimestamp();
+</script>
+<footer style="text-align:center;margin:32px 0 0 0;font-size:1em;color:#64748b;">
+  <a href="https://railway.app" target="_blank">View Railway Logs →</a>
+</footer>
   </script>
 </body>
 </html>

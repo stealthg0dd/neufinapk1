@@ -49,7 +49,7 @@ def _pr_body(
     itype = issue.get("type", "unknown")
     file_path = issue.get("file", "unknown")
     line = issue.get("line", 0)
-    message = issue.get("message", "")
+    # message = issue.get("message", "")
     issue_id = issue.get("id", "unknown")
     ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -184,6 +184,7 @@ async def open_issue_pr(
         # Commit diff as a placeholder file if new_content is empty
         # (for review-only PRs, we put the diff in the PR body — no file change needed)
         # If new_content is provided, update the actual file.
+        new_content = locals().get("new_content", None)
         if new_content and issue.get("file"):
             file_path = issue["file"]
             try:

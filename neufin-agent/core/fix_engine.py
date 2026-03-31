@@ -1,4 +1,20 @@
 # --- CI Fix Templates (auto-fix recurring CI failures) ---
+import asyncio
+import json
+import logging
+import re
+import subprocess
+from pathlib import Path
+
+from core.audit_log import get_open_issues, record_fix, mark_fixed
+from core.pr_creator import create_fix_pr
+from fixers.llm_fixer import generate_fix, LLMFixResult
+
+log = logging.getLogger("neufin-agent.fix_engine")
+
+TEMPLATES_DIR = Path(__file__).parent.parent / "fixers" / "templates"
+REPO_ROOT = Path(__file__).parent.parent.parent
+
 CI_FIX_TEMPLATES = [
     {
         "id": "ruff_format",
@@ -22,22 +38,6 @@ fix_engine.py — Template-first, LLM-fallback fix engine.
 Critical-path files are NEVER auto-fixed. Safe patterns are applied immediately.
 All changes are validated with tsc --noEmit before commit.
 """
-
-import asyncio
-import json
-import logging
-import re
-import subprocess
-from pathlib import Path
-
-from core.audit_log import get_open_issues, record_fix, mark_fixed
-from core.pr_creator import create_fix_pr
-from fixers.llm_fixer import generate_fix, LLMFixResult
-
-log = logging.getLogger("neufin-agent.fix_engine")
-
-TEMPLATES_DIR = Path(__file__).parent.parent / "fixers" / "templates"
-REPO_ROOT = Path(__file__).parent.parent.parent
 
 # ── Critical-path protection ───────────────────────────────────────────────
 # Files matching any of these patterns MUST go through human review.
