@@ -42,7 +42,8 @@ jobs:
         run: npm run lint --prefix neufin-web
 
       - name: TypeScript type check
-        run: npx --prefix neufin-web tsc --noEmit
+        working-directory: neufin-web
+        run: npx tsc --noEmit
 
   # ── Unit Tests ────────────────────────────────────────────────────────────
   unit-tests:
