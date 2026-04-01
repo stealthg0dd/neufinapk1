@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useState } from 'react'
 import { getSubscriptionStatus } from '@/lib/api'
 import TrialBanner from '@/components/TrialBanner'

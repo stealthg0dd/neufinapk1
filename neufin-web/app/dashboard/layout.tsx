@@ -1,4 +1,6 @@
 
+'use client'
+
 import AppHeader from '@/components/AppHeader'
 import TrialBannerLoader from '@/components/TrialBannerLoader'
 import PaywallOverlay from '@/components/PaywallOverlay'
