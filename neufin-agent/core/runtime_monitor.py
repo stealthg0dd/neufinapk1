@@ -156,18 +156,27 @@ async def receive_sentry_event(request: Request) -> dict:
     except Exception:
         return {"status": "ignored", "reason": "invalid json"}
 
-    # Sentry sends either {action, data} or a raw event object
-    event = payload.get("data", {}).get("event", payload.get("event", payload))
-    severity = _classify_sentry(event)
+    # Sentry sends two shapes:
+    #   Issue Alert: {action, data: {issue: {...}}}
+    #   Error Alert: {action, data: {event: {...}}}
+    #   Legacy:      raw event dict
+    data_block = payload.get("data", {})
+    event = data_block.get("event") or data_block.get("issue") or payload.get("event") or payload
 
-    title = event.get("title", event.get("message", "Unknown error"))
-    culprit = event.get("culprit", "unknown")
-    project = event.get("project", event.get("project_slug", "unknown"))
+    severity = _classify_sentry(event)
+    title    = event.get("title", event.get("message", "Unknown error"))
+    culprit  = event.get("culprit", "unknown")
+    project  = event.get("project", event.get("project_slug", payload.get("project", "unknown")))
     environment = event.get("environment", "production")
-    user_id = (
+    user_id  = (
         event.get("user", {}).get("id", "")
         or event.get("user", {}).get("email", "")
     )
+
+    # Sentry issue-level fields (present in Issue Alert payloads)
+    sentry_url    = event.get("permalink", event.get("url", ""))
+    occurrences   = int(event.get("count", event.get("times_seen", 1)) or 1)
+    affected_users= int(event.get("userCount", event.get("users_seen", 0)) or 0)
 
     # File + line from innermost frame
     frames = (
@@ -177,9 +186,20 @@ async def receive_sentry_event(request: Request) -> dict:
         .get("frames", [])
     ) or event.get("stacktrace", {}).get("frames", [])
     top = frames[-1] if frames else {}
-    file_path = top.get("filename", culprit)
-    line = top.get("lineno", 0)
+    file_path  = top.get("filename", culprit)
+    line       = top.get("lineno", 0)
     stack_trace = _extract_stack(event)
+
+    # Upgrade severity if many users are affected
+    if affected_users >= 10 and severity not in ("critical",):
+        severity = "critical"
+    elif affected_users >= 3 and severity == "medium":
+        severity = "high"
+
+    suggested_fix = (
+        f"Sentry: {culprit} — {occurrences} occurrences, {affected_users} users affected. "
+        f"Investigate in Sentry dashboard; check recent deploys."
+    )
 
     issue = Issue(
         severity=severity,
@@ -187,10 +207,14 @@ async def receive_sentry_event(request: Request) -> dict:
         file=file_path,
         line=int(line),
         message=f"[sentry] {title}",
-        suggested_fix="Investigate in Sentry dashboard; check recent deploys",
+        suggested_fix=suggested_fix,
         auto_fixable=False,
         requires_human=severity in ("critical", "high"),
         repo=project,
+        source="sentry",
+        sentry_url=sentry_url,
+        occurrences=occurrences,
+        affected_users=affected_users,
     )
 
     await upsert_issues([issue.to_dict()])
@@ -199,12 +223,27 @@ async def receive_sentry_event(request: Request) -> dict:
     if severity in ("critical", "high"):
         await notify_critical(issue.to_dict())
 
+    # Trigger targeted file scan for critical runtime errors
+    if severity == "critical" and file_path and file_path != "unknown":
+        import asyncio as _aio
+        from pathlib import Path as _Path
+        import detectors.secret_scanner as _secret
+        repo_root = _Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
+        abs_path = repo_root / file_path
+        if abs_path.exists():
+            raw: list = []
+            _secret._scan_file(abs_path, project, raw)
+            if raw:
+                await upsert_issues([i.to_dict() if hasattr(i, "to_dict") else i for i in raw])
+
     log.info({
         "action": "sentry_ingested",
         "severity": severity,
         "file": file_path,
         "project": project,
         "env": environment,
+        "occurrences": occurrences,
+        "affected_users": affected_users,
     })
     return {"status": "ok", "issue_id": issue.id, "severity": severity}
 
@@ -263,6 +302,96 @@ async def receive_mobile_crash(request: Request) -> dict:
 
     log.info({"action": "mobile_crash_ingested", "severity": severity, "crash_free": crash_free_rate})
     return {"status": "ok", "issue_id": issue.id, "severity": severity}
+
+
+# ── Sentry REST API poller ────────────────────────────────────────────────
+
+async def poll_sentry_issues() -> list[dict]:
+    """Fetch unresolved Sentry issues every 5 min and merge into agent DB."""
+    sentry_auth_token = os.getenv("SENTRY_AUTH_TOKEN", "")
+    sentry_org = os.getenv("SENTRY_ORG", "")
+    sentry_projects: dict[str, str] = {
+        "neufin-backend": os.getenv("SENTRY_PROJECT_neufin_backend", ""),
+        "neufin-web": os.getenv("SENTRY_PROJECT_neufin_web", ""),
+    }
+
+    if not sentry_auth_token or not sentry_org:
+        log.debug({"action": "sentry_poll_skip", "reason": "SENTRY_AUTH_TOKEN or SENTRY_ORG not set"})
+        return []
+
+    headers = {"Authorization": f"Bearer {sentry_auth_token}"}
+    new_issues: list[dict] = []
+
+    for repo, project in sentry_projects.items():
+        if not project:
+            continue
+        url = f"https://sentry.io/api/0/projects/{sentry_org}/{project}/issues/"
+        params = {"query": "is:unresolved", "limit": 25, "sort": "date"}
+        try:
+            async with httpx.AsyncClient(timeout=15.0, headers=headers) as client:
+                resp = await client.get(url, params=params)
+            if resp.status_code == 401:
+                log.warning({"action": "sentry_poll_auth_fail", "project": project})
+                continue
+            resp.raise_for_status()
+            sentry_items = resp.json()
+        except Exception as e:
+            log.error({"action": "sentry_poll_error", "project": project, "error": str(e)})
+            continue
+
+        for si in sentry_items:
+            level_map = {"fatal": "critical", "error": "high", "warning": "medium", "info": "low", "debug": "low"}
+            severity = level_map.get(si.get("level", "error"), "high")
+
+            # Extract file from metadata (what Sentry stores as the crash location)
+            meta     = si.get("metadata", {})
+            file_path = meta.get("filename", si.get("culprit", "unknown"))
+            line_no   = meta.get("lineno", 0)
+
+            occurrences    = int(si.get("count", 1) or 1)
+            affected_users = int(si.get("userCount", 0) or 0)
+            sentry_url     = si.get("permalink", "")
+            sentry_id      = f"sentry_{si['id']}"
+
+            # Upgrade severity if user impact is high
+            if affected_users >= 10 and severity != "critical":
+                severity = "critical"
+            elif affected_users >= 3 and severity == "medium":
+                severity = "high"
+
+            issue = Issue(
+                id=sentry_id,
+                severity=severity,
+                type="runtime_error",
+                file=file_path,
+                line=int(line_no),
+                message=f"[sentry] {si.get('title', 'Runtime error')}",
+                suggested_fix=(
+                    f"Sentry: {si.get('culprit', 'see stacktrace')} — "
+                    f"{occurrences} occurrences, {affected_users} users affected."
+                ),
+                auto_fixable=False,
+                requires_human=True,
+                repo=repo,
+                source="sentry",
+                sentry_url=sentry_url,
+                occurrences=occurrences,
+                affected_users=affected_users,
+            )
+            new_issues.append(issue.to_dict())
+
+    if new_issues:
+        await upsert_issues(new_issues)
+        critical = [i for i in new_issues if i["severity"] == "critical" and i.get("affected_users", 0) > 0]
+        for iss in critical:
+            await notify_critical(iss)
+
+    log.info({
+        "action": "sentry_poll_complete",
+        "ingested": len(new_issues),
+        "projects": [p for p in sentry_projects.values() if p],
+    })
+    return new_issues
 
 
 # ── Railway health poller ──────────────────────────────────────────────────

@@ -18,6 +18,11 @@ class Issue:
     detected_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     resolved_at: str | None = None
     resolution: str | None = None
+    # Runtime / Sentry enrichment
+    source: str = "scanner"         # "scanner" | "sentry" | "runtime_monitor"
+    sentry_url: str = ""            # Permalink to the Sentry issue
+    occurrences: int = 1            # How many times this error fired
+    affected_users: int = 0         # Unique users impacted
 
     def to_dict(self) -> dict:
         return {
@@ -32,6 +37,10 @@ class Issue:
             "requires_human": self.requires_human,
             "repo": self.repo,
             "detected_at": self.detected_at,
+            "source": self.source,
+            "sentry_url": self.sentry_url,
+            "occurrences": self.occurrences,
+            "affected_users": self.affected_users,
         }
 
     # Alias so callers using .dict() (Pydantic-style) also work

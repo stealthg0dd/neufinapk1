@@ -95,6 +95,23 @@
     .badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
     .badge-type { background: rgba(100,116,139,0.25); color: var(--muted); }
     .badge-repo { background: rgba(30,136,229,0.18); color: #60A5FA; }
+    .badge-live { background: rgba(239,68,68,0.2); color: #FCA5A5; display: inline-flex; align-items: center; gap: 4px; }
+    .badge-static { background: rgba(34,197,94,0.18); color: #86EFAC; }
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #EF4444;
+      box-shadow: 0 0 0 rgba(239,68,68,0.7);
+      animation: pulse-live 1.4s infinite;
+      display: inline-block;
+    }
+    @keyframes pulse-live {
+      0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+      100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+    }
+    .badge-impact { background: rgba(148,163,184,0.22); color: #CBD5E1; text-transform: none; }
     .empty-list { padding: 20px 14px; color: var(--muted); font-size: 12px; text-align: center; }
 
     /* ── Center panel ───────────────────────────────── */
@@ -328,6 +345,7 @@
         <div class="fix-actions">
           <button class="btn-act btn-autofix" onclick="applyFix()">⚡ Auto-fix &amp; Commit</button>
           <button class="btn-act btn-pr"      onclick="createPR()">📋 Create GitHub PR</button>
+          <button class="btn-act btn-pr" id="btn-sentry" onclick="openSentry()" style="display:none">↗ View in Sentry</button>
           <button class="btn-act btn-dismiss" onclick="dismissCurrent()">✕ Dismiss</button>
           <button class="btn-act btn-rescan"  onclick="rescanFile()">🔁 Re-scan file</button>
         </div>
@@ -523,7 +541,21 @@ function getFiltered() {
     .filter(i => sev === 'all' || i.severity === sev)
     .filter(i => !fileFilter || i.file === fileFilter)
     .filter(i => !q || (i.file||'').toLowerCase().includes(q) || (i.message||'').toLowerCase().includes(q))
-    .sort((a,b) => (SEV_RANK[a.severity]??4) - (SEV_RANK[b.severity]??4));
+    .sort((a,b) => {
+      const aLiveHot = a.source === 'sentry' && (a.affected_users || 0) > 0 ? 1 : 0;
+      const bLiveHot = b.source === 'sentry' && (b.affected_users || 0) > 0 ? 1 : 0;
+      if (aLiveHot !== bLiveHot) return bLiveHot - aLiveHot;
+
+      const aUsers = Number(a.affected_users || 0);
+      const bUsers = Number(b.affected_users || 0);
+      if (aUsers !== bUsers) return bUsers - aUsers;
+
+      const aOcc = Number(a.occurrences || 0);
+      const bOcc = Number(b.occurrences || 0);
+      if (aOcc !== bOcc) return bOcc - aOcc;
+
+      return (SEV_RANK[a.severity]??4) - (SEV_RANK[b.severity]??4);
+    });
 }
 
 function renderIssueList() {
@@ -538,6 +570,12 @@ function renderIssueList() {
     const fname = (issue.file||'unknown').split('/').pop();
     const line  = issue.line ? `:${issue.line}` : '';
     const msg   = issue.message || issue.description || 'No message';
+    const source = issue.source === 'sentry'
+      ? `<span class="badge badge-live"><span class="pulse-dot"></span>LIVE</span>`
+      : `<span class="badge badge-static">STATIC</span>`;
+    const impact = issue.source === 'sentry'
+      ? `<span class="badge badge-impact">Affected users: ${Number(issue.affected_users||0)} | Occurrences: ${Number(issue.occurrences||1)}</span>`
+      : '';
     const sel   = selIssue && selIssue.id === issue.id ? ' selected' : '';
     return `<div class="issue-row${sel}" data-id="${esc(issue.id)}" onclick="selectIssue(this.dataset.id)">
       <span class="sev-icon">${icon}</span>
@@ -545,8 +583,10 @@ function renderIssueList() {
         <div class="ric-file" title="${esc(issue.file||'')}">${esc(fname)}${esc(line)}</div>
         <div class="ric-msg" title="${esc(msg)}">${esc(msg)}</div>
         <div class="ric-badges">
+          ${source}
           <span class="badge badge-type">${esc((issue.type||'').toUpperCase())}</span>
           <span class="badge badge-repo">${esc(REPO_LBL[issue.repo]||issue.repo||'—')}</span>
+          ${impact}
         </div>
       </div>
     </div>`;
@@ -611,6 +651,12 @@ function renderDetail() {
 
   // S4 fix
   document.getElementById('d-fix').textContent = i.suggested_fix || i.fix || '—';
+  const sentryBtn = document.getElementById('btn-sentry');
+  if (i.source === 'sentry' && i.sentry_url) {
+    sentryBtn.style.display = 'inline-block';
+  } else {
+    sentryBtn.style.display = 'none';
+  }
   const ar = document.getElementById('action-result');
   ar.className   = '';
   ar.textContent = '';
@@ -623,6 +669,11 @@ function renderDetail() {
   ).join('');
   chatLog.scrollTop = chatLog.scrollHeight;
   document.getElementById('chat-inp').value = '';
+}
+
+function openSentry() {
+  if (!selIssue || !selIssue.sentry_url) return;
+  window.open(selIssue.sentry_url, '_blank');
 }
 
 // ================================================================

@@ -9,6 +9,7 @@ from datetime import datetime, UTC
 from pathlib import Path
 
 import uvicorn
+import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -34,11 +35,22 @@ from core.runtime_monitor import (
     init_runtime_db,
     check_railway_health,
     check_vercel_analytics,
+    poll_sentry_issues,
     get_runtime_summary,
 )
 from core.notifier import send_daily_summary, send_weekly_trend
 
 load_dotenv()
+
+_SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if _SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        environment=os.getenv("APP_ENV", "production"),
+        release=os.getenv("APP_VERSION", "1.0.0"),
+        send_default_pii=False,
+    )
 
 # ── Structured JSON logging ────────────────────────────────────────────────
 class JSONFormatter(logging.Formatter):
@@ -194,6 +206,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(scheduled_scan, "interval", hours=interval, id="full_scan")
     scheduler.add_job(check_railway_health, "interval", minutes=5, id="railway_health")
     scheduler.add_job(check_vercel_analytics, "interval", hours=1, id="vercel_analytics")
+    scheduler.add_job(poll_sentry_issues, "interval", minutes=5, id="sentry_poll")
     # 08:00 SGT = 00:00 UTC daily
     scheduler.add_job(daily_summary_job, "cron", hour=0, minute=0, id="daily_summary")
     # Weekly trend: Monday 00:00 UTC (08:00 SGT Mon)

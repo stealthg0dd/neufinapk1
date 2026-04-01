@@ -107,6 +107,10 @@ async def init_db() -> None:
         for stmt in (
             "ALTER TABLE issues ADD COLUMN root_cause TEXT",
             "ALTER TABLE issues ADD COLUMN root_cause_confidence TEXT DEFAULT 'medium'",
+            "ALTER TABLE issues ADD COLUMN source TEXT DEFAULT 'scanner'",
+            "ALTER TABLE issues ADD COLUMN sentry_url TEXT DEFAULT ''",
+            "ALTER TABLE issues ADD COLUMN occurrences INTEGER DEFAULT 1",
+            "ALTER TABLE issues ADD COLUMN affected_users INTEGER DEFAULT 0",
         ):
             try:
                 await db.execute(stmt)
@@ -139,18 +143,23 @@ async def upsert_issues(issues: list[dict]) -> None:
                 """
                 INSERT INTO issues
                     (id, severity, type, file, line, message, suggested_fix,
-                     auto_fixable, requires_human, detected_at, repo, status)
+                     auto_fixable, requires_human, detected_at, repo, status,
+                     source, sentry_url, occurrences, affected_users)
                 VALUES
                     (:id, :severity, :type, :file, :line, :message, :suggested_fix,
-                     :auto_fixable, :requires_human, :detected_at, :repo, 'open')
+                     :auto_fixable, :requires_human, :detected_at, :repo, 'open',
+                     :source, :sentry_url, :occurrences, :affected_users)
                 ON CONFLICT(id) DO UPDATE SET
-                    severity      = excluded.severity,
-                    message       = excluded.message,
-                    detected_at   = excluded.detected_at,
-                    status        = CASE
-                                      WHEN issues.status IN ('fixed','dismissed') THEN issues.status
-                                      ELSE 'open'
-                                    END
+                    severity       = excluded.severity,
+                    message        = excluded.message,
+                    detected_at    = excluded.detected_at,
+                    occurrences    = excluded.occurrences,
+                    affected_users = excluded.affected_users,
+                    sentry_url     = CASE WHEN excluded.sentry_url != '' THEN excluded.sentry_url ELSE issues.sentry_url END,
+                    status         = CASE
+                                       WHEN issues.status IN ('fixed','dismissed') THEN issues.status
+                                       ELSE 'open'
+                                     END
                 """,
                 {
                     "id": issue.get("id") or str(uuid.uuid4()),
@@ -164,6 +173,10 @@ async def upsert_issues(issues: list[dict]) -> None:
                     "requires_human": int(bool(issue.get("requires_human", False))),
                     "detected_at": issue.get("detected_at") or datetime.now(UTC).isoformat(),
                     "repo": issue.get("repo", ""),
+                    "source": issue.get("source", "scanner"),
+                    "sentry_url": issue.get("sentry_url", ""),
+                    "occurrences": issue.get("occurrences", 1),
+                    "affected_users": issue.get("affected_users", 0),
                 },
             )
         await db.commit()
@@ -177,12 +190,18 @@ async def get_open_issues(limit: int = 50) -> list[dict]:
             SELECT * FROM issues
             WHERE status = 'open'
             ORDER BY
+                CASE
+                    WHEN source = 'sentry' AND affected_users > 0 THEN 0
+                    ELSE 1
+                END,
                 CASE severity
                     WHEN 'critical' THEN 0
                     WHEN 'high'     THEN 1
                     WHEN 'medium'   THEN 2
                     ELSE                 3
                 END,
+                affected_users DESC,
+                occurrences DESC,
                 detected_at DESC
             LIMIT ?
             """,
