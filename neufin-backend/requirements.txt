@@ -19,7 +19,7 @@ pandas==2.2.3
 numpy==2.2.4
 
 # PDF generation
-reportlab==4.2.5
+reportlab==4.4.10
 
 # AI providers
 anthropic==0.84.0
