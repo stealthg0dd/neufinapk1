@@ -241,8 +241,31 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT.lower() == "production"
 
     @property
+    def is_staging(self) -> bool:
+        return self.ENVIRONMENT.lower() == "staging"
+
+    @property
     def is_development(self) -> bool:
         return self.ENVIRONMENT.lower() in ("development", "dev", "local")
+
+    @property
+    def effective_log_format(self) -> str:
+        """
+        Return the active log format.
+
+        Defaults to "console" in development when LOG_FORMAT has not been
+        explicitly set to anything other than the default "json".  This
+        means developers get human-readable output automatically without
+        needing to set LOG_FORMAT in their .env file.
+        """
+        if self.is_development and self.LOG_FORMAT.lower() == "json":
+            return "console"
+        return self.LOG_FORMAT.lower()
+
+    @property
+    def debug(self) -> bool:
+        """Enable FastAPI/Starlette debug mode in non-production environments."""
+        return self.is_development
 
     # ── Startup validation ────────────────────────────────────────────────────
     def validate_required(self) -> None:

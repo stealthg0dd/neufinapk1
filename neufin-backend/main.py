@@ -221,6 +221,7 @@ app = FastAPI(
     description="AI Portfolio Intelligence Platform",
     version=settings.APP_VERSION,
     lifespan=lifespan,
+    debug=settings.debug,
 )
 
 # ── Observability: Prometheus metrics endpoint (/metrics) ─────────────────────

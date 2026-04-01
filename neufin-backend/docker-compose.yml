@@ -1,0 +1,49 @@
+# ── Neufin backend — local development stack ──────────────────────────────────
+#
+# First-time setup:
+#   cp .env.example .env    # copy template
+#   nano .env               # fill in Supabase + Stripe + AI keys
+#   docker compose up --build
+#
+# Hot-reload is active: edit any .py file and uvicorn restarts automatically.
+# The host source directory is volume-mounted over /app so package changes
+# still require a `docker compose build`.
+#
+# Usage:
+#   docker compose up           # start with logs
+#   docker compose up -d        # start detached
+#   docker compose logs -f api  # stream logs
+#   docker compose down         # stop and remove containers
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Override production CMD with dev server (hot-reload + single worker)
+    command:
+      - uvicorn
+      - main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --reload
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      # Force development mode regardless of .env contents
+      ENVIRONMENT: development
+      LOG_FORMAT: console
+    volumes:
+      # Mount source so uvicorn --reload picks up file changes immediately.
+      # Installed packages stay in the image layer — no need to re-install.
+      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

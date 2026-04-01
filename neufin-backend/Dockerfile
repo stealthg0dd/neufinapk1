@@ -1,5 +1,5 @@
-# ── Stage 1: dependency builder ───────────────────────────────────────────────
-FROM python:3.12-slim AS deps
+# ── Stage 1: builder ──────────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -15,42 +15,40 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir -r requirements.txt
 
 
-# ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM python:3.12-slim AS runtime
+# ── Stage 2: production ───────────────────────────────────────────────────────
+FROM python:3.11-slim AS production
+
+# curl is required for the built-in HEALTHCHECK command.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# PYTHONPATH=/app ensures Python resolves top-level modules
-# PYTHONUNBUFFERED=1 flushes stdout/stderr instantly into Docker logs.
-# We set hard defaults here so gunicorn always has an integer if the ENV is missing.
+# PYTHONPATH=/app  — resolves top-level modules (main, routers, services …)
+# PYTHONUNBUFFERED=1 — no stdout/stderr buffering so logs reach Docker immediately
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
-    GUNICORN_WORKERS=4 \
-    PORT=8080
+    PORT=8000
 
-# Carry only the installed packages from the builder — no build tools.
-COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=deps /usr/local/bin /usr/local/bin
+# Copy only installed packages from builder — no build tools in production image.
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application source last
-COPY . .
+# Non-root user for security.
+RUN addgroup --system appgroup \
+ && adduser  --system --ingroup appgroup --no-create-home appuser
 
-# Match the port shown in your Railway networking settings
-EXPOSE 8080
+# Copy application source (owned by appuser so it can write cache files).
+COPY --chown=appuser:appgroup . .
 
-# ── Production entry point ─────────────────────────────────────────────────────
-# FIX: We remove the 'sh -c' and the braces from the CMD. 
-# By using the "Shell Form" (no square brackets), Docker automatically 
-# invokes /bin/sh -c, which correctly expands the environment variables 
-# before passing them to gunicorn.
-#
-# Note: timeout 300 is kept to support the 7-agent AI swarm processing time.
+USER appuser
 
-CMD gunicorn main:app \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --workers $GUNICORN_WORKERS \
-    --bind 0.0.0.0:$PORT \
-    --timeout 300 \
-    --keep-alive 5 \
-    --access-logfile - \
-    --error-logfile -
+EXPOSE 8000
+
+# Docker-native liveness probe — runs every 30 s, starts checking after 30 s.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Production entry point: uvicorn with 2 workers.
+# railway.toml startCommand overrides this for Railway deployments.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

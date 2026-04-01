@@ -26,7 +26,7 @@ def configure_logging() -> None:
 
     log_level_name = settings.LOG_LEVEL.upper()
     log_level = getattr(logging, log_level_name, logging.INFO)
-    json_logs = settings.LOG_FORMAT.lower() != "console"
+    json_logs = settings.effective_log_format != "console"
 
     # Processors shared by all log entries
     shared_processors: list = [

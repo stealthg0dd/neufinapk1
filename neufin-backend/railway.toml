@@ -3,14 +3,8 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-# Explicit startCommand so Railway never falls back to its internal cd-based default.
-# Uses gunicorn for production-grade worker isolation.
-# GUNICORN_WORKERS env var can be set in Railway dashboard (default: 4).
-startCommand = "sh -c 'exec gunicorn main:app --worker-class uvicorn.workers.UvicornWorker --workers ${GUNICORN_WORKERS:-4} --bind 0.0.0.0:${PORT:-8000} --timeout 300 --keep-alive 5 --access-logfile - --error-logfile -'"
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 3
-
-[healthcheck]
-path = "/health"
-intervalSeconds = 60
-timeoutSeconds = 100
+# uvicorn with 2 workers — lightweight and fast for Railway's single-instance plan.
+# Timeout 300 s is preserved in railway.json startCommand for gunicorn fallback.
+startCommand = "uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"
+healthcheckPath = "/health"
+restartPolicyType = "ALWAYS"

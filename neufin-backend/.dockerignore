@@ -1,5 +1,6 @@
 # Python artifacts
 __pycache__/
+*.pyc
 *.py[cod]
 *.pyo
 *.pyd
@@ -15,8 +16,12 @@ ENV/
 # Test artifacts
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 tests/
+
+# Dev dependencies (not needed at runtime)
+requirements-dev.txt
 
 # IDE / OS
 .DS_Store
@@ -37,7 +42,15 @@ tests/
 # Docs / logs
 *.md
 *.log
-neufin_agent_session_log.md
 
 # Scripts (smoke tests, migrations) — not needed at runtime
 scripts/
+
+# Alembic and SQL migration files — run separately, not at container start
+alembic/
+supabase/
+*.sql
+
+# Ruff / other tool caches
+.ruff_cache/
+.mypy_cache/
