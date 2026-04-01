@@ -20,7 +20,7 @@ import httpx
 from fastapi import APIRouter, Request
 
 from core.audit_log import DB_PATH, upsert_issues
-from core.notifier import notify_critical
+from core.notifier import notify_critical, get_notifier_throttle_counters
 from detectors import Issue
 
 log = logging.getLogger("neufin-agent.runtime_monitor")
@@ -235,7 +235,6 @@ async def receive_sentry_event(request: Request) -> dict:
 
     # Trigger targeted file scan for critical runtime errors
     if severity == "critical" and file_path and file_path != "unknown":
-        import asyncio as _aio
         from pathlib import Path as _Path
         import detectors.secret_scanner as _secret
         repo_root = _Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
@@ -643,5 +642,7 @@ async def get_runtime_summary(hours: int = 24) -> dict:
         "by_source": by_source,
         "total": sum(counts.values()),
         "trend": trend,
+        "sentry_health": get_sentry_poll_health(),
+        "notifier_throttle": get_notifier_throttle_counters(),
         "generated_at": datetime.now(UTC).isoformat(),
     }

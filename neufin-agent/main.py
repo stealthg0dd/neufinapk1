@@ -38,7 +38,6 @@ from core.runtime_monitor import (
     check_railway_health,
     check_vercel_analytics,
     poll_sentry_issues,
-    get_sentry_poll_health,
     get_runtime_summary,
 )
 from core.notifier import send_daily_summary, send_weekly_trend
@@ -316,11 +315,6 @@ async def weekly_trend():
 async def runtime_summary(hours: int = 24):
     return await get_runtime_summary(hours=hours)
 
-
-@app.get("/api/runtime/sentry-health")
-async def runtime_sentry_health():
-    return get_sentry_poll_health()
-
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     widget = Path(__file__).parent / "dashboard" / "widget.html"
@@ -359,7 +353,7 @@ async def analyze_issue_endpoint(issue_id: str):
             start = max(0, line_no - 10)
             end = min(len(lines), line_no + 11)
             code_context = "\n".join(
-                f"{start + i + 1}: {l}" for i, l in enumerate(lines[start:end])
+                f"{start + i + 1}: {line_text}" for i, line_text in enumerate(lines[start:end])
             )
     except Exception:
         pass
@@ -423,7 +417,7 @@ async def chat_issue_endpoint(issue_id: str, body: ChatRequest):
             start = max(0, line_no - 15)
             end = min(len(lines), line_no + 16)
             code_context = "\n".join(
-                f"{start + i + 1}: {l}" for i, l in enumerate(lines[start:end])
+                f"{start + i + 1}: {line_text}" for i, line_text in enumerate(lines[start:end])
             )
     except Exception:
         pass

@@ -265,6 +265,7 @@
   <div class="topbar-right">
     <span class="last-scan" id="last-scan-lbl">Last scan: —</span>
     <span class="sentry-health" id="sentry-health">Sentry: —</span>
+    <span class="sentry-health" id="notifier-health">Notifier: —</span>
     <button class="btn-scan" id="btn-scan" onclick="triggerScan()">⚡ Scan Now</button>
   </div>
 </header>
@@ -404,6 +405,7 @@ let fixes       = [];
 let scores      = {};
 let lastScanTs  = null;
 let sentryHealth = null;
+let notifierHealth = null;
 let selIssue    = null;          // selected Issue object
 let aCache      = {};            // id → {root_cause, confidence}
 let chatHist    = {};            // id → [{role, text}]
@@ -449,9 +451,10 @@ function maxSev(list) {
 // ================================================================
 async function loadData() {
   try {
-    const [hRes, fRes] = await Promise.all([
+    const [hRes, fRes, rRes] = await Promise.all([
       fetch('/api/health'),
       fetch('/api/fixes?limit=20'),
+      fetch('/api/runtime/summary'),
     ]);
     if (hRes.ok) {
       const d = await hRes.json();
@@ -477,13 +480,13 @@ async function loadData() {
       renderAuditLog();
     }
 
-    try {
-      const sRes = await fetch('/api/runtime/sentry-health');
-      if (sRes.ok) {
-        sentryHealth = await sRes.json();
-        renderSentryHealth();
-      }
-    } catch(_) {}
+    if (rRes.ok) {
+      const runtime = await rRes.json();
+      sentryHealth = runtime.sentry_health || null;
+      notifierHealth = runtime.notifier_throttle || null;
+      renderSentryHealth();
+      renderNotifierHealth();
+    }
   } catch(e) {
     console.error('loadData:', e);
   }
@@ -506,6 +509,24 @@ function renderSentryHealth() {
   if (sentryHealth.last_error) {
     el.title = sentryHealth.last_error;
   }
+}
+
+function renderNotifierHealth() {
+  const el = document.getElementById('notifier-health');
+  if (!el || !notifierHealth) return;
+
+  const counters = notifierHealth.counters || {};
+  const burst = Number(counters.suppressed_burst || 0);
+  const cooldown = Number(counters.suppressed_cooldown || 0);
+  const blocked = burst + cooldown;
+
+  el.className = 'sentry-health';
+  if (!notifierHealth.enabled) el.classList.add('warn');
+  else if (blocked > 0) el.classList.add('ok');
+  else el.classList.add('warn');
+
+  el.textContent = `Notifier: blocked ${blocked} (cd ${cooldown}, burst ${burst})`;
+  el.title = JSON.stringify(notifierHealth, null, 2);
 }
 
 async function triggerScan() {
