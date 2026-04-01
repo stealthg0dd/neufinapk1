@@ -14,18 +14,19 @@ output is colour-rendered for readability.
 """
 
 import logging
-import os
 import sys
 
 import structlog
+
+from core.config import settings
 
 
 def configure_logging() -> None:
     """Configure structlog and the stdlib root logger."""
 
-    log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_level_name = settings.LOG_LEVEL.upper()
     log_level = getattr(logging, log_level_name, logging.INFO)
-    json_logs = os.getenv("LOG_FORMAT", "json").lower() != "console"
+    json_logs = settings.LOG_FORMAT.lower() != "console"
 
     # Processors shared by all log entries
     shared_processors: list = [

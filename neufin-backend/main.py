@@ -3,8 +3,10 @@ import datetime
 import io
 import os
 import sys
+import time
 import uuid
 import warnings
+from contextlib import asynccontextmanager
 
 # Suppress library version mismatch and dependency warnings
 warnings.filterwarnings("ignore", message=".*urllib3.*")
@@ -19,25 +21,24 @@ try:
 except ImportError:
     pass
 
+# ── Settings — load before anything else ──────────────────────────────────────
+from core.config import settings  # noqa: E402
+
 # ── Observability: Sentry (initialise before any app code) ────────────────────
 import sentry_sdk  # noqa: E402
 from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
 from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
 
-_SENTRY_DSN = os.getenv("SENTRY_DSN")
-if _SENTRY_DSN:
+if settings.SENTRY_DSN:
     sentry_sdk.init(
-        dsn=_SENTRY_DSN,
+        dsn=settings.SENTRY_DSN,
         integrations=[
             StarletteIntegration(transaction_style="endpoint"),
             FastApiIntegration(transaction_style="endpoint"),
         ],
-        # Capture 10 % of transactions for performance monitoring in production.
-        # Increase to 1.0 in staging/dev via SENTRY_TRACES_SAMPLE_RATE env var.
-        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
-        environment=os.getenv("APP_ENV", "production"),
-        release=os.getenv("APP_VERSION", "1.1.0"),
-        # Strip PII from events
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        environment=settings.APP_ENV,
+        release=settings.APP_VERSION,
         send_default_pii=False,
     )
 
@@ -52,8 +53,6 @@ logger = structlog.get_logger("neufin.main")
 import pandas as pd  # noqa: E402
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-
-from config import APP_BASE_URL  # noqa: E402
 
 from database import supabase  # noqa: E402
 from routers import (  # noqa: E402
@@ -86,7 +85,113 @@ from services.risk_engine import (  # noqa: E402
     format_clusters_for_ai,
 )
 
-# calculator.py prints its own key confirmation on import — no need to repeat here
+# ── Startup time (for uptime_seconds in /health) ──────────────────────────────
+_startup_time: float = time.monotonic()
+
+# ── Supabase connectivity cache (30-second TTL for /health) ───────────────────
+_supabase_health_cache: dict = {"ok": None, "checked_at": 0.0}
+_SUPABASE_HEALTH_TTL = 30.0
+
+
+def _check_supabase_connected() -> bool:
+    """Return True if Supabase is reachable; cached for 30 seconds."""
+    now = time.monotonic()
+    if now - _supabase_health_cache["checked_at"] < _SUPABASE_HEALTH_TTL:
+        return bool(_supabase_health_cache["ok"])
+    try:
+        supabase.table("portfolios").select("id").limit(1).execute()
+        _supabase_health_cache.update(ok=True, checked_at=now)
+        return True
+    except Exception as exc:
+        logger.warning("health.supabase_check_failed", error=str(exc))
+        _supabase_health_cache.update(ok=False, checked_at=now)
+        return False
+
+
+# ── Router-system registration + heartbeat ────────────────────────────────────
+_heartbeat_task: asyncio.Task | None = None
+
+
+async def _register_with_router_system() -> None:
+    """POST service registration to the Agent OS router-system on startup."""
+    if not settings.AGENT_OS_API_KEY:
+        logger.info("router_system.skip", reason="AGENT_OS_API_KEY not set")
+        return
+    import httpx
+
+    payload = {
+        "repo_id": "neufin-backend",
+        "service_name": "NeuFin Backend API",
+        "health_url": f"{settings.APP_BASE_URL}/health",
+        "base_url": settings.APP_BASE_URL,
+        "version": settings.GIT_COMMIT_SHA,
+        "environment": settings.ENVIRONMENT,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{settings.AGENT_OS_URL}/api/register",
+                json=payload,
+                headers={"x-api-key": settings.AGENT_OS_API_KEY},
+            )
+            resp.raise_for_status()
+            logger.info("router_system.registered", status=resp.status_code)
+    except Exception as exc:
+        logger.warning("router_system.register_failed", error=str(exc))
+
+
+async def _heartbeat_loop() -> None:
+    """Send a heartbeat to the Agent OS router-system every 60 seconds."""
+    import httpx
+
+    while True:
+        await asyncio.sleep(60)
+        if not settings.AGENT_OS_API_KEY:
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{settings.AGENT_OS_URL}/api/heartbeat/neufin-backend",
+                    headers={"x-api-key": settings.AGENT_OS_API_KEY},
+                )
+                resp.raise_for_status()
+                logger.debug("router_system.heartbeat_sent", status=resp.status_code)
+        except Exception as exc:
+            logger.warning("router_system.heartbeat_failed", error=str(exc))
+
+
+# ── FastAPI lifespan ──────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    global _startup_time, _heartbeat_task
+
+    # Validate required env vars — exits with clear message if any are missing
+    settings.validate_required()
+
+    _startup_time = time.monotonic()
+    logger.info(
+        "app.startup",
+        version=settings.APP_VERSION,
+        environment=settings.ENVIRONMENT,
+        sentry_active=bool(settings.SENTRY_DSN),
+    )
+
+    # Register with router-system (non-blocking — warning on failure)
+    await _register_with_router_system()
+
+    # Start background heartbeat
+    _heartbeat_task = asyncio.create_task(_heartbeat_loop())
+
+    yield  # ── app is running ─────────────────────────────────────────────────
+
+    # Shutdown
+    if _heartbeat_task and not _heartbeat_task.done():
+        _heartbeat_task.cancel()
+        try:
+            await _heartbeat_task
+        except asyncio.CancelledError:
+            pass
+    logger.info("app.shutdown")
 
 # ── Auth config ────────────────────────────────────────────────────────────────
 PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json", "/metrics"}
@@ -104,9 +209,9 @@ PUBLIC_PREFIXES = [
     "/api/advisors/",
     "/api/market/",
     "/api/analytics/track",
-    "/api/swarm/",  # Swarm endpoints are public (demo-accessible)
-    "/api/admin/health",  # Health diagnostics — no auth required
-    "/api/auth/status",  # Auth status probe — unauthenticated callers get authenticated=false
+    "/api/swarm/",
+    "/api/admin/health",
+    "/api/auth/status",
 ]
 
 
@@ -114,13 +219,11 @@ PUBLIC_PREFIXES = [
 app = FastAPI(
     title="Neufin API",
     description="AI Portfolio Intelligence Platform",
-    version="1.1.0",
+    version=settings.APP_VERSION,
+    lifespan=lifespan,
 )
 
 # ── Observability: Prometheus metrics endpoint (/metrics) ─────────────────────
-# Tracks HTTP request count, latency histograms, and in-flight requests by
-# default.  Exposed at GET /metrics — excluded from auth middleware via
-# PUBLIC_PATHS above.
 try:
     from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -131,14 +234,9 @@ try:
         excluded_handlers=["/metrics", "/health"],
     ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=True, tags=["system"])
 except ImportError:
-    logger.warning("prometheus_fastapi_instrumentator not installed; /metrics unavailable")
+    logger.warning("prometheus.unavailable", detail="prometheus_fastapi_instrumentator not installed; /metrics unavailable")
 
-# ── CORS origins — driven entirely by ALLOWED_ORIGINS env var ────────────────
-# Set ALLOWED_ORIGINS to a comma-separated list of allowed origins in production.
-# Example: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
-_raw_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
-origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] if _raw_origins else ["http://localhost:3000"]
-# Regex covers all Vercel preview deployments (https://*.vercel.app)
+# ── CORS — origins from settings ──────────────────────────────────────────────
 _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
 
 # ── Middleware ordering ────────────────────────────────────────────────────────
@@ -164,7 +262,7 @@ _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
 # allow_origins is driven by the ALLOWED_ORIGINS env var (see above).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.allowed_origins_list,
     allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
@@ -173,27 +271,47 @@ app.add_middleware(
 )
 
 
+# ── Request logging + trace_id middleware (outermost after CORS) ──────────────
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    """
+    Attach a unique trace_id to every request via structlog contextvars so that
+    all log lines emitted during the request carry the same trace_id.
+    Logs: method, path, status_code, duration_ms, user_id (if authenticated).
+    """
+    trace_id = str(uuid.uuid4())
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(trace_id=trace_id)
+    request.state.trace_id = trace_id
+
+    t0 = time.monotonic()
+    response = await call_next(request)
+    duration_ms = round((time.monotonic() - t0) * 1000, 1)
+
+    user_id = getattr(getattr(request.state, "user", None), "id", None)
+    logger.info(
+        "http.request",
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+        user_id=user_id,
+        trace_id=trace_id,
+    )
+    response.headers["X-Trace-Id"] = trace_id
+    return response
+
+
 # ── Step 2: auth_middleware (registered last → outermost layer) ───────────────
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     """
-    Outermost HTTP middleware — runs before every request including preflights.
-
-    Explicit bypass rules (no JWT work, no state mutation):
-      • OPTIONS  — CORS preflight; must reach CORSMiddleware which returns 200.
-      • /health, /api/admin/health — monitoring probes; zero-overhead path.
-
-    All other requests: soft-attach a verified JWTUser to request.state.user.
-    Never rejects — authentication enforcement is per-endpoint via
-    Depends(get_current_user) in each router.
+    Soft-attach a verified JWTUser to request.state.user for every request.
+    Never rejects — authentication enforcement is per-endpoint via Depends(get_current_user).
     """
-    # ── Bypass 1: CORS preflight ───────────────────────────────────────────────
-    # CORSMiddleware (next in chain) intercepts OPTIONS and returns 200 with
-    # Access-Control-* headers.  Do NOT inspect or modify the request here.
     if request.method == "OPTIONS":
         return await call_next(request)
 
-    # ── Bypass 2: health-check endpoints ──────────────────────────────────────
     if request.url.path in ("/health", "/api/admin/health"):
         return await call_next(request)
 
@@ -268,10 +386,11 @@ async def analyze_dna(
         raise HTTPException(status_code=422, detail="File required.")
 
     # ── 0. Diagnostics ─────────────────────────────────────────────────────────
-    print(f"[DIAG] content-type: {request.headers.get('content-type', 'MISSING')}", file=sys.stderr)
-    print(
-        f"[DIAG] file.filename={incoming_file.filename!r}  content_type={incoming_file.content_type!r}",
-        file=sys.stderr,
+    logger.debug(
+        "analyze_dna.upload",
+        content_type=request.headers.get("content-type", "MISSING"),
+        filename=incoming_file.filename,
+        file_content_type=incoming_file.content_type,
     )
 
     # ── 1. Read + parse CSV ────────────────────────────────────────────────────
@@ -280,7 +399,7 @@ async def analyze_dna(
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
         df.columns = [c.lower().strip() for c in df.columns]
     except Exception as e:
-        print(f"[CSV] Parse error: {e}", file=sys.stderr)
+        logger.warning("analyze_dna.csv_parse_error", error=str(e))
         raise HTTPException(status_code=400, detail=f"Invalid CSV: {e}") from e
 
     if "symbol" not in df.columns or "shares" not in df.columns:
@@ -317,7 +436,7 @@ async def analyze_dna(
         if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
             failed_tickers.append(sym)
         elif isinstance(result, Exception):
-            print(f"[Price] {sym} unexpected error: {result}", file=sys.stderr)
+            logger.warning("analyze_dna.price_error", symbol=sym, error=str(result))
             failed_tickers.append(sym)
         else:
             price_map[sym] = float(result)
@@ -407,7 +526,7 @@ Return ONLY valid JSON:
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        print(f"[AI] All providers failed: {e}", file=sys.stderr)
+        logger.error("analyze_dna.ai_failed", error=str(e))
         raise HTTPException(status_code=503, detail="AI analysis providers are unavailable.") from e
 
     # ── 8. Format positions ────────────────────────────────────────────────────
@@ -425,17 +544,21 @@ Return ONLY valid JSON:
         )
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
-    print(
-        f"[Score] dna_score={dna_score}  max_pos={round(max_pos, 1)}%  "
-        f"hhi={hhi_pts}  beta={beta_pts}  tax={tax_pts}  corr={corr_pts}  "
-        f"weighted_beta={round(weighted_beta, 2)}  avg_corr={round(avg_corr, 3)}",
-        file=sys.stderr,
+    logger.info(
+        "analyze_dna.score",
+        dna_score=dna_score,
+        max_pos=round(max_pos, 1),
+        hhi=hhi_pts,
+        beta=beta_pts,
+        tax=tax_pts,
+        corr=corr_pts,
+        weighted_beta=round(weighted_beta, 2),
+        avg_corr=round(avg_corr, 3),
     )
 
     # ── 9.1. Create Portfolio ─────────────────────────────────────────────
     portfolio_id = None
     try:
-        # Portfolio name: 'Uploaded {date}'
         portfolio_name = (
             f"Uploaded {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M')}"
         )
@@ -447,8 +570,7 @@ Return ONLY valid JSON:
         port_result = supabase.table("portfolios").insert(port_row).execute()
         if port_result.data and len(port_result.data) > 0:
             portfolio_id = port_result.data[0]["id"]
-            print(f"[DB] portfolios insert ok id={portfolio_id}", file=sys.stderr)
-            # Insert positions
+            logger.debug("analyze_dna.portfolio_inserted", portfolio_id=portfolio_id)
             for pos in positions_out:
                 try:
                     supabase.table("portfolio_positions").insert(
@@ -460,15 +582,12 @@ Return ONLY valid JSON:
                         }
                     ).execute()
                 except Exception:
-                    print(
-                        f"[DB] portfolio_positions insert failed for {pos['symbol']}",
-                        file=sys.stderr,
-                    )
+                    logger.warning("analyze_dna.position_insert_failed", symbol=pos["symbol"])
         else:
-            print("[DB] portfolios insert returned empty data", file=sys.stderr)
+            logger.warning("analyze_dna.portfolio_empty_response")
             portfolio_id = None
     except Exception as e:
-        print(f"[DB] portfolios insert failed: {e}", file=sys.stderr)
+        logger.warning("analyze_dna.portfolio_insert_failed", error=str(e))
         portfolio_id = None
 
     # ── 9.2. Persist DNA record, link to portfolio ──────────────────────
@@ -493,12 +612,12 @@ Return ONLY valid JSON:
         res = supabase.table("dna_scores").insert(db_payload).execute()
         if res.data and len(res.data) > 0:
             record_id = res.data[0].get("id")
-            print(f"[DB] dna_scores insert ok id={record_id}", file=sys.stderr)
+            logger.debug("analyze_dna.dna_score_inserted", record_id=record_id)
         else:
-            print("[DB] dna_scores insert returned empty data", file=sys.stderr)
+            logger.warning("analyze_dna.dna_score_empty_response")
             record_id = None
     except Exception as e:
-        print(f"[DB] dna_scores insert failed: {e}", file=sys.stderr)
+        logger.warning("analyze_dna.dna_score_insert_failed", error=str(e))
         record_id = None
 
     # ── 10. Analytics — disabled until analytics_events table is created ─────────
@@ -506,16 +625,16 @@ Return ONLY valid JSON:
     # await track("dna_analysis_complete", {"dna_score": dna_score}, user_id=user_id)
 
     # ── 11. Response ───────────────────────────────────────────────────────────
-    # IMPORTANT: **analysis is spread FIRST so that our explicitly computed values
-    # (dna_score, total_value, etc.) always override any keys the AI may return.
-    print(
-        f"[Final] Payload being sent: dna_score={dna_score}, record_id={record_id}, portfolio_id={portfolio_id}, "
-        f"investor_type={analysis.get('investor_type')}",
-        file=sys.stderr,
+    logger.info(
+        "analyze_dna.complete",
+        dna_score=dna_score,
+        record_id=record_id,
+        portfolio_id=portfolio_id,
+        investor_type=analysis.get("investor_type"),
     )
     return {
         **analysis,
-        "dna_score": dna_score,  # computed — always wins
+        "dna_score": dna_score,
         "score_breakdown": score_breakdown,
         "total_value": round(total_value, 2),
         "num_positions": len(df),
@@ -526,7 +645,7 @@ Return ONLY valid JSON:
         "tax_analysis": tax_analysis,
         "positions": positions_out,
         "share_token": share_token,
-        "share_url": f"{APP_BASE_URL}/share/{share_token}",
+        "share_url": f"{settings.APP_BASE_URL}/share/{share_token}",
         "record_id": record_id,
         "portfolio_id": portfolio_id,
     }
@@ -535,7 +654,26 @@ Return ONLY valid JSON:
 # ── System endpoints ───────────────────────────────────────────────────────────
 @app.get("/health", tags=["system"])
 def health():
-    return {"status": "ok", "service": "neufin-api"}
+    """
+    Lightweight liveness + readiness probe.
+
+    Returns:
+      status            — "ok" always (unhealthy pods get killed before this runs)
+      version           — APP_VERSION from settings
+      environment       — ENVIRONMENT from settings
+      uptime_seconds    — seconds since last (re)start
+      supabase_connected — bool; cached for 30 s (no DB call on every probe)
+      sentry_active     — bool; true when SENTRY_DSN is configured
+    """
+    return {
+        "status": "ok",
+        "service": "neufin-api",
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+        "uptime_seconds": round(time.monotonic() - _startup_time, 1),
+        "supabase_connected": _check_supabase_connected(),
+        "sentry_active": bool(settings.SENTRY_DSN),
+    }
 
 
 @app.get("/api/auth/status", tags=["auth"])
@@ -659,34 +797,22 @@ async def subscription_status(request: Request):
 @app.get("/api/admin/health", tags=["system"])
 def admin_health():
     """Detailed feature/provider health check — used by frontend useBackendHealth hook."""
-    import importlib
     import importlib.util
 
-    from config import (
-        ANTHROPIC_API_KEY,
-        FMP_API_KEY,
-        GEMINI_KEY,
-        GROQ_KEY,
-        MARKETSTACK_API_KEY,
-        OPENAI_KEY,
-        POLYGON_API_KEY,
-        TWELVEDATA_API_KEY,
-    )
-
-    def _has(val: str) -> bool:
-        return bool(val and val.strip())
+    def _has(val: str | None) -> bool:
+        return bool(val and str(val).strip())
 
     ai_models = {
-        "claude": _has(ANTHROPIC_API_KEY),
-        "openai": _has(OPENAI_KEY),
-        "gemini": _has(GEMINI_KEY),
-        "groq": _has(GROQ_KEY),
+        "claude": _has(settings.ANTHROPIC_API_KEY),
+        "openai": _has(settings.OPENAI_KEY),
+        "gemini": _has(settings.GEMINI_KEY),
+        "groq": _has(settings.GROQ_KEY),
     }
     market_providers = {
-        "polygon": _has(POLYGON_API_KEY),
-        "fmp": _has(FMP_API_KEY),
-        "twelvedata": _has(TWELVEDATA_API_KEY),
-        "marketstack": _has(MARKETSTACK_API_KEY),
+        "polygon": _has(settings.POLYGON_API_KEY),
+        "fmp": _has(settings.FMP_API_KEY),
+        "twelvedata": _has(settings.TWELVEDATA_API_KEY),
+        "marketstack": _has(settings.MARKETSTACK_API_KEY),
     }
     features = {
         "swarm_engine": True,
@@ -701,6 +827,8 @@ def admin_health():
     return {
         "status": "ok",
         "service": "neufin-api",
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
         "ai_models": ai_models,
         "market_providers": market_providers,
         "features": features,
@@ -716,5 +844,4 @@ def root():
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)

@@ -16,15 +16,18 @@ from __future__ import annotations
 import datetime
 import json
 import math
-import os
-import sys
 import time
 from dataclasses import dataclass
 
 import pandas as pd
+import structlog
 from dotenv import load_dotenv
 
+from core.config import settings
+
 load_dotenv()
+
+logger = structlog.get_logger("neufin.market_cache")
 
 # ── Ticker alias map ───────────────────────────────────────────────────────────
 # When a ticker fails all 6 providers, try these aliases before giving up.
@@ -56,7 +59,7 @@ try:
     _REDIS_AVAILABLE = True
 except ImportError:
     _REDIS_AVAILABLE = False
-    print("[MarketCache] redis-py not installed — Redis tier disabled", file=sys.stderr)
+    logger.warning("market_cache.redis_missing")
 
 # ── Optional Supabase ──────────────────────────────────────────────────────────
 try:
@@ -65,9 +68,9 @@ try:
     _SUPABASE_AVAILABLE = True
 except Exception:
     _SUPABASE_AVAILABLE = False
-    print("[MarketCache] Supabase client unavailable — Supabase tier disabled", file=sys.stderr)
+    logger.warning("market_cache.supabase_missing")
 
-REDIS_URL = os.environ.get("REDIS_URL", "")
+REDIS_URL = settings.REDIS_URL
 _REDIS_TTL = 86_400  # 24 hours
 _SUPABASE_TTL = 86_400  # 24 hours
 _MEMORY_TTL = 3_600  # 1 hour  (in-process tier)
@@ -94,7 +97,7 @@ def _get_redis():
             )
             _redis_client.ping()  # type: ignore[attr-defined]
         except Exception as e:
-            print(f"[MarketCache] Redis connection failed: {e}", file=sys.stderr)
+            logger.warning("market_cache.redis_connection_failed", error=str(e))
             _redis_client = None
     return _redis_client
 
@@ -135,10 +138,10 @@ def get_closes(symbol: str, days: int) -> pd.Series | None:
         try:
             raw = r.get(k)  # type: ignore[attr-defined]
             if raw:
-                print(f"[MarketCache] Redis HIT {k}", file=sys.stderr)
+                logger.debug("market_cache.redis_hit", key=k)
                 return _json_to_series(raw)
         except Exception as e:
-            print(f"[MarketCache] Redis GET error: {e}", file=sys.stderr)
+            logger.warning("market_cache.redis_get_error", error=str(e))
 
     # ── Tier-2: Supabase ──────────────────────────────────────────────────────
     if _SUPABASE_AVAILABLE:
@@ -157,17 +160,17 @@ def get_closes(symbol: str, days: int) -> pd.Series | None:
                 row is not None and row.data
             ):  # FIXED: guard against None response from maybe_single()
                 series = _json_to_series(row.data["payload"])
-                print(f"[MarketCache] Supabase HIT {k}", file=sys.stderr)
+                logger.debug("market_cache.supabase_hit", key=k)
                 # Backfill Redis so the next hit is faster
                 _redis_set(k, row.data["payload"])
                 return series
         except Exception as e:
-            print(f"[MarketCache] Supabase GET error: {e}", file=sys.stderr)
+            logger.warning("market_cache.supabase_get_error", error=str(e))
 
     # ── Tier-3: In-process memory ─────────────────────────────────────────────
     entry = _MEMORY.get(k)
     if entry and (time.time() - entry[1]) < _MEMORY_TTL:
-        print(f"[MarketCache] Memory HIT {k}", file=sys.stderr)
+        logger.debug("market_cache.memory_hit", key=k)
         return entry[0]
 
     return None
@@ -195,7 +198,7 @@ def set_closes(symbol: str, days: int, series: pd.Series) -> None:
                 on_conflict="cache_key",
             ).execute()
         except Exception as e:
-            print(f"[MarketCache] Supabase SET error: {e}", file=sys.stderr)
+            logger.warning("market_cache.supabase_set_error", error=str(e))
 
     # Tier-3: memory
     _MEMORY[k] = (series, time.time())
@@ -208,7 +211,7 @@ def _redis_set(k: str, raw: str) -> None:
     try:
         r.setex(k, _REDIS_TTL, raw)  # type: ignore[attr-defined]
     except Exception as e:
-        print(f"[MarketCache] Redis SET error: {e}", file=sys.stderr)
+        logger.warning("market_cache.redis_set_error", error=str(e))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -271,9 +274,7 @@ class MarketCache:
 
         import requests as _req
 
-        av_key = os.environ.get("ALPHA_VANTAGE_API_KEY", "") or os.getenv(
-            "ALPHA_VANTAGE_API_KEY", ""
-        )
+        av_key = settings.ALPHA_VANTAGE_API_KEY or ""
 
         # ── 1. Alpha Vantage ──────────────────────────────────────────────────
         if av_key:
@@ -304,15 +305,12 @@ class MarketCache:
                         return series
                 else:
                     _reason = "premium" if "premium" in _av_msg.lower() else "rate-limit"
-                    print(
-                        f"[MarketCache] AV {_reason} for {sym} — trying Finnhub→Polygon",
-                        file=sys.stderr,
-                    )
+                    logger.warning("market_cache.av_blocked", symbol=sym, reason=_reason)
             except Exception as e:
-                print(f"[MarketCache] AV fetch error for {sym}: {e}", file=sys.stderr)
+                logger.warning("market_cache.av_fetch_error", symbol=sym, error=str(e))
 
         # ── 2. Finnhub fallback ───────────────────────────────────────────────
-        fh_key = os.environ.get("FINNHUB_API_KEY", "") or os.getenv("FINNHUB_API_KEY", "")
+        fh_key = settings.FINNHUB_API_KEY or ""
         if fh_key:
             try:
                 start_5y = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
@@ -340,16 +338,17 @@ class MarketCache:
                     if closes:
                         series = pd.Series(closes, dtype=float).sort_index()
                         series.name = sym
-                        print(
-                            f"[MarketCache] Finnhub supplied full history for {sym} ({len(series)} rows)",
-                            file=sys.stderr,
+                        logger.info(
+                            "market_cache.finnhub_history_ok",
+                            symbol=sym,
+                            rows=len(series),
                         )
                         return series
             except Exception as e:
-                print(f"[MarketCache] Finnhub fallback error for {sym}: {e}", file=sys.stderr)
+                logger.warning("market_cache.finnhub_fallback_error", symbol=sym, error=str(e))
 
         # ── 3. Polygon fallback ───────────────────────────────────────────────
-        pg_key = os.environ.get("POLYGON_API_KEY", "") or os.getenv("POLYGON_API_KEY", "")
+        pg_key = settings.POLYGON_API_KEY or ""
         if pg_key:
             try:
                 start_5y = (_dt.date.today() - _dt.timedelta(days=5 * 365)).isoformat()
@@ -370,13 +369,14 @@ class MarketCache:
                         if closes:
                             series = pd.Series(closes, dtype=float).sort_index()
                             series.name = sym
-                            print(
-                                f"[MarketCache] Polygon supplied full history for {sym} ({len(series)} rows)",
-                                file=sys.stderr,
+                            logger.info(
+                                "market_cache.polygon_history_ok",
+                                symbol=sym,
+                                rows=len(series),
                             )
                             return series
             except Exception as e:
-                print(f"[MarketCache] Polygon fallback error for {sym}: {e}", file=sys.stderr)
+                logger.warning("market_cache.polygon_fallback_error", symbol=sym, error=str(e))
 
         return pd.Series(dtype=float, name=sym)
 
@@ -421,7 +421,7 @@ def upsert_ticker_price_cache(symbol: str, price: float, source: str = "live") -
             on_conflict="symbol",
         ).execute()
     except Exception as e:
-        print(f"[PriceCache] upsert failed for {symbol}: {e}", file=sys.stderr)
+        logger.warning("market_cache.pricecache_upsert_failed", symbol=symbol, error=str(e))
 
 
 def get_ticker_price_cache(symbol: str) -> dict | None:
@@ -449,5 +449,5 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
         row_data["price"] = safe_price
         return row_data
     except Exception as e:
-        print(f"[PriceCache] get failed for {symbol}: {e}", file=sys.stderr)
+        logger.warning("market_cache.pricecache_get_failed", symbol=symbol, error=str(e))
         return None

@@ -16,56 +16,46 @@ from __future__ import annotations
 
 import datetime
 import json
-import os
 import sys
 import time
 from dataclasses import dataclass
 
 import httpx
+import structlog
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
-from config import SUPABASE_KEY, SUPABASE_URL
+from core.config import settings
+
+logger = structlog.get_logger("neufin.jwt_auth")
 
 # ── JWKS endpoint ──────────────────────────────────────────────────────────────
-# Standard OIDC path — more reliable than the short alias /auth/v1/jwks
-_JWKS_URL = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
-_JWKS_TTL = 3600.0  # seconds between cache refreshes (1 hour)
-_JWKS_RETRY_AFTER = 60.0  # backoff after a failed fetch
-_JWT_LEEWAY = 60  # seconds of clock-skew tolerance (Railway ↔ Supabase)
+_JWKS_URL = f"{settings.SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+_JWKS_TTL = 3600.0
+_JWKS_RETRY_AFTER = 60.0
+_JWT_LEEWAY = 60
 
 # Prefer the anon key for JWKS — some Supabase instances reject service_role here
 _SUPABASE_ANON_KEY = (
-    os.environ.get("SUPABASE_ANON_KEY")
-    or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    or SUPABASE_KEY  # last resort: fall back to whatever key we have
+    settings.SUPABASE_ANON_KEY
+    or settings.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    or settings.SUPABASE_KEY
 )
 
-_ALGORITHMS = ["ES256", "HS256"]  # accept both during key-type transition
+_ALGORITHMS = ["ES256", "HS256"]
 
 # ── Fallback secrets / keys ────────────────────────────────────────────────────
-# HS256 secret — only attempted for tokens that declare alg=HS256
-_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET") or os.environ.get("JWT_SECRET")
-
-# Raw public key fallback — set SUPABASE_PUBLIC_KEY to a PEM string or a single
-# JWK JSON object.  Used when the JWKS endpoint is unreachable and we have no
-# cached keys.
-_SUPABASE_PUBLIC_KEY_RAW = os.environ.get("SUPABASE_PUBLIC_KEY", "").strip()
-
-# Dev bypass — set BYPASS_AUTH_IN_DEV=true to skip verification entirely.
-# NEVER set this in production.
-_BYPASS_AUTH = os.environ.get("BYPASS_AUTH_IN_DEV", "").lower() == "true"
+_JWT_SECRET = settings.SUPABASE_JWT_SECRET or settings.JWT_SECRET
+_SUPABASE_PUBLIC_KEY_RAW = (settings.SUPABASE_PUBLIC_KEY or "").strip()
+_BYPASS_AUTH = settings.BYPASS_AUTH_IN_DEV
 
 # In-process cache — shared across requests (single-process uvicorn worker)
 _cache: dict = {"keys": None, "fetched_at": 0.0, "fail_until": 0.0}
 
-_TAG = "[JWT]"
-
 
 def _log(msg: str) -> None:
-    """Write a timestamped JWT log line to stderr (visible in Railway Live Logs)."""
-    ts = datetime.datetime.utcnow().strftime("%H:%M:%S.%f")[:-3]
-    print(f"{_TAG} {ts}  {msg}", file=sys.stderr, flush=True)
+    """Log a JWT event via structlog."""
+    logger.debug("jwt.event", detail=msg)
 
 
 # ── User object ────────────────────────────────────────────────────────────────

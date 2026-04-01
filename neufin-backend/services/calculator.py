@@ -1,14 +1,14 @@
 import datetime
-import os
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
 import requests
+import structlog
 from dotenv import load_dotenv
 
+from core.config import settings
 from services.market_cache import (
     TICKER_ALIASES,
     PriceResult,
@@ -18,12 +18,14 @@ from services.market_cache import (
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
-POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
-FMP_API_KEY = os.environ.get("FMP_API_KEY")
-TWELVEDATA_API_KEY = os.environ.get("TWELVEDATA_API_KEY")
-MARKETSTACK_API_KEY = os.environ.get("MARKETSTACK_API_KEY")
-ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
+logger = structlog.get_logger("neufin.calculator")
+
+POLYGON_API_KEY = settings.POLYGON_API_KEY
+FINNHUB_API_KEY = settings.FINNHUB_API_KEY
+FMP_API_KEY = settings.FMP_API_KEY
+TWELVEDATA_API_KEY = settings.TWELVEDATA_API_KEY
+MARKETSTACK_API_KEY = settings.MARKETSTACK_API_KEY
+ALPHA_VANTAGE_API_KEY = settings.ALPHA_VANTAGE_API_KEY
 
 _KEY_MAP = {
     "POLYGON_API_KEY": POLYGON_API_KEY,
@@ -34,7 +36,7 @@ _KEY_MAP = {
     "ALPHA_VANTAGE_API_KEY": ALPHA_VANTAGE_API_KEY,
 }
 for _k, _v in _KEY_MAP.items():
-    print(f"[calculator] {_k:25s} = {'FOUND ✓' if _v else 'MISSING ✗'}", file=sys.stderr)
+    logger.debug("calculator.key_status", key=_k, status="FOUND" if _v else "MISSING")
 
 # ── In-process caches (1-hour TTL) ────────────────────────────────────────────
 _PRICE_CACHE: dict[str, tuple[float, float]] = {}  # sym → (price, ts)
@@ -85,7 +87,7 @@ def _fetch_historical_returns(symbols: list[str], period: str = "1mo") -> pd.Dat
 
 def _blacklist(provider: str, secs: float = 60.0) -> None:
     _BLACKLIST[provider] = time.time() + secs
-    print(f"[Price] ⛔ {provider} blacklisted for {secs}s", file=sys.stderr)
+    logger.warning("price.blacklisted", provider=provider, secs=secs)
 
 
 def _available(provider: str) -> bool:
@@ -163,7 +165,7 @@ def _polygon_batch(symbols: list[str]) -> dict[str, float]:
                 results[norm[raw_sym]] = price
         return results
     except Exception as e:
-        print(f"[Price] Polygon batch failed: {e}", file=sys.stderr)
+        logger.warning("price.polygon_batch_failed", error=str(e))
         return {}
 
 
@@ -187,7 +189,7 @@ def _finnhub_single(sym: str) -> float | None:
         price = float(data.get("c") or 0)
         return price if price > 0.01 else None
     except Exception as e:
-        print(f"[Price] Finnhub {sym} failed: {e}", file=sys.stderr)
+        logger.warning("price.finnhub_single_failed", symbol=sym, error=str(e))
         return None
 
 
@@ -219,7 +221,7 @@ def _fmp_batch(symbols: list[str]) -> dict[str, float]:
                 results[orig] = price
         return results
     except Exception as e:
-        print(f"[Price] FMP batch failed: {e}", file=sys.stderr)
+        logger.warning("price.fmp_batch_failed", error=str(e))
         return {}
 
 
@@ -257,7 +259,7 @@ def _twelvedata_batch(symbols: list[str]) -> dict[str, float]:
                         results[orig] = price
         return results
     except Exception as e:
-        print(f"[Price] TwelveData batch failed: {e}", file=sys.stderr)
+        logger.warning("price.twelvedata_batch_failed", error=str(e))
         return {}
 
 
@@ -290,7 +292,7 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
                 results[orig] = price
         return results
     except Exception as e:
-        print(f"[Price] Marketstack batch failed: {e}", file=sys.stderr)
+        logger.warning("price.marketstack_batch_failed", error=str(e))
         return {}
 
 
@@ -316,7 +318,7 @@ def _av_single(sym: str) -> float | None:
         price = float(body.get("Global Quote", {}).get("05. price") or 0)
         return price if price > 0.01 else None
     except Exception as e:
-        print(f"[Price] AlphaVantage {sym} failed: {e}", file=sys.stderr)
+        logger.warning("price.alphavantage_single_failed", symbol=sym, error=str(e))
         return None
 
 
@@ -342,7 +344,7 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
         for sym, price in batch_result.items():
             if sym in remaining and price and price > 0:
                 results[sym] = price
-                print(f"[Price] {sym}={price}", file=sys.stderr)
+                logger.debug("price.resolved", symbol=sym, price=price)
         # Only remove from remaining if we actually got a price > 0
         remaining = [s for s in remaining if s not in results]
 
@@ -373,11 +375,11 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                     price = future.result()
                     if price and price > 0.01:
                         results[sym] = price
-                        print(f"[Price] Finnhub {sym}={price}", file=sys.stderr)
+                        logger.debug("price.finnhub_resolved", symbol=sym, price=price)
                         if sym in remaining:
                             remaining.remove(sym)
                 except Exception as e:
-                    print(f"[Price] Finnhub {sym} future error: {e}", file=sys.stderr)
+                    logger.warning("price.finnhub_future_error", symbol=sym, error=str(e))
 
     # 6. Alpha Vantage — parallel, last resort
     if remaining and _available("alphavantage"):
@@ -390,18 +392,18 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                     price = future.result()
                     if price and price > 0.01:
                         results[sym] = price
-                        print(f"[Price] AlphaVantage {sym}={price}", file=sys.stderr)
+                        logger.debug("price.av_resolved", symbol=sym, price=price)
                         if sym in remaining:
                             remaining.remove(sym)
                 except Exception as e:
-                    print(f"[Price] AlphaVantage {sym} future error: {e}", file=sys.stderr)
+                    logger.warning("price.av_future_error", symbol=sym, error=str(e))
 
     if remaining:
-        print(
-            f"[Price] PRICE_RESOLUTION_FAILURE symbols={remaining} "
-            f"resolved={list(results.keys())} "
-            f"providers_tried=polygon,fmp,twelvedata,marketstack,finnhub,alphavantage",
-            file=sys.stderr,
+        logger.warning(
+            "price.resolution_failure",
+            symbols=remaining,
+            resolved=list(results.keys()),
+            providers_tried="polygon,fmp,twelvedata,marketstack,finnhub,alphavantage",
         )
         results["__failed__"] = [*remaining]  # type: ignore[assignment]
 
@@ -462,7 +464,7 @@ def get_price_with_fallback(sym: str) -> "PriceResult":
         if alias_price and alias_price > 0:
             _PRICE_CACHE[sym] = (alias_price, time.time())
             upsert_ticker_price_cache(sym, alias_price, source=f"alias:{alias}")
-            print(f"[Price] {sym} resolved via alias {alias}={alias_price}", file=sys.stderr)
+            logger.debug("price.alias_resolved", symbol=sym, alias=alias, price=alias_price)
             return PriceResult(
                 symbol=sym,
                 price=alias_price,
@@ -490,10 +492,7 @@ def get_price_with_fallback(sym: str) -> "PriceResult":
             age_hours = (datetime.datetime.now(datetime.UTC) - recorded).total_seconds() / 3600
         except Exception:
             age_hours = 0.0
-        print(
-            f"[Price] {sym} using stale price ${stale_price} from {age_hours:.0f}h ago",
-            file=sys.stderr,
-        )
+        logger.warning("price.stale_used", symbol=sym, price=stale_price, age_hours=f"{age_hours:.0f}h")
         return PriceResult(
             symbol=sym,
             price=stale_price,
@@ -506,7 +505,7 @@ def get_price_with_fallback(sym: str) -> "PriceResult":
         )
 
     # Step 4: Unresolvable
-    print(f"[Price] {sym} UNRESOLVABLE — all providers and cache exhausted", file=sys.stderr)
+    logger.warning("price.unresolvable", symbol=sym)
     return PriceResult(
         symbol=sym,
         price=None,
@@ -589,11 +588,13 @@ def verify_price_integrity(positions: list) -> list[dict]:
         price_used = (p_polygon + p_finnhub) / 2 if warned else p_polygon
 
         if warned:
-            print(
-                f"[PriceIntegrity] DATA_INTEGRITY_WARNING: {sym} — "
-                f"Polygon={p_polygon:.4f} vs Finnhub={p_finnhub:.4f} "
-                f"({discrepancy:.1f}% gap). Using average {price_used:.4f}.",
-                file=sys.stderr,
+            logger.warning(
+                "price.data_integrity_warning",
+                symbol=sym,
+                price_polygon=f"{p_polygon:.4f}",
+                price_finnhub=f"{p_finnhub:.4f}",
+                discrepancy_pct=f"{discrepancy:.1f}",
+                price_used=f"{price_used:.4f}",
             )
 
         results.append(
@@ -897,7 +898,7 @@ def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series 
                 idx = [datetime.date.fromtimestamp(ts) for ts in data["t"]]
                 return pd.Series(data["c"], index=idx, name=sym)
         except Exception as err:
-            print(f"[History] Finnhub history fetch failed for {sym}: {err}", file=sys.stderr)
+            logger.warning("history.finnhub_fetch_failed", symbol=sym, error=str(err))
 
     if ALPHA_VANTAGE_API_KEY:
         try:
@@ -919,7 +920,7 @@ def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series 
                 cutoff = datetime.date.fromtimestamp(unix_from).isoformat()
                 return series[series.index >= cutoff]
         except Exception as err:
-            print(f"[History] AlphaVantage history fetch failed for {sym}: {err}", file=sys.stderr)
+            logger.warning("history.av_fetch_failed", symbol=sym, error=str(err))
 
     return None
 

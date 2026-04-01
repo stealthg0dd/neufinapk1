@@ -4,17 +4,18 @@ Claude Sonnet 4.6 → OpenAI GPT-4o → Gemini 3.1 Pro (→ 1.5 Flash) → Groq 
 """
 
 import json
-import os
 import re
-import sys
 import time
 
+import structlog
 from anthropic import Anthropic
 from google import genai as google_genai
 from groq import Groq
 from openai import OpenAI
 
-from config import ANTHROPIC_API_KEY, GEMINI_KEY, GROQ_KEY, OPENAI_KEY
+from core.config import settings
+
+logger = structlog.get_logger("neufin.ai_router")
 
 # Initialize Google Client lazily to avoid startup failures when GEMINI_KEY is absent
 _gemini: google_genai.Client | None = None
@@ -24,27 +25,25 @@ def _get_gemini_client() -> google_genai.Client:
     """Lazily initialize and return the Gemini client."""
     global _gemini
     if _gemini is None:
-        if not GEMINI_KEY:
+        if not settings.GEMINI_KEY:
             raise ValueError("GEMINI_KEY not set")
-        _gemini = google_genai.Client(api_key=GEMINI_KEY)
+        _gemini = google_genai.Client(api_key=settings.GEMINI_KEY)
     return _gemini
 
 
 # Centralized Gemini model config — single source of truth for main.py and ai_router.py
 GEMINI_PRIMARY_MODEL = "gemini-3.1-pro-preview"
-GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.0-flash")
+GEMINI_FALLBACK_MODEL = settings.GEMINI_FALLBACK_MODEL
 
 # Avoid any network/API calls during import so tests can run without provider keys.
-if GEMINI_KEY:
-    print(
-        f"[Gemini] Primary: {GEMINI_PRIMARY_MODEL} | Fallback: {GEMINI_FALLBACK_MODEL}",
-        file=sys.stderr,
+if settings.GEMINI_KEY:
+    logger.info(
+        "gemini.config",
+        primary=GEMINI_PRIMARY_MODEL,
+        fallback=GEMINI_FALLBACK_MODEL,
     )
 else:
-    print(
-        "[Gemini] GEMINI_KEY missing; Gemini provider disabled until key is configured.",
-        file=sys.stderr,
-    )
+    logger.warning("gemini.key_missing")
 
 
 def _strip_json_fences(text: str) -> str:
@@ -91,16 +90,13 @@ def call_gemini(prompt: str) -> dict:
         try:
             response = _get_gemini_client().models.generate_content(model=model, contents=prompt)
             result = _parse(response.text)
-            print(f"[AI] {model} ✓", file=sys.stderr)
+            logger.info("ai.gemini_ok", model=model)
             return result
         except Exception as exc:
             if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(exc):
-                print(
-                    f"[AI] {model} not found — retrying with {GEMINI_FALLBACK_MODEL}",
-                    file=sys.stderr,
-                )
+                logger.warning("ai.gemini_model_not_found", model=model, fallback=GEMINI_FALLBACK_MODEL)
                 continue
-            print(f"[AI] {model} ✗ — {exc}", file=sys.stderr)
+            logger.warning("ai.gemini_failed", model=model, error=str(exc))
             raise
     raise RuntimeError(
         f"Both Gemini models failed: {GEMINI_PRIMARY_MODEL}, {GEMINI_FALLBACK_MODEL}"
@@ -115,47 +111,47 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     # ── 1. Claude Sonnet 4.6 (Primary) ───────────────────────────────────────
     t0 = time.monotonic()
     try:
-        if not ANTHROPIC_API_KEY:  # FIXED: skip init entirely when key is absent
+        if not settings.ANTHROPIC_API_KEY:  # FIXED: skip init entirely when key is absent
             raise ValueError("ANTHROPIC_API_KEY not set")
-        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6",  # Latest March 2026 Stable
             max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse(response.content[0].text)
-        print(f"[AI] Claude ✓ ({time.monotonic() - t0:.1f}s)")
+        logger.info("ai.claude_ok", elapsed=f"{time.monotonic() - t0:.1f}s")
         return result
     except Exception as e:
-        print(f"[AI] Claude ✗ — Error: {e}", file=sys.stderr)
+        logger.warning("ai.claude_failed", error=str(e))
 
     # ── 2. OpenAI GPT-4o (Tier 2 Fallback) ───────────────────────────────────
     t1 = time.monotonic()
     try:
-        client = OpenAI(api_key=OPENAI_KEY)
+        client = OpenAI(api_key=settings.OPENAI_KEY)
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt}],
         )
         result = _parse(response.choices[0].message.content)
-        print(f"[AI] gpt-4o ✓ ({time.monotonic() - t1:.1f}s)")
+        logger.info("ai.gpt4o_ok", elapsed=f"{time.monotonic() - t1:.1f}s")
         return result
     except Exception as e:
-        print(f"[AI] gpt-4o ✗ — {e}", file=sys.stderr)
+        logger.warning("ai.gpt4o_failed", error=str(e))
 
     # ── 3. Gemini (Tier 3 Fallback) — auto-fallback: primary → GEMINI_FALLBACK_MODEL ─
     t2 = time.monotonic()
     try:
         result = call_gemini(prompt)
-        print(f"[AI] Gemini ✓ ({time.monotonic() - t2:.1f}s)")
+        logger.info("ai.gemini_ok", elapsed=f"{time.monotonic() - t2:.1f}s")
         return result
     except Exception as e:
-        print(f"[AI] Gemini ✗ — {e}", file=sys.stderr)
+        logger.warning("ai.gemini_failed", error=str(e))
 
     # ── 4. Groq Llama 3.3 70B (Final Fallback) ───────────────────────────────
     t3 = time.monotonic()
     try:
-        client = Groq(api_key=GROQ_KEY)
+        client = Groq(api_key=settings.GROQ_KEY)
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -168,10 +164,10 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
             temperature=0.1,
         )
         result = _parse(response.choices[0].message.content)
-        print(f"[AI] llama-3.3-70b-versatile ✓ ({time.monotonic() - t3:.1f}s)")
+        logger.info("ai.llama_ok", elapsed=f"{time.monotonic() - t3:.1f}s")
         return result
     except Exception as e:
-        print(f"[AI] llama-3.3-70b-versatile ✗ — {e}", file=sys.stderr)
+        logger.warning("ai.llama_failed", error=str(e))
 
     raise Exception(
         "All AI providers failed: claude-sonnet-4-6, gpt-4o, gemini-3.1-pro-preview, llama-3.3-70b-versatile. Check API keys and provider status."
@@ -189,7 +185,7 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
     # ── 1. Claude (system param) ──────────────────────────────────────────────
     t0 = time.monotonic()
     try:
-        client = Anthropic(api_key=ANTHROPIC_API_KEY)
+        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=4096,
@@ -197,15 +193,15 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
             messages=[{"role": "user", "content": user_content}],
         )
         text = response.content[0].text
-        print(f"[AI/Briefing] Claude ✓ ({time.monotonic() - t0:.1f}s)", file=sys.stderr)
+        logger.info("ai.briefing_claude_ok", elapsed=f"{time.monotonic() - t0:.1f}s")
         return text
     except Exception as e:
-        print(f"[AI/Briefing] Claude ✗ — {e}", file=sys.stderr)
+        logger.warning("ai.briefing_claude_failed", error=str(e))
 
     # ── 2. OpenAI GPT-4o ─────────────────────────────────────────────────────
     t1 = time.monotonic()
     try:
-        client = OpenAI(api_key=OPENAI_KEY)
+        client = OpenAI(api_key=settings.OPENAI_KEY)
         response = client.chat.completions.create(
             model="gpt-4o",
             max_tokens=4096,
@@ -215,10 +211,10 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
             ],
         )
         text = response.choices[0].message.content
-        print(f"[AI/Briefing] GPT-4o ✓ ({time.monotonic() - t1:.1f}s)", file=sys.stderr)
+        logger.info("ai.briefing_gpt4o_ok", elapsed=f"{time.monotonic() - t1:.1f}s")
         return text
     except Exception as e:
-        print(f"[AI/Briefing] GPT-4o ✗ — {e}", file=sys.stderr)
+        logger.warning("ai.briefing_gpt4o_failed", error=str(e))
 
     # ── 3. Gemini (system prepended to prompt) ────────────────────────────────
     t2 = time.monotonic()
@@ -229,18 +225,18 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
                 model=model, contents=full_prompt
             )
             text = response.text
-            print(f"[AI/Briefing] {model} ✓ ({time.monotonic() - t2:.1f}s)", file=sys.stderr)
+            logger.info("ai.briefing_gemini_ok", model=model, elapsed=f"{time.monotonic() - t2:.1f}s")
             return text
         except Exception as e:
             if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(e):
                 continue
-            print(f"[AI/Briefing] {model} ✗ — {e}", file=sys.stderr)
+            logger.warning("ai.briefing_gemini_failed", model=model, error=str(e))
             break
 
     # ── 4. Groq Llama 3.3 70B ────────────────────────────────────────────────
     t3 = time.monotonic()
     try:
-        client = Groq(api_key=GROQ_KEY)
+        client = Groq(api_key=settings.GROQ_KEY)
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=4096,
@@ -251,9 +247,9 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
             temperature=0.2,
         )
         text = response.choices[0].message.content
-        print(f"[AI/Briefing] Groq ✓ ({time.monotonic() - t3:.1f}s)", file=sys.stderr)
+        logger.info("ai.briefing_groq_ok", elapsed=f"{time.monotonic() - t3:.1f}s")
         return text
     except Exception as e:
-        print(f"[AI/Briefing] Groq ✗ — {e}", file=sys.stderr)
+        logger.warning("ai.briefing_groq_failed", error=str(e))
 
     raise Exception("All AI providers failed for IC Briefing generation.")

@@ -16,21 +16,20 @@ format_clusters_for_ai(clusters)                     -> str
 from __future__ import annotations
 
 import asyncio
-import os
-import sys
 import time
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import requests
-from dotenv import load_dotenv
+import structlog
+
+from core.config import settings
+
+logger = structlog.get_logger("neufin.risk_engine")
 
 # ── API key ────────────────────────────────────────────────────────────────────
-ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
-if not ALPHA_VANTAGE_API_KEY:
-    load_dotenv()
-    ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+ALPHA_VANTAGE_API_KEY = settings.ALPHA_VANTAGE_API_KEY
 
 # ── Multi-tier cache (Redis 24h → Supabase 24h → in-process 1h) ───────────────
 try:
@@ -39,22 +38,19 @@ try:
 
     _MARKET_CACHE_AVAILABLE = True
 except Exception as _mc_err:
-    print(
-        f"[RiskEngine] market_cache unavailable ({_mc_err}) — using in-process cache",
-        file=sys.stderr,
-    )
+    logger.warning("risk_engine.warn", detail=f"[RiskEngine] market_cache unavailable ({_mc_err}) — using in-process cache")
     _MARKET_CACHE_AVAILABLE = False
     # Legacy in-process fallback
     _CLOSES_CACHE: dict[str, tuple[pd.Series, float]] = {}
     _CACHE_TTL = 3600
 
 # Alternative price providers — fallback chain when AV is rate-limited or premium-blocked
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY") or os.getenv("FINNHUB_API_KEY")
-POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY") or os.getenv("POLYGON_API_KEY")
+FINNHUB_API_KEY = settings.FINNHUB_API_KEY
+POLYGON_API_KEY = settings.POLYGON_API_KEY
 
 # Alpha Vantage free tier: 25 req/day, ~5 req/min.
 # Set to 0 in production if using a paid key.
-_AV_REQUEST_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "1.2"))
+_AV_REQUEST_DELAY = settings.AV_REQUEST_DELAY
 
 # ── Provider blacklist (batch-level skip for rate-limited providers) ───────────
 # Maps provider name → expiry epoch.  When a provider signals rate-limit /
@@ -77,11 +73,7 @@ def _is_blacklisted(name: str) -> bool:
 def _blacklist(name: str) -> None:
     """Mark *name* as rate-limited for _PROVIDER_SKIP_TTL seconds."""
     _PROVIDER_SKIP[name] = time.time() + _PROVIDER_SKIP_TTL
-    print(
-        f"[RiskEngine] Provider '{name}' blacklisted for {_PROVIDER_SKIP_TTL}s "
-        "— skipping for remainder of batch.",
-        file=sys.stderr,
-    )
+    logger.warning("risk_engine.blacklisted", provider=name, ttl=_PROVIDER_SKIP_TTL)
 
 
 # ── Finnhub daily-closes fallback ─────────────────────────────────────────────
@@ -125,7 +117,7 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
             _cache_set(sym_upper, days, series)
         return series
     except Exception as e:
-        print(f"[RiskEngine] Finnhub fallback failed for {sym_upper}: {e}", file=sys.stderr)
+        logger.warning("risk_engine.warn", detail=f"[RiskEngine] Finnhub fallback failed for {sym_upper}: {e}")
         return pd.Series(dtype=float, name=sym_upper)
 
 
@@ -164,7 +156,7 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
             _cache_set(sym_upper, days, series)
         return series
     except Exception as e:
-        print(f"[RiskEngine] Polygon fallback failed for {sym_upper}: {e}", file=sys.stderr)
+        logger.warning("risk_engine.warn", detail=f"[RiskEngine] Polygon fallback failed for {sym_upper}: {e}")
         return pd.Series(dtype=float, name=sym_upper)
 
 
@@ -206,7 +198,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         return series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
 
     if not ALPHA_VANTAGE_API_KEY:
-        print(f"[RiskEngine] ALPHA_VANTAGE_API_KEY not set — skipping {sym_upper}", file=sys.stderr)
+        logger.warning("risk_engine.warn", detail=f"[RiskEngine] ALPHA_VANTAGE_API_KEY not set — skipping {sym_upper}")
         return pd.Series(dtype=float, name=sym_upper)
 
     if _AV_REQUEST_DELAY > 0:
@@ -230,10 +222,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
             _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            print(
-                f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon",
-                file=sys.stderr,
-            )
+            logger.warning("risk_engine.warn", detail=f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon")
             _blacklist("av")
             series = _fetch_daily_closes_finnhub(sym_upper, days)
             if not series.empty:
@@ -242,7 +231,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
 
         ts_data = payload.get("Time Series (Daily)", {})
         if not ts_data:
-            print(f"[RiskEngine] No time-series data returned for {sym_upper}", file=sys.stderr)
+            logger.warning("risk_engine.warn", detail=f"[RiskEngine] No time-series data returned for {sym_upper}")
             return pd.Series(dtype=float, name=sym_upper)
 
         # "5. adjusted close" — fall back to "4. close" for non-adjusted feeds
@@ -267,9 +256,9 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         return series
 
     except requests.RequestException as e:
-        print(f"[RiskEngine] HTTP error fetching {sym_upper}: {e}", file=sys.stderr)
+        logger.warning("risk_engine.warn", detail=f"[RiskEngine] HTTP error fetching {sym_upper}: {e}")
     except Exception as e:
-        print(f"[RiskEngine] Unexpected error for {sym_upper}: {e}", file=sys.stderr)
+        logger.warning("risk_engine.warn", detail=f"[RiskEngine] Unexpected error for {sym_upper}: {e}")
 
     return pd.Series(dtype=float, name=sym_upper)
 
@@ -363,10 +352,7 @@ def build_risk_report(
         else:
             failed.append(sym)
             if sym not in [s.upper() for s in symbols]:
-                print(
-                    f"[RiskEngine] {sym} dropped — insufficient data ({len(s)} rows)",
-                    file=sys.stderr,
-                )
+                logger.warning("risk_engine.warn", detail=f"[RiskEngine] {sym} dropped — insufficient data ({len(s)} rows)")
 
     symbols_used: list[str] = list(price_series.keys())
 

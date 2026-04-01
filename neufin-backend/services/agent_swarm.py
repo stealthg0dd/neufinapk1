@@ -29,14 +29,14 @@ import asyncio
 import datetime
 import json
 import operator
-import os
-import sys
 from typing import Annotated, TypedDict
 
 import numpy as np
 import pandas as pd
 import requests
-from dotenv import load_dotenv
+import structlog
+
+logger = structlog.get_logger("neufin.agent_swarm")
 
 # ── LangGraph (optional — graceful fallback) ───────────────────────────────────
 try:
@@ -45,7 +45,7 @@ try:
     _LANGGRAPH = True
 except ImportError:
     _LANGGRAPH = False
-    print("[Swarm] langgraph not installed — running in sequential fallback mode", file=sys.stderr)
+    logger.warning("swarm.langgraph_missing")
 
 # ── Service imports ────────────────────────────────────────────────────────────
 from services.ai_router import get_ai_analysis, get_ai_briefing
@@ -83,12 +83,10 @@ def _get_notify_fn():
 _ALERT_REGIMES = {"High Inflation", "Inflationary", "Elevated Inflation"}
 
 # ── API keys ───────────────────────────────────────────────────────────────────
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
-FRED_API_KEY = os.environ.get("FRED_API_KEY")
-if not FINNHUB_API_KEY or not FRED_API_KEY:
-    load_dotenv()
-    FINNHUB_API_KEY = FINNHUB_API_KEY or os.getenv("FINNHUB_API_KEY")
-    FRED_API_KEY = FRED_API_KEY or os.getenv("FRED_API_KEY")
+from core.config import settings
+
+FINNHUB_API_KEY = settings.FINNHUB_API_KEY
+FRED_API_KEY = settings.FRED_API_KEY
 
 # fredapi is optional — graceful fallback if not installed
 try:
@@ -98,7 +96,7 @@ try:
 except ImportError:
     _Fred = None  # type: ignore[assignment,misc]
     _FREDAPI_AVAILABLE = False
-    print("[Swarm] fredapi not installed — falling back to raw FRED requests", file=sys.stderr)
+    logger.warning("swarm.fredapi_missing")
 
 _RISK_FREE_ANNUAL = 0.053  # ~Fed funds rate — override via env var
 _CORR_REVISION_THRESHOLD = 0.80  # critic triggers quant revision above this
@@ -154,7 +152,7 @@ def _fetch_finnhub_news(symbol: str, days: int = 7) -> list[dict]:
             for i in items[:3]
         ]
     except Exception as e:
-        print(f"[Swarm/Strategist] News fetch failed for {symbol}: {e}", file=sys.stderr)
+        logger.warning("swarm.news_fetch_failed", symbol=symbol, error=str(e))
         return []
 
 
@@ -185,7 +183,7 @@ def _get_fred_cpi_analysis() -> dict:
             cpi_series = fred.get_series("CPIAUCSL", observation_start=start_date)
             values = [float(v) for v in cpi_series.dropna().tolist()]
         except Exception as e:
-            print(f"[Swarm/FRED] fredapi fetch failed: {e}", file=sys.stderr)
+            logger.warning("swarm.fred_fredapi_failed", error=str(e))
 
     # ── 2. Raw requests fallback ──────────────────────────────────────────────
     if not values:
@@ -204,7 +202,7 @@ def _get_fred_cpi_analysis() -> dict:
             obs = r.json().get("observations", [])
             values = [float(o["value"]) for o in obs if o.get("value") not in (".", None)]
         except Exception as e:
-            print(f"[Swarm/FRED] Raw request also failed: {e}", file=sys.stderr)
+            logger.warning("swarm.fred_raw_failed", error=str(e))
             return _EMPTY
 
     if len(values) < 13:
