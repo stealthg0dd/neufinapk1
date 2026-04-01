@@ -26,19 +26,19 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import os
-import sys
 import time
 
 import pandas as pd
 import requests
-from dotenv import load_dotenv
+import structlog
 
-load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
+from core.config import settings
 
-ALPHA_VANTAGE_API_KEY = os.environ.get("ALPHA_VANTAGE_API_KEY")
-POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
+logger = structlog.get_logger("neufin.stress_tester")
+
+ALPHA_VANTAGE_API_KEY = settings.ALPHA_VANTAGE_API_KEY
+POLYGON_API_KEY = settings.POLYGON_API_KEY
+FINNHUB_API_KEY = settings.FINNHUB_API_KEY
 
 try:
     from services.market_cache import get_closes as _cache_get
@@ -51,7 +51,7 @@ except Exception:
 _FULL_HIST_DAYS = 3650  # sentinel key for "full" history in market_cache
 _LOCAL_FULL: dict[str, tuple[pd.Series, float]] = {}
 _LOCAL_TTL = 86_400
-_AV_DELAY = float(os.environ.get("AV_REQUEST_DELAY", "0.0"))
+_AV_DELAY = settings.AV_REQUEST_DELAY
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -144,10 +144,7 @@ def _fetch_full_history(sym: str) -> pd.Series:
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
             _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            print(
-                f"[StressTester] AV {_reason} for {sym_upper} — trying Finnhub→Polygon fallback",
-                file=sys.stderr,
-            )
+            logger.warning("stress_tester.av_blocked", symbol=sym_upper, reason=_reason)
             return _fetch_full_history_fallback(sym_upper)
 
         ts = payload.get("Time Series (Daily)", {})
@@ -168,7 +165,7 @@ def _fetch_full_history(sym: str) -> pd.Series:
         return series
 
     except Exception as e:
-        print(f"[StressTester] full-history fetch failed for {sym_upper}: {e}", file=sys.stderr)
+        logger.warning("stress_tester.full_history_failed", symbol=sym_upper, error=str(e))
         return pd.Series(dtype=float, name=sym_upper)
 
 
@@ -383,7 +380,7 @@ def compute_factor_metrics(
             if len(s) >= 10:
                 series_map[sym] = s
     except Exception as e:
-        print(f"[StressTester] factor metrics fetch error: {e}", file=sys.stderr)
+        logger.warning("stress_tester.factor_metrics_error", error=str(e))
 
     spy_corr_map: dict[str, float] = {}
     if "SPY" in series_map and len(series_map) >= 2:
@@ -453,7 +450,7 @@ def _fetch_history_polygon(sym: str, start: str, end: str) -> pd.Series:
         series.name = sym
         return series
     except Exception as e:
-        print(f"[IndexPerf] Polygon candle {sym} failed: {e}", file=sys.stderr)
+        logger.warning("index_perf.polygon_candle_failed", symbol=sym, error=str(e))
         return pd.Series(dtype=float, name=sym)
 
 
@@ -490,7 +487,7 @@ def _fetch_history_finnhub(sym: str, start: str, end: str) -> pd.Series:
         series.name = sym
         return series
     except Exception as e:
-        print(f"[IndexPerf] Finnhub candle {sym} failed: {e}", file=sys.stderr)
+        logger.warning("index_perf.finnhub_candle_failed", symbol=sym, error=str(e))
         return pd.Series(dtype=float, name=sym)
 
 
@@ -514,9 +511,11 @@ def _fetch_full_history_fallback(sym: str) -> pd.Series:
             if _CACHE_AVAILABLE:
                 _cache_set(sym_upper, _FULL_HIST_DAYS, series)
             _LOCAL_FULL[sym_upper] = (series, time.time())
-            print(
-                f"[StressTester] {fetch_fn.__name__} supplied full history for {sym_upper} ({len(series)} rows)",
-                file=sys.stderr,
+            logger.info(
+                "stress_tester.fallback_history_ok",
+                fetch_fn=fetch_fn.__name__,
+                symbol=sym_upper,
+                rows=len(series),
             )
             return series
 

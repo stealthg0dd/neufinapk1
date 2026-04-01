@@ -9,9 +9,9 @@ Both endpoints are public (added to PUBLIC_PREFIXES in main.py).
 
 import json
 import re
-import sys
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -44,7 +44,7 @@ def _sanitize_message(message: str) -> str | None:
     Callers should return _MD_REJECTION when None is returned.
     """
     if _INJECTION_PATTERNS.search(message):
-        print(f"[Chat] Prompt injection blocked: {message[:120]!r}", file=sys.stderr)
+        logger.warning("chat.injection_blocked", preview=repr(message[:120]))
         return None
     return message
 
@@ -60,6 +60,8 @@ from services.auth_dependency import (  # noqa: E402
 from services.jwt_auth import JWTUser  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
+
+logger = structlog.get_logger("neufin.swarm")
 
 
 # ── Request / Response models ──────────────────────────────────────────────────
@@ -136,9 +138,9 @@ async def _persist_swarm_result(report_id: str, user_id: str | None, result: dic
         await asyncio.to_thread(
             lambda: supabase.table("swarm_reports").upsert(row, on_conflict="id").execute()
         )
-        print(f"[Swarm] Report {report_id} persisted ✓", file=sys.stderr)
+        logger.info("swarm.persist_ok", report_id=report_id)
     except Exception as e:
-        print(f"[Swarm] Persist failed for {report_id}: {e}", file=sys.stderr)
+        logger.warning("swarm.persist_failed", report_id=report_id, error=str(e))
 
 
 # ── MD context builder ─────────────────────────────────────────────────────────
@@ -250,7 +252,7 @@ async def analyze_with_swarm(
     try:
         result = await run_swarm(ticker_data, body.total_value)
     except Exception as e:
-        print(f"[Swarm] analyze exception: {e}", file=sys.stderr)
+        logger.warning("swarm.analyze_exception", error=str(e))
         return {
             "investment_thesis": {"error": str(e), "status": "failed"},
             "risk_metrics": {},
@@ -459,7 +461,7 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
         except HTTPException:
             raise
         except Exception as e:
-            print(f"[Chat] Supabase fetch failed for {body.record_id}: {e}", file=sys.stderr)
+            logger.warning("chat.supabase_fetch_failed", record_id=body.record_id, error=str(e))
         # Fall through to positions fallback if DB lookup fails
 
     # ── 3. Positions fallback (guest / no persisted report) ───────────────────
@@ -469,7 +471,7 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
             result = await chat_with_swarm(clean_message, ticker_data, body.total_value)
         except Exception as e:
             # FIXED: return 200 with error payload instead of 503
-            print(f"[Swarm] chat exception: {e}", file=sys.stderr)
+            logger.warning("swarm.chat_exception", error=str(e))
             return {
                 "reply": f"Analysis error: {e}. Please try again.",
                 "key_numbers": {},
@@ -583,7 +585,7 @@ Return ONLY valid JSON (no markdown fences):
         raw_kn = data.get("key_numbers") or {}
         action = data.get("action", "")
     except Exception as e:
-        print(f"[GlobalChat] AI error: {e}", file=sys.stderr)
+        logger.warning("global_chat.ai_error", error=str(e))
         reply = "Analysis temporarily unavailable. Please try again shortly."
         raw_kn = {}
         action = ""

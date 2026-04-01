@@ -17,15 +17,17 @@ the helper `notify_macro_shift()` exported from this module.
 from __future__ import annotations
 
 import datetime
-import sys
 
 import requests as _requests
+import structlog
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel, field_validator
 
 from database import get_supabase_client
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
+
+logger = structlog.get_logger("neufin.alerts")
 
 _EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 _MAX_BATCH = 100  # Expo recommends ≤ 100 messages per request
@@ -155,7 +157,7 @@ async def notify_macro_shift(
         ]
 
         if not tokens:
-            print(f"[Alerts] Regime shift '{regime}' — no matching subscribers.", file=sys.stderr)
+            logger.info("alerts.no_matching_subscribers", regime=regime)
             return
 
         messages = [
@@ -171,13 +173,10 @@ async def notify_macro_shift(
         ]
 
         await _send_expo_messages_async(messages)
-        print(
-            f"[Alerts] Sent {len(messages)} push notification(s) for regime '{regime}'.",
-            file=sys.stderr,
-        )
+        logger.info("alerts.push_sent", count=len(messages), regime=regime)
 
     except Exception as e:
-        print(f"[Alerts] notify_macro_shift failed: {e}", file=sys.stderr)
+        logger.warning("alerts.notify_macro_shift_failed", error=str(e))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -201,9 +200,9 @@ def _send_expo_messages(messages: list[dict]) -> None:
                 timeout=10.0,
             )
             if not r.ok:
-                print(f"[Alerts] Expo push error {r.status_code}: {r.text[:200]}", file=sys.stderr)
+                logger.warning("alerts.expo_push_error", status=r.status_code, detail=r.text[:200])
         except Exception as e:
-            print(f"[Alerts] Expo push request failed: {e}", file=sys.stderr)
+            logger.warning("alerts.expo_push_request_failed", error=str(e))
 
 
 async def _send_expo_messages_async(messages: list[dict]) -> None:

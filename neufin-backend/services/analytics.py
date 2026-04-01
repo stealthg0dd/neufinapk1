@@ -12,7 +12,11 @@ Funnel stages tracked:
   referral_used       → checkout with a valid ref_token
 """
 
+import structlog
+
 from database import supabase
+
+logger = structlog.get_logger("neufin.analytics")
 
 
 async def track(
@@ -32,6 +36,4 @@ async def track(
             }
         ).execute()
     except Exception as e:
-        import sys
-
-        print(f"[Analytics] track({event}) failed: {e}", file=sys.stderr)
+        logger.warning("analytics.track_failed", event=event, error=str(e))

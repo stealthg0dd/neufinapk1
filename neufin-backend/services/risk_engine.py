@@ -38,7 +38,7 @@ try:
 
     _MARKET_CACHE_AVAILABLE = True
 except Exception as _mc_err:
-    logger.warning("risk_engine.warn", detail=f"[RiskEngine] market_cache unavailable ({_mc_err}) — using in-process cache")
+    logger.warning("risk_engine.market_cache_unavailable", error=str(_mc_err))
     _MARKET_CACHE_AVAILABLE = False
     # Legacy in-process fallback
     _CLOSES_CACHE: dict[str, tuple[pd.Series, float]] = {}

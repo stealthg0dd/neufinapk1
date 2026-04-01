@@ -70,7 +70,7 @@ def _upload_pdf(pdf_bytes: bytes, report_id: str) -> str | None:
         )
         return supabase.storage.from_("advisor-reports").get_public_url(filename)
     except Exception as e:
-        print(f"[Storage] upload failed: {e}")
+        logger.warning("storage.upload_failed", error=str(e))
         return None
 
 
@@ -113,7 +113,7 @@ Return ONLY valid JSON:
 
         return pdf_url
     except Exception as e:
-        print(f"[PDF] generation failed for report {report_id}: {e}")
+        logger.warning("pdf.generation_failed", report_id=report_id, error=str(e))
         return None
 
 

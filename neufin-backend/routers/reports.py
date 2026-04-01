@@ -1,6 +1,7 @@
 import datetime
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -13,6 +14,8 @@ from services.jwt_auth import JWTUser
 from services.pdf_generator import generate_advisor_report
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
+
+logger = structlog.get_logger("neufin.reports")
 
 
 class ColorScheme(BaseModel):
@@ -48,7 +51,7 @@ def _upload_to_storage(pdf_bytes: bytes, filename: str) -> str | None:
         except Exception:  # noqa: S110 — fall through to public URL
             pass
     except Exception as e:
-        print(f"Supabase Storage upload failed: {e}")
+        logger.warning("reports.storage_upload_failed", error=str(e))
         return None
 
 
@@ -186,7 +189,7 @@ Be specific, data-driven, and professional."""
         )
         report_id = report_result.data[0]["id"] if report_result.data else None
     except Exception as e:
-        print(f"Failed to save report record: {e}")
+        logger.warning("reports.save_record_failed", error=str(e))
         report_id = None
 
     return {

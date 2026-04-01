@@ -23,14 +23,14 @@ Usage inside the container (PYTHONPATH=/app is set by Dockerfile):
 
 from __future__ import annotations
 
-import os
-
 from celery import Celery
 from dotenv import load_dotenv
 
+from core.config import settings
+
 load_dotenv()
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = settings.REDIS_URL or "redis://localhost:6379/0"
 
 celery_app = Celery(
     "neufin",

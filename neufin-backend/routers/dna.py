@@ -84,7 +84,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
         )
         record_id = result.data[0]["id"] if result.data else None
     except Exception as e:
-        print(f"Supabase insert failed: {e}")
+        logger.warning("dna.supabase_insert_failed", error=str(e))
         record_id = None
 
     return {
