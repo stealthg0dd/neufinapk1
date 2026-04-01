@@ -50,70 +50,11 @@ configure_logging()
 logger = structlog.get_logger("neufin.main")
 
 import pandas as pd  # noqa: E402
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, BackgroundTasks, Path  # noqa: E402
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from config import APP_BASE_URL  # noqa: E402
-import asyncio
-import random
-# --- Dashboard API Models ---
-from pydantic import BaseModel
 
-class ScoreResponse(BaseModel):
-    backend: int
-    web: int
-    mobile: int
-
-class Issue(BaseModel):
-    id: str
-    file: str
-    line: int
-    description: str
-    severity: str
-    fixable: bool = False
-    pr_url: str | None = None
-    status: str = "open"
-
-class Fix(BaseModel):
-    id: str
-    file: str
-    description: str
-    status: str
-    ago: str
-    pr_url: str | None = None
-
-# --- API ROUTES UNDER /api PREFIX ---
-from fastapi import APIRouter
-api_router = APIRouter()
-
-@api_router.post("/scan/trigger", tags=["dashboard"])
-async def trigger_scan(background_tasks: BackgroundTasks):
-    async def fake_scan():
-        await asyncio.sleep(2)
-        return True
-    background_tasks.add_task(fake_scan)
-    return {"status": "scan_started"}
-
-@api_router.get("/health", tags=["dashboard"])
-async def dashboard_health():
-    scores = {"backend": random.randint(60, 100), "web": random.randint(60, 100), "mobile": random.randint(60, 100)}
-    issues = [
-        {"id": "1", "file": "main.py", "line": 42, "description": "Unused import detected", "severity": "low", "fixable": True, "pr_url": None, "status": "open"},
-        {"id": "2", "file": "database.py", "line": 88, "description": "Possible SQL injection", "severity": "critical", "fixable": False, "pr_url": "https://github.com/example/pr/2", "status": "open"},
-    ]
-    return {"scores": scores, "issues": issues}
-
-@api_router.get("/fixes", tags=["dashboard"])
-async def dashboard_fixes():
-    fixes = [
-        {"id": "f1", "file": "main.py", "description": "Removed unused import", "status": "success", "ago": "2m ago", "pr_url": "https://github.com/example/pr/1"},
-        {"id": "f2", "file": "database.py", "description": "Patched SQL injection", "status": "pending_review", "ago": "10m ago", "pr_url": None},
-    ]
-    return {"fixes": fixes}
-
-@api_router.post("/fixes/{fix_id}/apply", tags=["dashboard"])
-async def apply_fix(fix_id: str = Path(...)):
-    return {"status": "applied", "fix_id": fix_id}
 from database import supabase  # noqa: E402
 from routers import (  # noqa: E402
     advisors,
@@ -176,15 +117,6 @@ app = FastAPI(
     version="1.1.0",
 )
 
-# ── CORS: Allow all origins for API ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # ── Observability: Prometheus metrics endpoint (/metrics) ─────────────────────
 # Tracks HTTP request count, latency histograms, and in-flight requests by
 # default.  Exposed at GET /metrics — excluded from auth middleware via
@@ -201,29 +133,12 @@ try:
 except ImportError:
     logger.warning("prometheus_fastapi_instrumentator not installed; /metrics unavailable")
 
-# ── CORS origins — dynamic: base set + optional ALLOWED_ORIGINS env var ─────────
-# Add production domains to Railway env: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
-_extra_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
-_vercel_url = os.environ.get("VERCEL_URL", "").strip()
-_vercel_origin = f"https://{_vercel_url}" if _vercel_url else ""
-origins = list(
-    {
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173",  # Vite dev server
-        "https://neufin-web.vercel.app",
-        "https://neufinapk1.vercel.app",
-        "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
-        "https://neufin.ai",
-        "https://www.neufin.ai",
-        "https://neufin-agent-production.up.railway.app",
-        _vercel_origin,
-        *_extra_origins,
-    }
-)
-origins = [o for o in origins if o]
+# ── CORS origins — driven entirely by ALLOWED_ORIGINS env var ────────────────
+# Set ALLOWED_ORIGINS to a comma-separated list of allowed origins in production.
+# Example: ALLOWED_ORIGINS=https://myapp.vercel.app,https://custom.domain.com
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "").strip()
+origins = [o.strip() for o in _raw_origins.split(",") if o.strip()] if _raw_origins else ["http://localhost:3000"]
 # Regex covers all Vercel preview deployments (https://*.vercel.app)
-# Starlette does not support glob wildcards in allow_origins — use allow_origin_regex instead.
 _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
 
 # ── Middleware ordering ────────────────────────────────────────────────────────
@@ -246,7 +161,7 @@ _origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
 
 # ── Step 1: CORSMiddleware (registered first → inner position) ────────────────
 # allow_origin_regex covers all Vercel preview deployments (https://*.vercel.app).
-# allow_origins lists every explicit origin; ALLOWED_ORIGINS env var extends it.
+# allow_origins is driven by the ALLOWED_ORIGINS env var (see above).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -311,18 +226,16 @@ async def auth_middleware(request: Request, call_next):
 
 # ── Routers ────────────────────────────────────────────────────────────────────
 
-# Mount all routers under /api
-app.include_router(api_router, prefix="/api")
-app.include_router(dna.router, prefix="/api")
-app.include_router(portfolio.router, prefix="/api")
-app.include_router(reports.router, prefix="/api")
-app.include_router(payments.router, prefix="/api")
-app.include_router(referrals.router, prefix="/api")
-app.include_router(advisors.router, prefix="/api")
-app.include_router(market.router, prefix="/api")
-app.include_router(vault.router, prefix="/api")
-app.include_router(swarm.router, prefix="/api")
-app.include_router(alerts.router, prefix="/api")
+app.include_router(dna.router)
+app.include_router(portfolio.router)
+app.include_router(reports.router)
+app.include_router(payments.router)
+app.include_router(referrals.router)
+app.include_router(advisors.router)
+app.include_router(market.router)
+app.include_router(vault.router)
+app.include_router(swarm.router)
+app.include_router(alerts.router)
 
 
 # ── Global OPTIONS handler ─────────────────────────────────────────────────────
