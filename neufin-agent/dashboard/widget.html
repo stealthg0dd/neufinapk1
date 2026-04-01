@@ -5,390 +5,927 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Neufin Code Health</title>
   <style>
-    html, body {
-      background: #0F172A;
-      color: #F1F5F9;
-      font-family: 'Inter', Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      min-height: 100vh;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0F172A;
+      --panel:    #1E293B;
+      --panel2:   #162032;
+      --border:   #334155;
+      --accent:   #1E88E5;
+      --accent2:  #1565C0;
+      --text:     #F1F5F9;
+      --muted:    #64748B;
+      --c-crit:   #EF4444;
+      --c-high:   #F59E0B;
+      --c-med:    #F97316;
+      --c-low:    #22C55E;
+      --font-ui:  'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+      --topbar-h: 68px;
+      --audit-h:  118px;
     }
-    .dashboard {
-      max-width: 700px;
-      margin: 32px auto;
-      background: #1E293B;
-      border-radius: 18px;
-      box-shadow: 0 2px 16px #0008;
-      padding: 0 0 24px 0;
-      border: 2px solid transparent;
-      transition: border 0.2s;
-    }
-    .dashboard.critical {
-      border-color: #ef4444;
-      box-shadow: 0 0 0 2px #ef4444, 0 2px 16px #0008;
-    }
-    .header {
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 13px; overflow: hidden; }
+
+    /* ── Topbar ─────────────────────────────────────── */
+    #topbar {
+      height: var(--topbar-h);
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding: 24px 32px 8px 32px;
-      font-size: 1.3rem;
-      font-weight: 700;
-      letter-spacing: 1px;
-      border-bottom: 1px solid #334155;
-    }
-    .scores {
-      display: flex;
-      justify-content: space-between;
-      padding: 24px 32px 8px 32px;
+      padding: 0 18px;
       gap: 16px;
+      flex-shrink: 0;
     }
-    .score-card {
-      background: #0F172A;
-      border-radius: 12px;
-      flex: 1;
-      margin: 0 4px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 18px 0 10px 0;
-      min-width: 120px;
-    }
-    .score-label {
-      font-size: 1.1rem;
-      margin-bottom: 6px;
-      color: #cbd5e1;
-      letter-spacing: 0.5px;
-    }
-    .score-ring {
-      width: 54px;
-      height: 54px;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .score-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 2px;
-    }
-    .section-title {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin: 18px 0 8px 32px;
-      letter-spacing: 0.5px;
-      color: #f1f5f9;
-    }
-    .issues-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin: 0 32px 0 32px;
-    }
-    .filter-select {
-      background: #1E293B;
-      color: #f1f5f9;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      padding: 2px 8px;
-      font-size: 1rem;
-    }
-    .issues-list {
-      margin: 0 32px 0 32px;
-      background: #0F172A;
-      border-radius: 10px;
-      padding: 0;
-      list-style: none;
-      font-size: 0.98rem;
-      min-height: 60px;
-    }
-    .issue {
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid #334155;
-      padding: 8px 0 8px 0;
-      gap: 10px;
-    }
-    .issue:last-child {
-      border-bottom: none;
-    }
-    .issue .sev {
-      font-size: 1.2em;
-      width: 28px;
-      text-align: center;
-    }
-    .issue .file {
-      color: #fbbf24;
-      font-family: monospace;
-      font-size: 0.97em;
-      margin-right: 4px;
-    }
-    .issue .desc {
-      flex: 1;
-      color: #f1f5f9;
-    }
-    .issue .action-btn {
-      background: #334155;
-      color: #f1f5f9;
-      border: none;
-      border-radius: 6px;
-      padding: 2px 10px;
-      margin-left: 6px;
-      cursor: pointer;
-      font-size: 0.97em;
-      transition: background 0.2s;
-    }
-    .issue .action-btn:hover {
-      background: #64748b;
-    }
-    .fixes-list {
-      margin: 0 32px 0 32px;
-      background: #0F172A;
-      border-radius: 10px;
-      padding: 0;
-      list-style: none;
-      font-size: 0.98rem;
-      min-height: 40px;
-    }
-    .fix {
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid #334155;
-      padding: 8px 0 8px 0;
-      gap: 10px;
-    }
-    .fix:last-child {
-      border-bottom: none;
-    }
-    .fix .status {
-      font-size: 1.2em;
-      width: 28px;
-      text-align: center;
-    }
-    .fix .file {
-      color: #38bdf8;
-      font-family: monospace;
-      font-size: 0.97em;
-      margin-right: 4px;
-    }
-    .fix .desc {
-      flex: 1;
-      color: #f1f5f9;
-    }
-    .fix .action-btn {
-      background: #334155;
-      color: #f1f5f9;
-      border: none;
-      border-radius: 6px;
-      padding: 2px 10px;
-      margin-left: 6px;
-      cursor: pointer;
-      font-size: 0.97em;
-      transition: background 0.2s;
-    }
-    .fix .action-btn:hover {
-      background: #64748b;
-    }
-    @media (max-width: 600px) {
-      .dashboard { max-width: 99vw; }
-      .scores { flex-direction: column; gap: 0; }
-      .score-card { margin: 8px 0; }
-      .issues-header, .section-title { margin-left: 8px; margin-right: 8px; }
-      .issues-list, .fixes-list { margin-left: 8px; margin-right: 8px; }
-    }
+    .brand { font-size: 13px; font-weight: 700; letter-spacing: 2px; white-space: nowrap; flex-shrink: 0; }
+    .scores-bar { display: flex; gap: 12px; flex: 1; min-width: 0; }
+    .score-item { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 100px; }
+    .score-label { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .score-num { font-size: 15px; font-weight: 700; min-width: 26px; text-align: right; font-family: var(--font-mono); }
+    .score-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .score-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .last-scan { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .btn-scan { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+    .btn-scan:hover { background: var(--accent2); }
+    .btn-scan:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Banner ─────────────────────────────────────── */
+    #banner { background: #78350F; color: #FEF3C7; text-align: center; padding: 5px; font-size: 12px; display: none; cursor: pointer; border-bottom: 1px solid #92400E; }
+    #banner.show { display: block; }
+
+    /* ── Main 3-panel ───────────────────────────────── */
+    #main { display: flex; height: calc(100vh - var(--topbar-h) - var(--audit-h)); overflow: hidden; }
+
+    .panel { display: flex; flex-direction: column; overflow: hidden; }
+    #panel-left   { width: 25%; min-width: 210px; background: var(--panel); border-right: 1px solid var(--border); }
+    #panel-center { flex: 1; background: var(--panel2); border-right: 1px solid var(--border); }
+    #panel-right  { width: 24%; min-width: 190px; background: var(--panel); }
+
+    .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .panel-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
+    .count-badge { background: var(--border); color: var(--muted); font-size: 10px; padding: 1px 6px; border-radius: 8px; }
+    .count-badge.has-crit { background: var(--c-crit); color: #fff; }
+
+    /* ── Left panel ─────────────────────────────────── */
+    .tab-row { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .tab { flex: 1; padding: 7px 2px; text-align: center; font-size: 10px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; user-select: none; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    .filter-row { display: flex; gap: 6px; padding: 7px 10px 5px; flex-shrink: 0; }
+    .filter-select { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px; font-size: 11px; }
+    .search-input { flex: 2; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; font-size: 11px; }
+    .search-input::placeholder { color: var(--muted); }
+    .search-input:focus, .filter-select:focus { outline: none; border-color: var(--accent); }
+
+    .btn-safe-fix { margin: 3px 10px 5px; background: transparent; border: 1px solid var(--c-low); color: var(--c-low); border-radius: 5px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+    .btn-safe-fix:hover { background: rgba(34,197,94,0.1); }
+    .btn-safe-fix:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .issue-list { overflow-y: auto; flex: 1; }
+    .issue-row { display: flex; align-items: flex-start; gap: 7px; padding: 7px 10px; border-bottom: 1px solid rgba(51,65,85,0.4); cursor: pointer; transition: background 0.12s; }
+    .issue-row:hover { background: rgba(30,136,229,0.07); }
+    .issue-row.selected { background: rgba(30,136,229,0.16); border-left: 2px solid var(--accent); padding-left: 8px; }
+    .sev-icon { font-size: 11px; flex-shrink: 0; margin-top: 2px; }
+    .ric { min-width: 0; flex: 1; }
+    .ric-file { font-family: var(--font-mono); font-size: 10px; color: #FBBF24; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ric-msg { font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .ric-badges { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+    .badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+    .badge-type { background: rgba(100,116,139,0.25); color: var(--muted); }
+    .badge-repo { background: rgba(30,136,229,0.18); color: #60A5FA; }
+    .empty-list { padding: 20px 14px; color: var(--muted); font-size: 12px; text-align: center; }
+
+    /* ── Center panel ───────────────────────────────── */
+    .detail-empty { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: var(--muted); }
+    .detail-empty .icon { font-size: 36px; opacity: 0.35; }
+    .detail-empty span { font-size: 13px; }
+
+    #detail-scroll { overflow-y: auto; flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 11px; }
+
+    .dsec { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+    .dsec-title { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+
+    /* Section 1 */
+    .loc-grid { display: grid; grid-template-columns: 70px 1fr; gap: 3px 10px; font-size: 12px; }
+    .loc-k { color: var(--muted); align-self: start; }
+    .loc-v { color: var(--text); font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
+    .gh-link { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--accent); text-decoration: none; font-size: 11px; }
+    .gh-link:hover { text-decoration: underline; }
+
+    /* Section 2 */
+    .sev-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; margin-right: 6px; margin-bottom: 8px; }
+    .sev-critical { background: rgba(239,68,68,0.18); color: var(--c-crit); }
+    .sev-high     { background: rgba(245,158,11,0.18); color: var(--c-high); }
+    .sev-medium   { background: rgba(249,115,22,0.18); color: var(--c-med); }
+    .sev-low      { background: rgba(34,197,94,0.18);  color: var(--c-low); }
+    .msg-text { font-size: 13px; color: #E2E8F0; line-height: 1.55; }
+
+    /* Section 3 */
+    .rc-box { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; min-height: 44px; font-size: 12px; line-height: 1.6; color: #CBD5E1; position: relative; }
+    .rc-conf { position: absolute; top: 8px; right: 10px; font-size: 10px; color: var(--muted); }
+    .rc-placeholder { font-style: italic; color: var(--muted); }
+    .btn-analyze { margin-top: 8px; background: transparent; border: 1px solid var(--accent); color: var(--accent); border-radius: 5px; padding: 4px 12px; font-size: 11px; cursor: pointer; transition: background 0.15s; }
+    .btn-analyze:hover { background: rgba(30,136,229,0.12); }
+    .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Section 4 */
+    .fix-text { font-size: 12px; color: #CBD5E1; line-height: 1.5; margin-bottom: 10px; }
+    .fix-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+    .btn-act { padding: 5px 11px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s; white-space: nowrap; }
+    .btn-autofix  { background: rgba(30,136,229,0.13); border-color: var(--accent); color: var(--accent); }
+    .btn-autofix:hover  { background: var(--accent); color: #fff; }
+    .btn-pr       { background: rgba(139,92,246,0.13); border-color: #8B5CF6; color: #A78BFA; }
+    .btn-pr:hover       { background: #7C3AED; color: #fff; border-color: #7C3AED; }
+    .btn-dismiss  { background: transparent; border-color: var(--border); color: var(--muted); }
+    .btn-dismiss:hover  { border-color: var(--c-crit); color: var(--c-crit); }
+    .btn-rescan   { background: transparent; border-color: var(--c-low); color: var(--c-low); }
+    .btn-rescan:hover   { background: rgba(34,197,94,0.1); }
+    #action-result { font-size: 11px; padding: 5px 9px; border-radius: 4px; margin-top: 8px; display: none; }
+    #action-result.ok  { background: rgba(34,197,94,0.13); color: var(--c-low); display: block; }
+    #action-result.err { background: rgba(239,68,68,0.13); color: var(--c-crit); display: block; }
+
+    /* Section 5 */
+    .chat-log { max-height: 180px; overflow-y: auto; margin-bottom: 9px; display: flex; flex-direction: column; gap: 7px; }
+    .chat-msg { padding: 7px 10px; border-radius: 6px; font-size: 12px; line-height: 1.5; max-width: 88%; white-space: pre-wrap; word-break: break-word; }
+    .chat-user  { background: rgba(30,136,229,0.15); color: #93C5FD; align-self: flex-end; }
+    .chat-agent { background: var(--bg); color: #CBD5E1; align-self: flex-start; }
+    .chat-row { display: flex; gap: 7px; }
+    .chat-inp { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; font-family: var(--font-ui); }
+    .chat-inp:focus { outline: none; border-color: var(--accent); }
+    .btn-send { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; }
+    .btn-send:hover { background: var(--accent2); }
+    .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Right panel (file tree) ─────────────────────── */
+    #file-tree { overflow-y: auto; flex: 1; padding: 4px 0 8px; font-size: 11px; font-family: var(--font-mono); }
+    .tree-clear-btn { background: transparent; border: none; color: var(--muted); font-size: 10px; cursor: pointer; padding: 0; }
+    .tree-clear-btn:hover { color: var(--c-crit); }
+    .tree-repo-wrap { padding: 2px 8px; }
+    .tree-repo-hdr { display: flex; align-items: center; gap: 5px; font-weight: 700; font-size: 10px; letter-spacing: 0.5px; color: var(--text); cursor: pointer; padding: 4px 2px; user-select: none; }
+    .tree-arrow { font-size: 9px; color: var(--muted); transition: transform 0.15s; flex-shrink: 0; }
+    .tree-arrow.closed { transform: rotate(-90deg); }
+    .tree-children { margin-left: 10px; }
+    .tree-dir-hdr { display: flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; padding: 2px 2px; user-select: none; font-size: 10px; }
+    .tree-dir-hdr:hover { color: var(--text); }
+    .tree-files-list { margin-left: 12px; }
+    .tree-file-row { display: flex; align-items: center; gap: 5px; padding: 2px 4px; cursor: pointer; border-radius: 3px; color: var(--muted); }
+    .tree-file-row:hover { background: rgba(100,116,139,0.13); color: var(--text); }
+    .tree-file-row.filter-active { background: rgba(30,136,229,0.15); color: var(--accent); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .d-crit { background: var(--c-crit); }
+    .d-high { background: var(--c-high); }
+    .d-med  { background: var(--c-med); }
+    .d-low  { background: var(--c-low); }
+    .d-none { background: var(--border); }
+    .tree-fname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+    .tree-fcount { font-size: 9px; color: var(--muted); flex-shrink: 0; }
+
+    /* ── Audit footer ───────────────────────────────── */
+    #audit-footer { height: var(--audit-h); background: var(--panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+    .audit-hdr { display: flex; align-items: center; justify-content: space-between; padding: 7px 16px 4px; border-bottom: 1px solid var(--border); }
+    .audit-title { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
+    .audit-link { font-size: 10px; color: var(--accent); text-decoration: none; }
+    .audit-link:hover { text-decoration: underline; }
+    #audit-list { flex: 1; overflow-x: auto; overflow-y: hidden; display: flex; align-items: center; gap: 8px; padding: 5px 14px; }
+    .audit-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; min-width: 150px; max-width: 200px; flex-shrink: 0; }
+    .audit-card.ok  { border-left: 3px solid var(--c-low); }
+    .audit-card.err { border-left: 3px solid var(--c-crit); }
+    .audit-card.pend { border-left: 3px solid var(--c-high); }
+    .audit-card.rev  { border-left: 3px solid #8B5CF6; }
+    .audit-ts     { font-size: 9px; color: var(--muted); margin-bottom: 2px; }
+    .audit-method { font-size: 11px; font-weight: 600; color: var(--text); }
+    .audit-iid    { font-size: 10px; color: var(--muted); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .audit-st     { font-size: 9px; margin-top: 3px; font-weight: 600; text-transform: uppercase; }
+    .audit-st.ok  { color: var(--c-low); }
+    .audit-st.err { color: var(--c-crit); }
+    .audit-st.pend { color: var(--c-high); }
+    .audit-st.rev  { color: #A78BFA; }
+
+    /* ── Toast ──────────────────────────────────────── */
+    #toast { position: fixed; bottom: 128px; right: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 9px 14px; font-size: 12px; max-width: 300px; display: none; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+    #toast.show { display: block; }
+    #toast.ok   { border-left: 3px solid var(--c-low); }
+    #toast.err  { border-left: 3px solid var(--c-crit); }
+    #toast.info { border-left: 3px solid var(--accent); }
+
+    /* ── Scrollbars ─────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--panel); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
   </style>
 </head>
 <body>
-  <div class="dashboard" id="dashboard">
-    <div class="header">
-      <span>NEUFIN CODE HEALTH</span>
-      <span id="timestamp">--:--:--</span>
+
+<!-- ── Topbar ─────────────────────────────────────────────────────── -->
+<header id="topbar">
+  <div class="brand">NEUFIN CODE HEALTH</div>
+  <div class="scores-bar">
+    <div class="score-item">
+      <span class="score-label">Backend</span>
+      <span class="score-num" id="s-be">--</span>
+      <div class="score-track"><div class="score-fill" id="sf-be" style="width:0%"></div></div>
     </div>
-    <div class="scores">
-      <div class="score-card">
-        <div class="score-label">Backend</div>
-        <div class="score-ring" id="score-backend"></div>
-        <div class="score-value" id="score-backend-value">--</div>
-      </div>
-      <div class="score-card">
-        <div class="score-label">Web</div>
-        <div class="score-ring" id="score-web"></div>
-        <div class="score-value" id="score-web-value">--</div>
-      </div>
-      <div class="score-card">
-        <div class="score-label">Mobile</div>
-        <div class="score-ring" id="score-mobile"></div>
-        <div class="score-value" id="score-mobile-value">--</div>
-      </div>
+    <div class="score-item">
+      <span class="score-label">Web</span>
+      <span class="score-num" id="s-web">--</span>
+      <div class="score-track"><div class="score-fill" id="sf-web" style="width:0%"></div></div>
     </div>
-    <div class="section-title">ACTIVE ISSUES</div>
-    <div class="issues-header">
-      <span></span>
-      <select class="filter-select" id="issue-filter">
-        <option value="all">All</option>
-        <option value="critical">Critical</option>
-        <option value="high">High</option>
-        <option value="medium">Medium</option>
-        <option value="low">Low</option>
-      </select>
+    <div class="score-item">
+      <span class="score-label">Mobile</span>
+      <span class="score-num" id="s-mob">--</span>
+      <div class="score-track"><div class="score-fill" id="sf-mob" style="width:0%"></div></div>
     </div>
-    <ul class="issues-list" id="issues-list"></ul>
-    <div class="section-title">RECENT FIXES</div>
-    <ul class="fixes-list" id="fixes-list"></ul>
   </div>
-  <script>
-    // --- API base ---
-    const API_BASE = '';
-    function scoreColor(score) {
-      if (score < 50) return '#ef4444';
-      if (score < 75) return '#fbbf24';
-      return '#22c55e';
-    }
-    function ringSVG(score) {
-      const color = scoreColor(score);
-      const pct = Math.max(0, Math.min(100, score));
-      const r = 24, c = 2 * Math.PI * r;
-      const arc = c * (pct / 100);
-      return `<svg width="54" height="54"><circle cx="27" cy="27" r="24" stroke="#334155" stroke-width="6" fill="none"/><circle cx="27" cy="27" r="24" stroke="${color}" stroke-width="6" fill="none" stroke-dasharray="${arc},${c-arc}" stroke-linecap="round" transform="rotate(-90 27 27)"/></svg>`;
-    }
-    function sevIcon(sev) {
-      if (sev === 'critical') return '🔴';
-      if (sev === 'high') return '🟡';
-      if (sev === 'medium') return '🟠';
-      return '🟢';
-    }
-    function fixStatusIcon(status) {
-      if (status === 'success') return '✅';
-      if (status === 'failed') return '❌';
-      if (status === 'pending_review') return '⏳';
-      return '⬜';
-    }
-    // --- State ---
-    let lastCriticalId = null;
-    let issues = [];
-    let fixes = [];
-    // --- Renderers ---
-    function renderScores(data) {
-      const scores = data.scores || {};
-      const backend = scores['neufin-backend'] ?? scores.backend ?? '--';
-      const web = scores['neufin-web'] ?? scores.web ?? '--';
-      const mobile = scores['neufin-mobile'] ?? scores.mobile ?? '--';
-      document.getElementById('score-backend').innerHTML = typeof backend === 'number' ? ringSVG(backend) : '';
-      document.getElementById('score-web').innerHTML = typeof web === 'number' ? ringSVG(web) : '';
-      document.getElementById('score-mobile').innerHTML = typeof mobile === 'number' ? ringSVG(mobile) : '';
-      document.getElementById('score-backend-value').textContent = backend;
-      document.getElementById('score-web-value').textContent = web;
-      document.getElementById('score-mobile-value').textContent = mobile;
-    }
-    function renderIssues() {
-      const filter = document.getElementById('issue-filter').value;
-      let filtered = issues;
-      if (filter !== 'all') filtered = issues.filter(i => i.severity === filter);
-      const list = document.getElementById('issues-list');
-      list.innerHTML = '';
-      if (filtered.length === 0) {
-        list.innerHTML = '<li style="padding:16px 16px;color:#64748b;">No issues found.</li>';
-        return;
-      }
-      filtered.slice(0, 20).forEach(issue => {
-        const message = issue.message
-          || issue.description
-          || issue.detail
-          || 'No message captured';
-        const file = issue.file || issue.path || 'unknown file';
-        const line = issue.line || issue.line_number || '';
-        const li = document.createElement('li');
-        li.className = 'issue';
-        li.innerHTML = `
-          <span class="sev">${sevIcon(issue.severity)}</span>
-          <span class="file">${file}${line ? ':' + line : ''}</span>
-          <span class="desc">${message}</span>
-          ${issue.auto_fixable ? `<button class="action-btn" onclick="applyFix('${issue.id}')">Fix</button>` : ''}
-          ${issue.pr_url ? `<button class="action-btn" onclick="window.open('${issue.pr_url}','_blank')">PR</button>` : ''}
-          ${issue.status === 'fixed' ? '<span class="action-btn">✓</span>' : ''}
-        `;
-        list.appendChild(li);
-      });
-      // Flash red border if new critical
-      const dashboard = document.getElementById('dashboard');
-      const critical = filtered.find(i => i.severity === 'critical');
-      if (critical && critical.id !== lastCriticalId) {
-        dashboard.classList.add('critical');
-        setTimeout(() => dashboard.classList.remove('critical'), 1200);
-        lastCriticalId = critical.id;
-      }
-    }
-    function renderFixes() {
-      const list = document.getElementById('fixes-list');
-      list.innerHTML = '';
-      if (fixes.length === 0) {
-        list.innerHTML = '<li style="padding:12px 16px;color:#64748b;">No fixes applied yet.</li>';
-        return;
-      }
-      fixes.slice(0, 10).forEach(fix => {
-        const desc = fix.method || fix.fix_type || fix.description || 'fix applied';
-        const fileLabel = fix.file || fix.issue_id || '';
-        const ago = fix.applied_at ? new Date(fix.applied_at).toLocaleString() : (fix.ago || '');
-        const li = document.createElement('li');
-        li.className = 'fix';
-        li.innerHTML = `
-          <span class="status">${fixStatusIcon(fix.status)}</span>
-          <span class="file">${fileLabel}</span>
-          <span class="desc">${desc}</span>
-          <span style="color:#64748b;font-size:0.93em;">${ago}</span>
-          ${fix.pr_url ? `<button class="action-btn" onclick="window.open('${fix.pr_url}','_blank')">View PR</button>` : ''}
-        `;
-        list.appendChild(li);
-      });
-    }
-    // --- API ---
-    async function fetchHealth() {
-      const res = await fetch('/api/health');
-      if (!res.ok) return;
-      const data = await res.json();
-      renderScores(data);
-      issues = data.issues || [];
-      renderIssues();
-    }
-    async function fetchFixes() {
-      const res = await fetch('/api/fixes');
-      if (!res.ok) return;
-      fixes = (await res.json()).fixes || [];
-      renderFixes();
-    }
-    async function applyFix(id) {
-      await fetch(`/api/fixes/${id}/apply`, { method: 'POST' });
-      fetchHealth();
-      fetchFixes();
-    }
-    // --- Polling ---
-    function updateTimestamp() {
-      const now = new Date();
-      document.getElementById('timestamp').textContent = now.toLocaleTimeString();
-    }
-    setInterval(fetchHealth, 60000);
-    setInterval(fetchFixes, 60000);
-    setInterval(updateTimestamp, 1000);
-    document.getElementById('issue-filter').addEventListener('change', renderIssues);
-    // --- Trigger Scan Now button ---
-    const scanBtn = document.createElement('button');
-    scanBtn.textContent = '⚡ Scan Now';
-    scanBtn.style = 'margin:16px 32px 0 32px;padding:8px 18px;font-size:1.1em;background:#22c55e;color:#fff;border:none;border-radius:8px;cursor:pointer;float:right;';
-    scanBtn.onclick = async function triggerScan() {
-      const res = await fetch('/api/scan/trigger', {method: 'POST'});
-      const data = await res.json();
-      alert(`Scan started. Check back in 30 seconds.`);
-    };
-    document.querySelector('.dashboard').prepend(scanBtn);
-    // Initial load
-    fetchHealth();
-    fetchFixes();
-    updateTimestamp();
-</script>
-<footer style="text-align:center;margin:32px 0 0 0;font-size:1em;color:#64748b;">
-  <a href="https://railway.app" target="_blank">View Railway Logs →</a>
+  <div class="topbar-right">
+    <span class="last-scan" id="last-scan-lbl">Last scan: —</span>
+    <button class="btn-scan" id="btn-scan" onclick="triggerScan()">⚡ Scan Now</button>
+  </div>
+</header>
+
+<!-- ── Banner ─────────────────────────────────────────────────────── -->
+<div id="banner">⚠ New issues detected — click to refresh</div>
+
+<!-- ── Three panels ───────────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- LEFT: issue list -->
+  <aside class="panel" id="panel-left">
+    <div class="panel-header">
+      <span class="panel-title">Active Issues</span>
+      <span class="count-badge" id="issue-badge">0</span>
+    </div>
+    <div class="tab-row">
+      <div class="tab active" data-repo="all"            onclick="setRepo('all')">All <span id="tc-all"></span></div>
+      <div class="tab"        data-repo="neufin-backend" onclick="setRepo('neufin-backend')">Backend <span id="tc-be"></span></div>
+      <div class="tab"        data-repo="neufin-web"     onclick="setRepo('neufin-web')">Web <span id="tc-web"></span></div>
+      <div class="tab"        data-repo="neufin-mobile"  onclick="setRepo('neufin-mobile')">Mobile <span id="tc-mob"></span></div>
+    </div>
+    <div class="filter-row">
+      <select class="filter-select" id="sev-filter" onchange="renderIssueList()">
+        <option value="all">All sev.</option>
+        <option value="critical">🔴 Critical</option>
+        <option value="high">🟡 High</option>
+        <option value="medium">🟠 Medium</option>
+        <option value="low">🟢 Low</option>
+      </select>
+      <input class="search-input" id="search-inp" placeholder="Search file or message…" oninput="renderIssueList()" />
+    </div>
+    <button class="btn-safe-fix" id="btn-safe" onclick="applySafeAll(this)">⚡ Auto-fix all safe issues</button>
+    <div class="issue-list" id="issue-list"></div>
+  </aside>
+
+  <!-- CENTER: issue detail -->
+  <main class="panel" id="panel-center">
+    <div class="detail-empty" id="detail-empty">
+      <span class="icon">🔍</span>
+      <span>Select an issue from the left panel to investigate</span>
+    </div>
+    <div id="detail-scroll" style="display:none">
+
+      <!-- S1: Location -->
+      <div class="dsec">
+        <div class="dsec-title">1 · Location</div>
+        <div class="loc-grid">
+          <span class="loc-k">File</span>  <span class="loc-v" id="d-file">—</span>
+          <span class="loc-k">Line</span>  <span class="loc-v" id="d-line">—</span>
+          <span class="loc-k">Repo</span>  <span class="loc-v" id="d-repo">—</span>
+          <span class="loc-k">Detected</span> <span class="loc-v" id="d-ts">—</span>
+        </div>
+        <a id="d-ghlink" class="gh-link" href="#" target="_blank" style="display:none">
+          ↗ Open in GitHub
+        </a>
+      </div>
+
+      <!-- S2: What is broken -->
+      <div class="dsec">
+        <div class="dsec-title">2 · What is Broken</div>
+        <div>
+          <span class="sev-badge" id="d-sevbadge">—</span>
+          <span class="badge badge-type" id="d-typebadge">—</span>
+        </div>
+        <div class="msg-text" id="d-message">—</div>
+      </div>
+
+      <!-- S3: Root cause -->
+      <div class="dsec">
+        <div class="dsec-title">3 · Root Cause Analysis</div>
+        <div class="rc-box" id="rc-box">
+          <span id="rc-text" class="rc-placeholder">Click "Analyze" to get LLM root cause.</span>
+          <span class="rc-conf" id="rc-conf"></span>
+        </div>
+        <button class="btn-analyze" id="btn-analyze" onclick="analyzeIssue()">🔬 Analyze root cause</button>
+      </div>
+
+      <!-- S4: How to fix -->
+      <div class="dsec">
+        <div class="dsec-title">4 · How to Fix</div>
+        <div class="fix-text" id="d-fix">—</div>
+        <div class="fix-actions">
+          <button class="btn-act btn-autofix" onclick="applyFix()">⚡ Auto-fix &amp; Commit</button>
+          <button class="btn-act btn-pr"      onclick="createPR()">📋 Create GitHub PR</button>
+          <button class="btn-act btn-dismiss" onclick="dismissCurrent()">✕ Dismiss</button>
+          <button class="btn-act btn-rescan"  onclick="rescanFile()">🔁 Re-scan file</button>
+        </div>
+        <div id="action-result"></div>
+      </div>
+
+      <!-- S5: Ask Agent -->
+      <div class="dsec">
+        <div class="dsec-title">5 · Ask Agent</div>
+        <div class="chat-log" id="chat-log"></div>
+        <div class="chat-row">
+          <input class="chat-inp" id="chat-inp"
+                 placeholder="Ask anything about this issue…"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitChat()}" />
+          <button class="btn-send" id="btn-send" onclick="submitChat()">Send</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- RIGHT: codebase map -->
+  <aside class="panel" id="panel-right">
+    <div class="panel-header">
+      <span class="panel-title">Codebase Map</span>
+      <button class="tree-clear-btn" onclick="clearFileFilter()" title="Clear file filter">✕ clear</button>
+    </div>
+    <div id="file-tree"></div>
+  </aside>
+
+</div>
+
+<!-- ── Audit log footer ───────────────────────────────────────────── -->
+<footer id="audit-footer">
+  <div class="audit-hdr">
+    <span class="audit-title">Audit Log — Last Fixes</span>
+    <a class="audit-link" href="/api/fixes" target="_blank">View full log →</a>
+  </div>
+  <div id="audit-list"></div>
 </footer>
-  </script>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ================================================================
+//  STATE
+// ================================================================
+let issues      = [];
+let fixes       = [];
+let scores      = {};
+let lastScanTs  = null;
+let selIssue    = null;          // selected Issue object
+let aCache      = {};            // id → {root_cause, confidence}
+let chatHist    = {};            // id → [{role, text}]
+let fileFilter  = null;
+let repoFilter  = 'all';
+let prevCount   = -1;
+
+// ================================================================
+//  HELPERS
+// ================================================================
+const SEV_ICON = {critical:'🔴', high:'🟡', medium:'🟠', low:'🟢'};
+const SEV_RANK = {critical:0, high:1, medium:2, low:3};
+const SEV_DOT  = {critical:'d-crit', high:'d-high', medium:'d-med', low:'d-low'};
+const REPO_LBL = {'neufin-backend':'BACKEND','neufin-web':'WEB','neufin-mobile':'MOBILE','neufin-agent':'AGENT'};
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function scoreColor(n) {
+  if (n < 50) return '#EF4444';
+  if (n < 75) return '#F59E0B';
+  return '#22C55E';
+}
+function relTime(iso) {
+  if (!iso) return '—';
+  const d = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(d / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+function maxSev(list) {
+  for (const s of ['critical','high','medium','low']) {
+    if (list.some(i => i.severity === s)) return s;
+  }
+  return null;
+}
+
+// ================================================================
+//  DATA LOADING
+// ================================================================
+async function loadData() {
+  try {
+    const [hRes, fRes] = await Promise.all([
+      fetch('/api/health'),
+      fetch('/api/fixes?limit=20'),
+    ]);
+    if (hRes.ok) {
+      const d = await hRes.json();
+      const newIssues = d.issues || [];
+      scores      = d.scores || {};
+      lastScanTs  = d.ts;
+      if (prevCount >= 0 && newIssues.length > prevCount) showBanner();
+      prevCount   = newIssues.length;
+      issues      = newIssues;
+      renderScores();
+      updateTabCounts();
+      renderIssueList();
+      renderFileTree();
+      document.title = issues.some(i=>i.severity==='critical')
+        ? '🔴 Neufin Code Health' : 'Neufin Code Health';
+      if (lastScanTs) {
+        document.getElementById('last-scan-lbl').textContent =
+          'Last scan: ' + new Date(lastScanTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      }
+    }
+    if (fRes.ok) {
+      fixes = (await fRes.json()).fixes || [];
+      renderAuditLog();
+    }
+  } catch(e) {
+    console.error('loadData:', e);
+  }
+}
+
+async function triggerScan() {
+  const btn = document.getElementById('btn-scan');
+  btn.disabled = true; btn.textContent = '⏳ Scanning…';
+  try {
+    const r = await fetch('/api/scan/trigger', {method:'POST'});
+    if (r.ok) { showToast('Scan started — refreshing in 15s', 'info'); setTimeout(loadData, 15000); }
+    else showToast('Scan failed to start', 'err');
+  } catch { showToast('Network error', 'err'); }
+  finally { btn.disabled = false; btn.textContent = '⚡ Scan Now'; }
+}
+
+// ================================================================
+//  TOPBAR SCORES
+// ================================================================
+function renderScores() {
+  const map = {
+    be:  scores['neufin-backend'] ?? scores.backend,
+    web: scores['neufin-web']     ?? scores.web,
+    mob: scores['neufin-mobile']  ?? scores.mobile,
+  };
+  for (const [k, v] of Object.entries(map)) {
+    const el   = document.getElementById(`s-${k}`);
+    const fill = document.getElementById(`sf-${k}`);
+    if (v != null) {
+      el.textContent = v;
+      el.style.color = scoreColor(v);
+      fill.style.width      = `${Math.max(0,Math.min(100,v))}%`;
+      fill.style.background = scoreColor(v);
+    } else {
+      el.textContent = '--';
+    }
+  }
+}
+
+// ================================================================
+//  LEFT PANEL
+// ================================================================
+function setRepo(repo) {
+  repoFilter = repo;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.repo === repo)
+  );
+  fileFilter = null;
+  renderIssueList();
+  renderFileTree();
+}
+
+function updateTabCounts() {
+  const all = issues.length;
+  document.getElementById('tc-all').textContent  = `(${all})`;
+  document.getElementById('tc-be').textContent   = `(${issues.filter(i=>i.repo==='neufin-backend').length})`;
+  document.getElementById('tc-web').textContent  = `(${issues.filter(i=>i.repo==='neufin-web').length})`;
+  document.getElementById('tc-mob').textContent  = `(${issues.filter(i=>i.repo==='neufin-mobile').length})`;
+  const badge = document.getElementById('issue-badge');
+  badge.textContent = all;
+  badge.className   = 'count-badge' + (issues.some(i=>i.severity==='critical') ? ' has-crit' : '');
+}
+
+function getFiltered() {
+  const sev = document.getElementById('sev-filter').value;
+  const q   = document.getElementById('search-inp').value.toLowerCase();
+  return issues
+    .filter(i => repoFilter === 'all' || i.repo === repoFilter)
+    .filter(i => sev === 'all' || i.severity === sev)
+    .filter(i => !fileFilter || i.file === fileFilter)
+    .filter(i => !q || (i.file||'').toLowerCase().includes(q) || (i.message||'').toLowerCase().includes(q))
+    .sort((a,b) => (SEV_RANK[a.severity]??4) - (SEV_RANK[b.severity]??4));
+}
+
+function renderIssueList() {
+  const list     = document.getElementById('issue-list');
+  const filtered = getFiltered();
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-list">No issues match current filters.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(issue => {
+    const icon = SEV_ICON[issue.severity] || '⚪';
+    const fname = (issue.file||'unknown').split('/').pop();
+    const line  = issue.line ? `:${issue.line}` : '';
+    const msg   = issue.message || issue.description || 'No message';
+    const sel   = selIssue && selIssue.id === issue.id ? ' selected' : '';
+    return `<div class="issue-row${sel}" data-id="${esc(issue.id)}" onclick="selectIssue(this.dataset.id)">
+      <span class="sev-icon">${icon}</span>
+      <div class="ric">
+        <div class="ric-file" title="${esc(issue.file||'')}">${esc(fname)}${esc(line)}</div>
+        <div class="ric-msg" title="${esc(msg)}">${esc(msg)}</div>
+        <div class="ric-badges">
+          <span class="badge badge-type">${esc((issue.type||'').toUpperCase())}</span>
+          <span class="badge badge-repo">${esc(REPO_LBL[issue.repo]||issue.repo||'—')}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ================================================================
+//  CENTER PANEL — DETAIL
+// ================================================================
+function selectIssue(id) {
+  selIssue = issues.find(i => i.id === id) || null;
+  renderIssueList();
+  if (!selIssue) return;
+  renderDetail();
+}
+
+function renderDetail() {
+  if (!selIssue) return;
+  const i = selIssue;
+
+  document.getElementById('detail-empty').style.display  = 'none';
+  document.getElementById('detail-scroll').style.display = 'flex';
+
+  // S1 location
+  document.getElementById('d-file').textContent = i.file || '—';
+  document.getElementById('d-line').textContent = i.line || '—';
+  document.getElementById('d-repo').textContent = i.repo || '—';
+  document.getElementById('d-ts').textContent   = relTime(i.detected_at);
+  const ghLink = document.getElementById('d-ghlink');
+  if (i.file) {
+    ghLink.href = `https://github.com/stealthg0dd/neufinapk1/blob/main/${i.file}${i.line ? '#L'+i.line : ''}`;
+    ghLink.style.display = 'inline-flex';
+  } else {
+    ghLink.style.display = 'none';
+  }
+
+  // S2 what is broken
+  const sb = document.getElementById('d-sevbadge');
+  sb.textContent = (i.severity||'').toUpperCase();
+  sb.className   = `sev-badge sev-${i.severity||'low'}`;
+  document.getElementById('d-typebadge').textContent = (i.type||'UNKNOWN').toUpperCase().replace(/_/g,' ');
+  document.getElementById('d-message').textContent   = i.message || i.description || '—';
+
+  // S3 root cause (show cache or placeholder)
+  const cached = aCache[i.id];
+  const rcText = document.getElementById('rc-text');
+  const rcConf = document.getElementById('rc-conf');
+  const btnAn  = document.getElementById('btn-analyze');
+  if (cached) {
+    rcText.textContent  = cached.root_cause;
+    rcText.className    = '';
+    rcConf.textContent  = cached.confidence ? `${cached.confidence} confidence` : '';
+    btnAn.style.display = 'none';
+  } else {
+    rcText.textContent  = 'Click "Analyze" to get LLM root cause.';
+    rcText.className    = 'rc-placeholder';
+    rcConf.textContent  = '';
+    btnAn.disabled      = false;
+    btnAn.textContent   = '🔬 Analyze root cause';
+    btnAn.style.display = 'inline-block';
+  }
+
+  // S4 fix
+  document.getElementById('d-fix').textContent = i.suggested_fix || i.fix || '—';
+  const ar = document.getElementById('action-result');
+  ar.className   = '';
+  ar.textContent = '';
+
+  // S5 chat history
+  const history  = chatHist[i.id] || [];
+  const chatLog  = document.getElementById('chat-log');
+  chatLog.innerHTML = history.map(m =>
+    `<div class="chat-msg chat-${m.role}">${esc(m.text)}</div>`
+  ).join('');
+  chatLog.scrollTop = chatLog.scrollHeight;
+  document.getElementById('chat-inp').value = '';
+}
+
+// ================================================================
+//  ANALYZE (root cause)
+// ================================================================
+async function analyzeIssue() {
+  if (!selIssue) return;
+  const id    = selIssue.id;
+  const btn   = document.getElementById('btn-analyze');
+  const rcText= document.getElementById('rc-text');
+
+  btn.disabled    = true;
+  btn.textContent = 'Analyzing…';
+  rcText.innerHTML= '<span class="spinner"></span>';
+  rcText.className= '';
+
+  try {
+    const r = await fetch(`/api/issues/${id}/analyze`, {method:'POST'});
+    if (r.ok) {
+      const d = await r.json();
+      aCache[id] = d;
+      renderDetail();
+    } else {
+      rcText.textContent = '⚠ Analysis failed — check API logs.';
+      rcText.style.color = 'var(--c-crit)';
+      btn.disabled    = false;
+      btn.textContent = '🔬 Retry';
+    }
+  } catch {
+    rcText.textContent = '⚠ Network error.';
+    btn.disabled    = false;
+    btn.textContent = '🔬 Retry';
+  }
+}
+
+// ================================================================
+//  CHAT
+// ================================================================
+async function submitChat() {
+  if (!selIssue) return;
+  const inp  = document.getElementById('chat-inp');
+  const q    = inp.value.trim();
+  if (!q) return;
+  const id   = selIssue.id;
+  if (!chatHist[id]) chatHist[id] = [];
+  chatHist[id].push({role:'user', text: q});
+  inp.value  = '';
+  const btn  = document.getElementById('btn-send');
+  btn.disabled = true;
+  const log  = document.getElementById('chat-log');
+  log.innerHTML = chatHist[id].map(m =>
+    `<div class="chat-msg chat-${m.role}">${esc(m.text)}</div>`
+  ).join('') + '<div class="chat-msg chat-agent"><span class="spinner"></span></div>';
+  log.scrollTop = log.scrollHeight;
+  try {
+    const r = await fetch(`/api/issues/${id}/chat`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({question: q}),
+    });
+    const d = r.ok ? await r.json() : {answer: '⚠ API error.'};
+    chatHist[id].push({role:'agent', text: d.answer || '—'});
+  } catch {
+    chatHist[id].push({role:'agent', text:'⚠ Network error.'});
+  } finally {
+    btn.disabled = false;
+    log.innerHTML = chatHist[id].map(m =>
+      `<div class="chat-msg chat-${m.role}">${esc(m.text)}</div>`
+    ).join('');
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+// ================================================================
+//  FIX ACTIONS
+// ================================================================
+async function applyFix() {
+  if (!selIssue) return;
+  const r = await doPost(`/api/fixes/${selIssue.id}/apply`);
+  if (r.method === 'llm_pr' || r.method === 'review_pr') {
+    showAR(`PR created${r.pr_url ? ': ' + r.pr_url : ' (see GitHub)'}`, 'ok');
+  } else if (r.success !== false) {
+    showAR('Fix applied ✓', 'ok');
+  } else {
+    showAR(r.message || 'Fix failed', 'err');
+  }
+  await loadData();
+}
+
+async function createPR() {
+  if (!selIssue) return;
+  const r = await doPost(`/api/fixes/${selIssue.id}/create-pr`);
+  if (r.pr_url) showAR(`PR created: ${r.pr_url}`, 'ok');
+  else if (r.success === false) showAR(r.message || 'Could not create PR', 'err');
+  else showAR('PR queued', 'ok');
+}
+
+async function dismissCurrent() {
+  if (!selIssue) return;
+  await doPost(`/api/issues/${selIssue.id}/dismiss`);
+  showAR('Issue dismissed ✓', 'ok');
+  selIssue = null;
+  document.getElementById('detail-empty').style.display  = 'flex';
+  document.getElementById('detail-scroll').style.display = 'none';
+  await loadData();
+}
+
+async function rescanFile() {
+  if (!selIssue || !selIssue.file) return;
+  const r = await doPost(`/api/scan/file?path=${encodeURIComponent(selIssue.file)}`);
+  showAR(`Re-scan complete: ${r.issues_found ?? 0} issues found`, 'ok');
+  await loadData();
+}
+
+async function applySafeAll(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Fixing…'; }
+  try {
+    const r = await doPost('/api/fixes/apply-safe');
+    showToast(`Auto-fix: ${r.applied||0} applied · ${r.failed||0} failed · ${r.skipped||0} skipped`, 'info');
+    await loadData();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Auto-fix all safe issues'; }
+  }
+}
+
+async function doPost(url) {
+  try {
+    const r = await fetch(url, {method:'POST'});
+    return r.ok ? await r.json() : {success:false, message:`HTTP ${r.status}`};
+  } catch(e) {
+    return {success:false, message: e.message};
+  }
+}
+
+function showAR(msg, cls) {
+  const el = document.getElementById('action-result');
+  el.textContent = msg;
+  el.className   = cls;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; el.textContent = ''; }, 7000);
+}
+
+// ================================================================
+//  RIGHT PANEL — FILE TREE
+// ================================================================
+function buildTree() {
+  const byFile = {};
+  for (const iss of issues) {
+    const f = iss.file || 'unknown';
+    if (!byFile[f]) byFile[f] = {file:f, name: f.split('/').pop(), issues:[]};
+    byFile[f].issues.push(iss);
+  }
+  // repo → dir → files[]
+  const tree = {};
+  for (const [file, data] of Object.entries(byFile)) {
+    const parts = file.split('/');
+    const repo  = parts[0] || 'unknown';
+    const dir   = parts.length > 2 ? parts.slice(1,-1).join('/') : '.';
+    if (!tree[repo]) tree[repo] = {};
+    if (!tree[repo][dir]) tree[repo][dir] = [];
+    tree[repo][dir].push(data);
+  }
+  return tree;
+}
+
+function renderFileTree() {
+  const tree = buildTree();
+  const el   = document.getElementById('file-tree');
+  if (!Object.keys(tree).length) {
+    el.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:11px">No issues to map.</div>';
+    return;
+  }
+  const ORDER = ['neufin-backend','neufin-web','neufin-mobile','neufin-agent'];
+  const NAMES = {'neufin-backend':'Backend','neufin-web':'Web','neufin-mobile':'Mobile','neufin-agent':'Agent'};
+  let html = '';
+  for (const repo of [...ORDER, ...Object.keys(tree).filter(r=>!ORDER.includes(r))]) {
+    if (!tree[repo]) continue;
+    const dirs       = tree[repo];
+    const repoIssues = Object.values(dirs).flatMap(fs=>fs.flatMap(f=>f.issues));
+    const rSev       = maxSev(repoIssues);
+    const rDot       = rSev ? SEV_DOT[rSev] : 'd-none';
+    html += `<div class="tree-repo-wrap">
+      <div class="tree-repo-hdr" onclick="toggleRepo(this)">
+        <span class="tree-arrow">▼</span>
+        <span class="dot ${rDot}"></span>
+        <span>${esc(NAMES[repo]||repo)}</span>
+        <span style="color:var(--muted);font-size:9px;margin-left:auto">(${repoIssues.length})</span>
+      </div>
+      <div class="tree-children">`;
+    for (const dir of Object.keys(dirs).sort()) {
+      const files   = dirs[dir];
+      const dIssues = files.flatMap(f=>f.issues);
+      const dSev    = maxSev(dIssues);
+      const dDot    = dSev ? SEV_DOT[dSev] : 'd-none';
+      if (dir === '.') {
+        html += files.map(f => treeFileRow(f)).join('');
+      } else {
+        html += `<div class="tree-dir-hdr" onclick="toggleDir(this)">
+          <span style="font-size:9px">▼</span>
+          <span class="dot ${dDot}" style="width:5px;height:5px"></span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(dir)}</span>
+        </div>
+        <div class="tree-files-list">${files.map(f => treeFileRow(f)).join('')}</div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function treeFileRow(f) {
+  const sev    = maxSev(f.issues);
+  const dot    = sev ? SEV_DOT[sev] : 'd-none';
+  const active = fileFilter === f.file ? ' filter-active' : '';
+  return `<div class="tree-file-row${active}" data-file="${esc(f.file)}" onclick="filterByFile(this.dataset.file)" title="${esc(f.file)}">
+    <span class="dot ${dot}"></span>
+    <span class="tree-fname">${esc(f.name)}</span>
+    ${f.issues.length ? `<span class="tree-fcount">${f.issues.length}</span>` : ''}
+  </div>`;
+}
+
+function filterByFile(file) {
+  if (fileFilter === file) {
+    fileFilter = null;
+  } else {
+    fileFilter = file;
+    const repo = file.split('/')[0];
+    if (repo && repo !== repoFilter) setRepo(repo);
+  }
+  renderIssueList();
+  renderFileTree();
+}
+
+function clearFileFilter() {
+  fileFilter = null;
+  renderIssueList();
+  renderFileTree();
+}
+
+function toggleRepo(hdr) {
+  const ch    = hdr.nextElementSibling;
+  const arrow = hdr.querySelector('.tree-arrow');
+  const open  = ch.style.display !== 'none';
+  ch.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.classList.toggle('closed', open);
+}
+
+function toggleDir(hdr) {
+  const files = hdr.nextElementSibling;
+  const arrow = hdr.querySelector('span');
+  const open  = files && files.style.display !== 'none';
+  if (files) files.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.textContent = open ? '▶' : '▼';
+}
+
+// ================================================================
+//  AUDIT LOG FOOTER
+// ================================================================
+function renderAuditLog() {
+  const list = document.getElementById('audit-list');
+  if (!fixes.length) {
+    list.innerHTML = '<span style="color:var(--muted);font-size:11px">No fixes applied yet.</span>';
+    return;
+  }
+  list.innerHTML = fixes.slice(0,10).map(fix => {
+    const ok   = !!fix.success;
+    const st   = fix.status || (ok ? 'applied' : 'pending');
+    const cls  = ok ? 'ok' : st === 'awaiting_review' ? 'rev' : st === 'pending' ? 'pend' : 'err';
+    const stLbl= ok ? '✓ applied' : st === 'awaiting_review' ? '⏳ reviewing' : st === 'pending' ? '⏳ pending' : '✕ failed';
+    const ts   = fix.applied_at ? new Date(fix.applied_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+    const card = `<div class="audit-card ${cls}"${fix.pr_url?` onclick="window.open('${esc(fix.pr_url)}','_blank')" style="cursor:pointer"`:''}>
+      <div class="audit-ts">${ts}</div>
+      <div class="audit-method">${esc(fix.method||fix.fix_type||'fix')}</div>
+      <div class="audit-iid">${esc((fix.issue_id||'').slice(0,8))}</div>
+      <div class="audit-st ${cls}">${stLbl}</div>
+    </div>`;
+    return card;
+  }).join('');
+}
+
+// ================================================================
+//  BANNER & TOAST
+// ================================================================
+function showBanner() {
+  const b = document.getElementById('banner');
+  b.classList.add('show');
+  b.onclick = () => { b.classList.remove('show'); loadData(); };
+}
+
+let toastTimer = null;
+function showToast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 5000);
+}
+
+// ================================================================
+//  INIT
+// ================================================================
+loadData();
+setInterval(loadData, 120000);
+</script>
 </body>
 </html>

@@ -11,20 +11,23 @@ from pathlib import Path
 import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from mcp.server.fastmcp import FastMCP
 
 from core.audit_log import (
     init_db,
     get_open_issues,
     get_fix_history,
+    get_issue,
+    cache_root_cause,
     dismiss_issue,
     add_false_positive,
     get_weekly_trend,
 )
-from core.fix_engine import apply_fix as _apply_fix
+from core.fix_engine import apply_fix as _apply_fix, can_auto_fix, _create_review_pr
 from core.scanner import run_all_detectors
 from core.runtime_monitor import (
     router as webhook_router,
@@ -299,6 +302,203 @@ async def runtime_summary(hours: int = 24):
 async def dashboard():
     widget = Path(__file__).parent / "dashboard" / "widget.html"
     return widget.read_text()
+
+
+# ── Triage endpoints ───────────────────────────────────────────────────────
+
+class ChatRequest(BaseModel):
+    question: str
+
+
+@app.post("/api/issues/{issue_id}/analyze")
+async def analyze_issue_endpoint(issue_id: str):
+    """LLM root-cause analysis for an issue. Caches result in DB."""
+    issue = await get_issue(issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    # Return cached result if available
+    if issue.get("root_cause"):
+        return {
+            "root_cause": issue["root_cause"],
+            "confidence": issue.get("root_cause_confidence", "medium"),
+            "cached": True,
+        }
+
+    # Read ±10 lines of file context
+    repo_root = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
+    code_context = ""
+    try:
+        file_path = repo_root / issue["file"]
+        if file_path.exists():
+            lines = file_path.read_text(errors="ignore").splitlines()
+            line_no = max(0, (issue.get("line") or 1) - 1)
+            start = max(0, line_no - 10)
+            end = min(len(lines), line_no + 11)
+            code_context = "\n".join(
+                f"{start + i + 1}: {l}" for i, l in enumerate(lines[start:end])
+            )
+    except Exception:
+        pass
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"root_cause": "ANTHROPIC_API_KEY not set", "confidence": "low", "cached": False}
+
+    try:
+        import anthropic
+
+        def _call() -> str:
+            client = anthropic.Anthropic(api_key=api_key)
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=200,
+                system=(
+                    "You are a senior engineer reviewing a bug in the Neufin codebase "
+                    "(FastAPI + Next.js + Expo). Be concise. Reply in one sentence."
+                ),
+                messages=[{
+                    "role": "user",
+                    "content": (
+                        f"Issue: {issue['message']}\n"
+                        f"File: {issue['file']}\n"
+                        f"Code:\n{code_context}\n\n"
+                        "What is the root cause in one sentence?"
+                    ),
+                }],
+            )
+            return resp.content[0].text.strip()
+
+        root_cause = await asyncio.to_thread(_call)
+        confidence = "high" if issue.get("severity") in ("critical", "high") else "medium"
+        await cache_root_cause(issue_id, root_cause, confidence)
+        return {"root_cause": root_cause, "confidence": confidence, "cached": False}
+    except Exception as exc:
+        log.error({"action": "analyze_error", "issue_id": issue_id, "error": str(exc)})
+        return {"root_cause": f"Analysis error: {exc}", "confidence": "low", "cached": False}
+
+
+@app.post("/api/issues/{issue_id}/chat")
+async def chat_issue_endpoint(issue_id: str, body: ChatRequest):
+    """Ask Claude anything about a specific issue with full context."""
+    issue = await get_issue(issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"answer": "ANTHROPIC_API_KEY not set — cannot call Claude."}
+
+    # Read file context
+    repo_root = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
+    code_context = ""
+    try:
+        fp = repo_root / issue["file"]
+        if fp.exists():
+            lines = fp.read_text(errors="ignore").splitlines()
+            line_no = max(0, (issue.get("line") or 1) - 1)
+            start = max(0, line_no - 15)
+            end = min(len(lines), line_no + 16)
+            code_context = "\n".join(
+                f"{start + i + 1}: {l}" for i, l in enumerate(lines[start:end])
+            )
+    except Exception:
+        pass
+
+    context_block = (
+        f"Issue ID: {issue_id}\n"
+        f"File: {issue.get('file','?')}\nLine: {issue.get('line','?')}\n"
+        f"Severity: {issue.get('severity','?')}\nType: {issue.get('type','?')}\n"
+        f"Message: {issue.get('message','?')}\n"
+        f"Suggested fix: {issue.get('suggested_fix','?')}\n"
+        f"Root cause: {issue.get('root_cause','not yet analyzed')}\n\n"
+        f"Code context:\n{code_context}"
+    )
+
+    try:
+        import anthropic
+
+        def _call() -> str:
+            client = anthropic.Anthropic(api_key=api_key)
+            resp = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=400,
+                system=(
+                    "You are a senior engineer helping triage issues in the Neufin codebase "
+                    "(FastAPI backend, Next.js 15 frontend, Expo mobile). "
+                    "Answer concisely and practically. Max 300 tokens."
+                ),
+                messages=[
+                    {"role": "user", "content": f"Context:\n{context_block}\n\nQuestion: {body.question}"},
+                ],
+            )
+            return resp.content[0].text.strip()
+
+        answer = await asyncio.to_thread(_call)
+        log.info({"action": "issue_chat", "issue_id": issue_id})
+        return {"answer": answer}
+    except Exception as exc:
+        log.error({"action": "chat_error", "issue_id": issue_id, "error": str(exc)})
+        return {"answer": f"Error calling Claude: {exc}"}
+
+
+@app.post("/api/fixes/apply-safe")
+async def apply_safe_endpoint():
+    """Auto-fix all issues where auto_fixable=True and requires_human=False."""
+    all_issues = await get_open_issues(limit=500)
+    safe_issues = [i for i in all_issues if await can_auto_fix(i)]
+    applied = failed = skipped = 0
+    for issue in safe_issues:
+        result = await _apply_fix(issue["id"])
+        if result.get("method") == "skipped":
+            skipped += 1
+        elif result.get("success"):
+            applied += 1
+        else:
+            failed += 1
+    log.info({"action": "apply_safe_all", "applied": applied, "failed": failed, "skipped": skipped})
+    return {"applied": applied, "failed": failed, "skipped": skipped, "total": len(safe_issues)}
+
+
+@app.post("/api/fixes/{issue_id}/create-pr")
+async def create_pr_endpoint(issue_id: str):
+    """Force-create a GitHub review PR for an issue without auto-applying."""
+    issue = await get_issue(issue_id)
+    if not issue:
+        raise HTTPException(status_code=404, detail="Issue not found")
+    result = await _create_review_pr(issue, issue.get("message", ""))
+    return result
+
+
+@app.post("/api/scan/file")
+async def scan_file_endpoint(path: str = Query(..., description="Relative file path")):
+    """Run all relevant detectors on a single file and update the DB."""
+    import detectors.secret_scanner as _secret
+    import detectors.mock_data_detector as _mock
+    import detectors.auth_detector as _auth
+
+    repo_root = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
+    abs_path = repo_root / path
+    if not abs_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found: {path}")
+
+    repo = path.split("/")[0] if "/" in path else "unknown"
+    raw_issues: list = []
+
+    _secret._scan_file(abs_path, repo, raw_issues)
+
+    if abs_path.suffix.lower() in (".ts", ".tsx", ".js", ".jsx"):
+        if not _mock._is_test_file(abs_path):
+            _mock._scan_file(abs_path, repo, raw_issues)
+        _auth._scan_file(abs_path, raw_issues, set())
+
+    issue_dicts = [i.to_dict() if hasattr(i, "to_dict") else i for i in raw_issues]
+    from core.audit_log import upsert_issues
+    await upsert_issues(issue_dicts)
+
+    log.info({"action": "scan_file", "path": path, "issues_found": len(issue_dicts)})
+    return {"path": path, "issues_found": len(issue_dicts), "issues": issue_dicts}
+
 
 if __name__ == "__main__":
     # Priority for Railway's dynamic $PORT

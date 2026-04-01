@@ -103,6 +103,24 @@ CREATE INDEX IF NOT EXISTS idx_scan_runs_start  ON scan_runs(started_at);
 async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(_DDL)
+        # Schema migrations — idempotent (SQLite raises if column exists)
+        for stmt in (
+            "ALTER TABLE issues ADD COLUMN root_cause TEXT",
+            "ALTER TABLE issues ADD COLUMN root_cause_confidence TEXT DEFAULT 'medium'",
+        ):
+            try:
+                await db.execute(stmt)
+            except Exception:
+                pass  # column already present
+        await db.commit()
+
+
+async def cache_root_cause(issue_id: str, root_cause: str, confidence: str = "medium") -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE issues SET root_cause = ?, root_cause_confidence = ? WHERE id = ?",
+            (root_cause, confidence, issue_id),
+        )
         await db.commit()
 
 
