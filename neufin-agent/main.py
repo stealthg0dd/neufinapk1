@@ -44,17 +44,38 @@ from core.notifier import send_daily_summary, send_weekly_trend
 
 load_dotenv()
 
+_AGENT_SENTRY_ENV: str = os.getenv("ENVIRONMENT", "production")
+_AGENT_SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+_AGENT_PII_KEYS: frozenset = frozenset({"password", "token", "api_key", "fernet_key", "secret"})
+
+
+def _agent_scrub(obj: object) -> object:
+    if isinstance(obj, dict):
+        return {k: "[REDACTED]" if k.lower() in _AGENT_PII_KEYS else _agent_scrub(v) for k, v in obj.items()}
+    return [_agent_scrub(i) for i in obj] if isinstance(obj, list) else obj
+
+
+def _agent_before_send(event: dict, _hint: dict) -> dict | None:
+    for section in ("request", "extra", "contexts"):
+        if section in event:
+            event[section] = _agent_scrub(event[section])
+    return event
+
+
 sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
+    dsn=_AGENT_SENTRY_DSN or None,
     integrations=[
         FastApiIntegration(),
         LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
     ],
-    traces_sample_rate=1.0,
-    profiles_sample_rate=1.0,
-    environment="production",
-    release=os.getenv("RAILWAY_GIT_COMMIT_SHA"),
+    traces_sample_rate=1.0 if _AGENT_SENTRY_ENV in ("development", "dev", "local") else 0.2,
+    profiles_sample_rate=0.1,
+    environment=_AGENT_SENTRY_ENV,
+    release=os.getenv("GIT_COMMIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or "unknown",
+    send_default_pii=False,
+    before_send=_agent_before_send,
 )
+sentry_sdk.set_tags({"service": "neufin-agent", "company": "neufin"})
 
 # ── Structured JSON logging ────────────────────────────────────────────────
 class JSONFormatter(logging.Formatter):
@@ -173,6 +194,7 @@ async def scheduled_scan():
     try:
         await run_all_detectors()
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         log.error({"action": "scheduled_scan_error", "error": str(e)})
 
 
@@ -185,6 +207,7 @@ async def daily_summary_job():
         report = json.loads(report_path.read_text())
         await send_daily_summary(report)
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         log.error({"action": "daily_summary_error", "error": str(e)})
 
 
@@ -194,6 +217,7 @@ async def weekly_trend_job():
         trend = await get_weekly_trend()
         await send_weekly_trend(trend)
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         log.error({"action": "weekly_trend_error", "error": str(e)})
 
 # ── App lifespan ───────────────────────────────────────────────────────────

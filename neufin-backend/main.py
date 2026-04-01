@@ -19,30 +19,58 @@ try:
 except ImportError:
     pass
 
-# ── Settings — load before anything else ──────────────────────────────────────
-# ── Observability: Sentry (initialise before any app code) ────────────────────
+# ── Sentry: initialise before all app imports to capture boot exceptions ───────
+import os  # noqa: E402
+
 import sentry_sdk  # noqa: E402
 from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
 from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
 
-from core.config import settings  # noqa: E402
+_SENTRY_ENV: str = os.getenv("ENVIRONMENT", "production")
+_SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
+_PII_KEYS: frozenset = frozenset({"password", "token", "api_key", "fernet_key"})
 
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        integrations=[
-            StarletteIntegration(transaction_style="endpoint"),
-            FastApiIntegration(transaction_style="endpoint"),
-        ],
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        environment=settings.APP_ENV,
-        release=settings.APP_VERSION,
-        send_default_pii=False,
-    )
 
+def _scrub(obj: object) -> object:
+    """Recursively redact PII field values from Sentry event dicts."""
+    if isinstance(obj, dict):
+        return {k: "[REDACTED]" if k.lower() in _PII_KEYS else _scrub(v) for k, v in obj.items()}
+    return [_scrub(i) for i in obj] if isinstance(obj, list) else obj
+
+
+def _before_send(event: dict, _hint: dict) -> dict | None:
+    """Strip sensitive fields from every Sentry event before transmission."""
+    for section in ("request", "extra", "contexts"):
+        if section in event:
+            event[section] = _scrub(event[section])
+    return event
+
+
+sentry_sdk.init(
+    dsn=_SENTRY_DSN or None,
+    environment=_SENTRY_ENV,
+    release=(
+        os.getenv("GIT_COMMIT_SHA")
+        or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+        or "unknown"
+    ),
+    # 20 % sampling in production keeps quota low; 100 % in dev for full traces
+    traces_sample_rate=1.0 if _SENTRY_ENV in ("development", "dev", "local") else 0.2,
+    send_default_pii=False,
+    before_send=_before_send,
+    integrations=[
+        StarletteIntegration(transaction_style="endpoint"),
+        FastApiIntegration(transaction_style="endpoint"),
+    ],
+)
+# Tag every event with service/company for Sentry issue filtering
+sentry_sdk.set_tags({"service": "neufin-backend", "company": "neufin"})
+
+# ── Config — validate required env vars in lifespan, not at import ────────────
 # ── Observability: structured logging ─────────────────────────────────────────
 import structlog  # noqa: E402
 
+from core.config import settings  # noqa: E402
 from services.logging_config import configure_logging  # noqa: E402
 
 configure_logging()
@@ -221,6 +249,42 @@ app = FastAPI(
     lifespan=lifespan,
     debug=settings.debug,
 )
+
+
+# ── Global exception handler: never leak stack traces to clients ──────────────
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """
+    Catch-all for any exception not handled by a specific route.
+    Sends the exception to Sentry, then returns a safe JSON response that
+    includes the trace_id so support can correlate logs without exposing
+    internal details.
+    """
+    # Re-raise HTTP exceptions so FastAPI handles them with their intended status.
+    from fastapi import HTTPException as _HTTPEx
+    from starlette.responses import JSONResponse as _JSONResponse
+
+    if isinstance(exc, _HTTPEx):
+        raise exc
+
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    sentry_sdk.capture_exception(exc)
+    logger.error(
+        "unhandled_exception",
+        trace_id=trace_id,
+        path=request.url.path,
+        exc=str(exc),
+        exc_type=type(exc).__name__,
+    )
+    return _JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_error",
+            "trace_id": trace_id,
+            "message": "An error occurred. Our team has been notified.",
+        },
+        headers={"X-Trace-Id": trace_id},
+    )
 
 # ── Observability: Prometheus metrics endpoint (/metrics) ─────────────────────
 try:

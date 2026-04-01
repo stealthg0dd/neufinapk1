@@ -6,6 +6,7 @@ import { PostHogProvider } from '@/lib/posthog'
 import { WebVitals } from '@/app/components/WebVitals'
 import AuthDebugBoot from '@/app/components/AuthDebugBoot'
 import { AuthDebugPanel } from '@/components/AuthDebugPanel'
+import { SentryUserContext } from '@/components/SentryUserContext'
 import { Toaster } from 'react-hot-toast'
 import '@/lib/env-check'
 
@@ -159,6 +160,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <PostHogProvider>
           <AuthProvider>
+            <SentryUserContext />
             <AuthDebugBoot />
             <WebVitals />
             {children}

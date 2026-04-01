@@ -5,6 +5,21 @@
  */
 import * as Sentry from "@sentry/nextjs";
 
+const _SENSITIVE = new Set(["password", "token", "api_key", "fernet_key"]);
+
+function scrubObject(obj: unknown): unknown {
+  if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+    return Object.fromEntries(
+      Object.entries(obj as Record<string, unknown>).map(([k, v]) => [
+        k,
+        _SENSITIVE.has(k.toLowerCase()) ? "[REDACTED]" : scrubObject(v),
+      ])
+    );
+  }
+  if (Array.isArray(obj)) return obj.map(scrubObject);
+  return obj;
+}
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
@@ -28,6 +43,18 @@ Sentry.init({
 
   environment: process.env.NEXT_PUBLIC_APP_ENV ?? "production",
 
+  release: process.env.NEXT_PUBLIC_SENTRY_RELEASE ?? "unknown",
+
   // Only initialise when a DSN is configured — keeps local dev noise-free.
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
+
+  initialScope: {
+    tags: { service: "neufin-web", company: "neufin" },
+  },
+
+  beforeSend(event) {
+    if (event.request) event.request = scrubObject(event.request) as typeof event.request;
+    if (event.extra)   event.extra   = scrubObject(event.extra)   as typeof event.extra;
+    return event;
+  },
 });

@@ -1,4 +1,21 @@
 import './global.css'
+// ── Sentry: initialise before NavigationContainer so native crashes are captured
+import * as Sentry from '@sentry/react-native'
+
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  environment: process.env.EXPO_PUBLIC_ENVIRONMENT ?? 'production',
+  release: process.env.EXPO_PUBLIC_APP_VERSION ?? 'unknown',
+  // Trace every transaction in dev; 20 % sample in production
+  tracesSampleRate: process.env.EXPO_PUBLIC_ENVIRONMENT === 'production' ? 0.2 : 1.0,
+  // Enable native crash handler (hard crashes, ANR, OOM)
+  enableNative: true,
+  enableNativeCrashHandling: true,
+})
+// Tag all events with service/company for filtering in Sentry UI
+Sentry.setTag('service', 'neufin-mobile')
+Sentry.setTag('company', 'neufin')
+
 import React, { useState, useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, ActivityIndicator } from 'react-native'
@@ -49,12 +66,20 @@ export default function App() {
     // Fast path: check for an existing session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthed(Boolean(session))
+      if (session?.user) {
+        Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined })
+      }
     })
 
     // Subscribe to auth state changes (sign-in / sign-out / token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setAuthed(Boolean(session))
+        if (session?.user) {
+          Sentry.setUser({ id: session.user.id, email: session.user.email ?? undefined })
+        } else {
+          Sentry.setUser(null)
+        }
       },
     )
     return () => subscription.unsubscribe()
