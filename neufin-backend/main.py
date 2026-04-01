@@ -1,8 +1,6 @@
 import asyncio
 import datetime
 import io
-import os
-import sys
 import time
 import uuid
 import warnings
@@ -22,12 +20,12 @@ except ImportError:
     pass
 
 # ── Settings — load before anything else ──────────────────────────────────────
-from core.config import settings  # noqa: E402
-
 # ── Observability: Sentry (initialise before any app code) ────────────────────
 import sentry_sdk  # noqa: E402
 from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
 from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
+
+from core.config import settings  # noqa: E402
 
 if settings.SENTRY_DSN:
     sentry_sdk.init(
@@ -162,7 +160,7 @@ async def _heartbeat_loop() -> None:
 
 # ── FastAPI lifespan ──────────────────────────────────────────────────────────
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # noqa: ARG001
+async def lifespan(app: FastAPI):
     global _startup_time, _heartbeat_task
 
     # Validate required env vars — exits with clear message if any are missing

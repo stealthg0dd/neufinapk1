@@ -15,7 +15,6 @@ start if any required variable is absent.
 from __future__ import annotations
 
 import sys
-from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,27 +40,27 @@ class Settings(BaseSettings):
             "Dashboard → Settings → API → service_role."
         ),
     )
-    SUPABASE_KEY: Optional[str] = Field(
+    SUPABASE_KEY: str | None = Field(
         default=None,
         description="Supabase anon key (public). Dashboard → Settings → API → anon public.",
     )
-    SUPABASE_JWT_SECRET: Optional[str] = Field(
+    SUPABASE_JWT_SECRET: str | None = Field(
         default=None,
         description="Supabase JWT secret for HS256 token verification.",
     )
-    SUPABASE_PUBLIC_KEY: Optional[str] = Field(
+    SUPABASE_PUBLIC_KEY: str | None = Field(
         default=None,
         description="Supabase ES256 public key PEM (optional; JWKS is preferred).",
     )
-    SUPABASE_ANON_KEY: Optional[str] = Field(
+    SUPABASE_ANON_KEY: str | None = Field(
         default=None,
         description="Alias for SUPABASE_KEY used by some Supabase SDK versions.",
     )
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: Optional[str] = Field(
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: str | None = Field(
         default=None,
         description="Browser-side Supabase anon key (mirrored from the frontend build).",
     )
-    JWT_SECRET: Optional[str] = Field(
+    JWT_SECRET: str | None = Field(
         default=None,
         description="Alias for SUPABASE_JWT_SECRET.",
     )
@@ -88,11 +87,11 @@ class Settings(BaseSettings):
         default="",
         description="Stripe webhook signing secret. Dashboard → Webhooks → Signing secret.",
     )
-    STRIPE_PRICE_SINGLE_REPORT: Optional[str] = Field(
+    STRIPE_PRICE_SINGLE_REPORT: str | None = Field(
         default=None,
         description="Stripe Price ID for single report ($29). Dashboard → Products.",
     )
-    STRIPE_PRICE_UNLIMITED_MONTHLY: Optional[str] = Field(
+    STRIPE_PRICE_UNLIMITED_MONTHLY: str | None = Field(
         default=None,
         description="Stripe Price ID for unlimited monthly ($99/mo). Dashboard → Products.",
     )
@@ -102,13 +101,13 @@ class Settings(BaseSettings):
     )
 
     # ── Observability (SENTRY_DSN required at startup) ────────────────────────
-    SENTRY_DSN: Optional[str] = Field(
+    SENTRY_DSN: str | None = Field(
         default=None,
         description="Sentry DSN for error tracking. sentry.io → Project → Settings → Client Keys.",
     )
     SENTRY_TRACES_SAMPLE_RATE: float = Field(
         default=0.1,
-        description="Sentry performance traces sample rate (0.0–1.0).",
+        description="Sentry performance traces sample rate (0.0-1.0).",
     )
     APP_ENV: str = Field(
         default="production",
@@ -143,31 +142,31 @@ class Settings(BaseSettings):
     )
 
     # ── Market data providers (all optional) ──────────────────────────────────
-    POLYGON_API_KEY: Optional[str] = Field(
+    POLYGON_API_KEY: str | None = Field(
         default=None,
         description="Polygon.io API key. polygon.io → Dashboard → API Keys.",
     )
-    FINNHUB_API_KEY: Optional[str] = Field(
+    FINNHUB_API_KEY: str | None = Field(
         default=None,
         description="Finnhub API key. finnhub.io → Dashboard → API key.",
     )
-    FMP_API_KEY: Optional[str] = Field(
+    FMP_API_KEY: str | None = Field(
         default=None,
         description="Financial Modeling Prep API key. financialmodelingprep.com → Dashboard.",
     )
-    TWELVEDATA_API_KEY: Optional[str] = Field(
+    TWELVEDATA_API_KEY: str | None = Field(
         default=None,
         description="Twelve Data API key. twelvedata.com → Dashboard.",
     )
-    MARKETSTACK_API_KEY: Optional[str] = Field(
+    MARKETSTACK_API_KEY: str | None = Field(
         default=None,
         description="Marketstack API key. marketstack.com → Dashboard.",
     )
-    ALPHA_VANTAGE_API_KEY: Optional[str] = Field(
+    ALPHA_VANTAGE_API_KEY: str | None = Field(
         default=None,
         description="Alpha Vantage API key. alphavantage.co → Get Free API Key.",
     )
-    FRED_API_KEY: Optional[str] = Field(
+    FRED_API_KEY: str | None = Field(
         default=None,
         description="FRED (Federal Reserve Economic Data) API key. fred.stlouisfed.org → My Account → API Keys.",
     )
@@ -177,19 +176,19 @@ class Settings(BaseSettings):
     )
 
     # ── AI providers (all optional — fallback chain used) ─────────────────────
-    ANTHROPIC_API_KEY: Optional[str] = Field(
+    ANTHROPIC_API_KEY: str | None = Field(
         default=None,
         description="Anthropic Claude API key. console.anthropic.com → API Keys.",
     )
-    GEMINI_KEY: Optional[str] = Field(
+    GEMINI_KEY: str | None = Field(
         default=None,
         description="Google Gemini API key. aistudio.google.com → Get API key.",
     )
-    OPENAI_KEY: Optional[str] = Field(
+    OPENAI_KEY: str | None = Field(
         default=None,
         description="OpenAI API key. platform.openai.com → API keys.",
     )
-    GROQ_KEY: Optional[str] = Field(
+    GROQ_KEY: str | None = Field(
         default=None,
         description="Groq API key. console.groq.com → API Keys.",
     )
@@ -219,7 +218,7 @@ class Settings(BaseSettings):
         default="https://ctech-production.up.railway.app",
         description="Agent OS base URL for service registration and heartbeats.",
     )
-    AGENT_OS_API_KEY: Optional[str] = Field(
+    AGENT_OS_API_KEY: str | None = Field(
         default=None,
         description="API key for the Agent OS router-system. Provided by the AgentOS administrator.",
     )

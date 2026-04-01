@@ -48,8 +48,8 @@ except ImportError:
     logger.warning("swarm.langgraph_missing")
 
 # ── Service imports ────────────────────────────────────────────────────────────
-from services.ai_router import get_ai_analysis, get_ai_briefing
-from services.calculator import (
+from services.ai_router import get_ai_analysis, get_ai_briefing  # noqa: E402
+from services.calculator import (  # noqa: E402
     _beta_score,
     _hhi_score,
     _tax_alpha_score,
@@ -57,7 +57,7 @@ from services.calculator import (
     get_tax_impact_analysis,
     get_tax_neutral_pairs,
 )
-from services.risk_engine import (
+from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,
     build_correlation_matrix_from_series,
     correlation_penalty_score,
@@ -65,7 +65,7 @@ from services.risk_engine import (
     find_correlation_clusters,
     format_clusters_for_ai,
 )
-from services.stress_tester import StressTester, compute_factor_metrics
+from services.stress_tester import StressTester, compute_factor_metrics  # noqa: E402
 
 
 # alerts router is in routers/ — import lazily to avoid circular dependency at
@@ -83,7 +83,7 @@ def _get_notify_fn():
 _ALERT_REGIMES = {"High Inflation", "Inflationary", "Elevated Inflation"}
 
 # ── API keys ───────────────────────────────────────────────────────────────────
-from core.config import settings
+from core.config import settings  # noqa: E402
 
 FINNHUB_API_KEY = settings.FINNHUB_API_KEY
 FRED_API_KEY = settings.FRED_API_KEY

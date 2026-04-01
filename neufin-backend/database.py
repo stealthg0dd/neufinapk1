@@ -1,12 +1,7 @@
-import sys
-
 import structlog
-from dotenv import load_dotenv
-from supabase import Client, create_client
 
 from core.config import settings
-
-load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
+from supabase import Client, create_client
 
 logger = structlog.get_logger("neufin.database")
 

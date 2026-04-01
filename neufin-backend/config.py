@@ -6,7 +6,7 @@ This module re-exports individual constants so existing imports keep working:
 
     from config import SUPABASE_URL, APP_BASE_URL   # still works
 """
-from core.config import settings  # noqa: F401 — re-exported for convenience
+from core.config import settings
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
 SUPABASE_URL: str = settings.SUPABASE_URL

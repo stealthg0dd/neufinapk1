@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import sys
 import time
 from dataclasses import dataclass
 
@@ -133,7 +132,7 @@ async def _fetch_jwks() -> list[dict]:
                 # try it as a one-shot secondary attempt before giving up.
                 _log("/.well-known/jwks.json returned 404; retrying /auth/v1/jwks")
                 resp2 = await client.get(
-                    f"{SUPABASE_URL}/auth/v1/jwks",
+                    f"{settings.SUPABASE_URL}/auth/v1/jwks",
                     headers={"apikey": _SUPABASE_ANON_KEY},
                 )
                 if resp2.status_code == 200:
