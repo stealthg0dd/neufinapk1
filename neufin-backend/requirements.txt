@@ -44,7 +44,7 @@ gunicorn==23.0.0
 
 # Caching + task queue
 redis==5.2.1
-celery[redis]==5.4.0
+celery[redis]==5.6.3
 
 # JWT verification (ES256 via Supabase JWKS)
 python-jose[cryptography]==3.3.0
