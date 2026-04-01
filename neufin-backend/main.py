@@ -216,6 +216,7 @@ origins = list(
         "https://neufinapk1-git-master-varuns-projects-6fad10b9.vercel.app",
         "https://neufin.ai",
         "https://www.neufin.ai",
+        "https://neufin-agent-production.up.railway.app",
         _vercel_origin,
         *_extra_origins,
     }

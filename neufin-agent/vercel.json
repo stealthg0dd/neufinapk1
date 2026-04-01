@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://neufin-agent-production.up.railway.app/$1",
+      "permanent": false
+    }
+  ]
+}

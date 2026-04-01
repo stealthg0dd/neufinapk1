@@ -17,7 +17,7 @@ REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 PATTERN_SPECS: list[tuple[str, tuple[str, ...], str]] = [
     (
         "Anthropic API key",
-        ("sk-" + "ant-", "api03-" + "[A-Za-z0-9_\-]{20,}"),
+        ("sk-" + "ant-", r"api03-" + r"[A-Za-z0-9_\-]{20,}"),
         "Rotate the exposed Anthropic key and load it from environment variables.",
     ),
     (
@@ -32,12 +32,12 @@ PATTERN_SPECS: list[tuple[str, tuple[str, ...], str]] = [
     ),
     (
         "Google API key",
-        ("AI" + "zaSy", "[A-Za-z0-9_\-]{30,}"),
+        ("AI" + "zaSy", r"[A-Za-z0-9_\-]{30,}"),
         "Regenerate the Google API key and restrict it by domain/IP.",
     ),
     (
         "Hardcoded JWT token",
-        ("ey" + "J", "[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
+        ("ey" + "J", r"[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}"),
         "Never hardcode JWTs in code; issue tokens at runtime only.",
     ),
     (

@@ -221,6 +221,7 @@ app.add_middleware(
 # Mount MCP server
 app.mount("/mcp", mcp.streamable_http_app())
 
+@app.get("/health")
 @app.get("/api/health")
 async def health():
     score_data = await get_health_score()
