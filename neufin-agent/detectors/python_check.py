@@ -7,7 +7,7 @@ from pathlib import Path
 from detectors import Issue
 
 # Standardized REPO_ROOT for Railway
-REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
+REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 log = logging.getLogger("neufin-agent.python_check")
 
 # ruff codes that can be auto-fixed

@@ -5,7 +5,7 @@ from pathlib import Path
 from detectors import Issue
 
 # Standardized REPO_ROOT for Railway
-REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
+REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 
 # FastAPI route decorators in backend
 _ROUTER_ROUTE = re.compile(

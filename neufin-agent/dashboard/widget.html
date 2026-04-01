@@ -238,9 +238,8 @@
     <ul class="fixes-list" id="fixes-list"></ul>
   </div>
   <script>
-    // --- API base for Railway ---
-    // Use Railway backend API base for all dashboard API calls
-    const API_BASE = "https://neufin101-production.up.railway.app";
+    // --- API base ---
+    const API_BASE = '';
     function scoreColor(score) {
       if (score < 50) return '#ef4444';
       if (score < 75) return '#fbbf24';
@@ -325,7 +324,7 @@
     }
     // --- API ---
     async function fetchHealth() {
-      const res = await fetch(`${API_BASE}/api/health`);
+      const res = await fetch('/api/health');
       if (!res.ok) return;
       const data = await res.json();
       renderScores(data);
@@ -333,13 +332,13 @@
       renderIssues();
     }
     async function fetchFixes() {
-      const res = await fetch(`${API_BASE}/api/fixes`);
+      const res = await fetch('/api/fixes');
       if (!res.ok) return;
       fixes = (await res.json()).fixes || [];
       renderFixes();
     }
     async function applyFix(id) {
-      await fetch(`${API_BASE}/api/fixes/${id}/apply`, { method: 'POST' });
+      await fetch(`/api/fixes/${id}/apply`, { method: 'POST' });
       fetchHealth();
       fetchFixes();
     }
@@ -357,7 +356,7 @@
     scanBtn.textContent = '⚡ Scan Now';
     scanBtn.style = 'margin:16px 32px 0 32px;padding:8px 18px;font-size:1.1em;background:#22c55e;color:#fff;border:none;border-radius:8px;cursor:pointer;float:right;';
     scanBtn.onclick = async function triggerScan() {
-      const res = await fetch(`${API_BASE}/api/scan/trigger`, {method: 'POST'});
+      const res = await fetch('/api/scan/trigger', {method: 'POST'});
       const data = await res.json();
       alert(`Scan started. Check back in 30 seconds.`);
     };

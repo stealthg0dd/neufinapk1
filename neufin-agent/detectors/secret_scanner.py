@@ -11,7 +11,7 @@ except ImportError:
             self.__dict__.update(kwargs)
 
 # Standardized REPO_ROOT for Railway
-REPO_ROOT = Path(os.getenv("REPO_ROOT", str(Path(__file__).parent.parent.parent)))
+REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 
 # Build patterns via concatenation/escaping so literal secrets are never present verbatim
 PATTERN_SPECS: list[tuple[str, tuple[str, ...], str]] = [

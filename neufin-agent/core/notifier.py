@@ -106,6 +106,8 @@ async def _post_slack(payload: dict) -> None:
 # ── Public API ────────────────────────────────────────────────────────────
 
 async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") -> None:
+    if not SLACK_WEBHOOK:
+        return
     """Immediate alert for critical severity issues — Slack + email."""
     sev = issue.get("severity", "critical")
     emoji = _sev_emoji(sev)
@@ -144,6 +146,8 @@ async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") 
 
 
 async def notify_fix_applied(issue: dict, pr_url: str = "", method: str = "auto") -> None:
+    if not SLACK_WEBHOOK:
+        return
     """Slack notification when a HIGH issue is auto-fixed."""
     sev = issue.get("severity", "high")
     if sev not in ("critical", "high"):
@@ -159,6 +163,8 @@ async def notify_fix_applied(issue: dict, pr_url: str = "", method: str = "auto"
 
 
 async def notify_pr_created(issue: dict, pr_url: str) -> None:
+    if not SLACK_WEBHOOK:
+        return
     """Slack notification when a PR is opened for human review."""
     sev = issue.get("severity", "high")
     emoji = _sev_emoji(sev)
@@ -172,6 +178,8 @@ async def notify_pr_created(issue: dict, pr_url: str) -> None:
 
 
 async def notify_scan_complete(report: dict) -> None:
+    if not SLACK_WEBHOOK:
+        return
     """Post alert if any score has dropped below 70 after a scan."""
     scores = report.get("scores", {})
     if not any(v < 70 for v in scores.values()):

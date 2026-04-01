@@ -12,6 +12,7 @@ import uvicorn
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from mcp.server.fastmcp import FastMCP
 
@@ -209,30 +210,63 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Neufin Code Health Agent", lifespan=lifespan)
 app.include_router(webhook_router)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Mount MCP server
 app.mount("/mcp", mcp.streamable_http_app())
 
-@app.get("/health")
+@app.get("/api/health")
 async def health():
+    score_data = await get_health_score()
+    issues = await get_open_issues(limit=50)
     return {
-        "status": "ok", 
+        "status": "ok",
         "ts": datetime.now(UTC).isoformat(),
-        "repo_root": os.getenv("REPO_ROOT")
+        "repo_root": os.getenv("REPO_ROOT"),
+        "scores": score_data.get("scores", {}),
+        "issues": issues,
     }
 
-@app.get("/scan")
-async def trigger_scan():
-    report = await run_all_detectors()
-    return report
 
-@app.get("/errors")
+@app.post("/api/scan/trigger")
+async def trigger_scan_api():
+    report = await run_all_detectors()
+    return {"status": "scan_complete", "report": report}
+
+
+@app.get("/api/fixes")
+async def fixes(limit: int = 50):
+    history = await get_fix_history(limit=limit)
+    return {"fixes": history}
+
+
+@app.post("/api/fixes/{issue_id}/apply")
+async def apply_fix_endpoint(issue_id: str):
+    result = await _apply_fix(issue_id)
+    return result
+
+
+@app.get("/api/score")
+async def score_api():
+    return await get_health_score()
+
+
+@app.get("/api/scan")
+async def trigger_scan():
+    return {
+        "note": "Use POST /api/scan/trigger",
+    }
+
+@app.get("/api/errors")
 async def errors(limit: int = 50):
     issues = await get_open_issues(limit=limit)
     return {"issues": issues, "count": len(issues)}
-
-@app.get("/score")
-async def score():
-    return await get_health_score()
 
 @app.post("/api/issues/{issue_id}/dismiss")
 async def dismiss(issue_id: str, reason: str = ""):
