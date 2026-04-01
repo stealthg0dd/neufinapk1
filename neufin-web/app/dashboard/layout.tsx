@@ -2,7 +2,7 @@
 import AppHeader from '@/components/AppHeader'
 import TrialBannerLoader from '@/components/TrialBannerLoader'
 import PaywallOverlay from '@/components/PaywallOverlay'
-import { useAuth } from '@/lib/store'
+import { useAuth } from '@/lib/auth-context'
 
 const TRIAL_PERIOD_DAYS = 14;
 
@@ -20,8 +20,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <TrialBannerLoader />
       <AppHeader />
       <main className="flex-1">
-        {!isTrialActive && <PaywallOverlay />}
-        {children}
+        {!isTrialActive && <PaywallOverlay locked={!isTrialActive} onUnlock={() => {}}>{children}</PaywallOverlay>}
+        {isTrialActive && children}
       </main>
     </div>
   );

@@ -103,6 +103,11 @@ const TERMINAL_LINES = [
 ]
 
 export default function DashboardPage() {
+  // Auth and visit state must be declared before effects that depend on them
+  const { loading: isLoading, token, user } = useAuth()
+  const [firstVisit, setFirstVisit] = useState<boolean | null>(null)
+  const hasPatchedVisit = useRef(false)
+
     // Data for first-time dashboard
     const [portfolio, setPortfolio] = useState<any>(null)
     const [market, setMarket] = useState<any>(null)
@@ -136,7 +141,6 @@ export default function DashboardPage() {
       }).finally(() => setLoadingAll(false))
     }, [firstVisit, token])
   // ...existing code...
-  const { loading: isLoading, token, user } = useAuth()
   const [result, setResult] = useState<DNAResult | null>(null)
   const [selectedSymbol, setSelectedSymbol] = useState<string>('')
   const [candleData, setCandleData] = useState<CandleData[]>([])
@@ -148,9 +152,7 @@ export default function DashboardPage() {
   const [reportLoading, setReportLoading] = useState(false)
   const [reportError, setReportError] = useState('')
 
-  // First-time dashboard visit logic
-  const [firstVisit, setFirstVisit] = useState<boolean | null>(null)
-  const hasPatchedVisit = useRef(false)
+  // First-time dashboard visit logic (declared at top of function)
 
   useEffect(() => {
     debugAuth('dashboard:mount')
@@ -476,10 +478,10 @@ function AnimatedTerminal() {
             className="glass-card-dark rounded-xl p-5 flex flex-col overflow-hidden"
           >
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-              Holdings · {result.positions.length} positions
+              Holdings · {result?.positions.length ?? 0} positions
             </h3>
             <div className="flex-1 overflow-y-auto space-y-1 -mx-1 px-1">
-              {result.positions
+              {(result?.positions ?? [])
                 .sort((a, b) => b.value - a.value)
                 .map((p) => {
                   const active = p.symbol === selectedSymbol
@@ -581,13 +583,13 @@ function AnimatedTerminal() {
           >
             <div>
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">AI Recommendation</h3>
-              <p className="text-sm text-gray-300 leading-relaxed">{result.recommendation}</p>
+              <p className="text-sm text-gray-300 leading-relaxed">{result?.recommendation}</p>
             </div>
 
             <div>
               <h3 className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-2">Strengths</h3>
               <ul className="space-y-1.5">
-                {result.strengths.map((s, i) => (
+                {(result?.strengths ?? []).map((s, i) => (
                   <li key={i} className="text-xs text-gray-400 flex gap-1.5">
                     <span className="text-green-500 shrink-0">✓</span>{s}
                   </li>
@@ -598,7 +600,7 @@ function AnimatedTerminal() {
             <div>
               <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-2">Watch out</h3>
               <ul className="space-y-1.5">
-                {result.weaknesses.map((w, i) => (
+                {(result?.weaknesses ?? []).map((w, i) => (
                   <li key={i} className="text-xs text-gray-400 flex gap-1.5">
                     <span className="text-red-500 shrink-0">!</span>{w}
                   </li>
