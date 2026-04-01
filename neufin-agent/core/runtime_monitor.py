@@ -322,8 +322,8 @@ async def poll_sentry_issues() -> list[dict]:
     sentry_auth_token = os.getenv("SENTRY_AUTH_TOKEN", "")
     sentry_org = os.getenv("SENTRY_ORG", "")
     sentry_projects: dict[str, str] = {
-        "neufin-backend": os.getenv("SENTRY_PROJECT_neufin_backend", ""),
-        "neufin-web": os.getenv("SENTRY_PROJECT_neufin_web", ""),
+        "neufin-backend": os.getenv("SENTRY_PROJECT_neufin_backend") or os.getenv("SENTRY_PROJECT_BACKEND", ""),
+        "neufin-web": os.getenv("SENTRY_PROJECT_neufin_web") or os.getenv("SENTRY_PROJECT_WEB", ""),
     }
 
     if not sentry_auth_token or not sentry_org:
