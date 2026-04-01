@@ -2,7 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.32.1
 python-multipart==0.0.20
 python-dotenv==1.0.1
-requests==2.32.3
+requests==2.33.1
 httpx==0.28.1
 finnhub-python==2.4.20
 
