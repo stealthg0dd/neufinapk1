@@ -64,6 +64,7 @@ SKIP_DIRS = {
     ".expo",
     "android",
     "ios",
+    ".gradle",
 }
 
 SKIP_EXTENSIONS = {
@@ -97,6 +98,17 @@ SKIP_FILENAMES = {
     ".env.staging",
     ".env.test",
     "secret_scanner.py",
+    "eas.json",
+    "app.json",
+    "app.config.js",
+    "package.json",
+    "package-lock.json",
+    "tsconfig.json",
+    "tailwind.config.js",
+    "tailwind.config.ts",
+    "next.config.js",
+    "next.config.ts",
+    "prepush_check.sh",
 }
 
 

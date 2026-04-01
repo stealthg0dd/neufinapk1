@@ -270,10 +270,13 @@
     let fixes = [];
     // --- Renderers ---
     function renderScores(data) {
-      const { backend, web, mobile } = data.scores;
-      document.getElementById('score-backend').innerHTML = ringSVG(backend);
-      document.getElementById('score-web').innerHTML = ringSVG(web);
-      document.getElementById('score-mobile').innerHTML = ringSVG(mobile);
+      const scores = data.scores || {};
+      const backend = scores['neufin-backend'] ?? scores.backend ?? '--';
+      const web = scores['neufin-web'] ?? scores.web ?? '--';
+      const mobile = scores['neufin-mobile'] ?? scores.mobile ?? '--';
+      document.getElementById('score-backend').innerHTML = typeof backend === 'number' ? ringSVG(backend) : '';
+      document.getElementById('score-web').innerHTML = typeof web === 'number' ? ringSVG(web) : '';
+      document.getElementById('score-mobile').innerHTML = typeof mobile === 'number' ? ringSVG(mobile) : '';
       document.getElementById('score-backend-value').textContent = backend;
       document.getElementById('score-web-value').textContent = web;
       document.getElementById('score-mobile-value').textContent = mobile;
@@ -284,14 +287,24 @@
       if (filter !== 'all') filtered = issues.filter(i => i.severity === filter);
       const list = document.getElementById('issues-list');
       list.innerHTML = '';
+      if (filtered.length === 0) {
+        list.innerHTML = '<li style="padding:16px 16px;color:#64748b;">No issues found.</li>';
+        return;
+      }
       filtered.slice(0, 20).forEach(issue => {
+        const message = issue.message
+          || issue.description
+          || issue.detail
+          || 'No message captured';
+        const file = issue.file || issue.path || 'unknown file';
+        const line = issue.line || issue.line_number || '';
         const li = document.createElement('li');
         li.className = 'issue';
         li.innerHTML = `
           <span class="sev">${sevIcon(issue.severity)}</span>
-          <span class="file">${issue.file}:${issue.line}</span>
-          <span class="desc">${issue.description}</span>
-          ${issue.fixable ? `<button class="action-btn" onclick="applyFix('${issue.id}')">Fix</button>` : ''}
+          <span class="file">${file}${line ? ':' + line : ''}</span>
+          <span class="desc">${message}</span>
+          ${issue.auto_fixable ? `<button class="action-btn" onclick="applyFix('${issue.id}')">Fix</button>` : ''}
           ${issue.pr_url ? `<button class="action-btn" onclick="window.open('${issue.pr_url}','_blank')">PR</button>` : ''}
           ${issue.status === 'fixed' ? '<span class="action-btn">✓</span>' : ''}
         `;
@@ -309,14 +322,21 @@
     function renderFixes() {
       const list = document.getElementById('fixes-list');
       list.innerHTML = '';
+      if (fixes.length === 0) {
+        list.innerHTML = '<li style="padding:12px 16px;color:#64748b;">No fixes applied yet.</li>';
+        return;
+      }
       fixes.slice(0, 10).forEach(fix => {
+        const desc = fix.method || fix.fix_type || fix.description || 'fix applied';
+        const fileLabel = fix.file || fix.issue_id || '';
+        const ago = fix.applied_at ? new Date(fix.applied_at).toLocaleString() : (fix.ago || '');
         const li = document.createElement('li');
         li.className = 'fix';
         li.innerHTML = `
           <span class="status">${fixStatusIcon(fix.status)}</span>
-          <span class="file">${fix.file}</span>
-          <span class="desc">${fix.description}</span>
-          <span style="color:#64748b;font-size:0.93em;">${fix.ago}</span>
+          <span class="file">${fileLabel}</span>
+          <span class="desc">${desc}</span>
+          <span style="color:#64748b;font-size:0.93em;">${ago}</span>
           ${fix.pr_url ? `<button class="action-btn" onclick="window.open('${fix.pr_url}','_blank')">View PR</button>` : ''}
         `;
         list.appendChild(li);

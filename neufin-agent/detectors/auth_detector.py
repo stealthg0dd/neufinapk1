@@ -43,7 +43,7 @@ PATTERNS: list[tuple[re.Pattern, str, str, str, bool, bool]] = [
     ),
 ]
 
-SKIP_DIRS = {".git", ".next", "node_modules", "__pycache__", ".venv", "build", "dist"}
+SKIP_DIRS = {".git", ".next", "node_modules", "__pycache__", ".venv", "build", "dist", ".expo", "android", "ios", ".gradle"}
 
 
 async def scan() -> list[Issue]:

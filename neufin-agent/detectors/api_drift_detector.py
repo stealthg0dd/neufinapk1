@@ -21,7 +21,7 @@ _TEMPLATE_CALL = re.compile(
     r"""\$\{[^}]+\}\s*(`[^`]*?(/api/[^`"'\s)]+)|["']([^"']*?/api/[^"'\s)]+)["'])"""
 )
 
-SKIP_DIRS = {".git", ".next", "node_modules", "__pycache__", ".venv", "build", "dist", ".expo"}
+SKIP_DIRS = {".git", ".next", "node_modules", "__pycache__", ".venv", "build", "dist", ".expo", "android", "ios", ".gradle"}
 
 
 async def scan() -> list[Issue]:
