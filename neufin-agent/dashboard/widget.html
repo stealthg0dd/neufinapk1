@@ -46,6 +46,10 @@
     .score-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
     .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     .last-scan { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .sentry-health { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .sentry-health.ok { color: #22C55E; }
+    .sentry-health.err { color: #EF4444; }
+    .sentry-health.warn { color: #F59E0B; }
     .btn-scan { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
     .btn-scan:hover { background: var(--accent2); }
     .btn-scan:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -260,6 +264,7 @@
   </div>
   <div class="topbar-right">
     <span class="last-scan" id="last-scan-lbl">Last scan: —</span>
+    <span class="sentry-health" id="sentry-health">Sentry: —</span>
     <button class="btn-scan" id="btn-scan" onclick="triggerScan()">⚡ Scan Now</button>
   </div>
 </header>
@@ -398,6 +403,7 @@ let issues      = [];
 let fixes       = [];
 let scores      = {};
 let lastScanTs  = null;
+let sentryHealth = null;
 let selIssue    = null;          // selected Issue object
 let aCache      = {};            // id → {root_cause, confidence}
 let chatHist    = {};            // id → [{role, text}]
@@ -470,8 +476,35 @@ async function loadData() {
       fixes = (await fRes.json()).fixes || [];
       renderAuditLog();
     }
+
+    try {
+      const sRes = await fetch('/api/runtime/sentry-health');
+      if (sRes.ok) {
+        sentryHealth = await sRes.json();
+        renderSentryHealth();
+      }
+    } catch(_) {}
   } catch(e) {
     console.error('loadData:', e);
+  }
+}
+
+function renderSentryHealth() {
+  const el = document.getElementById('sentry-health');
+  if (!el || !sentryHealth) return;
+
+  const status = sentryHealth.status || 'unknown';
+  const ingested = Number(sentryHealth.last_ingested_count || 0);
+  const last = sentryHealth.last_success_at ? relTime(sentryHealth.last_success_at) : 'never';
+
+  el.className = 'sentry-health';
+  if (status === 'ok') el.classList.add('ok');
+  else if (status === 'error') el.classList.add('err');
+  else el.classList.add('warn');
+
+  el.textContent = `Sentry: ${status} | +${ingested} | ${last}`;
+  if (sentryHealth.last_error) {
+    el.title = sentryHealth.last_error;
   }
 }
 

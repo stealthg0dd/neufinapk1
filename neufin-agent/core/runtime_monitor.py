@@ -36,6 +36,16 @@ VERCEL_PROJECT_ID = os.getenv("VERCEL_PROJECT_ID", "")
 # Track consecutive Railway failures in-process (reset on restart, acceptable)
 _railway_consecutive_failures: int = 0
 
+# Sentry poll health state (in-memory for lightweight observability)
+_sentry_poll_health: dict[str, object] = {
+    "status": "never_run",
+    "last_poll_at": None,
+    "last_success_at": None,
+    "last_ingested_count": 0,
+    "projects_checked": 0,
+    "last_error": "",
+}
+
 # ── DB schema ─────────────────────────────────────────────────────────────
 
 CREATE_RUNTIME_EVENTS = """
@@ -308,6 +318,7 @@ async def receive_mobile_crash(request: Request) -> dict:
 
 async def poll_sentry_issues() -> list[dict]:
     """Fetch unresolved Sentry issues every 5 min and merge into agent DB."""
+    _sentry_poll_health["last_poll_at"] = datetime.now(UTC).isoformat()
     sentry_auth_token = os.getenv("SENTRY_AUTH_TOKEN", "")
     sentry_org = os.getenv("SENTRY_ORG", "")
     sentry_projects: dict[str, str] = {
@@ -316,15 +327,20 @@ async def poll_sentry_issues() -> list[dict]:
     }
 
     if not sentry_auth_token or not sentry_org:
+        _sentry_poll_health["status"] = "skipped"
+        _sentry_poll_health["last_error"] = "SENTRY_AUTH_TOKEN or SENTRY_ORG not set"
+        _sentry_poll_health["last_ingested_count"] = 0
         log.debug({"action": "sentry_poll_skip", "reason": "SENTRY_AUTH_TOKEN or SENTRY_ORG not set"})
         return []
 
     headers = {"Authorization": f"Bearer {sentry_auth_token}"}
     new_issues: list[dict] = []
 
+    projects_checked = 0
     for repo, project in sentry_projects.items():
         if not project:
             continue
+        projects_checked += 1
         url = f"https://sentry.io/api/0/projects/{sentry_org}/{project}/issues/"
         params = {"query": "is:unresolved", "limit": 25, "sort": "date"}
         try:
@@ -336,6 +352,8 @@ async def poll_sentry_issues() -> list[dict]:
             resp.raise_for_status()
             sentry_items = resp.json()
         except Exception as e:
+            _sentry_poll_health["status"] = "error"
+            _sentry_poll_health["last_error"] = str(e)
             log.error({"action": "sentry_poll_error", "project": project, "error": str(e)})
             continue
 
@@ -391,7 +409,21 @@ async def poll_sentry_issues() -> list[dict]:
         "ingested": len(new_issues),
         "projects": [p for p in sentry_projects.values() if p],
     })
+    _sentry_poll_health["status"] = "ok"
+    _sentry_poll_health["last_success_at"] = datetime.now(UTC).isoformat()
+    _sentry_poll_health["last_ingested_count"] = len(new_issues)
+    _sentry_poll_health["projects_checked"] = projects_checked
+    _sentry_poll_health["last_error"] = ""
     return new_issues
+
+
+def get_sentry_poll_health() -> dict:
+    """Return last Sentry poll health snapshot for dashboard/API visibility."""
+    return {
+        **_sentry_poll_health,
+        "configured": bool(os.getenv("SENTRY_DSN") and os.getenv("SENTRY_AUTH_TOKEN") and os.getenv("SENTRY_ORG")),
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
 
 
 # ── Railway health poller ──────────────────────────────────────────────────

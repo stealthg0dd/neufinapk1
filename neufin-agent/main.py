@@ -10,6 +10,8 @@ from pathlib import Path
 
 import uvicorn
 import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -36,21 +38,24 @@ from core.runtime_monitor import (
     check_railway_health,
     check_vercel_analytics,
     poll_sentry_issues,
+    get_sentry_poll_health,
     get_runtime_summary,
 )
 from core.notifier import send_daily_summary, send_weekly_trend
 
 load_dotenv()
 
-_SENTRY_DSN = os.getenv("SENTRY_DSN", "")
-if _SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=_SENTRY_DSN,
-        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
-        environment=os.getenv("APP_ENV", "production"),
-        release=os.getenv("APP_VERSION", "1.0.0"),
-        send_default_pii=False,
-    )
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    integrations=[
+        FastApiIntegration(),
+        LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+    ],
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+    environment="production",
+    release=os.getenv("RAILWAY_GIT_COMMIT_SHA"),
+)
 
 # ── Structured JSON logging ────────────────────────────────────────────────
 class JSONFormatter(logging.Formatter):
@@ -310,6 +315,11 @@ async def weekly_trend():
 @app.get("/api/runtime/summary")
 async def runtime_summary(hours: int = 24):
     return await get_runtime_summary(hours=hours)
+
+
+@app.get("/api/runtime/sentry-health")
+async def runtime_sentry_health():
+    return get_sentry_poll_health()
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
