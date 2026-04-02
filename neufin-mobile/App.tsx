@@ -63,7 +63,7 @@ export default function App() {
   // (show LoginScreen), true = authenticated (show main stack).
   const [authed, setAuthed] = useState<boolean | null>(null)
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null)
-  const routeNameRef  = useRef<string | undefined>()
+  const routeNameRef  = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     trackMobileEvent('app_opened', {})

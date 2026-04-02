@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
 from fastapi.testclient import TestClient
 
 from main import app

@@ -72,7 +72,7 @@ def encrypt_value(val: "float | int | str | None") -> str:
 def decrypt_value(token: "str | float | int | None") -> float:
     if token is None or token == "":
         return 0.0
-    if isinstance(token, (int, float)):
+    if isinstance(token, int | float):
         return float(token)
     if isinstance(token, str) and token.startswith("PLAIN:"):
         try:

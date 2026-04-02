@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import supabase
-from services.auth_dependency import get_current_user, get_subscribed_user
+from services.auth_dependency import get_subscribed_user
 from services.jwt_auth import JWTUser
 
 router = APIRouter(prefix="/api/advisors", tags=["advisors"])

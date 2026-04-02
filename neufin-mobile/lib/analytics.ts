@@ -36,5 +36,5 @@ export function trackMobileEvent(
   event: string,
   props: Record<string, unknown> = {},
 ): void {
-  posthog.capture(event, { ...baseProps(), ...props })
+  posthog.capture(event, { ...baseProps(), ...props } as Parameters<typeof posthog.capture>[1])
 }

@@ -76,7 +76,7 @@ from services.logging_config import configure_logging  # noqa: E402
 configure_logging()
 logger = structlog.get_logger("neufin.main")
 
-import pandas as pd  # noqa: E402
+import pandas as pd  # noqa: E402, I001
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -361,7 +361,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
     trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
     first_error = exc.errors()[0] if exc.errors() else {}
-    loc = " → ".join(str(l) for l in first_error.get("loc", []))
+    loc = " → ".join(str(part) for part in first_error.get("loc", []))
     message = f"{loc}: {first_error.get('msg', 'Validation error')}" if loc else first_error.get("msg", "Invalid request")
     return _JSONResponse(
         status_code=422,

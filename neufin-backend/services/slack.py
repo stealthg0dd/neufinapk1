@@ -12,8 +12,8 @@ All errors are swallowed so notification failures never crash the caller.
 
 from __future__ import annotations
 
-import structlog
 import httpx
+import structlog
 
 from core.config import settings
 
