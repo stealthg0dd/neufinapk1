@@ -14,14 +14,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import Stripe from "stripe"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+export const dynamic = "force-dynamic"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2023-10-16",
-})
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
+
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
+    apiVersion: "2026-03-25.dahlia",
+  })
+}
 
 function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -41,7 +47,7 @@ async function stripeMonthRevenue(from: Date, to: Date): Promise<number> {
     let hasMore = true
     let startingAfter: string | undefined
     while (hasMore) {
-      const list = await stripe.paymentIntents.list({
+      const list = await getStripe().paymentIntents.list({
         created: { gte: Math.floor(from.getTime() / 1000), lte: Math.floor(to.getTime() / 1000) },
         limit: 100,
         ...(startingAfter ? { starting_after: startingAfter } : {}),
@@ -60,7 +66,7 @@ async function stripeMonthRevenue(from: Date, to: Date): Promise<number> {
 
 async function safeCount(table: string, filter?: Record<string, string>): Promise<number> {
   try {
-    let q = supabaseAdmin.from(table).select("id", { count: "exact", head: true })
+    let q = getSupabaseAdmin().from(table).select("id", { count: "exact", head: true })
     if (filter) {
       for (const [k, v] of Object.entries(filter)) q = q.eq(k, v)
     }
@@ -73,7 +79,7 @@ async function safeCount(table: string, filter?: Record<string, string>): Promis
 
 async function safeCountGte(table: string, dateField: string, since: string, filter?: Record<string, string>): Promise<number> {
   try {
-    let q = supabaseAdmin
+    let q = getSupabaseAdmin()
       .from(table)
       .select("id", { count: "exact", head: true })
       .gte(dateField, since)
@@ -93,11 +99,11 @@ export async function GET(req: NextRequest) {
   if (!token) {
     return NextResponse.json({ error: "unauthorized", message: "Missing token", trace_id: "", timestamp: new Date().toISOString() }, { status: 401 })
   }
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user }, error: authErr } = await getSupabaseAdmin().auth.getUser(token)
   if (authErr || !user) {
     return NextResponse.json({ error: "unauthorized", message: "Invalid token", trace_id: "", timestamp: new Date().toISOString() }, { status: 401 })
   }
-  const { data: profile } = await supabaseAdmin.from("user_profiles").select("role").eq("id", user.id).single()
+  const { data: profile } = await getSupabaseAdmin().from("user_profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "advisor") {
     return NextResponse.json({ error: "forbidden", message: "Advisor role required", trace_id: "", timestamp: new Date().toISOString() }, { status: 403 })
   }
@@ -125,7 +131,7 @@ export async function GET(req: NextRequest) {
     safeCount("user_profiles", { subscription_status: "active" }),
     safeCount("user_profiles", { subscription_status: "trial" }),
     safeCount("user_profiles", { subscription_status: "expired" }),
-    supabaseAdmin
+    getSupabaseAdmin()
       .from("advisor_reports")
       .select("advisor_id, plan_type, amount_cents, created_at")
       .eq("is_paid", true)
@@ -138,7 +144,7 @@ export async function GET(req: NextRequest) {
 
   // Enrich recent purchases with email from user_profiles
   const advisorIds = [...new Set((recentPurchasesResult.data ?? []).map((r: {advisor_id: string}) => r.advisor_id))]
-  const { data: emailProfiles } = await supabaseAdmin
+  const { data: emailProfiles } = await getSupabaseAdmin()
     .from("user_profiles")
     .select("id, email")
     .in("id", advisorIds)

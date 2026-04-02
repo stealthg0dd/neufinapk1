@@ -13,10 +13,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+export const dynamic = "force-dynamic"
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 export interface UserAdminRow {
   id:                  string
@@ -38,12 +42,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Validate token + check advisor role
-  const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user }, error: authErr } = await getSupabaseAdmin().auth.getUser(token)
   if (authErr || !user) {
     return NextResponse.json({ error: "unauthorized", message: "Invalid token", trace_id: "", timestamp: new Date().toISOString() }, { status: 401 })
   }
 
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await getSupabaseAdmin()
     .from("user_profiles")
     .select("role")
     .eq("id", user.id)
@@ -56,7 +60,7 @@ export async function GET(req: NextRequest) {
   const planFilter = req.nextUrl.searchParams.get("plan")
 
   // Fetch user_profiles (limit 200)
-  let query = supabaseAdmin
+  let query = getSupabaseAdmin()
     .from("user_profiles")
     .select("id, email, subscription_status, trial_started_at, created_at, last_sign_in_at, role")
     .order("created_at", { ascending: false })
@@ -75,11 +79,11 @@ export async function GET(req: NextRequest) {
   const userIds = (profiles ?? []).map((p: {id: string}) => p.id)
 
   const [dnaCounts, reportCounts] = await Promise.all([
-    supabaseAdmin
+    getSupabaseAdmin()
       .from("dna_scores")
       .select("user_id")
       .in("user_id", userIds),
-    supabaseAdmin
+    getSupabaseAdmin()
       .from("advisor_reports")
       .select("advisor_id")
       .eq("is_paid", true)

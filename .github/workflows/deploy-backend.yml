@@ -27,7 +27,7 @@ jobs:
         working-directory: neufin-backend
         run: railway up --service Neufin101 --detach
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_NEUFIN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
       # Railway propagates in ~30s; wait before health-checking
       - name: Wait for Railway deployment to propagate

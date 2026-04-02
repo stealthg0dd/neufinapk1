@@ -10,10 +10,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-)
+export const dynamic = "force-dynamic"
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+}
 
 function errorResp(status: number, error: string, message: string) {
   return NextResponse.json(
@@ -25,9 +29,9 @@ function errorResp(status: number, error: string, message: string) {
 async function getAdvisorUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? ""
   if (!token) return null
-  const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+  const { data: { user } } = await getSupabaseAdmin().auth.getUser(token)
   if (!user) return null
-  const { data: profile } = await supabaseAdmin.from("user_profiles").select("role").eq("id", user.id).single()
+  const { data: profile } = await getSupabaseAdmin().from("user_profiles").select("role").eq("id", user.id).single()
   if (profile?.role !== "advisor") return null
   return user
 }
@@ -51,7 +55,7 @@ export async function POST(
     }
     // Set trial_started_at to (now + days - 14) so the 14-day trial ends `days` from now
     const newStart = new Date(Date.now() + days * 86400_000 - 14 * 86400_000)
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from("user_profiles")
       .update({ trial_started_at: newStart.toISOString(), subscription_status: "trial" })
       .eq("id", userId)
@@ -63,7 +67,7 @@ export async function POST(
   // ── resend-onboarding ───────────────────────────────────────────────────────
   if (url.pathname.endsWith("/resend-onboarding")) {
     // Fetch user email from user_profiles
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await getSupabaseAdmin()
       .from("user_profiles")
       .select("email")
       .eq("id", userId)
@@ -75,7 +79,7 @@ export async function POST(
 
     try {
       // Send a magic link to the user's email (Supabase admin API)
-      const { error } = await supabaseAdmin.auth.admin.generateLink({
+      const { error } = await getSupabaseAdmin().auth.admin.generateLink({
         type: "magiclink",
         email: profile.email,
         options: { redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/auth/callback` },
