@@ -14,7 +14,9 @@ class TestAIRouter:
     def test_uses_claude_first(self, mock_anthropic):
         client = MagicMock()
         client.messages.create.return_value = MagicMock(
-            content=[MagicMock(text='{"dna_score": 74, "investor_type": "Balanced Growth"}')]
+            content=[
+                MagicMock(text='{"dna_score": 74, "investor_type": "Balanced Growth"}')
+            ]
         )
         mock_anthropic.return_value = client
 

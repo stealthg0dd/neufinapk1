@@ -62,7 +62,9 @@ class CheckoutRequest(BaseModel):
 
 
 def _upload_pdf(pdf_bytes: bytes, report_id: str) -> str | None:
-    filename = f"{datetime.datetime.utcnow().strftime('%Y/%m/%d')}/report-{report_id[:8]}.pdf"
+    filename = (
+        f"{datetime.datetime.utcnow().strftime('%Y/%m/%d')}/report-{report_id[:8]}.pdf"
+    )
     try:
         supabase.storage.from_("advisor-reports").upload(
             path=filename,
@@ -142,7 +144,9 @@ def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
 
 
 @router.post("/api/reports/checkout")
-async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(get_optional_user)):
+async def create_checkout(
+    body: CheckoutRequest, user: JWTUser | None = Depends(get_optional_user)
+):
     """
     Create a Stripe Checkout session.
     Returns { checkout_url, report_id } for the frontend to redirect.
@@ -156,7 +160,9 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
 
     price_id = STRIPE_PRICE_SINGLE if plan == "single" else STRIPE_PRICE_UNLIMITED
     if not price_id:
-        raise HTTPException(503, f"Stripe price ID for plan '{plan}' is not configured.")
+        raise HTTPException(
+            503, f"Stripe price ID for plan '{plan}' is not configured."
+        )
 
     effective_advisor_id = "anonymous"
     if user:
@@ -202,7 +208,9 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                 raise HTTPException(422, f"Could not create portfolio: {e}") from e
 
         if not portfolio_id:
-            raise HTTPException(400, "portfolio_id or positions required for single report plan")
+            raise HTTPException(
+                400, "portfolio_id or positions required for single report plan"
+            )
 
         # Create pending advisor_report record
         try:
@@ -211,9 +219,11 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                 .insert(
                     {
                         "portfolio_id": portfolio_id,
-                        "advisor_id": None
-                        if effective_advisor_id == "anonymous"
-                        else effective_advisor_id,
+                        "advisor_id": (
+                            None
+                            if effective_advisor_id == "anonymous"
+                            else effective_advisor_id
+                        ),
                         "is_paid": False,
                     }
                 )
@@ -253,13 +263,17 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                 "advisor_id": effective_advisor_id,
                 "ref_token": body.ref_token or "",
             },
-            "allow_promotion_codes": not bool(discounts),  # no promo codes if coupon applied
+            "allow_promotion_codes": not bool(
+                discounts
+            ),  # no promo codes if coupon applied
         }
         if discounts:
             session_params["discounts"] = discounts
 
         # FIXED: run blocking Stripe call in a thread to avoid holding the event loop (502 timeout fix)
-        session = await asyncio.to_thread(lambda: stripe.checkout.Session.create(**session_params))
+        session = await asyncio.to_thread(
+            lambda: stripe.checkout.Session.create(**session_params)
+        )
     except stripe.StripeError as e:
         raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
@@ -304,7 +318,9 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
+        )
     except stripe.SignatureVerificationError as e:
         # CRITICAL: potential replay attack or misconfigured webhook secret
         msg = (
@@ -312,7 +328,13 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
             f"Path: `{request.url.path}`  IP: `{request.client.host if request.client else 'unknown'}`\n"
             f"Error: `{e}`"
         )
-        sentry_sdk.capture_exception(e, extras={"severity": "critical", "ip": request.client.host if request.client else "unknown"})
+        sentry_sdk.capture_exception(
+            e,
+            extras={
+                "severity": "critical",
+                "ip": request.client.host if request.client else "unknown",
+            },
+        )
         await notify_alerts(msg)
         logger.critical("stripe.webhook_signature_invalid", error=str(e))
         raise HTTPException(400, "Invalid Stripe signature") from e
@@ -330,9 +352,15 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
             .execute()
         )
         if existing.data:
-            logger.info("stripe.webhook_duplicate_skipped", event_id=event_id, event_type=event["type"])
+            logger.info(
+                "stripe.webhook_duplicate_skipped",
+                event_id=event_id,
+                event_type=event["type"],
+            )
             return {"status": "ok"}
-        supabase.table("stripe_processed_events").insert({"event_id": event_id, "event_type": event["type"]}).execute()
+        supabase.table("stripe_processed_events").insert(
+            {"event_id": event_id, "event_type": event["type"]}
+        ).execute()
     except Exception as e:
         logger.warning("stripe.idempotency_check_failed", error=str(e))
         # Fail open: proceed even if idempotency table is unavailable
@@ -363,7 +391,9 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
             # Queue PDF generation as background task so we return 200 to Stripe
             # immediately — PDF generation can take 3-30 seconds.
             if portfolio_id:
-                background_tasks.add_task(_generate_and_store_pdf, portfolio_id, report_id)
+                background_tasks.add_task(
+                    _generate_and_store_pdf, portfolio_id, report_id
+                )
 
         elif plan == "unlimited" and advisor_id and advisor_id != "anonymous":
             # Upgrade subscription status and store Stripe customer ID
@@ -386,7 +416,9 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
         sub = event["data"]["object"]
         customer_id = sub.get("customer")
         try:
-            customer = await asyncio.to_thread(lambda: stripe.Customer.retrieve(customer_id))
+            customer = await asyncio.to_thread(
+                lambda: stripe.Customer.retrieve(customer_id)
+            )
             advisor_id = customer.get("metadata", {}).get("advisor_id")
             if advisor_id:
                 supabase.table("user_profiles").update(
@@ -403,7 +435,9 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
 @router.get("/api/reports/fulfill")
-async def fulfill_report(report_id: str, user: JWTUser | None = Depends(get_optional_user)):
+async def fulfill_report(
+    report_id: str, user: JWTUser | None = Depends(get_optional_user)
+):
     """
     Called from the frontend success page.
     If the report is paid but has no PDF yet, generates it now.
@@ -428,7 +462,9 @@ async def fulfill_report(report_id: str, user: JWTUser | None = Depends(get_opti
         if record.get("advisor_id") != user.id:
             raise HTTPException(404, "Report not found.")
     if not record["is_paid"]:
-        raise HTTPException(402, "Payment not yet confirmed. Please wait a moment and retry.")
+        raise HTTPException(
+            402, "Payment not yet confirmed. Please wait a moment and retry."
+        )
 
     # Already has PDF
     if record.get("pdf_url"):

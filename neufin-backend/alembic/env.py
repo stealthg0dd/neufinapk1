@@ -8,6 +8,7 @@ Usage:
   alembic revision --autogenerate -m "add_foo_table"
   alembic downgrade -1          # roll back one migration
 """
+
 import os
 from logging.config import fileConfig
 

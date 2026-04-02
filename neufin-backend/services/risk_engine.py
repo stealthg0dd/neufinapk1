@@ -89,7 +89,9 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
         import datetime as _dt
 
         unix_to = int(_dt.datetime.utcnow().timestamp())
-        unix_from = unix_to - int(days * 1.8 * 86_400)  # generous window to cover weekends
+        unix_from = unix_to - int(
+            days * 1.8 * 86_400
+        )  # generous window to cover weekends
         r = requests.get(
             "https://finnhub.io/api/v1/stock/candle",
             params={
@@ -117,7 +119,10 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
             _cache_set(sym_upper, days, series)
         return series
     except Exception as e:
-        logger.warning("risk_engine.warn", detail=f"[RiskEngine] Finnhub fallback failed for {sym_upper}: {e}")
+        logger.warning(
+            "risk_engine.warn",
+            detail=f"[RiskEngine] Finnhub fallback failed for {sym_upper}: {e}",
+        )
         return pd.Series(dtype=float, name=sym_upper)
 
 
@@ -137,7 +142,12 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
         date_from = (_dt.date.today() - _dt.timedelta(days=int(days * 1.8))).isoformat()
         r = requests.get(
             f"https://api.polygon.io/v2/aggs/ticker/{sym_upper}/range/1/day/{date_from}/{date_to}",
-            params={"adjusted": "true", "sort": "asc", "limit": 300, "apiKey": POLYGON_API_KEY},
+            params={
+                "adjusted": "true",
+                "sort": "asc",
+                "limit": 300,
+                "apiKey": POLYGON_API_KEY,
+            },
             timeout=10.0,
         )
         if r.status_code == 429:
@@ -149,14 +159,20 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
         results = data.get("results") or []
         if not results:
             return pd.Series(dtype=float, name=sym_upper)
-        closes = {_dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"] for bar in results}
+        closes = {
+            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
+            for bar in results
+        }
         series = pd.Series(closes, dtype=float).sort_index().tail(days)
         series.name = sym_upper
         if _MARKET_CACHE_AVAILABLE:
             _cache_set(sym_upper, days, series)
         return series
     except Exception as e:
-        logger.warning("risk_engine.warn", detail=f"[RiskEngine] Polygon fallback failed for {sym_upper}: {e}")
+        logger.warning(
+            "risk_engine.warn",
+            detail=f"[RiskEngine] Polygon fallback failed for {sym_upper}: {e}",
+        )
         return pd.Series(dtype=float, name=sym_upper)
 
 
@@ -195,10 +211,15 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
     # ── Batch blacklist check: skip AV entirely if it was rate-limited earlier ──
     if _is_blacklisted("av"):
         series = _fetch_daily_closes_finnhub(sym_upper, days)
-        return series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
+        return (
+            series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
+        )
 
     if not ALPHA_VANTAGE_API_KEY:
-        logger.warning("risk_engine.warn", detail=f"[RiskEngine] ALPHA_VANTAGE_API_KEY not set — skipping {sym_upper}")
+        logger.warning(
+            "risk_engine.warn",
+            detail=f"[RiskEngine] ALPHA_VANTAGE_API_KEY not set — skipping {sym_upper}",
+        )
         return pd.Series(dtype=float, name=sym_upper)
 
     if _AV_REQUEST_DELAY > 0:
@@ -221,8 +242,13 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         # AV returns "Information" for rate-limits / "Note" for premium/quota blocks
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
-            _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            logger.warning("risk_engine.warn", detail=f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon")
+            _reason = (
+                "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
+            )
+            logger.warning(
+                "risk_engine.warn",
+                detail=f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon",
+            )
             _blacklist("av")
             series = _fetch_daily_closes_finnhub(sym_upper, days)
             if not series.empty:
@@ -231,7 +257,10 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
 
         ts_data = payload.get("Time Series (Daily)", {})
         if not ts_data:
-            logger.warning("risk_engine.warn", detail=f"[RiskEngine] No time-series data returned for {sym_upper}")
+            logger.warning(
+                "risk_engine.warn",
+                detail=f"[RiskEngine] No time-series data returned for {sym_upper}",
+            )
             return pd.Series(dtype=float, name=sym_upper)
 
         # "5. adjusted close" — fall back to "4. close" for non-adjusted feeds
@@ -256,9 +285,15 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         return series
 
     except requests.RequestException as e:
-        logger.warning("risk_engine.warn", detail=f"[RiskEngine] HTTP error fetching {sym_upper}: {e}")
+        logger.warning(
+            "risk_engine.warn",
+            detail=f"[RiskEngine] HTTP error fetching {sym_upper}: {e}",
+        )
     except Exception as e:
-        logger.warning("risk_engine.warn", detail=f"[RiskEngine] Unexpected error for {sym_upper}: {e}")
+        logger.warning(
+            "risk_engine.warn",
+            detail=f"[RiskEngine] Unexpected error for {sym_upper}: {e}",
+        )
 
     return pd.Series(dtype=float, name=sym_upper)
 
@@ -352,7 +387,10 @@ def build_risk_report(
         else:
             failed.append(sym)
             if sym not in [s.upper() for s in symbols]:
-                logger.warning("risk_engine.warn", detail=f"[RiskEngine] {sym} dropped — insufficient data ({len(s)} rows)")
+                logger.warning(
+                    "risk_engine.warn",
+                    detail=f"[RiskEngine] {sym} dropped — insufficient data ({len(s)} rows)",
+                )
 
     symbols_used: list[str] = list(price_series.keys())
 
@@ -379,7 +417,9 @@ def build_risk_report(
         corr_dict[row_sym] = {}
         for col_sym in corr_df.columns:
             val = corr_df.loc[row_sym, col_sym]
-            corr_dict[row_sym][col_sym] = round(float(val), 4) if not np.isnan(val) else None
+            corr_dict[row_sym][col_sym] = (
+                round(float(val), 4) if not np.isnan(val) else None
+            )
 
     # 4. Identify risk clusters: all unique pairs with |rho| > threshold
     risk_clusters: list[dict[str, Any]] = []

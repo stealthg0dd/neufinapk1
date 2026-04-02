@@ -72,7 +72,9 @@ async def market_health():
     try:
         result = (
             supabase.table("dna_scores")
-            .select("dna_score, investor_type, total_value, max_position_pct, created_at")
+            .select(
+                "dna_score, investor_type, total_value, max_position_pct, created_at"
+            )
             .not_.is_("dna_score", "null")
             .execute()
         )
@@ -93,7 +95,9 @@ async def market_health():
         return payload
 
     scores = [r["dna_score"] for r in rows if r.get("dna_score") is not None]
-    concentrations = [r["max_position_pct"] for r in rows if r.get("max_position_pct") is not None]
+    concentrations = [
+        r["max_position_pct"] for r in rows if r.get("max_position_pct") is not None
+    ]
 
     # Score distribution
     bands = [0, 0, 0, 0, 0]
@@ -102,7 +106,11 @@ async def market_health():
         bands[idx] += 1
 
     score_distribution = [
-        {**_SCORE_BANDS[i], "count": bands[i], "pct": round(bands[i] / len(scores) * 100, 1)}
+        {
+            **_SCORE_BANDS[i],
+            "count": bands[i],
+            "pct": round(bands[i] / len(scores) * 100, 1),
+        }
         for i in range(5)
     ]
 
@@ -140,9 +148,9 @@ async def market_health():
         "total_portfolios": total,
         "avg_dna_score": round(sum(scores) / len(scores), 1),
         "median_dna_score": round(median, 1),
-        "avg_concentration": round(sum(concentrations) / len(concentrations), 1)
-        if concentrations
-        else 0,
+        "avg_concentration": (
+            round(sum(concentrations) / len(concentrations), 1) if concentrations else 0
+        ),
         "score_distribution": score_distribution,
         "strategy_mix": strategy_mix,
     }
@@ -219,5 +227,7 @@ async def track_event(body: TrackRequest):
             }
         ).execute()
     except Exception:
-        logger.warning("Failed to track analytics event", exc_info=True)  # fire-and-forget
+        logger.warning(
+            "Failed to track analytics event", exc_info=True
+        )  # fire-and-forget
     return {"ok": True}

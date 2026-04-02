@@ -58,7 +58,9 @@ class ClaimRequest(BaseModel):
 
 
 @router.post("/claim")
-async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get_current_user)):
+async def claim_anonymous_record(
+    body: ClaimRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Associate an anonymous dna_scores record with the now-authenticated user.
     Only succeeds if the record currently has no user_id (prevents hijacking).
@@ -81,10 +83,14 @@ async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get
     if record.get("user_id") is not None:
         if record["user_id"] == uid:
             return {"claimed": True, "record_id": body.record_id}
-        raise HTTPException(409, "This record is already associated with another account.")
+        raise HTTPException(
+            409, "This record is already associated with another account."
+        )
 
     try:
-        supabase.table("dna_scores").update({"user_id": uid}).eq("id", body.record_id).execute()
+        supabase.table("dna_scores").update({"user_id": uid}).eq(
+            "id", body.record_id
+        ).execute()
         return {"claimed": True, "record_id": body.record_id}
     except Exception as e:
         raise HTTPException(500, f"Claim failed: {e}") from e
@@ -163,7 +169,9 @@ class PortalRequest(BaseModel):
 
 
 @router.post("/stripe-portal")
-async def create_stripe_portal(body: PortalRequest, user: JWTUser = Depends(get_current_user)):
+async def create_stripe_portal(
+    body: PortalRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Create a Stripe Customer Portal session so users can manage their subscription.
     Looks up the Stripe customer_id from user_profiles; creates one if missing.

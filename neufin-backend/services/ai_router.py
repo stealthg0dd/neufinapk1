@@ -76,7 +76,14 @@ def _is_model_not_found(exc: Exception) -> bool:
     msg = str(exc).lower()
     return any(
         k in msg
-        for k in ("not found", "not_found", "404", "unsupported", "invalid model", "does not exist")
+        for k in (
+            "not found",
+            "not_found",
+            "404",
+            "unsupported",
+            "invalid model",
+            "does not exist",
+        )
     )
 
 
@@ -88,13 +95,19 @@ def call_gemini(prompt: str) -> dict:
     """
     for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
         try:
-            response = _get_gemini_client().models.generate_content(model=model, contents=prompt)
+            response = _get_gemini_client().models.generate_content(
+                model=model, contents=prompt
+            )
             result = _parse(response.text)
             logger.info("ai.gemini_ok", model=model)
             return result
         except Exception as exc:
             if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(exc):
-                logger.warning("ai.gemini_model_not_found", model=model, fallback=GEMINI_FALLBACK_MODEL)
+                logger.warning(
+                    "ai.gemini_model_not_found",
+                    model=model,
+                    fallback=GEMINI_FALLBACK_MODEL,
+                )
                 continue
             logger.warning("ai.gemini_failed", model=model, error=str(exc))
             raise
@@ -111,7 +124,9 @@ async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     # ── 1. Claude Sonnet 4.6 (Primary) ───────────────────────────────────────
     t0 = time.monotonic()
     try:
-        if not settings.ANTHROPIC_API_KEY:  # FIXED: skip init entirely when key is absent
+        if (
+            not settings.ANTHROPIC_API_KEY
+        ):  # FIXED: skip init entirely when key is absent
             raise ValueError("ANTHROPIC_API_KEY not set")
         client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
         response = client.messages.create(
@@ -220,12 +235,18 @@ async def get_ai_briefing(system_prompt: str, user_content: str) -> str:
     t2 = time.monotonic()
     for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
         try:
-            full_prompt = f"SYSTEM INSTRUCTIONS:\n{system_prompt}\n\n---\n\nUSER:\n{user_content}"
+            full_prompt = (
+                f"SYSTEM INSTRUCTIONS:\n{system_prompt}\n\n---\n\nUSER:\n{user_content}"
+            )
             response = _get_gemini_client().models.generate_content(
                 model=model, contents=full_prompt
             )
             text = response.text
-            logger.info("ai.briefing_gemini_ok", model=model, elapsed=f"{time.monotonic() - t2:.1f}s")
+            logger.info(
+                "ai.briefing_gemini_ok",
+                model=model,
+                elapsed=f"{time.monotonic() - t2:.1f}s",
+            )
             return text
         except Exception as e:
             if model == GEMINI_PRIMARY_MODEL and _is_model_not_found(e):

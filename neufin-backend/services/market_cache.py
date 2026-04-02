@@ -105,7 +105,9 @@ def _get_redis():
 # ── Serialisation helpers ──────────────────────────────────────────────────────
 def _series_to_json(s: pd.Series) -> str:
     """Serialise a pandas Series (string-indexed) to a compact JSON string."""
-    return json.dumps({"index": list(s.index), "values": list(s.values), "name": s.name})
+    return json.dumps(
+        {"index": list(s.index), "values": list(s.values), "name": s.name}
+    )
 
 
 def _json_to_series(raw: str) -> pd.Series:
@@ -191,7 +193,8 @@ def set_closes(symbol: str, days: int, series: pd.Series) -> None:
         try:
             sb = get_supabase_client()
             exp = (
-                datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=_SUPABASE_TTL)
+                datetime.datetime.now(datetime.UTC)
+                + datetime.timedelta(seconds=_SUPABASE_TTL)
             ).isoformat()
             sb.table(_TABLE).upsert(
                 {"cache_key": k, "payload": raw, "expires_at": exp},
@@ -226,7 +229,9 @@ class MarketCache:
     Exposes get_historical_range(ticker, start, end) for StressTester.
     """
 
-    async def get_historical_range(self, ticker: str, start: str, end: str) -> pd.Series:
+    async def get_historical_range(
+        self, ticker: str, start: str, end: str
+    ) -> pd.Series:
         """
         Return daily closes for *ticker* between *start* and *end* (YYYY-MM-DD).
         Fetches full AV history, caches it with the _FULL_HIST_SENTINEL key,
@@ -296,7 +301,9 @@ class MarketCache:
                     ts = payload.get("Time Series (Daily)", {})
                     if ts:
                         closes = {
-                            d: float(v.get("5. adjusted close") or v.get("4. close") or 0)
+                            d: float(
+                                v.get("5. adjusted close") or v.get("4. close") or 0
+                            )
                             for d, v in ts.items()
                             if v.get("5. adjusted close") or v.get("4. close")
                         }
@@ -304,8 +311,12 @@ class MarketCache:
                         series.name = sym
                         return series
                 else:
-                    _reason = "premium" if "premium" in _av_msg.lower() else "rate-limit"
-                    logger.warning("market_cache.av_blocked", symbol=sym, reason=_reason)
+                    _reason = (
+                        "premium" if "premium" in _av_msg.lower() else "rate-limit"
+                    )
+                    logger.warning(
+                        "market_cache.av_blocked", symbol=sym, reason=_reason
+                    )
             except Exception as e:
                 logger.warning("market_cache.av_fetch_error", symbol=sym, error=str(e))
 
@@ -345,7 +356,9 @@ class MarketCache:
                         )
                         return series
             except Exception as e:
-                logger.warning("market_cache.finnhub_fallback_error", symbol=sym, error=str(e))
+                logger.warning(
+                    "market_cache.finnhub_fallback_error", symbol=sym, error=str(e)
+                )
 
         # ── 3. Polygon fallback ───────────────────────────────────────────────
         pg_key = settings.POLYGON_API_KEY or ""
@@ -355,14 +368,21 @@ class MarketCache:
                 end_today = _dt.date.today().isoformat()
                 r = _req.get(
                     f"https://api.polygon.io/v2/aggs/ticker/{sym}/range/1/day/{start_5y}/{end_today}",
-                    params={"adjusted": "true", "sort": "asc", "limit": 2000, "apiKey": pg_key},
+                    params={
+                        "adjusted": "true",
+                        "sort": "asc",
+                        "limit": 2000,
+                        "apiKey": pg_key,
+                    },
                     timeout=10.0,
                 )
                 if r.status_code == 200:
                     results = r.json().get("results") or []
                     if results:
                         closes = {
-                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): float(bar["c"])
+                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): float(
+                                bar["c"]
+                            )
                             for bar in results
                             if _coerce_price(bar.get("c")) is not None
                         }
@@ -376,7 +396,9 @@ class MarketCache:
                             )
                             return series
             except Exception as e:
-                logger.warning("market_cache.polygon_fallback_error", symbol=sym, error=str(e))
+                logger.warning(
+                    "market_cache.polygon_fallback_error", symbol=sym, error=str(e)
+                )
 
         return pd.Series(dtype=float, name=sym)
 
@@ -421,7 +443,9 @@ def upsert_ticker_price_cache(symbol: str, price: float, source: str = "live") -
             on_conflict="symbol",
         ).execute()
     except Exception as e:
-        logger.warning("market_cache.pricecache_upsert_failed", symbol=symbol, error=str(e))
+        logger.warning(
+            "market_cache.pricecache_upsert_failed", symbol=symbol, error=str(e)
+        )
 
 
 def get_ticker_price_cache(symbol: str) -> dict | None:
@@ -449,5 +473,7 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
         row_data["price"] = safe_price
         return row_data
     except Exception as e:
-        logger.warning("market_cache.pricecache_get_failed", symbol=symbol, error=str(e))
+        logger.warning(
+            "market_cache.pricecache_get_failed", symbol=symbol, error=str(e)
+        )
         return None

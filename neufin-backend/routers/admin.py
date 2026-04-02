@@ -154,15 +154,20 @@ async def extend_trial(
     new_trial_ends = (now + datetime.timedelta(days=body.days)).date().isoformat()
 
     try:
-        supabase.table("user_profiles").update(
-            {"trial_started_at": new_start_iso}
-        ).eq("id", user_id).execute()
+        supabase.table("user_profiles").update({"trial_started_at": new_start_iso}).eq(
+            "id", user_id
+        ).execute()
     except Exception as exc:
         logger.error("admin.extend_trial.failed", user_id=user_id, error=str(exc))
         raise HTTPException(500, f"Failed to extend trial: {exc}") from exc
 
     invalidate_subscription_cache(user_id)
-    logger.info("admin.extend_trial.ok", user_id=user_id, days=body.days, new_trial_ends=new_trial_ends)
+    logger.info(
+        "admin.extend_trial.ok",
+        user_id=user_id,
+        days=body.days,
+        new_trial_ends=new_trial_ends,
+    )
 
     return {"ok": True, "new_trial_ends": new_trial_ends}
 
@@ -205,7 +210,9 @@ async def resend_onboarding(
             body=resp.text[:200],
         )
     except Exception as exc:
-        logger.warning("admin.resend_onboarding.failed", user_id=user_id, error=str(exc))
+        logger.warning(
+            "admin.resend_onboarding.failed", user_id=user_id, error=str(exc)
+        )
 
     # Best-effort fallback — log and return queued
     logger.info("admin.resend_onboarding.queued", user_id=user_id)

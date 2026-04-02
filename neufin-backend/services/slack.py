@@ -27,7 +27,9 @@ async def _post(webhook_url: str | None, text: str) -> None:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(webhook_url, json={"text": text})
             if resp.status_code not in (200, 204):
-                logger.warning("slack.post_failed", status=resp.status_code, text_snippet=text[:80])
+                logger.warning(
+                    "slack.post_failed", status=resp.status_code, text_snippet=text[:80]
+                )
     except Exception as exc:
         logger.warning("slack.post_error", error=str(exc), text_snippet=text[:80])
 

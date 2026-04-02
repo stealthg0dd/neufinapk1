@@ -9,6 +9,7 @@ documentary — it marks the starting point for Alembic tracking. Do NOT
 run `alembic downgrade` to this migration in production as it would drop
 all tables.
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY, TEXT

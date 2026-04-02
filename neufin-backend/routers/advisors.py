@@ -109,7 +109,9 @@ async def upsert_advisor_profile(
     }
 
     try:
-        result = supabase.table("user_profiles").upsert(payload, on_conflict="id").execute()
+        result = (
+            supabase.table("user_profiles").upsert(payload, on_conflict="id").execute()
+        )
         return result.data[0] if result.data else payload
     except Exception as e:
         raise HTTPException(500, f"Could not save profile: {e}") from e

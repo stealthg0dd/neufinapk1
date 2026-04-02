@@ -117,9 +117,7 @@ async def revenue_stats(user: JWTUser = Depends(get_current_user)):
     active_count = trial_count = expired_count = 0
     try:
         profiles_result = (
-            supabase.table("user_profiles")
-            .select("subscription_status")
-            .execute()
+            supabase.table("user_profiles").select("subscription_status").execute()
         )
         for row in profiles_result.data or []:
             status = row.get("subscription_status", "")
@@ -143,9 +141,13 @@ async def revenue_stats(user: JWTUser = Depends(get_current_user)):
             .limit(20)
             .execute()
         )
-        advisor_ids = list({
-            r["advisor_id"] for r in (reports_result.data or []) if r.get("advisor_id")
-        })
+        advisor_ids = list(
+            {
+                r["advisor_id"]
+                for r in (reports_result.data or [])
+                if r.get("advisor_id")
+            }
+        )
 
         # Bulk-fetch emails for those advisors
         email_map: dict[str, str] = {}
@@ -177,7 +179,9 @@ async def revenue_stats(user: JWTUser = Depends(get_current_user)):
         logger.warning("revenue.recent_purchases_failed", error=str(exc))
 
     # ── Funnel counts (this calendar month) ──────────────────────────────────
-    start_of_month_iso = datetime.datetime(this_year, this_month, 1, tzinfo=datetime.UTC).isoformat()
+    start_of_month_iso = datetime.datetime(
+        this_year, this_month, 1, tzinfo=datetime.UTC
+    ).isoformat()
 
     signups = dna_scores_count = swarm_runs = purchases = 0
 

@@ -17,7 +17,11 @@ logger.info(
     "db.init",
     supabase_url="SET" if SUPABASE_URL else "MISSING",
     supabase_key="SET" if SUPABASE_KEY else "MISSING",
-    service_role_key="SET (RLS bypassed)" if SUPABASE_SERVICE_ROLE_KEY else "MISSING — using anon key (RLS applies)",
+    service_role_key=(
+        "SET (RLS bypassed)"
+        if SUPABASE_SERVICE_ROLE_KEY
+        else "MISSING — using anon key (RLS applies)"
+    ),
 )
 
 # Synchronous Supabase client — compatible with all routers and sync SDK calls.
@@ -117,9 +121,9 @@ def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
         )
         port_ids = [r["id"] for r in (port_res.data or [])]
         if port_ids:
-            supabase.table("portfolios").update({"user_id": user_id, "session_id": None}).in_(
-                "id", port_ids
-            ).execute()
+            supabase.table("portfolios").update(
+                {"user_id": user_id, "session_id": None}
+            ).in_("id", port_ids).execute()
             claimed["portfolios"] = len(port_ids)
     except Exception as exc:
         logger.warning("claim_guest_data.portfolios.error", error=str(exc))
@@ -134,9 +138,9 @@ def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
         )
         dna_ids = [r["id"] for r in (dna_res.data or [])]
         if dna_ids:
-            supabase.table("dna_scores").update({"user_id": user_id, "session_id": None}).in_(
-                "id", dna_ids
-            ).execute()
+            supabase.table("dna_scores").update(
+                {"user_id": user_id, "session_id": None}
+            ).in_("id", dna_ids).execute()
             claimed["dna_scores"] = len(dna_ids)
     except Exception as exc:
         logger.warning("claim_guest_data.dna_scores.error", error=str(exc))
@@ -151,9 +155,9 @@ def claim_guest_data(session_id: str, user_id: str) -> dict[str, int]:
         )
         swarm_ids = [r["id"] for r in (swarm_res.data or [])]
         if swarm_ids:
-            supabase.table("swarm_reports").update({"user_id": user_id, "session_id": None}).in_(
-                "id", swarm_ids
-            ).execute()
+            supabase.table("swarm_reports").update(
+                {"user_id": user_id, "session_id": None}
+            ).in_("id", swarm_ids).execute()
             claimed["swarm_reports"] = len(swarm_ids)
     except Exception as exc:
         logger.warning("claim_guest_data.swarm_reports.error", error=str(exc))

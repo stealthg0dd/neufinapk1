@@ -49,7 +49,9 @@ def get_subscription_status(user_id: str) -> dict:
     status_val = profile.get("subscription_status", "trial")
     if trial_started_at:
         try:
-            started = datetime.datetime.fromisoformat(trial_started_at.replace("Z", "+00:00"))
+            started = datetime.datetime.fromisoformat(
+                trial_started_at.replace("Z", "+00:00")
+            )
             now = datetime.datetime.now(datetime.UTC)
             trial_days = (now - started).days
             if trial_days <= 14:

@@ -47,7 +47,11 @@ def client():
 
 class TestGenerateDNA:
     @patch("routers.dna.calculate_portfolio_metrics", return_value=MOCK_METRICS)
-    @patch("routers.dna.get_ai_analysis", new_callable=AsyncMock, return_value=MOCK_AI_RESPONSE)
+    @patch(
+        "routers.dna.get_ai_analysis",
+        new_callable=AsyncMock,
+        return_value=MOCK_AI_RESPONSE,
+    )
     @patch("routers.dna.supabase")
     def test_returns_dna_score(self, mock_db, mock_ai, mock_calc, client):
         mock_db.table.return_value.insert.return_value.execute.return_value = MagicMock(
@@ -111,7 +115,9 @@ class TestLeaderboard:
     @patch("routers.dna.supabase")
     def test_returns_list(self, mock_db, client):
         mock_db.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value = MagicMock(
-            data=[{"investor_type": "Momentum Trader", "dna_score": 91, "view_count": 43}]
+            data=[
+                {"investor_type": "Momentum Trader", "dna_score": 91, "view_count": 43}
+            ]
         )
         response = client.get("/api/dna/leaderboard")
         assert response.status_code == 200

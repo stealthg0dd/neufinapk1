@@ -142,7 +142,12 @@ def _fetch_finnhub_news(symbol: str, days: int = 7) -> list[dict]:
         date_from = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
         r = requests.get(
             "https://finnhub.io/api/v1/company-news",
-            params={"symbol": symbol, "from": date_from, "to": date_to, "token": FINNHUB_API_KEY},
+            params={
+                "symbol": symbol,
+                "from": date_from,
+                "to": date_to,
+                "token": FINNHUB_API_KEY,
+            },
             timeout=6.0,
         )
         items = r.json() if isinstance(r.json(), list) else []
@@ -179,7 +184,9 @@ def _get_fred_cpi_analysis() -> dict:
     if _FREDAPI_AVAILABLE and _Fred is not None:
         try:
             fred = _Fred(api_key=FRED_API_KEY)
-            start_date = (datetime.date.today() - datetime.timedelta(days=420)).isoformat()
+            start_date = (
+                datetime.date.today() - datetime.timedelta(days=420)
+            ).isoformat()
             cpi_series = fred.get_series("CPIAUCSL", observation_start=start_date)
             values = [float(v) for v in cpi_series.dropna().tolist()]
         except Exception as e:
@@ -200,7 +207,9 @@ def _get_fred_cpi_analysis() -> dict:
                 timeout=8.0,
             )
             obs = r.json().get("observations", [])
-            values = [float(o["value"]) for o in obs if o.get("value") not in (".", None)]
+            values = [
+                float(o["value"]) for o in obs if o.get("value") not in (".", None)
+            ]
         except Exception as e:
             logger.warning("swarm.fred_raw_failed", error=str(e))
             return _EMPTY
@@ -211,7 +220,9 @@ def _get_fred_cpi_analysis() -> dict:
     yoy_pct = round((values[-1] / values[-13] - 1.0) * 100, 2)
     # 3-month annualised: (last / 3-months-ago)^4 - 1
     trend_3m_ann = (
-        round(((values[-1] / values[-4]) ** 4 - 1.0) * 100, 2) if len(values) >= 4 else yoy_pct
+        round(((values[-1] / values[-4]) ** 4 - 1.0) * 100, 2)
+        if len(values) >= 4
+        else yoy_pct
     )
 
     # Regime classification — trend > 3% YoY triggers "Inflationary"
@@ -235,12 +246,12 @@ def _get_fred_cpi_analysis() -> dict:
         )
     elif yoy_pct > 0:
         regime = "Target Inflation"
-        description = (
-            f"CPI YoY {yoy_pct:.1f}% is near the Fed target — growth equities are favoured."
-        )
+        description = f"CPI YoY {yoy_pct:.1f}% is near the Fed target — growth equities are favoured."
     else:
         regime = "Disinflationary"
-        description = f"CPI YoY {yoy_pct:.1f}% — below target, watch for growth slowdown signals."
+        description = (
+            f"CPI YoY {yoy_pct:.1f}% — below target, watch for growth slowdown signals."
+        )
 
     return {
         "yoy_pct": yoy_pct,
@@ -360,20 +371,28 @@ async def strategist_node(state: SwarmState) -> dict:
     news_map = dict(zip(top3, news_lists, strict=False))
 
     regime = cpi_data["regime"]
-    yoy_str = f"{cpi_data['yoy_pct']:.1f}%" if cpi_data["yoy_pct"] is not None else "N/A"
-    trend_str = (
-        f"{cpi_data['trend_3m_ann']:.1f}%" if cpi_data["trend_3m_ann"] is not None else "N/A"
+    yoy_str = (
+        f"{cpi_data['yoy_pct']:.1f}%" if cpi_data["yoy_pct"] is not None else "N/A"
     )
-    trace.append(f"[Strategist] FRED CPI YoY={yoy_str}, 3m-ann={trend_str} → Regime: {regime}")
+    trend_str = (
+        f"{cpi_data['trend_3m_ann']:.1f}%"
+        if cpi_data["trend_3m_ann"] is not None
+        else "N/A"
+    )
+    trace.append(
+        f"[Strategist] FRED CPI YoY={yoy_str}, 3m-ann={trend_str} → Regime: {regime}"
+    )
 
     for sym, items in news_map.items():
         trace.append(f"[Strategist] {sym}: {len(items)} news item(s) retrieved")
 
     # ── AI synthesis ──────────────────────────────────────────────────────────
     news_text = "\n".join(
-        f"  {sym}: " + "; ".join(n["headline"] for n in items[:3])
-        if items
-        else f"  {sym}: no recent news"
+        (
+            f"  {sym}: " + "; ".join(n["headline"] for n in items[:3])
+            if items
+            else f"  {sym}: no recent news"
+        )
         for sym, items in news_map.items()
     )
     top_tickers = [t["symbol"] for t in state["ticker_data"][:5]]
@@ -406,7 +425,9 @@ Return ONLY valid JSON — no markdown:
         result.setdefault("regime", regime)
         result.setdefault("cpi_yoy", yoy_str)
         macro_context = json.dumps(result, indent=2)
-        trace.append(f"[Strategist] Regime synthesis complete — {regime} implications generated.")
+        trace.append(
+            f"[Strategist] Regime synthesis complete — {regime} implications generated."
+        )
     except Exception as e:
         macro_context = json.dumps(
             {
@@ -466,16 +487,22 @@ async def quant_node(state: SwarmState) -> dict:
     # ── Weighted beta ─────────────────────────────────────────────────────────
     trace.append(f"[Quant] Fetching beta for {len(symbols)} symbols...")
     betas = await asyncio.gather(*[asyncio.to_thread(fetch_beta, s) for s in symbols])
-    beta_map = dict(zip(symbols, [b if isinstance(b, float) else 1.0 for b in betas], strict=False))
+    beta_map = dict(
+        zip(symbols, [b if isinstance(b, float) else 1.0 for b in betas], strict=False)
+    )
     weighted_beta = sum(weights.get(s, 0.0) * beta_map.get(s, 1.0) for s in symbols)
     beta_pts = _beta_score(weighted_beta)
-    trace.append(f"[Quant] Weighted beta: {weighted_beta:.3f} → beta_score: {beta_pts}/25")
+    trace.append(
+        f"[Quant] Weighted beta: {weighted_beta:.3f} → beta_score: {beta_pts}/25"
+    )
 
     # ── Parallel price fetch (single batch for sharpe + correlation) ─────────────
     # fetch_all_closes uses asyncio.gather internally — all tickers fetched at once.
     # The provider blacklist in risk_engine ensures that once AV/Finnhub is
     # rate-limited, remaining symbols skip that provider immediately.
-    trace.append(f"[Quant] Fetching 60-day price history for {len(symbols)} symbols in parallel...")
+    trace.append(
+        f"[Quant] Fetching 60-day price history for {len(symbols)} symbols in parallel..."
+    )
     price_series = await fetch_all_closes(symbols, days=60)
     fetched_count = sum(1 for s in price_series.values() if len(s) >= 10)
     trace.append(
@@ -487,11 +514,7 @@ async def quant_node(state: SwarmState) -> dict:
     sharpe_rating = (
         "Strong"
         if sharpe > 1.0
-        else "Acceptable"
-        if sharpe > 0.5
-        else "Weak"
-        if sharpe > 0
-        else "Negative"
+        else "Acceptable" if sharpe > 0.5 else "Weak" if sharpe > 0 else "Negative"
     )
     trace.append(f"[Quant] Annualised Sharpe ratio: {sharpe} ({sharpe_rating})")
 
@@ -506,13 +529,17 @@ async def quant_node(state: SwarmState) -> dict:
 
     # Serialise top-5 correlation sub-matrix for frontend heatmap
     top5_by_wt = sorted(symbols, key=lambda s: weights.get(s, 0), reverse=True)[:5]
-    top5_in_mx = [s for s in top5_by_wt if not corr_matrix.empty and s in corr_matrix.index]
+    top5_in_mx = [
+        s for s in top5_by_wt if not corr_matrix.empty and s in corr_matrix.index
+    ]
     if top5_in_mx:
         try:
             _sub = corr_matrix.loc[top5_in_mx, top5_in_mx]
             corr_matrix_data: dict = {
                 "symbols": top5_in_mx,
-                "values": [[round(float(v), 3) for v in row] for row in _sub.values.tolist()],
+                "values": [
+                    [round(float(v), 3) for v in row] for row in _sub.values.tolist()
+                ],
             }
         except Exception:
             corr_matrix_data = {"symbols": [], "values": []}
@@ -541,7 +568,9 @@ async def quant_node(state: SwarmState) -> dict:
     )
     stress_results = StressTester.to_list(stress_dict)
     for sr in stress_results:
-        fragility = " ⚠ STRUCTURAL FRAGILITY" if sr["portfolio_return_pct"] <= -20 else ""
+        fragility = (
+            " ⚠ STRUCTURAL FRAGILITY" if sr["portfolio_return_pct"] <= -20 else ""
+        )
         trace.append(
             f"[Quant] {sr['label']}: portfolio={sr['portfolio_return_pct']:+.1f}% "
             f"vs SPY={sr['spy_return_pct']:+.1f}% "
@@ -616,9 +645,13 @@ async def tax_arch_node(state: SwarmState) -> dict:
     trace.append(f"[Tax] Total deferred liability: ${liability:,.0f}")
     trace.append(f"[Tax] Harvesting opportunity: ${harvest:,.0f}")
     if harvestable:
-        trace.append(f"[Tax] Top harvest: {', '.join(p['symbol'] for p in harvestable)}")
+        trace.append(
+            f"[Tax] Top harvest: {', '.join(p['symbol'] for p in harvestable)}"
+        )
     if at_risk:
-        trace.append(f"[Tax] Highest liability: {', '.join(p['symbol'] for p in at_risk)}")
+        trace.append(
+            f"[Tax] Highest liability: {', '.join(p['symbol'] for p in at_risk)}"
+        )
 
     # Effective tax alpha score
     tax_pts = _tax_alpha_score(df)
@@ -683,7 +716,9 @@ async def critic_node(state: SwarmState) -> dict:
                 f"Moderate pairwise correlation ({avg_corr:.3f}) warrants diversification review."
             )
         else:
-            trace.append(f"[Critic] Correlation levels acceptable (avg_corr={avg_corr:.3f}).")
+            trace.append(
+                f"[Critic] Correlation levels acceptable (avg_corr={avg_corr:.3f})."
+            )
 
     # 2. Beta risk
     wb = risk.get("weighted_beta", 1.0)
@@ -743,7 +778,9 @@ async def market_regime_node(state: SwarmState) -> dict:
     Runs BEFORE strategist so downstream agents can access the canonical regime label.
     """
     trace: list[str] = []
-    trace.append("[Market Regime] Fetching FRED CPI data for macro regime classification...")
+    trace.append(
+        "[Market Regime] Fetching FRED CPI data for macro regime classification..."
+    )
 
     cpi_data = await asyncio.to_thread(_get_fred_cpi_analysis)
 
@@ -802,9 +839,11 @@ async def market_regime_node(state: SwarmState) -> dict:
             confidence = min(0.95, 0.72 + (yoy - 3.0) * 0.05)
             drivers = [
                 f"CPI YoY {yoy:.1f}% above 3% threshold",
-                f"3m annualised trend {trend:.1f}%"
-                if trend is not None
-                else "Trend data unavailable",
+                (
+                    f"3m annualised trend {trend:.1f}%"
+                    if trend is not None
+                    else "Trend data unavailable"
+                ),
                 "Rate-sensitive sectors under pressure; real assets defensive",
             ]
     else:
@@ -901,7 +940,9 @@ async def risk_sentinel_node(state: SwarmState) -> dict:
     elif hhi_pts < 15:
         risk_score += 1.5
         primary_risks.append(f"Moderate concentration — HHI score {hhi_pts:.0f}/25")
-        mitigations.append("Introduce 2-3 positions in sectors absent from current portfolio")
+        mitigations.append(
+            "Introduce 2-3 positions in sectors absent from current portfolio"
+        )
 
     # ── Beta exposure (max 3 pts) ──────────────────────────────────────────────
     if weighted_beta > 1.8:
@@ -971,7 +1012,9 @@ async def risk_sentinel_node(state: SwarmState) -> dict:
             "Maintain current allocation; monitor for regime changes and rebalance quarterly"
         ]
 
-    trace.append(f"[Risk Sentinel] Verdict: {risk_level.upper()} (score {risk_score:.1f}/10)")
+    trace.append(
+        f"[Risk Sentinel] Verdict: {risk_level.upper()} (score {risk_score:.1f}/10)"
+    )
     for r in primary_risks[:3]:
         prefix = "⚠" if risk_level == "high" else "⚑"
         trace.append(f"[Risk Sentinel] {prefix} {r}")
@@ -996,7 +1039,9 @@ async def alpha_scout_node(state: SwarmState) -> dict:
     Runs AFTER risk_sentinel (has access to risk verdict) and BEFORE critic.
     """
     trace: list[str] = []
-    trace.append("[Alpha Scout] Scanning for alpha opportunities not in current portfolio...")
+    trace.append(
+        "[Alpha Scout] Scanning for alpha opportunities not in current portfolio..."
+    )
 
     market_regime = state.get("market_regime", {})
     macro_context = state.get("macro_context", "")
@@ -1050,14 +1095,22 @@ confidence must be between 0.0 and 1.0. Return 3-5 opportunities."""
         result = await get_ai_analysis(prompt)
         opps = result.get("opportunities", [])
         # Enforce: remove any symbol already in portfolio
-        opps = [o for o in opps if isinstance(o, dict) and o.get("symbol") not in existing_symbols]
+        opps = [
+            o
+            for o in opps
+            if isinstance(o, dict) and o.get("symbol") not in existing_symbols
+        ]
         for o in opps:
             try:
-                o["confidence"] = round(max(0.0, min(1.0, float(o.get("confidence", 0.65)))), 2)
+                o["confidence"] = round(
+                    max(0.0, min(1.0, float(o.get("confidence", 0.65)))), 2
+                )
             except (TypeError, ValueError):
                 o["confidence"] = 0.65
         alpha_out = {"opportunities": opps[:5]}
-        trace.append(f"[Alpha Scout] {len(opps)} opportunity(ies) identified for {regime} regime:")
+        trace.append(
+            f"[Alpha Scout] {len(opps)} opportunity(ies) identified for {regime} regime:"
+        )
         for o in opps[:3]:
             sym = o.get("symbol", "?")
             why = o.get("reason", "")[:80]
@@ -1065,7 +1118,9 @@ confidence must be between 0.0 and 1.0. Return 3-5 opportunities."""
             trace.append(f"[Alpha Scout] ✦ {sym}: {why}... (conf={conf:.0%})")
     except Exception as e:
         alpha_out = {"opportunities": []}
-        trace.append(f"[Alpha Scout] AI opportunity scan failed ({e}) — no opportunities returned.")
+        trace.append(
+            f"[Alpha Scout] AI opportunity scan failed ({e}) — no opportunities returned."
+        )
 
     return {"alpha_opportunities": alpha_out, "agent_trace": trace}
 
@@ -1221,7 +1276,9 @@ async def synthesizer_node(state: SwarmState) -> dict:
     ]
 
     strategist_parsed = (
-        json.loads(macro) if macro and macro not in ("N/A", "") else {"regime": "Unknown"}
+        json.loads(macro)
+        if macro and macro not in ("N/A", "")
+        else {"regime": "Unknown"}
     )
 
     swarm_state_payload = {
@@ -1265,7 +1322,9 @@ async def synthesizer_node(state: SwarmState) -> dict:
     system_prompt = _IC_SYSTEM_PROMPT.format(swarm_state_json=swarm_state_json)
 
     # ── Derive canonical regime label (market_regime_agent is authoritative) ───
-    regime_label = mkt_regime.get("regime") or strategist_parsed.get("regime", "Unknown")
+    regime_label = mkt_regime.get("regime") or strategist_parsed.get(
+        "regime", "Unknown"
+    )
 
     # ── IC Briefing user turn ──────────────────────────────────────────────────
     user_content = (
@@ -1279,7 +1338,9 @@ async def synthesizer_node(state: SwarmState) -> dict:
     # ── Structured Investment Thesis prompt ────────────────────────────────────
     sentinel_risks = sentinel.get("primary_risks", [])
     alpha_syms = [
-        o.get("symbol", "") for o in alpha.get("opportunities", [])[:3] if o.get("symbol")
+        o.get("symbol", "")
+        for o in alpha.get("opportunities", [])[:3]
+        if o.get("symbol")
     ]
     tax_narrative = (tax.get("narrative") or "")[:200]
 
@@ -1327,15 +1388,21 @@ Return ONLY valid JSON matching this exact schema:
             f"## 5. The 90-Day Directive\n"
             f"- Review the swarm metrics manually and re-run the analysis.\n"
         )
-        trace.append(f"[Synthesizer] IC Briefing failed ({briefing_result}) — fallback returned.")
+        trace.append(
+            f"[Synthesizer] IC Briefing failed ({briefing_result}) — fallback returned."
+        )
     else:
         briefing_md = briefing_result
-        trace.append("[Synthesizer] IC Briefing generated — 5-section markdown complete.")
+        trace.append(
+            "[Synthesizer] IC Briefing generated — 5-section markdown complete."
+        )
 
     # Structured Thesis
     if isinstance(struct_result, Exception) or not isinstance(struct_result, dict):
         struct_result = {}
-        trace.append("[Synthesizer] Structured thesis generation failed — defaults applied.")
+        trace.append(
+            "[Synthesizer] Structured thesis generation failed — defaults applied."
+        )
     else:
         trace.append("[Synthesizer] Structured Investment Thesis JSON generated.")
 
@@ -1376,10 +1443,14 @@ Return ONLY valid JSON matching this exact schema:
         _strat = {}
 
     _sentiment_text = (
-        _strat.get("regime_implication", "") + " " + _strat.get("positioning_advice", "")
+        _strat.get("regime_implication", "")
+        + " "
+        + _strat.get("positioning_advice", "")
     ).lower()
     thesis["strategist_intel"] = {
-        "narrative": _strat.get("regime_implication", mkt_regime.get("portfolio_implication", "")),
+        "narrative": _strat.get(
+            "regime_implication", mkt_regime.get("portfolio_implication", "")
+        ),
         "key_drivers": mkt_regime.get("drivers", [])[:3],
         "news_risks": _strat.get("news_risks", []),
         "hedge_positions": _strat.get("hedge_positions", []),
@@ -1399,11 +1470,11 @@ Return ONLY valid JSON matching this exact schema:
         "hhi_interpretation": (
             "Extreme Concentration"
             if hhi_pts < 8
-            else "High Concentration"
-            if hhi_pts < 15
-            else "Moderate"
-            if hhi_pts < 20
-            else "Diversified"
+            else (
+                "High Concentration"
+                if hhi_pts < 15
+                else "Moderate" if hhi_pts < 20 else "Diversified"
+            )
         ),
         "weighted_beta": risk.get("weighted_beta"),
         "beta_map": risk.get("beta_map", {}),
@@ -1414,9 +1485,9 @@ Return ONLY valid JSON matching this exact schema:
         "corr_matrix_data": risk.get("corr_matrix_data", {"symbols": [], "values": []}),
         "top_symbols": [
             t["symbol"]
-            for t in sorted(state["ticker_data"], key=lambda x: x.get("weight", 0), reverse=True)[
-                :5
-            ]
+            for t in sorted(
+                state["ticker_data"], key=lambda x: x.get("weight", 0), reverse=True
+            )[:5]
         ],
     }
 
@@ -1426,9 +1497,11 @@ Return ONLY valid JSON matching this exact schema:
         "total_liability": _liability,
         "harvest_opportunities": tax.get("harvestable_top3", []),
         "liability_top3": tax.get("liability_top3", []),
-        "tax_drag_pct": round(_liability / max(state["total_value"], 1) * 100, 2)
-        if tax.get("available")
-        else None,
+        "tax_drag_pct": (
+            round(_liability / max(state["total_value"], 1) * 100, 2)
+            if tax.get("available")
+            else None
+        ),
         "tax_pts": tax.get("tax_pts", 10),
         "narrative": tax.get("narrative", ""),
         "tax_neutral_pairs": tax.get("tax_neutral_pairs", []),
@@ -1556,7 +1629,15 @@ async def run_swarm(ticker_data: list[dict], total_value: float) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 _CHAT_ROUTES = {
     "tax": ["tax", "harvest", "cost basis", "capital gains", "liability", "cgt"],
-    "quant": ["risk", "correlation", "beta", "sharpe", "volatility", "hhi", "concentration"],
+    "quant": [
+        "risk",
+        "correlation",
+        "beta",
+        "sharpe",
+        "volatility",
+        "hhi",
+        "concentration",
+    ],
     "macro": ["news", "macro", "inflation", "cpi", "market", "economy", "fed", "rate"],
 }
 
@@ -1579,7 +1660,9 @@ async def chat_with_swarm(
     Returns {"response": dict, "agent": str, "thinking_steps": list[str]}.
     """
     agent = _classify_question(message)
-    thinking: list[str] = [f"[Router] Question classified → routing to {agent.upper()} agent"]
+    thinking: list[str] = [
+        f"[Router] Question classified → routing to {agent.upper()} agent"
+    ]
 
     # Build minimal state (chat only runs the relevant single node)
     initial: dict = {
