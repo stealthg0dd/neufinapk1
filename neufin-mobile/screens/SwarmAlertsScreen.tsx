@@ -35,6 +35,7 @@ import type { SwarmReport } from '@/lib/api'
 import type { MacroAlert } from '@/lib/notifications'
 import { getLatestSwarmReport } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { trackMobileEvent } from '@/lib/analytics'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://neufin101-production.up.railway.app'
 
@@ -354,7 +355,11 @@ export default function SwarmAlertsScreen() {
       const res = await fetch(`${API_BASE}/api/alerts/recent?limit=20`)
       if (res.ok) {
         const data = await res.json()
-        setAlerts(Array.isArray(data) ? data : (data.alerts ?? []))
+        const loaded: MacroAlert[] = Array.isArray(data) ? data : (data.alerts ?? [])
+        setAlerts(loaded)
+        if (loaded.length > 0) {
+          trackMobileEvent('alert_received', { alert_count: loaded.length })
+        }
       }
     } catch (err) {
       console.warn('[SwarmAlerts] loadAlerts error:', err)

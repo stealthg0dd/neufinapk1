@@ -21,6 +21,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { debugAuth } from '@/lib/auth-debug'
 import { upsertAdvisorProfile } from '@/lib/api'
+import { useNeufinAnalytics } from '@/lib/analytics'
 
 type UserType = 'investor' | 'advisor'
 
@@ -34,6 +35,7 @@ function OnboardingContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
   const { token, loading: authLoading } = useAuth()
+  const { capture } = useNeufinAnalytics()
 
   const [step, setStep]         = useState<1 | 2 | 3>(1)
     // For portfolio upload (step 3)
@@ -93,6 +95,7 @@ function OnboardingContent() {
       await supabase.auth.updateUser({
         data: { user_type: 'investor', onboarding_complete: true },
       })
+      capture('onboarding_completed', { steps_skipped: 1, user_type: 'investor' })
       const dest = localStorage.getItem('onboarding_next') || '/dashboard'
       localStorage.removeItem('onboarding_next')
       router.replace(dest)
@@ -123,6 +126,7 @@ function OnboardingContent() {
       await supabase.auth.updateUser({
         data: { user_type: 'advisor', onboarding_complete: true },
       })
+      capture('onboarding_completed', { steps_skipped: 0, user_type: 'advisor' })
       const dest = localStorage.getItem('onboarding_next') || '/advisor/dashboard'
       localStorage.removeItem('onboarding_next')
       router.replace(dest)

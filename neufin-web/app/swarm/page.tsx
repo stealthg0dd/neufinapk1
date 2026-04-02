@@ -8,6 +8,7 @@ import CommandPalette from '@/components/CommandPalette'
 import RiskMatrix from '@/components/RiskMatrix'
 import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
+import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
 import { useUser } from '@/lib/store'
 import { debugAuth } from '@/lib/auth-debug'
@@ -753,6 +754,7 @@ export default function SwarmPage() {
   const [totalValue,      setTotalValue]      = useState(0)
 
   const { isPro, token, loading: authLoading, user } = useUser()
+  const { capture } = useNeufinAnalytics()
   const isTrialBypass = useMemo(() => {
     const createdAt = user?.created_at
     if (!createdAt) return false
@@ -873,6 +875,12 @@ export default function SwarmPage() {
     setThesis(null)
     setIsRunning(true)
 
+    const portfolioId = typeof window !== 'undefined'
+      ? (JSON.parse(localStorage.getItem('dnaResult') ?? 'null')?.record_id ?? undefined)
+      : undefined
+    capture('swarm_analysis_started', { portfolio_id: portfolioId })
+    perfTimer.start('swarm')
+
     try {
       const headers = {
         'Content-Type': 'application/json',
@@ -894,10 +902,18 @@ export default function SwarmPage() {
       setThesis(newThesis)
       if (data.failed_tickers?.length) setFailedTickers(data.failed_tickers)
 
+      const swarmDurationMs = perfTimer.end('swarm') ?? 0
+      capture('swarm_analysis_completed', {
+        report_id:   newThesis?.swarm_report_id,
+        duration_ms: swarmDurationMs,
+      })
+      captureSentrySlowOp('swarm_analysis', swarmDurationMs)
+
       if (newThesis?.swarm_report_id && typeof window !== 'undefined') {
         localStorage.setItem('neufin-swarm-report-id', newThesis.swarm_report_id)
       }
     } catch (e: any) {
+      perfTimer.end('swarm') // clean up timer
       setTraces(prev => [...prev, `[System] ERROR: ${e.message}`])
     } finally {
       setIsRunning(false)

@@ -15,14 +15,15 @@ Sentry.init({
 // Tag all events with service/company for filtering in Sentry UI
 Sentry.setTag('service', 'neufin-mobile')
 Sentry.setTag('company', 'neufin')
-
-import React, { useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
 import { View, ActivityIndicator } from 'react-native'
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native'
+import { NavigationContainer, DefaultTheme, NavigationContainerRef } from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { PostHogProvider } from 'posthog-react-native'
 import { supabase } from '@/lib/supabase'
+import { posthog, trackMobileEvent } from '@/lib/analytics'
 import LoginScreen from '@/screens/LoginScreen'
 import PortfolioSyncScreen from '@/screens/PortfolioSyncScreen'
 import AnalysisScreen from '@/screens/AnalysisScreen'
@@ -61,8 +62,11 @@ export default function App() {
   // Three states: null = checking (show splash), false = unauthenticated
   // (show LoginScreen), true = authenticated (show main stack).
   const [authed, setAuthed] = useState<boolean | null>(null)
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null)
+  const routeNameRef  = useRef<string | undefined>()
 
   useEffect(() => {
+    trackMobileEvent('app_opened', {})
     // Fast path: check for an existing session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthed(Boolean(session))
@@ -107,28 +111,43 @@ export default function App() {
   // ── Authenticated: main navigation stack ──────────────────────────────────
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer theme={DarkTheme}>
-        <StatusBar style="light" />
-        <Stack.Navigator
-          initialRouteName="PortfolioSync"
-          screenOptions={{
-            headerShown:         false,
-            cardStyle:           { backgroundColor: '#030712' },
-            cardStyleInterpolator: ({ current, layouts }) => ({
-              cardStyle: {
-                opacity: current.progress,
-                transform: [{ translateX: current.progress.interpolate({ inputRange: [0, 1], outputRange: [layouts.screen.width * 0.1, 0] }) }],
-              },
-            }),
+      <PostHogProvider client={posthog}>
+        <NavigationContainer
+          theme={DarkTheme}
+          ref={navigationRef}
+          onReady={() => {
+            routeNameRef.current = navigationRef.current?.getCurrentRoute()?.name
+          }}
+          onStateChange={() => {
+            const currentRoute = navigationRef.current?.getCurrentRoute()?.name
+            if (currentRoute && currentRoute !== routeNameRef.current) {
+              trackMobileEvent('screen_viewed', { screen_name: currentRoute })
+              routeNameRef.current = currentRoute
+            }
           }}
         >
-          <Stack.Screen name="PortfolioSync" component={PortfolioSyncScreen} />
-          <Stack.Screen name="Analysis"      component={AnalysisScreen}      />
-          <Stack.Screen name="SwarmReport"   component={SwarmReportScreen}   />
-          <Stack.Screen name="Share"         component={ShareScreen}         />
-          <Stack.Screen name="SwarmAlerts"   component={SwarmAlertsScreen}   />
-        </Stack.Navigator>
-      </NavigationContainer>
+          <StatusBar style="light" />
+          <Stack.Navigator
+            initialRouteName="PortfolioSync"
+            screenOptions={{
+              headerShown:         false,
+              cardStyle:           { backgroundColor: '#030712' },
+              cardStyleInterpolator: ({ current, layouts }) => ({
+                cardStyle: {
+                  opacity: current.progress,
+                  transform: [{ translateX: current.progress.interpolate({ inputRange: [0, 1], outputRange: [layouts.screen.width * 0.1, 0] }) }],
+                },
+              }),
+            }}
+          >
+            <Stack.Screen name="PortfolioSync" component={PortfolioSyncScreen} />
+            <Stack.Screen name="Analysis"      component={AnalysisScreen}      />
+            <Stack.Screen name="SwarmReport"   component={SwarmReportScreen}   />
+            <Stack.Screen name="Share"         component={ShareScreen}         />
+            <Stack.Screen name="SwarmAlerts"   component={SwarmAlertsScreen}   />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PostHogProvider>
     </GestureHandlerRootView>
   )
 }

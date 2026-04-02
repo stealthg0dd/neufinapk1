@@ -30,6 +30,7 @@ import type { PortfolioSummary } from '@/lib/api'
 import type { RootStackParamList } from '@/App'
 import { getPortfolioList } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { trackMobileEvent } from '@/lib/analytics'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace'
@@ -171,6 +172,7 @@ export default function PortfolioSyncScreen({ navigation }: Props) {
       setAuthed(true)
       const list = await getPortfolioList(session.access_token)
       setPortfolios(list)
+      trackMobileEvent('portfolio_synced', { portfolio_count: list.length })
     } catch (err: any) {
       console.error('[PortfolioSync] load error:', err?.message)
       setError('Could not load portfolios. Pull down to retry.')

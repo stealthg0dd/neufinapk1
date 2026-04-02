@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { analyzeDNA } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { useAnalytics } from '@/lib/posthog'
 import RefCapture from '@/components/RefCapture'
 import { trackEvent, EVENTS } from '@/components/Analytics'
+import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
 
 const SAMPLE_CSV = `symbol,shares,cost_basis
 AAPL,10,145.50
@@ -20,7 +20,7 @@ JPM,12,155.00
 export default function UploadPage() {
   const router = useRouter()
   const { token } = useAuth()
-  const { track } = useAnalytics()
+  const { capture } = useNeufinAnalytics()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -54,19 +54,30 @@ export default function UploadPage() {
     if (!file) return
     setLoading(true)
     setError('')
-    track('csv_upload_started', { filename: file.name, size_kb: Math.round(file.size / 1024) })
-    trackEvent(EVENTS.UPLOAD_STARTED, { size_kb: Math.round(file.size / 1024) })
+    const fileSizeKb = Math.round(file.size / 1024)
+    capture('csv_upload_started', {})
+    perfTimer.start('dna_score')
+    trackEvent(EVENTS.UPLOAD_STARTED, { size_kb: fileSizeKb })
     try {
       const result = await analyzeDNA(file, token)
+      const durationMs = perfTimer.end('dna_score') ?? 0
       localStorage.setItem('dnaResult', JSON.stringify(result))
-      track('dna_analysis_complete', {
-        dna_score:     result.dna_score,
-        investor_type: result.investor_type,
-        num_positions: result.num_positions,
+      capture('csv_upload_completed', {
+        ticker_count:  result.num_positions,
+        file_size_kb:  fileSizeKb,
       })
+      capture('dna_score_generated', {
+        score:            result.dna_score,
+        risk_level:       result.investor_type,
+        ticker_count:     result.num_positions,
+        is_authenticated: !!token,
+        duration_ms:      durationMs,
+      })
+      captureSentrySlowOp('dna_score', durationMs)
       router.push('/results')
     } catch (e: unknown) {
-      track('csv_upload_error', { error: e instanceof Error ? e.message : 'unknown' })
+      perfTimer.end('dna_score') // clean up timer
+      capture('csv_upload_failed', { error_reason: e instanceof Error ? e.message : 'unknown' })
       setError(e instanceof Error ? e.message : 'Analysis failed. Please try again.')
     } finally {
       setLoading(false)

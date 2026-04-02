@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { claimAnonymousRecord } from '@/lib/api'
+import { useNeufinAnalytics } from '@/lib/analytics'
 
 type Method = 'magic' | 'google' | 'password'
 
@@ -45,6 +46,7 @@ export default function AuthPage() {
 function AuthContent() {
   const router       = useRouter()
   const searchParams = useSearchParams()
+  const { capture }  = useNeufinAnalytics()
 
   const [method,   setMethod]   = useState<Method>('magic')
   const [email,    setEmail]    = useState('')
@@ -73,6 +75,7 @@ function AuthContent() {
   async function handleMagicLink(e: FormEvent) {
     e.preventDefault()
     setLoading(true); setError('')
+    sessionStorage.setItem('neufin_auth_method', 'magic')
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOtp({
       email,
@@ -85,6 +88,7 @@ function AuthContent() {
 
   async function handleGoogle() {
     setLoading(true); setError('')
+    sessionStorage.setItem('neufin_auth_method', 'google')
     const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -100,10 +104,12 @@ function AuthContent() {
       if (mode === 'signup') {
         const { error: err } = await supabase.auth.signUp({ email, password })
         if (err) throw err
+        capture('user_signed_up', { method: 'email' })
         setSent(true)
       } else {
         const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
         if (err) throw err
+        capture('user_logged_in', { method: 'email' })
         if (data.session?.access_token) await claimPendingRecord(data.session.access_token)
         router.replace(next)
       }

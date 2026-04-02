@@ -25,6 +25,7 @@ import type { SwarmReport } from '@/lib/api'
 import type { RootStackParamList } from '@/App'
 import { getLatestSwarmReport } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
+import { trackMobileEvent } from '@/lib/analytics'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 const MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace'
@@ -80,6 +81,7 @@ export default function SwarmReportScreen({ navigation }: Props) {
         setEmptyReason('no_data')
       } else {
         setReport(r)
+        trackMobileEvent('swarm_report_viewed', { report_id: r.swarm_report_id ?? undefined })
       }
     } catch (err) {
       console.error('[SwarmReport] load error:', err)

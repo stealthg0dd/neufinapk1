@@ -13,6 +13,7 @@ import AdvisorCTA from '@/components/AdvisorCTA'
 import { trackEvent, EVENTS } from '@/components/Analytics'
 import { useAuth } from '@/lib/auth-context'
 import { useAnalytics } from '@/lib/posthog'
+import { useNeufinAnalytics } from '@/lib/analytics'
 import type { DNAAnalysisResponse } from '@/lib/api'
 import PaywallOverlay from '@/components/PaywallOverlay'
 
@@ -103,6 +104,7 @@ export default function ResultsContent() {
   const searchParams = useSearchParams()
   const { user, token } = useAuth()
   const { track }    = useAnalytics()
+  const { capture }  = useNeufinAnalytics()
 
   const [result, setResult]               = useState<DNAAnalysisResponse | null>(null)
   const [copied, setCopied]               = useState(false)
@@ -206,6 +208,7 @@ export default function ResultsContent() {
     }
     setCheckoutLoading(true)
     track('checkout_started', { record_id: result.record_id })
+    capture('advisor_report_checkout_started', { plan_type: 'advisor_report', price: 29, record_id: result.record_id })
     trackEvent(EVENTS.CHECKOUT_CLICKED, { record_id: result.record_id })
     try {
       await createCheckoutSession(result.record_id, token)
@@ -580,7 +583,10 @@ export default function ResultsContent() {
               {pdfUrl ? (
                 <a
                   href={pdfUrl} target="_blank" rel="noreferrer"
-                  onClick={() => trackEvent(EVENTS.PDF_DOWNLOADED, { source: 'results_page' })}
+                  onClick={() => {
+                    trackEvent(EVENTS.PDF_DOWNLOADED, { source: 'results_page' })
+                    capture('advisor_report_downloaded', { report_id: result?.record_id })
+                  }}
                   className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-base"
                 >
                   ⬇ Download Your Advisor Report (PDF)

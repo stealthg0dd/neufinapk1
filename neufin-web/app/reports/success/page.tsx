@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fulfillReport } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { trackEvent, EVENTS } from '@/components/Analytics'
+import { useNeufinAnalytics } from '@/lib/analytics'
 
 // ── Poll config ───────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 3_000
@@ -27,6 +28,7 @@ type Phase = 'polling' | 'ready' | 'error' | 'missing'
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ReportSuccessPage() {
   const { token } = useAuth()
+  const { capture } = useNeufinAnalytics()
 
   const [phase,    setPhase]    = useState<Phase>('polling')
   const [attempt,  setAttempt]  = useState(0)
@@ -72,6 +74,11 @@ export default function ReportSuccessPage() {
         setPhase('ready')
         localStorage.removeItem('pendingReportId')
         trackEvent(EVENTS.PAYMENT_SUCCEEDED, { report_id: reportIdRef.current })
+        capture('advisor_report_purchased', {
+          plan_type: 'advisor_report',
+          price:     29,
+          report_id: reportIdRef.current,
+        })
       })
       .catch(() => {
         // Not ready yet — schedule next poll
@@ -233,7 +240,10 @@ export default function ReportSuccessPage() {
                   href={pdfUrl!}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={() => trackEvent(EVENTS.PDF_DOWNLOADED, { source: 'success_page' })}
+                  onClick={() => {
+                    trackEvent(EVENTS.PDF_DOWNLOADED, { source: 'success_page' })
+                    capture('advisor_report_downloaded', { report_id: reportIdRef.current })
+                  }}
                   className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-base"
                 >
                   ⬇ Download Your Advisor Report (PDF)

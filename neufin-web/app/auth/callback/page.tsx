@@ -30,6 +30,7 @@ import { debugAuth } from '@/lib/auth-debug'
 import { syncAuthCookie } from '@/lib/sync-auth-cookie'
 import { claimAnonymousRecord } from '@/lib/api'
 import { logger } from '@/lib/logger'
+import { useNeufinAnalytics } from '@/lib/analytics'
 
 const TAG = '[AuthCallback]'
 
@@ -53,6 +54,7 @@ export default function AuthCallbackPage() {
 function AuthCallbackContent() {
   const searchParams = useSearchParams()
   const next         = searchParams.get('next') || '/dashboard'
+  const { capture }  = useNeufinAnalytics()
 
   const [error, setError] = useState<string | null>(null)
 
@@ -78,6 +80,9 @@ function AuthCallbackContent() {
       }
       if (data?.session) {
         syncAuthCookie(data.session)
+        const method = sessionStorage.getItem('neufin_auth_method') ?? 'google'
+        sessionStorage.removeItem('neufin_auth_method')
+        capture('user_logged_in', { method })
         // Optionally: claimAnonymousRecord if needed (see previous logic)
         // ...existing code for claiming DNA record if required...
         window.location.href = next

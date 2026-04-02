@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/lib/auth-context'
+import { useNeufinAnalytics } from '@/lib/analytics'
 
 // ── Milestone config ──────────────────────────────────────────────────────────
 const MILESTONES = [
@@ -33,6 +34,7 @@ const stagger = {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ReferralsPage() {
   const { user } = useAuth()
+  const { capture } = useNeufinAnalytics()
 
   const [shareToken,  setShareToken]  = useState<string | null>(null)
   const [shareCount,  setShareCount]  = useState(0)
@@ -76,6 +78,7 @@ export default function ReferralsPage() {
     if (!referralUrl) return
     await navigator.clipboard.writeText(referralUrl)
     setCopied(true)
+    capture('referral_link_shared', { channel: 'copy' })
     recordShare()
     setTimeout(() => setCopied(false), 2500)
   }
@@ -88,6 +91,7 @@ export default function ReferralsPage() {
         text:  `I scored ${localStorage.getItem('dnaResult') ? JSON.parse(localStorage.getItem('dnaResult')!).dna_score : '?'}/100 on my Investor DNA Score 🧬 — check yours free:`,
         url:   referralUrl,
       })
+      capture('referral_link_shared', { channel: 'copy' })
       recordShare()
     } catch {
       // user cancelled — no-op
@@ -99,12 +103,14 @@ export default function ReferralsPage() {
     const score = (() => { try { return JSON.parse(localStorage.getItem('dnaResult')!).dna_score } catch { return '?' } })()
     const text  = `I scored ${score}/100 on my Investor DNA Score 🧬\nDiscover yours (and get 20% off your first report) → `
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text + referralUrl)}`, '_blank')
+    capture('referral_link_shared', { channel: 'twitter' })
     recordShare()
   }
 
   const shareWhatsApp = () => {
     if (!referralUrl) return
     window.open(`https://wa.me/?text=${encodeURIComponent(`Check out my Investor DNA Score 🧬 — use my link and get 20% off your first report: ${referralUrl}`)}`, '_blank')
+    capture('referral_link_shared', { channel: 'whatsapp' })
     recordShare()
   }
 
