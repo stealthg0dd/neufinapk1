@@ -1,0 +1,237 @@
+name: Security Scan
+
+on:
+  schedule:
+    # Every Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  push:
+    branches: [main]
+
+concurrency:
+  group: security-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write  # needed to create GitHub Issues
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── pip-audit (Python dependencies) ───────────────────────────────────
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: pip-audit — neufin-backend
+        id: pip-audit
+        run: |
+          pip-audit \
+            -r neufin-backend/requirements.txt \
+            --format json \
+            -o /tmp/pip-audit.json \
+            --progress-spinner off || true
+          # Surface HIGH/CRITICAL (pip-audit uses CVSS severity labels)
+          VULNS=$(python3 -c "
+          import json, sys
+          data = json.load(open('/tmp/pip-audit.json'))
+          findings = []
+          for dep in data.get('dependencies', []):
+              for v in dep.get('vulns', []):
+                  sev = v.get('fix_versions', [])
+                  findings.append(f\"- {dep['name']}@{dep['version']}: {v['id']} — {v.get('description','')[:120]}\")
+          print('\n'.join(findings) if findings else 'none')
+          " 2>/dev/null || echo "parse-error")
+          echo "findings<<EOF" >> $GITHUB_OUTPUT
+          echo "$VULNS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "pip_audit_raw<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/pip-audit.json >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ── npm audit (Web) ────────────────────────────────────────────────────
+      - name: npm audit — neufin-web
+        id: npm-audit-web
+        working-directory: neufin-web
+        run: |
+          npm ci --quiet
+          # audit exits non-zero on findings; capture but don't fail the step
+          npm audit --audit-level=high --json > /tmp/npm-audit-web.json 2>&1 || true
+          HIGH_CRIT=$(python3 -c "
+          import json, sys
+          try:
+              data = json.load(open('/tmp/npm-audit-web.json'))
+              vulns = data.get('vulnerabilities', {})
+              findings = [f\"- {k}: {v.get('severity','?')} — {v.get('via',[{}])[0] if isinstance(v.get('via',[{}])[0], str) else v.get('via',[{}])[0].get('title','?') if v.get('via') else '?'}\"
+                          for k, v in vulns.items() if v.get('severity') in ('high','critical')]
+              print('\n'.join(findings) if findings else 'none')
+          except Exception as e:
+              print('parse-error: ' + str(e))
+          " 2>/dev/null || echo "parse-error")
+          echo "findings<<EOF" >> $GITHUB_OUTPUT
+          echo "$HIGH_CRIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ── npm audit (Mobile) ────────────────────────────────────────────────
+      - name: npm audit — neufin-mobile
+        id: npm-audit-mobile
+        working-directory: neufin-mobile
+        run: |
+          npm ci --quiet
+          npm audit --audit-level=high --json > /tmp/npm-audit-mobile.json 2>&1 || true
+          HIGH_CRIT=$(python3 -c "
+          import json, sys
+          try:
+              data = json.load(open('/tmp/npm-audit-mobile.json'))
+              vulns = data.get('vulnerabilities', {})
+              findings = [f\"- {k}: {v.get('severity','?')} — {v.get('via',[{}])[0] if isinstance(v.get('via',[{}])[0], str) else v.get('via',[{}])[0].get('title','?') if v.get('via') else '?'}\"
+                          for k, v in vulns.items() if v.get('severity') in ('high','critical')]
+              print('\n'.join(findings) if findings else 'none')
+          except Exception as e:
+              print('parse-error: ' + str(e))
+          " 2>/dev/null || echo "parse-error")
+          echo "findings<<EOF" >> $GITHUB_OUTPUT
+          echo "$HIGH_CRIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ── Trivy — full repo scan ─────────────────────────────────────────────
+      - name: Trivy scan
+        id: trivy
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: '/tmp/trivy.json'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'        # don't fail the step; we handle it below
+          ignore-unfixed: true
+
+      - name: Parse Trivy results
+        id: trivy-parse
+        run: |
+          HIGH_CRIT=$(python3 -c "
+          import json, sys
+          try:
+              data = json.load(open('/tmp/trivy.json'))
+              findings = []
+              for result in data.get('Results', []):
+                  for v in result.get('Vulnerabilities', []):
+                      sev = v.get('Severity', '')
+                      if sev in ('HIGH', 'CRITICAL'):
+                          findings.append(f\"- [{sev}] {result.get('Target','?')}: {v.get('VulnerabilityID','?')} in {v.get('PkgName','?')}@{v.get('InstalledVersion','?')} — {v.get('Title','?')[:100]}\")
+              print('\n'.join(findings[:50]) if findings else 'none')
+          except Exception as e:
+              print('parse-error: ' + str(e))
+          ")
+          echo "findings<<EOF" >> $GITHUB_OUTPUT
+          echo "$HIGH_CRIT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ── Determine if issues were found ────────────────────────────────────
+      - name: Check for HIGH/CRITICAL findings
+        id: check
+        run: |
+          PIP="${{ steps.pip-audit.outputs.findings }}"
+          WEB="${{ steps.npm-audit-web.outputs.findings }}"
+          MOB="${{ steps.npm-audit-mobile.outputs.findings }}"
+          TRIVY="${{ steps.trivy-parse.outputs.findings }}"
+
+          HAS_FINDINGS="false"
+          [[ "$PIP"   != "none" && "$PIP"   != "" ]] && HAS_FINDINGS="true"
+          [[ "$WEB"   != "none" && "$WEB"   != "" ]] && HAS_FINDINGS="true"
+          [[ "$MOB"   != "none" && "$MOB"   != "" ]] && HAS_FINDINGS="true"
+          [[ "$TRIVY" != "none" && "$TRIVY" != "" ]] && HAS_FINDINGS="true"
+
+          echo "has_findings=$HAS_FINDINGS" >> $GITHUB_OUTPUT
+
+          # Build combined report for issue body
+          REPORT="## Security Scan Report
+          **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
+          **Commit:** ${{ github.sha }}
+          **Triggered by:** ${{ github.event_name }}
+
+          ### pip-audit (neufin-backend)
+          \`\`\`
+          ${PIP:-none}
+          \`\`\`
+
+          ### npm audit (neufin-web)
+          \`\`\`
+          ${WEB:-none}
+          \`\`\`
+
+          ### npm audit (neufin-mobile)
+          \`\`\`
+          ${MOB:-none}
+          \`\`\`
+
+          ### Trivy (full repo, HIGH/CRITICAL)
+          \`\`\`
+          ${TRIVY:-none}
+          \`\`\`"
+
+          echo "report<<EOREPORT" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOREPORT" >> $GITHUB_OUTPUT
+
+      # ── Create GitHub Issue ───────────────────────────────────────────────
+      - name: Create GitHub Issue for HIGH/CRITICAL findings
+        if: steps.check.outputs.has_findings == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list \
+            --label "security" \
+            --state open \
+            --json number,title \
+            --jq '[.[] | select(.title | startswith("🔴 Security Scan"))] | length')
+
+          if [ "$EXISTING" -gt "0" ]; then
+            echo "Open security issue already exists; skipping creation to avoid duplicates."
+          else
+            gh issue create \
+              --title "🔴 Security Scan — HIGH/CRITICAL findings $(date -u '+%Y-%m-%d')" \
+              --label "security,automated" \
+              --body "${{ steps.check.outputs.report }}"
+          fi
+
+      # ── Slack notification ─────────────────────────────────────────────────
+      - name: Notify Slack — findings found
+        if: steps.check.outputs.has_findings == 'true'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"🔴 *Security Scan — HIGH/CRITICAL vulnerabilities found*\",
+              \"attachments\": [{
+                \"color\": \"danger\",
+                \"fields\": [
+                  {\"title\": \"pip-audit (backend)\", \"value\": \"$(echo '${{ steps.pip-audit.outputs.findings }}' | head -3)\", \"short\": false},
+                  {\"title\": \"npm audit (web)\", \"value\": \"$(echo '${{ steps.npm-audit-web.outputs.findings }}' | head -3)\", \"short\": false},
+                  {\"title\": \"npm audit (mobile)\", \"value\": \"$(echo '${{ steps.npm-audit-mobile.outputs.findings }}' | head -3)\", \"short\": false},
+                  {\"title\": \"Trivy\", \"value\": \"$(echo '${{ steps.trivy-parse.outputs.findings }}' | head -3)\", \"short\": false},
+                  {\"title\": \"Full report\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/issues|View GitHub Issues>\", \"short\": false}
+                ]
+              }]
+            }"
+
+      - name: Notify Slack — scan clean
+        if: steps.check.outputs.has_findings == 'false'
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"✅ *Security Scan — No HIGH/CRITICAL findings* ($(date -u '+%Y-%m-%d'))\"
+            }"

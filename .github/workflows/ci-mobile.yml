@@ -1,0 +1,60 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'neufin-mobile/**'
+      - '.github/workflows/ci-mobile.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'neufin-mobile/**'
+      - '.github/workflows/ci-mobile.yml'
+
+concurrency:
+  group: ci-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── TypeScript Check ──────────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: neufin-mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: neufin-mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Notify Slack on failure
+        if: failure()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"❌ *Mobile CI — TypeScript check failed*\",
+              \"attachments\": [{
+                \"color\": \"danger\",
+                \"fields\": [
+                  {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\", \"short\": true},
+                  {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
+                ]
+              }]
+            }"

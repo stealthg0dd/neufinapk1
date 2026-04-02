@@ -1,0 +1,127 @@
+name: Deploy Web
+
+on:
+  # Runs after Web CI completes successfully on main
+  workflow_run:
+    workflows: ["Web CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    # Only deploy when CI passed
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      # ── Deploy ────────────────────────────────────────────────────────────
+      - name: Deploy to Vercel (production)
+        id: vercel-deploy
+        working-directory: neufin-web
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prod \
+            --token "${{ secrets.VERCEL_TOKEN }}" \
+            --scope "${{ secrets.VERCEL_ORG_ID }}" \
+            --yes \
+            2>&1 | tee /tmp/vercel-output.txt | grep -E '^https://' | tail -1)
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOYMENT_URL"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_NEUFIN_WEB }}
+
+      # ── Wait & Verify Ready ───────────────────────────────────────────────
+      - name: Wait for deployment to be ready
+        run: |
+          URL="${{ steps.vercel-deploy.outputs.deployment_url }}"
+          if [ -z "$URL" ]; then
+            echo "No deployment URL captured; checking Vercel output..."
+            cat /tmp/vercel-output.txt
+            exit 1
+          fi
+          echo "Polling $URL for readiness..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "$URL" --max-time 20 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "308" ]; then
+              echo "✅ Deployment is ready (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $STATUS — waiting 15s..."
+            sleep 15
+          done
+          echo "❌ Deployment did not become ready in time"
+          exit 1
+
+      # ── Sentry Release ────────────────────────────────────────────────────
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_NEUFIN_WEB }}
+        with:
+          environment: production
+          version: ${{ github.event.workflow_run.head_sha }}
+
+      # ── Heartbeat ─────────────────────────────────────────────────────────
+      - name: POST heartbeat to router-system
+        run: |
+          curl -s -X POST "${{ secrets.AGENT_OS_URL }}/api/heartbeat/neufin-web" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.AGENT_OS_API_KEY }}" \
+            -d "{
+              \"service\": \"neufin-web\",
+              \"status\": \"deployed\",
+              \"sha\": \"${{ github.event.workflow_run.head_sha }}\",
+              \"url\": \"${{ steps.vercel-deploy.outputs.deployment_url }}\",
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }" || echo "Heartbeat endpoint unavailable — continuing"
+
+      # ── Slack Success ─────────────────────────────────────────────────────
+      - name: Notify Slack — deploy success
+        if: success()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"✅ *neufin-web deployed to production*\",
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"fields\": [
+                  {\"title\": \"URL\", \"value\": \"${{ steps.vercel-deploy.outputs.deployment_url }}\", \"short\": false},
+                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}|${{ github.event.workflow_run.head_sha }}>\", \"short\": true},
+                  {\"title\": \"Environment\", \"value\": \"production\", \"short\": true}
+                ]
+              }]
+            }"
+
+      # ── Slack Failure ─────────────────────────────────────────────────────
+      - name: Notify Slack — deploy failure
+        if: failure()
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"❌ *neufin-web deploy FAILED*\",
+              \"attachments\": [{
+                \"color\": \"danger\",
+                \"fields\": [
+                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}|${{ github.event.workflow_run.head_sha }}>\", \"short\": true},
+                  {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
+                ]
+              }]
+            }"
