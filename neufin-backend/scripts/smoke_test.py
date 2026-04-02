@@ -220,5 +220,5 @@ if __name__ == "__main__":
     import sys
 
     sys.exit(
-        subprocess.call(["pytest", __file__, "-v", "--tb=short"])
-    )  # noqa: S603, S607
+        subprocess.call(["pytest", __file__, "-v", "--tb=short"])  # noqa: S603, S607
+    )
