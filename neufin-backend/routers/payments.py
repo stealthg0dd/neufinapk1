@@ -18,7 +18,7 @@ import datetime
 import sentry_sdk
 import stripe
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from config import (
@@ -32,10 +32,11 @@ from config import (
 from database import supabase
 from services.ai_router import get_ai_analysis
 from services.analytics import track
-from services.auth_dependency import get_optional_user
+from services.auth_dependency import get_optional_user, invalidate_subscription_cache
 from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
 from services.pdf_generator import generate_advisor_report
+from services.slack import notify_alerts
 
 logger = structlog.get_logger(__name__)
 
@@ -285,11 +286,18 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
 
 
 @router.post("/api/stripe/webhook")
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     Stripe webhook handler.
+
+    Security:
+      - Validates stripe-signature header before processing any event.
+      - Rejects replays with CRITICAL alert on signature failure.
+      - Idempotency: each Stripe event_id is processed at most once via
+        the stripe_processed_events Supabase table.
+
     Handles: checkout.session.completed
-      - single plan  → marks report as paid, triggers PDF generation
+      - single plan  → marks report as paid, queues PDF generation in background
       - unlimited    → upgrades user subscription_tier to 'pro'
     """
     payload = await request.body()
@@ -298,9 +306,36 @@ async def stripe_webhook(request: Request):
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
     except stripe.SignatureVerificationError as e:
+        # CRITICAL: potential replay attack or misconfigured webhook secret
+        msg = (
+            f":rotating_light: *CRITICAL — Stripe webhook signature validation FAILED*\n"
+            f"Path: `{request.url.path}`  IP: `{request.client.host if request.client else 'unknown'}`\n"
+            f"Error: `{e}`"
+        )
+        sentry_sdk.capture_exception(e, extras={"severity": "critical", "ip": request.client.host if request.client else "unknown"})
+        await notify_alerts(msg)
+        logger.critical("stripe.webhook_signature_invalid", error=str(e))
         raise HTTPException(400, "Invalid Stripe signature") from e
     except Exception as e:
         raise HTTPException(400, f"Webhook error: {e}") from e
+
+    # ── Idempotency: skip already-processed events ─────────────────────────────
+    event_id = event["id"]
+    try:
+        existing = (
+            supabase.table("stripe_processed_events")
+            .select("event_id")
+            .eq("event_id", event_id)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            logger.info("stripe.webhook_duplicate_skipped", event_id=event_id, event_type=event["type"])
+            return {"status": "ok"}
+        supabase.table("stripe_processed_events").insert({"event_id": event_id, "event_type": event["type"]}).execute()
+    except Exception as e:
+        logger.warning("stripe.idempotency_check_failed", error=str(e))
+        # Fail open: proceed even if idempotency table is unavailable
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
@@ -321,13 +356,14 @@ async def stripe_webhook(request: Request):
         stripe_customer_id = session.get("customer")
 
         if plan == "single" and report_id:
-            # Mark paid
+            # Mark paid synchronously — fast DB call
             supabase.table("advisor_reports").update({"is_paid": True}).eq(
                 "id", report_id
             ).execute()
-            # Generate PDF asynchronously (Stripe timeout is 30s — PDF gen is ~3-8s)
+            # Queue PDF generation as background task so we return 200 to Stripe
+            # immediately — PDF generation can take 3-30 seconds.
             if portfolio_id:
-                await _generate_and_store_pdf(portfolio_id, report_id)
+                background_tasks.add_task(_generate_and_store_pdf, portfolio_id, report_id)
 
         elif plan == "unlimited" and advisor_id and advisor_id != "anonymous":
             # Upgrade subscription status and store Stripe customer ID
@@ -339,6 +375,8 @@ async def stripe_webhook(request: Request):
                         "trial_started_at": None,
                     }
                 ).eq("id", advisor_id).execute()
+                # Immediately invalidate cached subscription status for this user
+                invalidate_subscription_cache(advisor_id)
             except Exception as e:
                 sentry_sdk.set_tag("stripe_event_type", "subscription_upgrade")
                 sentry_sdk.capture_exception(e)
@@ -348,8 +386,7 @@ async def stripe_webhook(request: Request):
         sub = event["data"]["object"]
         customer_id = sub.get("customer")
         try:
-            # Look up advisor_id from Stripe customer metadata
-            customer = stripe.Customer.retrieve(customer_id)
+            customer = await asyncio.to_thread(lambda: stripe.Customer.retrieve(customer_id))
             advisor_id = customer.get("metadata", {}).get("advisor_id")
             if advisor_id:
                 supabase.table("user_profiles").update(
@@ -357,6 +394,7 @@ async def stripe_webhook(request: Request):
                         "subscription_status": "expired",
                     }
                 ).eq("id", advisor_id).execute()
+                invalidate_subscription_cache(advisor_id)
         except Exception as e:
             sentry_sdk.set_tag("stripe_event_type", "subscription_deleted")
             sentry_sdk.capture_exception(e)

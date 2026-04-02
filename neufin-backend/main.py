@@ -78,6 +78,7 @@ logger = structlog.get_logger("neufin.main")
 
 import pandas as pd  # noqa: E402
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from database import supabase  # noqa: E402
@@ -220,6 +221,46 @@ async def lifespan(app: FastAPI):
     logger.info("app.shutdown")
 
 # ── Auth config ────────────────────────────────────────────────────────────────
+#
+# UNAUTHENTICATED ACCESS DOCUMENTATION
+# ======================================
+# The auth_middleware is SOFT — it never rejects; it only attaches
+# request.state.user when a valid token is found. Rejection is enforced
+# per-endpoint via FastAPI Depends(get_current_user).
+#
+# Paths accessible without any authentication (open to the internet):
+#   GET  /                        — landing / health redirect
+#   GET  /health                  — uptime check, no secrets
+#   GET  /docs, /redoc, /openapi.json  — API docs (consider restricting in prod)
+#   GET  /metrics                 — Prometheus (consider IP-allow in prod)
+#   POST /api/analyze-dna         — guest DNA analysis (rate-limited: 3/IP/24h)
+#   GET  /api/dna/share/{id}      — shareable DNA score link
+#   GET  /api/dna/leaderboard     — public leaderboard
+#   POST /api/reports/checkout    — initiate Stripe checkout (no sensitive data)
+#   GET  /api/reports/fulfill     — PDF download (gated by report ownership check)
+#   POST /api/stripe/webhook      — Stripe webhook (gated by sig validation)
+#   GET  /api/payments/plans      — list public pricing plans
+#   GET  /api/portfolio/chart/*   — public chart data
+#   GET  /api/referrals/*         — referral landing pages
+#   POST /api/emails/*            — email capture / waitlist
+#   GET  /api/advisors/*          — public advisor profiles (not private endpoints)
+#   GET  /api/market/*            — public market data
+#   POST /api/analytics/track     — client-side event tracking
+#   GET  /api/swarm/*             — public swarm results
+#   GET  /api/admin/health        — internal health check (same as /health)
+#   GET  /api/auth/status         — auth status ping (returns null user if unauthed)
+#
+# COOKIE AUTH DECISION
+# =====================
+# auth_middleware reads BOTH the `sb-access-token` cookie AND the `neufin-auth`
+# cookie. The `neufin-auth` cookie is written by neufin-web/lib/sync-auth-cookie.ts
+# and validated by the Next.js middleware for server-side rendering.
+# Decision: KEEP the neufin-auth cookie path.
+# Rationale: The SSR pages (advisors dashboard, report pages) require a cookie
+# that is forwarded with the SSR fetch to this API. Removing it would break SSR
+# auth without any security benefit, since both cookies carry the same Supabase
+# JWT and are validated identically.
+#
 PUBLIC_PATHS = {"/", "/health", "/docs", "/redoc", "/openapi.json", "/metrics"}
 PUBLIC_PREFIXES = [
     "/api/analyze-dna",
@@ -260,7 +301,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     includes the trace_id so support can correlate logs without exposing
     internal details.
     """
-    # Re-raise HTTP exceptions so FastAPI handles them with their intended status.
     from fastapi import HTTPException as _HTTPEx
     from starlette.responses import JSONResponse as _JSONResponse
 
@@ -282,9 +322,71 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             "error": "internal_error",
             "trace_id": trace_id,
             "message": "An error occurred. Our team has been notified.",
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
         },
         headers={"X-Trace-Id": trace_id},
     )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Standardised error shape for all HTTP exceptions:
+    {error, message, trace_id, timestamp}
+    """
+    from starlette.responses import JSONResponse as _JSONResponse
+
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    return _JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": _http_status_slug(exc.status_code),
+            "message": exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+            "trace_id": trace_id,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        },
+        headers={"X-Trace-Id": trace_id},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Standardised error shape for Pydantic / FastAPI request validation errors:
+    {error, message, trace_id, timestamp}
+    """
+    from starlette.responses import JSONResponse as _JSONResponse
+
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    first_error = exc.errors()[0] if exc.errors() else {}
+    loc = " → ".join(str(l) for l in first_error.get("loc", []))
+    message = f"{loc}: {first_error.get('msg', 'Validation error')}" if loc else first_error.get("msg", "Invalid request")
+    return _JSONResponse(
+        status_code=422,
+        content={
+            "error": "validation_error",
+            "message": message,
+            "trace_id": trace_id,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        },
+        headers={"X-Trace-Id": trace_id},
+    )
+
+
+def _http_status_slug(status_code: int) -> str:
+    return {
+        400: "bad_request",
+        401: "unauthorized",
+        403: "forbidden",
+        404: "not_found",
+        405: "method_not_allowed",
+        409: "conflict",
+        422: "validation_error",
+        429: "too_many_requests",
+        500: "internal_error",
+        502: "bad_gateway",
+        503: "service_unavailable",
+    }.get(status_code, f"http_{status_code}")
 
 # ── Observability: Prometheus metrics endpoint (/metrics) ─────────────────────
 try:
@@ -447,6 +549,39 @@ async def analyze_dna(
     incoming_file = file or csv_file or upload or data
     if incoming_file is None:
         raise HTTPException(status_code=422, detail="File required.")
+
+    # ── Guest rate-limiting (unauthenticated callers: max 3 analyses per IP per 24h) ─
+    # Cookie auth is preserved for SSR (see auth_middleware notes); this limit only
+    # applies when NO valid JWT is present.
+    _requesting_user = getattr(getattr(request, "state", None), "user", None)
+    if _requesting_user is None:
+        _client_ip = (request.headers.get("X-Forwarded-For") or (request.client.host if request.client else "")).split(",")[0].strip()
+        _today = datetime.date.today().isoformat()
+        try:
+            _limit_row = (
+                supabase.table("guest_analysis_limits")
+                .select("count")
+                .eq("ip", _client_ip)
+                .eq("window_start", _today)
+                .limit(1)
+                .execute()
+            )
+            _current_count = _limit_row.data[0]["count"] if _limit_row.data else 0
+            if _current_count >= 3:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Guest analysis limit reached (3 per day). Please sign in to continue.",
+                )
+            # Upsert counter for this IP/day
+            if _limit_row.data:
+                supabase.table("guest_analysis_limits").update({"count": _current_count + 1}).eq("ip", _client_ip).eq("window_start", _today).execute()
+            else:
+                supabase.table("guest_analysis_limits").insert({"ip": _client_ip, "window_start": _today, "count": 1}).execute()
+        except HTTPException:
+            raise
+        except Exception as _e:
+            logger.warning("guest_rate_limit.check_failed", error=str(_e))
+            # Fail open — don't block the user if the rate-limit table is unavailable
 
     # ── 0. Diagnostics ─────────────────────────────────────────────────────────
     logger.debug(

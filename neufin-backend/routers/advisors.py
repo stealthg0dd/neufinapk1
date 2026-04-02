@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import supabase
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_subscribed_user
 from services.jwt_auth import JWTUser
 
 router = APIRouter(prefix="/api/advisors", tags=["advisors"])
@@ -93,7 +93,7 @@ async def get_advisor_profile(advisor_id: str):
 
 @router.put("/me")
 async def upsert_advisor_profile(
-    body: AdvisorProfileRequest, user: JWTUser = Depends(get_current_user)
+    body: AdvisorProfileRequest, user: JWTUser = Depends(get_subscribed_user)
 ):
     """Upsert the authenticated user's advisor profile."""
     user_id = user.id

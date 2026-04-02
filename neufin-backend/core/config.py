@@ -100,6 +100,20 @@ class Settings(BaseSettings):
         description="Stripe coupon ID for referral discount. Dashboard → Coupons.",
     )
 
+    # ── Slack webhooks ────────────────────────────────────────────────────────
+    SLACK_WEBHOOK_NEUFIN_ALERTS: str | None = Field(
+        default=None,
+        description="Slack incoming webhook URL for #neufin-alerts.",
+    )
+    SLACK_WEBHOOK_NEUFIN_DEV: str | None = Field(
+        default=None,
+        description="Slack incoming webhook URL for #neufin-dev.",
+    )
+    SLACK_WEBHOOK_CTECH_COMMAND: str | None = Field(
+        default=None,
+        description="Slack incoming webhook URL for #ctech-command.",
+    )
+
     # ── Observability (SENTRY_DSN required at startup) ────────────────────────
     SENTRY_DSN: str | None = Field(
         default=None,

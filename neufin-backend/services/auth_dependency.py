@@ -1,11 +1,23 @@
 import datetime
 import json
+import time
 from urllib.parse import unquote
 
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 
 from database import supabase
 from services.jwt_auth import JWTUser, verify_jwt
+
+# ── Subscription cache ─────────────────────────────────────────────────────────
+# Per-user in-memory cache: {user_id: (status_dict, expires_at)}
+_sub_cache: dict[str, tuple[dict, float]] = {}
+_SUB_CACHE_TTL = 60.0  # seconds
+
+
+def invalidate_subscription_cache(user_id: str) -> None:
+    """Remove a user's cached subscription status (call after Stripe webhook)."""
+    _sub_cache.pop(user_id, None)
+
 
 # ── Subscription helpers ────────────────────────────────────────────────────────
 
@@ -25,6 +37,13 @@ def fetch_user_profile(user_id: str) -> dict:
 
 
 def get_subscription_status(user_id: str) -> dict:
+    # Check cache first
+    cached = _sub_cache.get(user_id)
+    if cached is not None:
+        status_dict, expires_at = cached
+        if time.monotonic() < expires_at:
+            return status_dict
+
     profile = fetch_user_profile(user_id)
     trial_started_at = profile.get("trial_started_at")
     status_val = profile.get("subscription_status", "trial")
@@ -35,12 +54,18 @@ def get_subscription_status(user_id: str) -> dict:
             trial_days = (now - started).days
             if trial_days <= 14:
                 days_remaining = 14 - trial_days
-                return {"status": "trial", "days_remaining": days_remaining}
+                result = {"status": "trial", "days_remaining": days_remaining}
+                _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
+                return result
         except Exception:  # noqa: S110
             pass  # malformed date — fall through to expired
     if status_val == "active":
-        return {"status": "active"}
-    return {"status": "expired", "days_remaining": 0}
+        result = {"status": "active"}
+        _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
+        return result
+    result = {"status": "expired", "days_remaining": 0}
+    _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
+    return result
 
 
 def require_active_subscription(user: JWTUser | None = None) -> JWTUser:
@@ -141,3 +166,11 @@ async def get_optional_user(request: Request) -> JWTUser | None:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
         ) from err
+
+
+async def get_subscribed_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
+    """
+    FastAPI dependency that requires both a valid JWT AND an active/trial subscription.
+    Use on advisor-only endpoints that require a paid or trial account.
+    """
+    return require_active_subscription(user)
