@@ -23,12 +23,19 @@ def _ruff_severity(code: str) -> str:
 
 
 async def _run_ruff() -> list[Issue]:
-    backend = REPO_ROOT
-    proc = await asyncio.create_subprocess_exec(
-        "ruff", "check", str(backend), "--output-format=json",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    backend = REPO_ROOT / "neufin-backend"
+    if not backend.exists():
+        log.warning({"action": "python_check_skip", "reason": "backend_not_found", "path": str(backend)})
+        return []
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ruff", "check", str(backend), "--output-format=json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        log.warning({"action": "python_check_skip", "reason": "ruff_not_installed"})
+        return []
     stdout, _ = await proc.communicate()
     try:
         results = json.loads(stdout.decode(errors="replace"))
@@ -62,14 +69,20 @@ async def _run_ruff() -> list[Issue]:
 
 
 async def _run_bandit() -> list[Issue]:
-    backend = REPO_ROOT
-    proc = await asyncio.create_subprocess_exec(
-        "bandit", "-r", str(backend), "-f", "json",
-        "-x", str(backend / "tests"),
-        "--quiet",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    backend = REPO_ROOT / "neufin-backend"
+    if not backend.exists():
+        return []
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "bandit", "-r", str(backend), "-f", "json",
+            "-x", str(backend / "tests"),
+            "--quiet",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        log.warning({"action": "python_check_skip", "reason": "bandit_not_installed"})
+        return []
     stdout, _ = await proc.communicate()
     try:
         data = json.loads(stdout.decode(errors="replace"))

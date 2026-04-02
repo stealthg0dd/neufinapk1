@@ -5,7 +5,6 @@ import os
 from datetime import datetime, UTC
 from pathlib import Path
 
-import httpx
 import sentry_sdk
 
 from core.audit_log import (
@@ -13,8 +12,12 @@ from core.audit_log import (
     begin_scan_run,
     complete_scan_run,
     compute_health_score,
+    get_recently_resolved,
 )
-from core.notifier import notify_scan_complete, notify_critical
+from core.notifier import notify_scan_complete, notify_critical, notify_high
+from core.supabase_persistence import write_findings, write_scan_run
+from core.github_issues import process_findings as gh_process_findings, close_resolved_issues
+from core.router_sync import post_scan_results
 import detectors.typescript_check as typescript_check
 import detectors.python_check as python_check
 import detectors.auth_detector as auth_detector
@@ -31,64 +34,32 @@ REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 REPOS = ("neufin-backend", "neufin-web", "neufin-mobile")
 
 
-def _sentry_project_map() -> dict[str, str]:
-    return {
-        "neufin-backend": os.getenv("SENTRY_PROJECT_neufin_backend") or os.getenv("SENTRY_PROJECT_BACKEND", ""),
-        "neufin-web": os.getenv("SENTRY_PROJECT_neufin_web") or os.getenv("SENTRY_PROJECT_WEB", ""),
-    }
-
-
-async def _create_sentry_releases_for_scan() -> None:
-    auth_token = os.getenv("SENTRY_AUTH_TOKEN", "")
-    org = os.getenv("SENTRY_ORG", "")
-    if not auth_token or not org:
-        return
-
-    commit_sha = os.getenv("RAILWAY_GIT_COMMIT_SHA") or datetime.now(UTC).strftime("%Y%m%d%H%M%S")
-    headers = {"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"}
-
-    async with httpx.AsyncClient(timeout=20.0, headers=headers) as client:
-        for repo, project in _sentry_project_map().items():
-            if not project:
-                continue
-            version = f"{repo}@{commit_sha}"
-            payload = {
-                "version": version,
-                "projects": [project],
-            }
-            try:
-                resp = await client.post(
-                    f"https://sentry.io/api/0/organizations/{org}/releases/",
-                    json=payload,
-                )
-                # 208/409 means release already exists; treat as success
-                if resp.status_code not in (200, 201, 208, 409):
-                    log.warning({
-                        "action": "sentry_release_create_failed",
-                        "repo": repo,
-                        "project": project,
-                        "status": resp.status_code,
-                        "body": resp.text[:200],
-                    })
-                else:
-                    log.info({"action": "sentry_release_ready", "repo": repo, "version": version})
-            except Exception as exc:
-                log.error({"action": "sentry_release_error", "repo": repo, "error": str(exc)})
-
-
 def _publish_scan_issues_to_sentry(issues: list[dict]) -> int:
-    """Emit scanner issues as Sentry events so they appear in Sentry Issues tab."""
+    """Emit HIGH/CRITICAL scanner issues as Sentry events via SDK (no Sentry API scopes required)."""
     if not os.getenv("SENTRY_DSN"):
         return 0
 
     limit = int(os.getenv("SENTRY_SCAN_ISSUE_LIMIT", "121"))
     sent = 0
     for issue in issues[:limit]:
+        sev = issue.get("severity", "medium")
+        if sev not in ("critical", "high"):
+            continue
+
+        repo = issue.get("repo", "")
+        if repo == "neufin-backend":
+            project_tag = "python-fastapi"
+        elif repo == "neufin-web":
+            project_tag = "neufin-web"
+        else:
+            continue
+
         try:
             with sentry_sdk.push_scope() as scope:
                 scope.set_tag("source", "scanner")
-                scope.set_tag("repo", issue.get("repo", "unknown"))
-                scope.set_tag("severity", issue.get("severity", "medium"))
+                scope.set_tag("repo", repo)
+                scope.set_tag("project", project_tag)
+                scope.set_tag("severity", sev)
                 scope.set_tag("issue_type", issue.get("type", "unknown"))
                 scope.set_extra("file", issue.get("file", ""))
                 scope.set_extra("line", issue.get("line", 0))
@@ -113,6 +84,7 @@ async def run_all_detectors() -> dict:
         log.error({"action": "scan_aborted", "reason": f"Directory {REPO_ROOT} not found"})
         return {"error": "Repository root not found", "path": str(REPO_ROOT)}
 
+    started_at = datetime.now(UTC).isoformat()
     run_id = await begin_scan_run()
     log.info({"action": "detectors_start", "run_id": run_id, "scanning_path": str(REPO_ROOT)})
 
@@ -172,14 +144,31 @@ async def run_all_detectors() -> dict:
     await upsert_issues(issues)
     await complete_scan_run(run_id, scores, counts)
 
-    # Sentry integration: create per-repo releases and publish scanner issues as Sentry events
-    await _create_sentry_releases_for_scan()
+    # ── Supabase persistence ───────────────────────────────────────────────
+    completed_at = datetime.now(UTC).isoformat()
+    await write_findings(run_id, issues)
+    await write_scan_run(run_id, started_at, completed_at, counts)
+
+    # ── Router-system sync ─────────────────────────────────────────────────
+    await post_scan_results(report)
+
+    # ── GitHub Issues: open for new CRITICAL/HIGH, close resolved ─────────
+    await gh_process_findings(issues)
+    recently_resolved = await get_recently_resolved(started_at)
+    if recently_resolved:
+        await close_resolved_issues(recently_resolved)
+
+    # Sentry integration: publish scanner findings directly via SDK
     published = _publish_scan_issues_to_sentry(issues)
     log.info({"action": "sentry_scan_sync_complete", "published_issues": published})
 
+    # ── Slack: CRITICAL → alerts+command, HIGH → dev ───────────────────────
     for issue in issues:
-        if issue.get("severity") == "critical":
+        sev = issue.get("severity")
+        if sev == "critical":
             await notify_critical(issue)
+        elif sev == "high":
+            await notify_high(issue)
 
     await notify_scan_complete(report)
     return report

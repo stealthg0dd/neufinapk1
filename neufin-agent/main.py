@@ -41,8 +41,12 @@ from core.runtime_monitor import (
     get_runtime_summary,
 )
 from core.notifier import send_daily_summary, send_weekly_trend
+from core.router_sync import register_agent, heartbeat_loop
 
 load_dotenv()
+
+# Validate all required env vars at startup — fails fast via SystemExit if missing
+from core.config import settings  # noqa: E402  (import after load_dotenv)
 
 _AGENT_SENTRY_ENV: str = os.getenv("ENVIRONMENT", "production")
 _AGENT_SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
@@ -199,13 +203,14 @@ async def scheduled_scan():
 
 
 async def daily_summary_job():
-    """Send daily Slack summary — scheduled at 00:00 UTC (08:00 SGT)."""
+    """Send daily Slack digest — 08:30 SGT = 00:30 UTC."""
     report_path = Path(__file__).parent / "health_report.json"
     if not report_path.exists():
         return
     try:
         report = json.loads(report_path.read_text())
-        await send_daily_summary(report)
+        open_findings = await get_open_issues(limit=5)
+        await send_daily_summary(report, open_findings=open_findings)
     except Exception as e:
         sentry_sdk.capture_exception(e)
         log.error({"action": "daily_summary_error", "error": str(e)})
@@ -225,22 +230,28 @@ async def weekly_trend_job():
 async def lifespan(app: FastAPI):
     # Railway/Deployment Sync
     sync_repository()
-    
+
     await init_db()
     await init_runtime_db()
     log.info({"action": "db_init_complete"})
+
+    # Register with router-system (non-blocking; errors are swallowed in router_sync)
+    asyncio.create_task(register_agent())
 
     interval = int(os.getenv("SCAN_INTERVAL_HOURS", "6"))
     scheduler.add_job(scheduled_scan, "interval", hours=interval, id="full_scan")
     scheduler.add_job(check_railway_health, "interval", minutes=5, id="railway_health")
     scheduler.add_job(check_vercel_analytics, "interval", hours=1, id="vercel_analytics")
     scheduler.add_job(poll_sentry_issues, "interval", minutes=5, id="sentry_poll")
-    # 08:00 SGT = 00:00 UTC daily
-    scheduler.add_job(daily_summary_job, "cron", hour=0, minute=0, id="daily_summary")
+    # 08:30 SGT = 00:30 UTC daily
+    scheduler.add_job(daily_summary_job, "cron", hour=0, minute=30, id="daily_summary")
     # Weekly trend: Monday 00:00 UTC (08:00 SGT Mon)
     scheduler.add_job(weekly_trend_job, "cron", day_of_week="mon", hour=0, minute=0, id="weekly_trend")
     scheduler.start()
     log.info({"action": "scheduler_started", "interval_hours": interval})
+
+    # Start 60-second heartbeat loop
+    asyncio.create_task(heartbeat_loop())
 
     # Initial scan on startup (non-blocking)
     asyncio.create_task(scheduled_scan())

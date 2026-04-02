@@ -454,7 +454,23 @@ def _is_false_positive(issue: dict, fps: list[dict]) -> bool:
 
 # ── Weekly trend report data ───────────────────────────────────────────────
 
-async def get_weekly_trend() -> dict:
+async def get_recently_resolved(since_iso: str) -> list[dict]:
+    """Return issues that were fixed or dismissed after `since_iso`."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """
+            SELECT * FROM issues
+            WHERE status IN ('fixed', 'dismissed')
+              AND resolved_at >= ?
+            ORDER BY resolved_at DESC
+            """,
+            (since_iso,),
+        )
+        return [dict(r) for r in await cur.fetchall()]
+
+
+
     """
     Aggregate last 7 days of scan_runs to produce trend report data.
     Returns dict ready for notifier.send_weekly_trend().
