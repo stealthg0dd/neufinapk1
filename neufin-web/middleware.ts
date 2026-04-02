@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // ── Public path prefixes — skip auth check entirely ───────────────────────
 const PUBLIC_PREFIXES = [
@@ -25,6 +26,12 @@ const PUBLIC_PREFIXES = [
   '/sitemap',
   '/robots',
   '/llms',
+]
+
+// ── Advisor-only paths — require valid session AND advisor role ────────────
+const ADVISOR_ONLY_PREFIXES = [
+  '/dashboard/admin',
+  '/dashboard/revenue',
 ]
 
 function isJwtExpired(token: string): boolean {
@@ -73,6 +80,44 @@ async function hasValidSupabaseSession(token: string): Promise<boolean> {
     logger.error({ error }, 'middleware.supabase_session_error')
     return false
   }
+}
+
+async function hasAdvisorRole(token: string): Promise<boolean> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return false
+  try {
+    // Get user from token
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!userRes.ok) return false
+    const userJson = await userRes.json() as { id?: string }
+    const userId = userJson.id
+    if (!userId) return false
+
+    // Check user_profiles.role via REST API with service key
+    const profileRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=role&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        cache: 'no-store',
+      },
+    )
+    if (!profileRes.ok) return false
+    const profiles = await profileRes.json() as { role?: string }[]
+    return profiles[0]?.role === 'advisor'
+  } catch (error) {
+    logger.error({ error }, 'middleware.advisor_check_error')
+    return false
+  }
+}
+
+function redirectToDashboard(request: NextRequest): NextResponse {
+  const dashboardUrl = new URL('/dashboard', request.url)
+  return NextResponse.redirect(dashboardUrl)
 }
 
 function redirectToAuth(request: NextRequest, pathname: string, clearCookie = false): NextResponse {
@@ -128,6 +173,15 @@ export async function middleware(request: NextRequest) {
   if (!isValid) {
     logger.info({ pathname }, '[Middleware] redirect_invalid_cookie')
     return redirectToAuth(request, pathname, true)
+  }
+
+  // ── Advisor-only paths: additional role check ─────────────────────────────
+  if (ADVISOR_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
+    const isAdvisor = await hasAdvisorRole(token)
+    if (!isAdvisor) {
+      logger.info({ pathname }, '[Middleware] redirect_non_advisor')
+      return redirectToDashboard(request)
+    }
   }
 
   logger.info({ pathname }, '[Middleware] allow_request')

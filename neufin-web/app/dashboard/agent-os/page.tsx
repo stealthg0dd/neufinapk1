@@ -4,17 +4,198 @@
  * CTech Agent OS Monitoring Dashboard
  * Route: /dashboard/agent-os
  *
+ * ROW 0 — NeuFin repo health (neufin-backend/web/mobile/agent) + scan findings
  * ROW 1 — Budget bar (today + monthly)
  * ROW 2 — Provider health grid
  * ROW 3 — Company status cards (agent count, last brief time, task queue)
  * ROW 4 — Today's briefs accordion (one per company)
  *
  * Polls /api/agent-os/status every 30 seconds.
+ * NeuFin health polls /api/neufin/health every 60 seconds.
  * Tailwind only — no external UI libraries.
  * Dark-mode compatible using Tailwind dark: variants.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import type { NeuFinHealthData, RepoHeartbeat, ScanFinding, RepoDeployment } from "@/app/api/neufin/health/route"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NeuFin Health types (imported from API route, re-stated for clarity)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Re-export types are imported above via the route module.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NeuFin Health — utilities
+// ─────────────────────────────────────────────────────────────────────────────
+
+const REPO_LABELS: Record<string, string> = {
+  "neufin-backend": "Backend",
+  "neufin-web":     "Web",
+  "neufin-mobile":  "Mobile",
+  "neufin-agent":   "Agent",
+}
+
+function statusBadgeClass(status: RepoHeartbeat["status"]): string {
+  switch (status) {
+    case "live":    return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+    case "stale":   return "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30"
+    case "offline": return "bg-red-500/15 text-red-400 border border-red-500/30"
+  }
+}
+
+function statusDotClass(status: RepoHeartbeat["status"]): string {
+  switch (status) {
+    case "live":    return "bg-emerald-400"
+    case "stale":   return "bg-yellow-400 animate-pulse"
+    case "offline": return "bg-red-500"
+  }
+}
+
+function severityClass(sev: ScanFinding["severity"]): string {
+  switch (sev) {
+    case "CRITICAL": return "bg-red-500/15 text-red-400 border border-red-500/30"
+    case "HIGH":     return "bg-orange-500/15 text-orange-400 border border-orange-500/30"
+    case "MEDIUM":   return "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30"
+    case "LOW":      return "bg-gray-700 text-gray-400"
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROW 0a — Repo health cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RepoHealthCard({
+  repo,
+  deployment,
+  onRunScan,
+  scanning,
+}: {
+  repo:       RepoHeartbeat
+  deployment: RepoDeployment | undefined
+  onRunScan?: () => void
+  scanning?:  boolean
+}) {
+  const label = REPO_LABELS[repo.repo_id] ?? repo.repo_id
+
+  return (
+    <div className={`rounded-xl border p-4 space-y-3 ${
+      repo.status === "live"    ? "border-gray-800 bg-gray-900" :
+      repo.status === "stale"  ? "border-yellow-500/20 bg-yellow-500/5" :
+                                  "border-red-500/20 bg-red-500/5"
+    }`}>
+      {/* Name + dot */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`h-2 w-2 rounded-full flex-shrink-0 ${statusDotClass(repo.status)}`} />
+          <span className="font-semibold text-sm text-gray-200">{label}</span>
+        </div>
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusBadgeClass(repo.status)}`}>
+          {repo.status.toUpperCase()}
+        </span>
+      </div>
+
+      {/* Last seen */}
+      <div className="space-y-1">
+        {repo.last_seen && (
+          <p className="text-[11px] text-gray-500">
+            Last seen: <span className="text-gray-400">{relativeTime(repo.last_seen)}</span>
+          </p>
+        )}
+        {repo.version && (
+          <p className="text-[11px] text-gray-500">
+            Version: <span className="text-gray-400 font-mono">{repo.version}</span>
+          </p>
+        )}
+        {deployment?.deployed_at && (
+          <p className="text-[11px] text-gray-500">
+            Deployed: <span className="text-gray-400">{relativeTime(deployment.deployed_at)}</span>
+            {deployment.commit_sha && (
+              <span className="ml-1 font-mono text-gray-600">{deployment.commit_sha.slice(0, 7)}</span>
+            )}
+          </p>
+        )}
+        {deployment?.commit_msg && (
+          <p className="text-[11px] text-gray-600 truncate" title={deployment.commit_msg}>
+            {deployment.commit_msg}
+          </p>
+        )}
+      </div>
+
+      {/* Run scan button — only on backend */}
+      {onRunScan && (
+        <button
+          onClick={onRunScan}
+          disabled={scanning}
+          className="w-full rounded-lg border border-blue-500/30 py-1.5 text-[11px] font-medium text-blue-400 hover:bg-blue-500/10 disabled:opacity-50 transition-colors"
+        >
+          {scanning ? "Scanning…" : "▶ Run Scan"}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROW 0b — Top findings
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ScanFindingsSection({
+  findings,
+  errorRate,
+}: {
+  findings:  ScanFinding[]
+  errorRate: NeuFinHealthData["error_rate"]
+}) {
+  if (findings.length === 0 && errorRate.unresolved_critical === 0 && errorRate.unresolved_high === 0) {
+    return (
+      <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <span className="text-sm text-gray-300">All clear — no open findings</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-3">
+      {/* Error rate pills */}
+      {(errorRate.unresolved_critical > 0 || errorRate.unresolved_high > 0) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {errorRate.unresolved_critical > 0 && (
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+              {errorRate.unresolved_critical} CRITICAL
+            </span>
+          )}
+          {errorRate.unresolved_high > 0 && (
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/30">
+              {errorRate.unresolved_high} HIGH
+            </span>
+          )}
+          <span className="text-[11px] text-gray-500">unresolved</span>
+        </div>
+      )}
+
+      {/* Findings list */}
+      <div className="divide-y divide-gray-800/60">
+        {findings.map((f) => (
+          <div key={f.id} className="py-2.5 flex items-start gap-3">
+            <span className={`mt-0.5 flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${severityClass(f.severity)}`}>
+              {f.severity}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-300 leading-snug">{f.message}</p>
+              <p className="text-[10px] text-gray-600 mt-0.5">
+                {f.category} · {f.repo_id} · {relativeTime(f.detected_at)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -479,6 +660,11 @@ export default function AgentOSDashboard() {
   // Which brief is open in ROW 4 accordion
   const [openBriefs,   setOpenBriefs]   = useState<Set<string>>(new Set())
 
+  // ── NeuFin health state ────────────────────────────────────────────────────
+  const [neufinHealth, setNeufinHealth] = useState<NeuFinHealthData | null>(null)
+  const [scanRunning,  setScanRunning]  = useState(false)
+  const [scanError,    setScanError]    = useState<string | null>(null)
+
   const refresh = useCallback(async () => {
     try {
       const res  = await fetch("/api/agent-os/status", { cache: "no-store" })
@@ -495,11 +681,45 @@ export default function AgentOSDashboard() {
     }
   }, [])
 
+  // ── NeuFin health refresh (60s poll) ────────────────────────────────────────
+  const refreshNeufinHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/neufin/health", { cache: "no-store" })
+      if (res.ok) setNeufinHealth(await res.json())
+    } catch { /* non-critical — fail silently */ }
+  }, [])
+
+  // ── Run neufin-backend scan via agent-os proxy ────────────────────────────
+  const runScan = useCallback(async () => {
+    setScanRunning(true)
+    setScanError(null)
+    try {
+      const res = await fetch("/api/agent-os/repos/neufin-backend/run-scan", { method: "POST" })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({})) as { detail?: string }
+        throw new Error(j.detail ?? `HTTP ${res.status}`)
+      }
+      // Refresh health data after a brief delay to pick up new scan results
+      setTimeout(refreshNeufinHealth, 3000)
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setScanRunning(false)
+    }
+  }, [refreshNeufinHealth])
+
   useEffect(() => {
     refresh()
     const id = setInterval(refresh, 30_000)
     return () => clearInterval(id)
   }, [refresh])
+
+  // NeuFin health: initial fetch + 60s poll
+  useEffect(() => {
+    refreshNeufinHealth()
+    const id = setInterval(refreshNeufinHealth, 60_000)
+    return () => clearInterval(id)
+  }, [refreshNeufinHealth])
 
   const toggleBrief = (company: string) => {
     setOpenBriefs((prev) => {
@@ -607,6 +827,55 @@ export default function AgentOSDashboard() {
             </button>
           </div>
         </div>
+
+        {/* ── ROW 0 — NeuFin Repo Health ─────────────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-2.5">
+            <h2 className={SL}>
+              NeuFin Infra
+              {neufinHealth && (
+                <span className="ml-2 normal-case font-normal text-gray-500">
+                  {neufinHealth.repos.filter(r => r.status === "live").length}/
+                  {neufinHealth.repos.length} live
+                </span>
+              )}
+            </h2>
+            {scanError && <span className="text-[11px] text-red-400">{scanError}</span>}
+          </div>
+
+          {!neufinHealth ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-gray-800 bg-gray-900 h-28 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {neufinHealth.repos.map((repo) => (
+                <RepoHealthCard
+                  key={repo.repo_id}
+                  repo={repo}
+                  deployment={neufinHealth.deployments.find(d => d.repo_id === repo.repo_id)}
+                  onRunScan={repo.repo_id === "neufin-backend" ? runScan : undefined}
+                  scanning={repo.repo_id === "neufin-backend" ? scanRunning : undefined}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Top findings */}
+          {neufinHealth && (neufinHealth.top_findings.length > 0 || neufinHealth.error_rate.unresolved_critical > 0 || neufinHealth.error_rate.unresolved_high > 0) && (
+            <div className="mt-3">
+              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-600 mb-2">
+                Open Findings
+              </h3>
+              <ScanFindingsSection
+                findings={neufinHealth.top_findings}
+                errorRate={neufinHealth.error_rate}
+              />
+            </div>
+          )}
+        </section>
 
         {/* ── ROW 1 — Budget ─────────────────────────────────────────────── */}
         <section>
