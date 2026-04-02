@@ -16,7 +16,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS analytics_events (
             id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id     UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -32,14 +33,17 @@ def upgrade() -> None:
         -- Only service role can insert; users cannot read their own raw events
         CREATE POLICY "service_role_insert" ON analytics_events
             FOR INSERT WITH CHECK (true);
-    """)
+    """
+    )
 
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_analytics_events_user
             ON analytics_events (user_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_analytics_events_name
             ON analytics_events (event_name, created_at DESC);
-    """)
+    """
+    )
 
 
 def downgrade() -> None:
