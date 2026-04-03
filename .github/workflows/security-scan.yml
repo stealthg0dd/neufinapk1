@@ -162,33 +162,33 @@ jobs:
 
           echo "has_findings=$HAS_FINDINGS" >> $GITHUB_OUTPUT
 
-          # Write report to a temp file using heredoc to avoid shell quoting/backtick issues
-          cat > /tmp/security-report.md << EOREPORT
-## Security Scan Report
-**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
-**Commit:** ${GITHUB_SHA}
-**Triggered by:** ${GITHUB_EVENT_NAME}
-
-### pip-audit (neufin-backend)
-\`\`\`
-${PIP}
-\`\`\`
-
-### npm audit (neufin-web)
-\`\`\`
-${WEB}
-\`\`\`
-
-### npm audit (neufin-mobile)
-\`\`\`
-${MOB}
-\`\`\`
-
-### Trivy (full repo, HIGH/CRITICAL)
-\`\`\`
-${TRIVY}
-\`\`\`
-EOREPORT
+          # Write report to a temp file; use printf/echo to stay YAML-indentation safe
+          {
+            echo "## Security Scan Report"
+            echo "**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "**Commit:** ${GITHUB_SHA}"
+            echo "**Triggered by:** ${GITHUB_EVENT_NAME}"
+            echo ""
+            echo "### pip-audit (neufin-backend)"
+            printf '```\n'
+            echo "${PIP}"
+            printf '```\n'
+            echo ""
+            echo "### npm audit (neufin-web)"
+            printf '```\n'
+            echo "${WEB}"
+            printf '```\n'
+            echo ""
+            echo "### npm audit (neufin-mobile)"
+            printf '```\n'
+            echo "${MOB}"
+            printf '```\n'
+            echo ""
+            echo "### Trivy (full repo, HIGH/CRITICAL)"
+            printf '```\n'
+            echo "${TRIVY}"
+            printf '```\n'
+          } > /tmp/security-report.md
 
           echo "report<<EOREPORT" >> $GITHUB_OUTPUT
           cat /tmp/security-report.md >> $GITHUB_OUTPUT
