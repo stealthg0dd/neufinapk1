@@ -29,7 +29,7 @@ Last audited: 2026-04-03
 
 | Secret | Status | Description |
 |---|---|---|
-| `VERCEL_TOKEN` | ✅ CONFIRMED SET | Vercel personal access token. Used by `deploy-web.yml`. Get from: vercel.com → Account Settings → Tokens. |
+| `VERCEL_TOKEN` | ⚠️ NEEDS RENEWAL | Vercel personal access token. Used by `deploy-web.yml`. **Deploy Web is failing with "token not valid" as of 2026-04-03.** Token has been revoked or expired. Regenerate at: vercel.com → Account Settings → Tokens → Create → select "Full Account" scope. Then: `gh secret set VERCEL_TOKEN --body "<new-token>"`. |
 | `VERCEL_ORG_ID` | ✅ CONFIRMED SET | Vercel team/org ID. Found in: vercel.com → Team Settings → General. Format: `team_xxxx`. |
 | `VERCEL_PROJECT_ID_NEUFIN_WEB` | ✅ CONFIRMED SET | Vercel project ID for `neufin-web`. Found in: vercel.com → Project Settings → General. Format: `prj_xxxx`. |
 
