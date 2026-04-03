@@ -27,9 +27,11 @@ jobs:
         run: npm install -g vercel
 
       # ── Deploy ────────────────────────────────────────────────────────────
+      # Deploy from repo root — Vercel project has rootDirectory="neufin-web"
+      # set in its settings, so running from root avoids the neufin-web/neufin-web
+      # path doubling that occurs when working-directory: neufin-web is used.
       - name: Deploy to Vercel (production)
         id: vercel-deploy
-        working-directory: neufin-web
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
