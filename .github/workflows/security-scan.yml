@@ -200,6 +200,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Ensure labels exist (idempotent — --force skips error if already present)
+          gh label create "security"  --color "#e11d48" --description "Security vulnerability" --force || true
+          gh label create "automated" --color "#6366f1" --description "Created by automation"  --force || true
+
           EXISTING=$(gh issue list \
             --label "security" \
             --state open \
