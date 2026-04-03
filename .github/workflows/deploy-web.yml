@@ -102,9 +102,9 @@ jobs:
       - name: Notify Slack — deploy success
         if: success()
         run: |
-          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
-          [ -z "$WEBHOOK" ] && exit 0
-          curl -s -X POST "$WEBHOOK" \
+          W1="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
+          W2="${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}"
+          [ -n "$W1" ] && curl -s -X POST "$W1" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"✅ *neufin-web deployed to production*\",
@@ -116,6 +116,11 @@ jobs:
                   {\"title\": \"Environment\", \"value\": \"production\", \"short\": true}
                 ]
               }]
+            }" || true
+          [ -n "$W2" ] && curl -s -X POST "$W2" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"✅ *neufin-web* → production | commit: ${{ github.event.workflow_run.head_sha }} | url: ${{ steps.vercel-deploy.outputs.deployment_url }}\"
             }" || true
 
       # ── Slack Failure ─────────────────────────────────────────────────────
