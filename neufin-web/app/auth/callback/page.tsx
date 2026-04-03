@@ -91,7 +91,7 @@ function AuthCallbackContent() {
       setError('Sign-in failed. No session returned.')
     })()
     return () => { cancelled = true }
-  }, [next, searchParams])
+  }, [next, searchParams, capture])
 
   if (error) {
     return (

@@ -1,5 +1,7 @@
 # Auth Flow Issues
 
+> Last reviewed: 2026-04-03 — Validation Pass 2
+
 ## High severity
 
 1. Middleware token source does not match Supabase persistence model
@@ -9,12 +11,17 @@
 - Impact:
   - Protected routes can redirect to `/auth` even when client has a valid localStorage session.
   - Explains repeated "asked to login again" behavior.
+- **Status: ✅ FIXED** — `lib/sync-auth-cookie.ts` bridges the gap: `AuthProvider` calls
+  `syncAuthCookie(session)` on `SIGNED_IN`, `TOKEN_REFRESHED`, and initial load, writing
+  the access token to the `neufin-auth` cookie so middleware can read it.
 
 2. Middleware treats cookie value as bearer token without structural validation
 - Evidence:
   - `middleware.ts` forwards cookie value directly in `Authorization: Bearer ...`.
 - Impact:
   - If cookie carries non-JWT serialized payload, backend auth probe fails and redirects.
+- **Status: ✅ FIXED** — `isJwtExpired()` guard added in middleware; token is validated
+  structurally before the Supabase probe is called.
 
 ## Medium severity
 
@@ -31,22 +38,24 @@
   - Advisor pages used `/login` while canonical route is `/auth`.
 - Impact:
   - Broken/inconsistent re-auth entrypoint.
-- Status:
-  - Fixed in this pass to `/auth?next=/advisor/dashboard` and `/auth?next=/advisor/settings`.
+- **Status: ✅ FIXED** — Updated to `/auth?next=/advisor/dashboard` and `/auth?next=/advisor/settings`.
 
 ## Low severity / design risks
 
 5. Callback default destination `/vault` can still be bounced by middleware if token is not cookie-visible
 - Evidence:
-  - `app/auth/callback/page.tsx` defaults `next` to `/vault`.
+  - `app/auth/callback/page.tsx` defaults `next` to `/dashboard` (updated from `/vault`).
 - Impact:
-  - User appears signed in client-side but gets redirected back to login server-side.
+  - `syncAuthCookie` is called before redirect, so the cookie is set before middleware evaluates the next route.
+- **Status: ✅ MITIGATED** — `syncAuthCookie(session)` called immediately after `exchangeCodeForSession`,
+  then `window.location.href = next` triggers a full navigation with the cookie already set.
 
 6. Middleware allows protected routes when auth probe is unreachable
 - Evidence:
-  - `middleware.ts` catches probe failures and falls through with `NextResponse.next()`.
+  - `middleware.ts` `hasValidSupabaseSession` catch block previously fell through.
 - Impact:
   - Availability-over-security tradeoff; page-level guards become final enforcement.
+- **Status: ✅ FIXED** — Catch block now returns `false` (fail-closed), causing redirect to `/auth`.
 
 ## Redirect loop check
 
