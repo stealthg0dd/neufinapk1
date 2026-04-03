@@ -3,6 +3,7 @@ import datetime
 import io
 import time
 import uuid
+# ci-validation: 2026-04-03
 import warnings
 from contextlib import asynccontextmanager
 
