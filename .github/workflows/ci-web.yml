@@ -48,7 +48,9 @@ jobs:
       - name: Notify Slack on build failure
         if: failure()
         run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}"
+          [ -z "$WEBHOOK" ] && exit 0
+          curl -s -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"❌ *Web CI — Build failed*\",
@@ -60,4 +62,4 @@ jobs:
                   {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
                 ]
               }]
-            }"
+            }" || true
