@@ -30,18 +30,16 @@ jobs:
       - name: Deploy to Vercel (production)
         id: vercel-deploy
         working-directory: neufin-web
-        run: |
-          DEPLOYMENT_URL=$(vercel deploy --prod \
-            --token "${{ secrets.VERCEL_TOKEN }}" \
-            --scope "${{ secrets.VERCEL_ORG_ID }}" \
-            --yes \
-            2>&1 | tee /tmp/vercel-output.txt | grep -E '^https://' | tail -1)
-          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
-          echo "Deployed to: $DEPLOYMENT_URL"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_NEUFIN_WEB }}
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prod --yes \
+            --token "$VERCEL_TOKEN" \
+            2>&1 | tee /tmp/vercel-output.txt | grep -E '^https://' | tail -1)
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOYMENT_URL"
 
       # ── Wait & Verify Ready ───────────────────────────────────────────────
       - name: Wait for deployment to be ready
@@ -95,7 +93,9 @@ jobs:
       - name: Notify Slack — deploy success
         if: success()
         run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}" \
+          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
+          [ -z "$WEBHOOK" ] && exit 0
+          curl -s -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"✅ *neufin-web deployed to production*\",
@@ -107,13 +107,15 @@ jobs:
                   {\"title\": \"Environment\", \"value\": \"production\", \"short\": true}
                 ]
               }]
-            }"
+            }" || true
 
       # ── Slack Failure ─────────────────────────────────────────────────────
       - name: Notify Slack — deploy failure
         if: failure()
         run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}" \
+          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
+          [ -z "$WEBHOOK" ] && exit 0
+          curl -s -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"❌ *neufin-web deploy FAILED*\",
@@ -124,4 +126,4 @@ jobs:
                   {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
                 ]
               }]
-            }"
+            }" || true

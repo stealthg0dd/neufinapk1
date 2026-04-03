@@ -87,7 +87,9 @@ jobs:
       - name: Notify Slack — deploy success
         if: success()
         run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}" \
+          W1="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
+          W2="${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}"
+          [ -n "$W1" ] && curl -s -X POST "$W1" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"✅ *neufin-backend deployed to production*\",
@@ -98,18 +100,20 @@ jobs:
                   {\"title\": \"Environment\", \"value\": \"production\", \"short\": true}
                 ]
               }]
-            }"
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}" \
+            }" || true
+          [ -n "$W2" ] && curl -s -X POST "$W2" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"✅ *neufin-backend* → production | commit: ${{ github.event.workflow_run.head_sha }}\"
-            }"
+            }" || true
 
       # ── Slack Failure ─────────────────────────────────────────────────────
       - name: Notify Slack — deploy failure
         if: failure()
         run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}" \
+          W1="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
+          W2="${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}"
+          [ -n "$W1" ] && curl -s -X POST "$W1" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"❌ *neufin-backend deploy FAILED*\",
@@ -120,9 +124,9 @@ jobs:
                   {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
                 ]
               }]
-            }"
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}" \
+            }" || true
+          [ -n "$W2" ] && curl -s -X POST "$W2" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"❌ *neufin-backend* deploy FAILED | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\"
-            }"
+            }" || true
