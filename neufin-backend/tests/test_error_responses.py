@@ -110,8 +110,9 @@ class TestReportsFulfillErrors:
 
 class TestNotFoundErrors:
     def test_unknown_route_returns_error_shape(self):
-        """GET on a non-existent route should return 4xx standard shape.
-        Returns 405 (not 404) because a catch-all OPTIONS route matches all paths."""
+        """GET on a non-existent route should return a 4xx in standard shape.
+        Returns 405 (not 404) due to the catch-all OPTIONS route; both cases
+        must return our {error, message, trace_id, timestamp} envelope."""
         resp = client.get("/api/does-not-exist-xyz")
         assert resp.status_code in (404, 405)
         assert_error_shape(resp.json())

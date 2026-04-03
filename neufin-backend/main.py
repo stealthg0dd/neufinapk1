@@ -357,6 +357,33 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+# Starlette raises MethodNotAllowedException as a StarletteHTTPException which
+# bypasses the FastAPI HTTPException handler above.  Register the same handler
+# for the Starlette base class so 405 (and similar) get our standard shape.
+from starlette.exceptions import HTTPException as _StarletteHTTPException  # noqa: E402
+
+
+@app.exception_handler(_StarletteHTTPException)
+async def starlette_http_exception_handler(
+    request: Request, exc: _StarletteHTTPException
+):
+    from starlette.responses import JSONResponse as _JSONResponse
+
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(
+        uuid.uuid4()
+    )
+    return _JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": _http_status_slug(exc.status_code),
+            "message": exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+            "trace_id": trace_id,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        },
+        headers={"X-Trace-Id": trace_id},
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """
