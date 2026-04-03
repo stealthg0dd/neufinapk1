@@ -142,48 +142,56 @@ jobs:
       # ── Determine if issues were found ────────────────────────────────────
       - name: Check for HIGH/CRITICAL findings
         id: check
+        # Pass findings via env vars — safe for any special chars (backticks, quotes, etc.)
+        env:
+          PIP_FINDINGS: ${{ steps.pip-audit.outputs.findings }}
+          WEB_FINDINGS: ${{ steps.npm-audit-web.outputs.findings }}
+          MOB_FINDINGS: ${{ steps.npm-audit-mobile.outputs.findings }}
+          TRIVY_FINDINGS: ${{ steps.trivy-parse.outputs.findings }}
         run: |
-          PIP="${{ steps.pip-audit.outputs.findings }}"
-          WEB="${{ steps.npm-audit-web.outputs.findings }}"
-          MOB="${{ steps.npm-audit-mobile.outputs.findings }}"
-          TRIVY="${{ steps.trivy-parse.outputs.findings }}"
+          PIP="${PIP_FINDINGS:-none}"
+          WEB="${WEB_FINDINGS:-none}"
+          MOB="${MOB_FINDINGS:-none}"
+          TRIVY="${TRIVY_FINDINGS:-none}"
 
           HAS_FINDINGS="false"
-          [[ "$PIP"   != "none" && "$PIP"   != "" ]] && HAS_FINDINGS="true"
-          [[ "$WEB"   != "none" && "$WEB"   != "" ]] && HAS_FINDINGS="true"
-          [[ "$MOB"   != "none" && "$MOB"   != "" ]] && HAS_FINDINGS="true"
-          [[ "$TRIVY" != "none" && "$TRIVY" != "" ]] && HAS_FINDINGS="true"
+          [[ "$PIP"   != "none" && -n "$PIP"   ]] && HAS_FINDINGS="true"
+          [[ "$WEB"   != "none" && -n "$WEB"   ]] && HAS_FINDINGS="true"
+          [[ "$MOB"   != "none" && -n "$MOB"   ]] && HAS_FINDINGS="true"
+          [[ "$TRIVY" != "none" && -n "$TRIVY" ]] && HAS_FINDINGS="true"
 
           echo "has_findings=$HAS_FINDINGS" >> $GITHUB_OUTPUT
 
-          # Build combined report for issue body
-          REPORT="## Security Scan Report
-          **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
-          **Commit:** ${{ github.sha }}
-          **Triggered by:** ${{ github.event_name }}
+          # Write report to a temp file using heredoc to avoid shell quoting/backtick issues
+          cat > /tmp/security-report.md << EOREPORT
+## Security Scan Report
+**Date:** $(date -u '+%Y-%m-%d %H:%M UTC')
+**Commit:** ${GITHUB_SHA}
+**Triggered by:** ${GITHUB_EVENT_NAME}
 
-          ### pip-audit (neufin-backend)
-          \`\`\`
-          ${PIP:-none}
-          \`\`\`
+### pip-audit (neufin-backend)
+\`\`\`
+${PIP}
+\`\`\`
 
-          ### npm audit (neufin-web)
-          \`\`\`
-          ${WEB:-none}
-          \`\`\`
+### npm audit (neufin-web)
+\`\`\`
+${WEB}
+\`\`\`
 
-          ### npm audit (neufin-mobile)
-          \`\`\`
-          ${MOB:-none}
-          \`\`\`
+### npm audit (neufin-mobile)
+\`\`\`
+${MOB}
+\`\`\`
 
-          ### Trivy (full repo, HIGH/CRITICAL)
-          \`\`\`
-          ${TRIVY:-none}
-          \`\`\`"
+### Trivy (full repo, HIGH/CRITICAL)
+\`\`\`
+${TRIVY}
+\`\`\`
+EOREPORT
 
           echo "report<<EOREPORT" >> $GITHUB_OUTPUT
-          echo "$REPORT" >> $GITHUB_OUTPUT
+          cat /tmp/security-report.md >> $GITHUB_OUTPUT
           echo "EOREPORT" >> $GITHUB_OUTPUT
 
       # ── Create GitHub Issue ───────────────────────────────────────────────
@@ -204,28 +212,28 @@ jobs:
             gh issue create \
               --title "🔴 Security Scan — HIGH/CRITICAL findings $(date -u '+%Y-%m-%d')" \
               --label "security,automated" \
-              --body "${{ steps.check.outputs.report }}"
+              --body-file /tmp/security-report.md
           fi
 
       # ── Slack notification ─────────────────────────────────────────────────
       - name: Notify Slack — findings found
         if: steps.check.outputs.has_findings == 'true'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
-          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+          [ -z "$SLACK_WEBHOOK" ] && exit 0
+          curl -s -X POST "$SLACK_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
               \"text\": \"🔴 *Security Scan — HIGH/CRITICAL vulnerabilities found*\",
               \"attachments\": [{
                 \"color\": \"danger\",
                 \"fields\": [
-                  {\"title\": \"pip-audit (backend)\", \"value\": \"$(echo '${{ steps.pip-audit.outputs.findings }}' | head -3)\", \"short\": false},
-                  {\"title\": \"npm audit (web)\", \"value\": \"$(echo '${{ steps.npm-audit-web.outputs.findings }}' | head -3)\", \"short\": false},
-                  {\"title\": \"npm audit (mobile)\", \"value\": \"$(echo '${{ steps.npm-audit-mobile.outputs.findings }}' | head -3)\", \"short\": false},
-                  {\"title\": \"Trivy\", \"value\": \"$(echo '${{ steps.trivy-parse.outputs.findings }}' | head -3)\", \"short\": false},
-                  {\"title\": \"Full report\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/issues|View GitHub Issues>\", \"short\": false}
+                  {\"title\": \"Details\", \"value\": \"<${REPO_URL}/issues|View GitHub Issues>\", \"short\": false}
                 ]
               }]
-            }"
+            }" || true
 
       - name: Notify Slack — scan clean
         if: steps.check.outputs.has_findings == 'false'
