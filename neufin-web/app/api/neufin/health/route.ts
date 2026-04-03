@@ -82,7 +82,18 @@ function classifyStatus(lastSeen: string | null): "live" | "stale" | "offline" {
 
 export async function GET() {
   if (!KEY) {
-    return NextResponse.json({ error: "AGENT_OS_API_KEY not set" }, { status: 500 })
+    // Return degraded-but-valid response so UI renders without crashing
+    const offlineRepos: RepoHeartbeat[] = NEUFIN_REPOS.map((repo) => ({
+      repo_id: repo, status: "offline", last_seen: null, version: null, environment: null,
+    }))
+    return NextResponse.json({
+      timestamp: new Date().toISOString(),
+      repos: offlineRepos,
+      top_findings: [],
+      deployments: NEUFIN_REPOS.map((r) => ({ repo_id: r, deployed_at: null, commit_sha: null, commit_msg: null, deployed_by: null })),
+      error_rate: { unresolved_critical: 0, unresolved_high: 0 },
+      _warning: "AGENT_OS_API_KEY not configured — data unavailable",
+    } satisfies NeuFinHealthData & { _warning: string })
   }
 
   // Fetch heartbeat/status for all 4 repos + scan data in parallel

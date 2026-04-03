@@ -31,10 +31,12 @@ async function agentGet<T>(path: string, fallback: T): Promise<T> {
 
 export async function GET() {
   if (!KEY) {
-    return NextResponse.json(
-      { error: "AGENT_OS_API_KEY not set in environment" },
-      { status: 500 }
-    )
+    const empty: DashboardData = {
+      timestamp: new Date().toISOString(),
+      briefs: [], providers: {}, rateLimits: {}, callLogs: [],
+      budget: { daily_spend: 0, daily_cap: 15, daily_remaining: 15, monthly_spend: 0, monthly_cap: 400, monthly_remaining: 400 },
+    }
+    return NextResponse.json({ ...empty, _warning: "AGENT_OS_API_KEY not configured — data unavailable" })
   }
 
   const [briefs, routerStatus, callLogsRaw, _agents] = await Promise.all([

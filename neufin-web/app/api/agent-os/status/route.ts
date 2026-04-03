@@ -27,10 +27,11 @@ async function get<T>(path: string, fallback: T): Promise<T> {
 
 export async function GET() {
   if (!KEY) {
-    return NextResponse.json(
-      { error: "AGENT_OS_API_KEY is not set in Vercel environment variables" },
-      { status: 500 }
-    )
+    return NextResponse.json({
+      timestamp: new Date().toISOString(),
+      providers: {}, budget: {}, briefs: [], agents: {}, rateLimits: {},
+      _warning: "AGENT_OS_API_KEY not configured — data unavailable",
+    })
   }
 
   const [routerStatus, budget, briefs, agents, rateLimits] = await Promise.all([
