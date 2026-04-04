@@ -15,7 +15,8 @@ export function syncAuthCookie(session: Pick<Session, 'access_token'> | null): v
     const maxAge = 60 * 60 * 24 * 7
     const cookieValue = session.access_token
 
-    document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax`
+    const secure = window.location.protocol === 'https:' ? '; Secure' : ''
+    document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${maxAge}; SameSite=Lax${secure}`
 
     logger.debug({
       name: cookieName,

@@ -57,9 +57,14 @@ function AuthContent() {
   const [sent,     setSent]     = useState(false)
 
   const next = searchParams.get('next') || '/dashboard'
+  const oauthError = searchParams.get('error')
   const hasPending = typeof window !== 'undefined' && (() => {
     try { return !!(JSON.parse(localStorage.getItem('dnaResult') || 'null')?.record_id) } catch { return false }
   })()
+
+  useEffect(() => {
+    if (oauthError) setError(decodeURIComponent(oauthError))
+  }, [oauthError])
 
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -76,7 +81,8 @@ function AuthContent() {
     e.preventDefault()
     setLoading(true); setError('')
     sessionStorage.setItem('neufin_auth_method', 'magic')
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
@@ -89,7 +95,8 @@ function AuthContent() {
   async function handleGoogle() {
     setLoading(true); setError('')
     sessionStorage.setItem('neufin_auth_method', 'google')
-    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
