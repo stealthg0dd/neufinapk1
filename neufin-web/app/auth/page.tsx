@@ -81,7 +81,7 @@ function AuthContent() {
     e.preventDefault()
     setLoading(true); setError('')
     sessionStorage.setItem('neufin_auth_method', 'magic')
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOtp({
       email,
@@ -95,7 +95,7 @@ function AuthContent() {
   async function handleGoogle() {
     setLoading(true); setError('')
     sessionStorage.setItem('neufin_auth_method', 'google')
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
     const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
