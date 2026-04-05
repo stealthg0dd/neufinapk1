@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import structlog
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from database import supabase
 from services.slack import notify_ctech
@@ -20,7 +20,7 @@ router = APIRouter(tags=["leads"])
 
 class LeadCreate(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     company: str
     role: str
     aum_range: str
