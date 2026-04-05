@@ -36,8 +36,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = Field(
         default="",
         description=(
-            "Supabase service-role key — bypasses RLS. "
-            "Dashboard → Settings → API → service_role."
+            "Supabase service-role key — bypasses RLS. Dashboard → Settings → API → service_role."
         ),
     )
     SUPABASE_KEY: str | None = Field(
@@ -94,6 +93,22 @@ class Settings(BaseSettings):
     STRIPE_PRICE_UNLIMITED_MONTHLY: str | None = Field(
         default=None,
         description="Stripe Price ID for unlimited monthly ($99/mo). Dashboard → Products.",
+    )
+    STRIPE_PRICE_RETAIL_MONTHLY: str | None = Field(
+        default=None,
+        description="Stripe Price ID for Retail Investor plan ($29/mo). Dashboard → Products.",
+    )
+    STRIPE_PRICE_ADVISOR_MONTHLY: str | None = Field(
+        default=None,
+        description="Stripe Price ID for Financial Advisor plan ($299/mo). Dashboard → Products.",
+    )
+    STRIPE_PRICE_ENTERPRISE_MONTHLY: str | None = Field(
+        default=None,
+        description="Stripe Price ID for Enterprise/API plan ($999/mo). Dashboard → Products.",
+    )
+    STRIPE_PRICE_ADVISOR_REPORT_ONETIME: str | None = Field(
+        default=None,
+        description="Stripe Price ID for individual advisor report one-time ($49). Dashboard → Products.",
     )
     STRIPE_REFERRAL_COUPON_ID: str = Field(
         default="REFER20",
