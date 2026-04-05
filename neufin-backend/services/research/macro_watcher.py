@@ -15,7 +15,6 @@ Schedule: every 4 hours via APScheduler (registered in main.py).
 from __future__ import annotations
 
 import asyncio
-import datetime
 import statistics
 from typing import Any
 
@@ -54,9 +53,12 @@ WORLDBANK_INDICATORS = [
 def _get_embedding_sync(text: str) -> list[float] | None:
     """Generate a 1536-dim embedding using OpenAI text-embedding-3-small."""
     try:
-        from openai import OpenAI  # noqa: PLC0415
+        from openai import OpenAI
+
         client = OpenAI(api_key=settings.OPENAI_KEY)
-        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:8000])
+        resp = client.embeddings.create(
+            model="text-embedding-3-small", input=text[:8000]
+        )
         return resp.data[0].embedding
     except Exception as exc:
         logger.warning("macro_watcher.embedding_failed", error=str(exc))
@@ -99,7 +101,9 @@ def _upsert_signal(
         change_pct = round((value - previous_value) / abs(previous_value) * 100, 4)
 
     # Generate embedding text
-    embed_text = f"{title}: {value} ({region}, {signal_date}). Significance: {significance}."
+    embed_text = (
+        f"{title}: {value} ({region}, {signal_date}). Significance: {significance}."
+    )
 
     payload: dict[str, Any] = {
         "signal_type": signal_type,
@@ -133,10 +137,20 @@ def _upsert_signal(
             payload["embedding"] = embedding
 
         supabase.table("macro_signals").insert(payload).execute()
-        logger.info("macro_watcher.signal_inserted", source=source, signal_type=signal_type, region=region)
+        logger.info(
+            "macro_watcher.signal_inserted",
+            source=source,
+            signal_type=signal_type,
+            region=region,
+        )
         return True
     except Exception as exc:
-        logger.error("macro_watcher.upsert_failed", error=str(exc), source=source, signal_type=signal_type)
+        logger.error(
+            "macro_watcher.upsert_failed",
+            error=str(exc),
+            source=source,
+            signal_type=signal_type,
+        )
         return False
 
 
@@ -163,7 +177,9 @@ async def fetch_fred_series(series_id: str, limit: int = 14) -> list[dict]:
                 if o.get("value") not in (".", None, "")
             ]
     except Exception as exc:
-        logger.warning("macro_watcher.fred_fetch_failed", series=series_id, error=str(exc))
+        logger.warning(
+            "macro_watcher.fred_fetch_failed", series=series_id, error=str(exc)
+        )
         return []
 
 
@@ -176,7 +192,7 @@ async def ingest_fred() -> int:
     new_count = 0
     tasks = {s[0]: fetch_fred_series(s[0]) for s in FRED_SERIES}
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-    series_results = dict(zip(tasks.keys(), results))
+    series_results = dict(zip(tasks.keys(), results, strict=False))
 
     for series_id, signal_type, region, title in FRED_SERIES:
         obs = series_results.get(series_id)
@@ -213,7 +229,12 @@ async def ingest_mas() -> int:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 f"{MAS_BASE}/exchange-rates",
-                params={"offset": 0, "limit": 5, "sort_by": "end_of_day", "sort_dir": "desc"},
+                params={
+                    "offset": 0,
+                    "limit": 5,
+                    "sort_by": "end_of_day",
+                    "sort_dir": "desc",
+                },
             )
             if resp.status_code != 200:
                 return 0
@@ -282,12 +303,18 @@ async def ingest_worldbank() -> int:
                     previous_value=float(obs[1]["value"]) if len(obs) > 1 else None,
                     signal_date=f"{latest['date']}-01-01T00:00:00Z",
                     significance=significance,
-                    raw_data={"indicator": indicator, "country": country_code, "records": obs[:3]},
+                    raw_data={
+                        "indicator": indicator,
+                        "country": country_code,
+                        "records": obs[:3],
+                    },
                 )
                 if inserted:
                     new_count += 1
         except Exception as exc:
-            logger.warning("macro_watcher.worldbank_failed", indicator=indicator, error=str(exc))
+            logger.warning(
+                "macro_watcher.worldbank_failed", indicator=indicator, error=str(exc)
+            )
 
     logger.info("macro_watcher.worldbank_done", new_signals=new_count)
     return new_count

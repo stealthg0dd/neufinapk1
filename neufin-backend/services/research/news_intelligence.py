@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import feedparser
 import httpx
@@ -37,7 +37,10 @@ FMP_BASE = "https://financialmodelingprep.com/api/v3"
 # SEA-focused financial RSS feeds (free, no auth)
 RSS_FEEDS = [
     ("https://feeds.reuters.com/reuters/businessNews", "rss_reuters"),
-    ("https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311", "rss_cna"),
+    (
+        "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6311",
+        "rss_cna",
+    ),
 ]
 
 # NewsAPI search queries for SEA financial news
@@ -54,11 +57,21 @@ _TICKER_RE = re.compile(r"\b([A-Z]{2,5}(?:\.SI|\.HK|\.KL|\.NS)?)\b")
 
 # Well-known SEA company name to ticker mappings
 _COMPANY_TICKERS: dict[str, str] = {
-    "DBS": "DBS.SI", "OCBC": "OCBC.SI", "UOB": "U11.SI",
-    "Singtel": "Z74.SI", "Grab": "GRAB", "Sea Limited": "SE",
-    "Shopee": "SE", "GoTo": "GOTO.JK", "Maybank": "MAY.KL",
-    "Petronas": "PETD.KL", "Telkom": "TLKM.JK", "Gojek": "GOTO.JK",
-    "AIA": "1299.HK", "HSBC": "HSBC", "Standard Chartered": "2888.HK",
+    "DBS": "DBS.SI",
+    "OCBC": "OCBC.SI",
+    "UOB": "U11.SI",
+    "Singtel": "Z74.SI",
+    "Grab": "GRAB",
+    "Sea Limited": "SE",
+    "Shopee": "SE",
+    "GoTo": "GOTO.JK",
+    "Maybank": "MAY.KL",
+    "Petronas": "PETD.KL",
+    "Telkom": "TLKM.JK",
+    "Gojek": "GOTO.JK",
+    "AIA": "1299.HK",
+    "HSBC": "HSBC",
+    "Standard Chartered": "2888.HK",
 }
 
 
@@ -72,24 +85,59 @@ def _extract_tickers(text: str) -> list[str]:
     # Regex-based
     regex_matches = _TICKER_RE.findall(text)
     # Filter out common false positives (all-caps English words)
-    _STOPWORDS = {"THE", "FOR", "AND", "BUT", "NOT", "ARE", "FROM", "WITH", "THIS", "THAT",
-                   "CEO", "CFO", "IPO", "MAS", "SGX", "GDP", "CPI", "FED", "IMF", "AUM",
-                   "USD", "SGD", "HKD", "MYR", "IDR", "EUR", "GBP", "YEN"}
+    _STOPWORDS = {
+        "THE",
+        "FOR",
+        "AND",
+        "BUT",
+        "NOT",
+        "ARE",
+        "FROM",
+        "WITH",
+        "THIS",
+        "THAT",
+        "CEO",
+        "CFO",
+        "IPO",
+        "MAS",
+        "SGX",
+        "GDP",
+        "CPI",
+        "FED",
+        "IMF",
+        "AUM",
+        "USD",
+        "SGD",
+        "HKD",
+        "MYR",
+        "IDR",
+        "EUR",
+        "GBP",
+        "YEN",
+    }
     regex_matches = [t for t in regex_matches if t not in _STOPWORDS and len(t) >= 2]
     combined = list(dict.fromkeys(found + regex_matches))  # dedupe, preserve order
     return combined[:6]  # cap at 6 tickers per article
 
 
 def _sentiment_to_score(sentiment: str) -> float:
-    return {"very_negative": -1.0, "negative": -0.5, "neutral": 0.0,
-            "positive": 0.5, "very_positive": 1.0}.get(sentiment, 0.0)
+    return {
+        "very_negative": -1.0,
+        "negative": -0.5,
+        "neutral": 0.0,
+        "positive": 0.5,
+        "very_positive": 1.0,
+    }.get(sentiment, 0.0)
 
 
 def _get_embedding_sync(text: str) -> list[float] | None:
     try:
-        from openai import OpenAI  # noqa: PLC0415
+        from openai import OpenAI
+
         client = OpenAI(api_key=settings.OPENAI_KEY)
-        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:8000])
+        resp = client.embeddings.create(
+            model="text-embedding-3-small", input=text[:8000]
+        )
         return resp.data[0].embedding
     except Exception as exc:
         logger.warning("news_intelligence.embedding_failed", error=str(exc))
@@ -210,7 +258,7 @@ async def ingest_newsapi(query: str) -> int:
         description = article.get("description", "") or ""
         content = f"{description} {article.get('content', '') or ''}"
         tickers = _extract_tickers(f"{title} {content}")
-        published = article.get("publishedAt", datetime.now(timezone.utc).isoformat())
+        published = article.get("publishedAt", datetime.now(UTC).isoformat())
 
         sentiment, score = await _score_article_sentiment(title, content[:400])
         inserted = _insert_event(
@@ -255,7 +303,7 @@ async def ingest_rss_feed(feed_url: str, source_name: str) -> int:
         title = getattr(entry, "title", "") or ""
         summary = getattr(entry, "summary", "") or ""
         tickers = _extract_tickers(f"{title} {summary}")
-        published = getattr(entry, "published", datetime.now(timezone.utc).isoformat())
+        published = getattr(entry, "published", datetime.now(UTC).isoformat())
 
         sentiment, score = await _score_article_sentiment(title, summary[:400])
         inserted = _insert_event(
@@ -282,8 +330,9 @@ async def ingest_fmp_earnings(days_ahead: int = 7) -> int:
     if not settings.FMP_API_KEY:
         return 0
     try:
-        from datetime import timedelta  # noqa: PLC0415
-        today = datetime.now(timezone.utc).date()
+        from datetime import timedelta
+
+        today = datetime.now(UTC).date()
         end = today + timedelta(days=days_ahead)
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
@@ -355,5 +404,16 @@ async def run_news_intelligence() -> dict:
     fmp_total = await ingest_fmp_earnings()
 
     total = newsapi_total + rss_total + fmp_total
-    logger.info("news_intelligence.run_complete", newsapi=newsapi_total, rss=rss_total, fmp=fmp_total, total=total)
-    return {"newsapi": newsapi_total, "rss": rss_total, "fmp": fmp_total, "total": total}
+    logger.info(
+        "news_intelligence.run_complete",
+        newsapi=newsapi_total,
+        rss=rss_total,
+        fmp=fmp_total,
+        total=total,
+    )
+    return {
+        "newsapi": newsapi_total,
+        "rss": rss_total,
+        "fmp": fmp_total,
+        "total": total,
+    }
