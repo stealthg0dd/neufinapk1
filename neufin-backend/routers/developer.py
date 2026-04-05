@@ -117,8 +117,8 @@ async def create_api_key(body: CreateKeyRequest, user: JWTUser = Depends(get_cur
             raise HTTPException(400, "Maximum of 10 active API keys allowed.")
     except HTTPException:
         raise
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("api_key.count_check_failed", user_id=user.id, error=str(e))
 
     raw_key = f"nf_{secrets.token_urlsafe(32)}"
     key_hash = _hash_key(raw_key)
@@ -202,7 +202,7 @@ async def check_api_key(request: Request) -> JWTUser | None:
             .execute()
         )
     except Exception:
-        raise HTTPException(401, "Invalid API key.")
+        raise HTTPException(401, "Invalid API key.") from None
 
     key_record = result.data
     if not key_record or not key_record.get("is_active"):

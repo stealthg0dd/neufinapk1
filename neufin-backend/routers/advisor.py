@@ -11,7 +11,7 @@ GET  /api/advisor/clients/{client_id}/reports  → list PDF reports for a client
 POST /api/advisor/reports/batch                → queue reports for multiple clients
 """
 
-from typing import Optional
+
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -60,9 +60,9 @@ def _require_advisor_plan(user: JWTUser) -> str:
 
 class ClientPortfolioRequest(BaseModel):
     name: str
-    client_name: Optional[str] = None
-    client_email: Optional[str] = None
-    notes: Optional[str] = None
+    client_name: str | None = None
+    client_email: str | None = None
+    notes: str | None = None
     total_value: float = 0.0
 
 
