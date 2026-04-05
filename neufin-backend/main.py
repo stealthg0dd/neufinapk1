@@ -98,6 +98,7 @@ from routers import (  # noqa: E402
     portfolio,
     referrals,
     reports,
+    research as research_router,
     revenue as revenue_router,
     swarm,
     vault,
@@ -217,6 +218,59 @@ async def lifespan(app: FastAPI):
     # Start background heartbeat
     _heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
+    # ── APScheduler: Research Intelligence Layer ──────────────────────────────
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        from services.research.macro_watcher import run_macro_watcher
+        from services.research.news_intelligence import run_news_intelligence
+        from services.research.regime_detector import run_regime_detector
+        from services.research.synthesiser import run_daily_synthesis
+
+        _scheduler = AsyncIOScheduler(timezone="Asia/Singapore")
+        # Macro data: every 4 hours
+        _scheduler.add_job(
+            run_macro_watcher,
+            IntervalTrigger(hours=4),
+            id="macro_watcher",
+            replace_existing=True,
+        )
+        # News: every 2 hours
+        _scheduler.add_job(
+            run_news_intelligence,
+            IntervalTrigger(hours=2),
+            id="news_intelligence",
+            replace_existing=True,
+        )
+        # Regime detection: every 6 hours
+        _scheduler.add_job(
+            run_regime_detector,
+            IntervalTrigger(hours=6),
+            id="regime_detector",
+            replace_existing=True,
+        )
+        # Daily synthesis: 06:00 SGT
+        _scheduler.add_job(
+            run_daily_synthesis,
+            CronTrigger(hour=6, minute=0),
+            id="daily_synthesis",
+            replace_existing=True,
+        )
+        _scheduler.start()
+        logger.info(
+            "scheduler.started",
+            jobs=[
+                "macro_watcher",
+                "news_intelligence",
+                "regime_detector",
+                "daily_synthesis",
+            ],
+        )
+    except Exception as _sched_exc:
+        logger.warning("scheduler.start_failed", error=str(_sched_exc))
+
     yield  # ── app is running ─────────────────────────────────────────────────
 
     # Shutdown
@@ -290,6 +344,8 @@ PUBLIC_PREFIXES = [
     "/api/swarm/",
     "/api/admin/health",
     "/api/auth/status",
+    "/api/research/regime",
+    "/api/research/notes",
 ]
 
 
@@ -581,6 +637,7 @@ app.include_router(swarm.router)
 app.include_router(alerts.router)
 app.include_router(admin_router.router)
 app.include_router(revenue_router.router)
+app.include_router(research_router.router)
 
 
 # ── Global OPTIONS handler ─────────────────────────────────────────────────────
@@ -949,6 +1006,29 @@ Return ONLY valid JSON:
         except Exception as _e:
             logger.warning("usage_tracker.track_failed", user_id=user_id, error=str(_e))
 
+    # ── 10b. Fetch market context from research layer ─────────────────────────
+    _market_context: dict = {}
+    try:
+        from services.research.regime_detector import get_current_regime_summary
+
+        _regime = get_current_regime_summary()
+        # Fetch latest public macro_outlook note summary
+        _note_result = (
+            supabase.table("research_notes")
+            .select("id,title,executive_summary,regime,generated_at")
+            .eq("is_public", True)
+            .order("generated_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        _market_context = {
+            "regime": _regime.get("regime", "neutral"),
+            "regime_confidence": _regime.get("confidence", 0.5),
+            "latest_note": _note_result.data[0] if _note_result.data else None,
+        }
+    except Exception as _ctx_exc:
+        logger.debug("analyze_dna.market_context_unavailable", error=str(_ctx_exc))
+
     # ── 11. Analytics — disabled until analytics_events table is created ─────────
     # await track("dna_upload_started", {"rows": len(df), "filename": file.filename}, user_id=user_id)
     # await track("dna_analysis_complete", {"dna_score": dna_score}, user_id=user_id)
@@ -977,6 +1057,7 @@ Return ONLY valid JSON:
         "share_url": f"{settings.APP_BASE_URL}/share/{share_token}",
         "record_id": record_id,
         "portfolio_id": portfolio_id,
+        "market_context": _market_context,
     }
 
 

@@ -183,6 +183,10 @@ class Settings(BaseSettings):
         default=None,
         description="Financial Modeling Prep API key. financialmodelingprep.com → Dashboard.",
     )
+    NEWSAPI_KEY: str | None = Field(
+        default=None,
+        description="NewsAPI.org API key. newsapi.org → Get API Key (free tier: 100 req/day).",
+    )
     TWELVEDATA_API_KEY: str | None = Field(
         default=None,
         description="Twelve Data API key. twelvedata.com → Dashboard.",
