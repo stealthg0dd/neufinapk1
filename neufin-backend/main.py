@@ -36,7 +36,10 @@ _PII_KEYS: frozenset = frozenset({"password", "token", "api_key", "fernet_key"})
 def _scrub(obj: object) -> object:
     """Recursively redact PII field values from Sentry event dicts."""
     if isinstance(obj, dict):
-        return {k: "[REDACTED]" if k.lower() in _PII_KEYS else _scrub(v) for k, v in obj.items()}
+        return {
+            k: "[REDACTED]" if k.lower() in _PII_KEYS else _scrub(v)
+            for k, v in obj.items()
+        }
     return [_scrub(i) for i in obj] if isinstance(obj, list) else obj
 
 
@@ -51,7 +54,9 @@ def _before_send(event: dict, _hint: dict) -> dict | None:
 sentry_sdk.init(
     dsn=_SENTRY_DSN or None,
     environment=_SENTRY_ENV,
-    release=(os.getenv("GIT_COMMIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or "unknown"),
+    release=(
+        os.getenv("GIT_COMMIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or "unknown"
+    ),
     # 20 % sampling in production keeps quota low; 100 % in dev for full traces
     traces_sample_rate=1.0 if _SENTRY_ENV in ("development", "dev", "local") else 0.2,
     send_default_pii=False,
@@ -311,7 +316,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     if isinstance(exc, _HTTPEx):
         raise exc
 
-    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(
+        uuid.uuid4()
+    )
     sentry_sdk.capture_exception(exc)
     logger.error(
         "unhandled_exception",
@@ -340,7 +347,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     """
     from starlette.responses import JSONResponse as _JSONResponse
 
-    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(
+        uuid.uuid4()
+    )
     return _JSONResponse(
         status_code=exc.status_code,
         content={
@@ -360,10 +369,14 @@ from starlette.exceptions import HTTPException as _StarletteHTTPException  # noq
 
 
 @app.exception_handler(_StarletteHTTPException)
-async def starlette_http_exception_handler(request: Request, exc: _StarletteHTTPException):
+async def starlette_http_exception_handler(
+    request: Request, exc: _StarletteHTTPException
+):
     from starlette.responses import JSONResponse as _JSONResponse
 
-    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(
+        uuid.uuid4()
+    )
     return _JSONResponse(
         status_code=exc.status_code,
         content={
@@ -384,7 +397,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     """
     from starlette.responses import JSONResponse as _JSONResponse
 
-    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(uuid.uuid4())
+    trace_id = getattr(getattr(request, "state", None), "trace_id", None) or str(
+        uuid.uuid4()
+    )
     first_error = exc.errors()[0] if exc.errors() else {}
     loc = " → ".join(str(part) for part in first_error.get("loc", []))
     message = (
@@ -429,7 +444,9 @@ try:
         should_ignore_untemplated=True,
         should_respect_env_var=False,
         excluded_handlers=["/metrics", "/health"],
-    ).instrument(app).expose(app, endpoint="/metrics", include_in_schema=True, tags=["system"])
+    ).instrument(app).expose(
+        app, endpoint="/metrics", include_in_schema=True, tags=["system"]
+    )
 except ImportError:
     logger.warning(
         "prometheus.unavailable",
@@ -534,7 +551,9 @@ async def auth_middleware(request: Request, call_next):
             sentry_sdk.set_user({"id": request.state.user.id})
             sentry_sdk.set_tag("endpoint", request.url.path)
         except Exception as exc:
-            logger.warning("auth.token_rejected", path=request.url.path, reason=str(exc))
+            logger.warning(
+                "auth.token_rejected", path=request.url.path, reason=str(exc)
+            )
             request.state.user = None
     else:
         request.state.user = None
@@ -621,9 +640,9 @@ async def analyze_dna(
                 )
             # Upsert counter for this IP/day
             if _limit_row.data:
-                supabase.table("guest_analysis_limits").update({"count": _current_count + 1}).eq(
-                    "ip", _client_ip
-                ).eq("window_start", _today).execute()
+                supabase.table("guest_analysis_limits").update(
+                    {"count": _current_count + 1}
+                ).eq("ip", _client_ip).eq("window_start", _today).execute()
             else:
                 supabase.table("guest_analysis_limits").insert(
                     {"ip": _client_ip, "window_start": _today, "count": 1}
@@ -665,7 +684,9 @@ async def analyze_dna(
             user = await verify_jwt(auth_header.split(" ", 1)[1])
             user_id = user.id
         except Exception:
-            logger.warning("JWT verification failed for anonymous upload", exc_info=True)
+            logger.warning(
+                "JWT verification failed for anonymous upload", exc_info=True
+            )
 
     # ── 2.1 Subscription usage gate ─────────────────────────────────────────────
     # For authenticated users, enforce monthly DNA analysis limits based on plan.
@@ -682,8 +703,8 @@ async def analyze_dna(
                 .execute()
             )
             _tier = (
-                (_profile.data[0].get("subscription_tier") if _profile.data else None) or "free"
-            )
+                _profile.data[0].get("subscription_tier") if _profile.data else None
+            ) or "free"
             _limit = PLAN_DNA_LIMITS.get(_tier, 3)
             _check = check_dna_limit(user_id, _limit)
             if not _check["allowed"]:
@@ -813,12 +834,18 @@ Return ONLY valid JSON:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
         logger.error("analyze_dna.ai_failed", error=str(e))
-        raise HTTPException(status_code=503, detail="AI analysis providers are unavailable.") from e
+        raise HTTPException(
+            status_code=503, detail="AI analysis providers are unavailable."
+        ) from e
 
     # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = []
     for _, row in df[["symbol", "shares", "current_price", "value"]].iterrows():
-        weight = round(float(row["value"]) / total_value * 100, 2) if total_value > 0 else 0.0
+        weight = (
+            round(float(row["value"]) / total_value * 100, 2)
+            if total_value > 0
+            else 0.0
+        )
         positions_out.append(
             {
                 "symbol": row["symbol"],
@@ -868,7 +895,9 @@ Return ONLY valid JSON:
                         }
                     ).execute()
                 except Exception:
-                    logger.warning("analyze_dna.position_insert_failed", symbol=pos["symbol"])
+                    logger.warning(
+                        "analyze_dna.position_insert_failed", symbol=pos["symbol"]
+                    )
         else:
             logger.warning("analyze_dna.portfolio_empty_response")
             portfolio_id = None
@@ -892,7 +921,9 @@ Return ONLY valid JSON:
         "total_value": round(total_value, 2),
     }
     db_payload = {
-        k: v for k, v in db_payload.items() if v is not None or k in ("user_id", "summary")
+        k: v
+        for k, v in db_payload.items()
+        if v is not None or k in ("user_id", "summary")
     }
     try:
         res = supabase.table("dna_scores").insert(db_payload).execute()
@@ -1021,7 +1052,9 @@ async def auth_status(request: Request):
             raw_claims = _jwt.get_unverified_claims(token)  # type: ignore[possibly-undefined]
             exp_ts = raw_claims.get("exp")
             expires_at = (
-                datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%dT%H:%M:%SZ")
+                datetime.datetime.utcfromtimestamp(exp_ts).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )
                 if exp_ts
                 else None
             )
@@ -1075,7 +1108,9 @@ async def subscription_status(request: Request):
     TRIAL_DAYS = 14
     if trial_started_at:
         try:
-            started = datetime.datetime.fromisoformat(trial_started_at.replace("Z", "+00:00"))
+            started = datetime.datetime.fromisoformat(
+                trial_started_at.replace("Z", "+00:00")
+            )
             elapsed = (datetime.datetime.now(datetime.UTC) - started).days
             days_remaining = max(0, TRIAL_DAYS - elapsed)
         except Exception:

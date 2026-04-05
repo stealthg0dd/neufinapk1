@@ -11,8 +11,6 @@ GET  /api/advisor/clients/{client_id}/reports  → list PDF reports for a client
 POST /api/advisor/reports/batch                → queue reports for multiple clients
 """
 
-
-
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -80,7 +78,9 @@ async def list_clients(user: JWTUser = Depends(get_current_user)):
     try:
         result = (
             supabase.table("portfolios")
-            .select("id, name, total_value, created_at, advisor_id, client_name, client_email")
+            .select(
+                "id, name, total_value, created_at, advisor_id, client_name, client_email"
+            )
             .eq("advisor_id", user.id)
             .order("created_at", desc=True)
             .execute()
@@ -91,7 +91,9 @@ async def list_clients(user: JWTUser = Depends(get_current_user)):
 
 
 @router.post("/clients", status_code=201)
-async def add_client(body: ClientPortfolioRequest, user: JWTUser = Depends(get_current_user)):
+async def add_client(
+    body: ClientPortfolioRequest, user: JWTUser = Depends(get_current_user)
+):
     """Add a new client portfolio under this advisor's account."""
     _require_advisor_plan(user)
     try:
@@ -114,7 +116,9 @@ async def add_client(body: ClientPortfolioRequest, user: JWTUser = Depends(get_c
 
 
 @router.get("/clients/{client_id}/analysis")
-async def get_client_analysis(client_id: str, user: JWTUser = Depends(get_current_user)):
+async def get_client_analysis(
+    client_id: str, user: JWTUser = Depends(get_current_user)
+):
     """Return the latest DNA analysis for a client's portfolio."""
     _require_advisor_plan(user)
 
@@ -154,7 +158,9 @@ async def get_client_analysis(client_id: str, user: JWTUser = Depends(get_curren
 
 
 @router.get("/clients/{client_id}/reports")
-async def list_client_reports(client_id: str, user: JWTUser = Depends(get_current_user)):
+async def list_client_reports(
+    client_id: str, user: JWTUser = Depends(get_current_user)
+):
     """List all reports generated for a client's portfolio."""
     _require_advisor_plan(user)
 

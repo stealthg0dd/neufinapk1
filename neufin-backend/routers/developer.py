@@ -97,7 +97,9 @@ async def list_api_keys(user: JWTUser = Depends(get_current_user)):
 
 
 @router.post("/keys", status_code=201)
-async def create_api_key(body: CreateKeyRequest, user: JWTUser = Depends(get_current_user)):
+async def create_api_key(
+    body: CreateKeyRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Generate a new API key.
     The raw key is returned only once — store it securely.
@@ -228,9 +230,9 @@ async def check_api_key(request: Request) -> JWTUser | None:
             raise HTTPException(429, "API rate limit exceeded. Resets at midnight UTC.")
 
         if usage_result.data:
-            supabase.table("api_keys_daily_usage").update({"calls": current_calls + 1}).eq(
-                "key_id", key_id
-            ).eq("date", today).execute()
+            supabase.table("api_keys_daily_usage").update(
+                {"calls": current_calls + 1}
+            ).eq("key_id", key_id).eq("date", today).execute()
         else:
             supabase.table("api_keys_daily_usage").insert(
                 {"key_id": key_id, "date": today, "calls": 1}
