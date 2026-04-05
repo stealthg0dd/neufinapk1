@@ -1,0 +1,120 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useAuth } from '@/lib/auth-context'
+
+const API = process.env.NEXT_PUBLIC_API_URL
+
+interface PlanStatus {
+  subscription_tier: string
+  plan_name: string
+  price_monthly: number
+}
+
+const PLAN_FEATURES: Record<string, string[]> = {
+  retail: ['Unlimited DNA analyses', 'Swarm AI analysis', 'Portfolio alerts', 'Mobile app access'],
+  advisor: ['Everything in Retail', 'Multi-client dashboard', 'White-label PDF reports (10/mo)', 'MAS-compliant audit trail'],
+  enterprise: ['Everything in Advisor', 'Unlimited reports', 'Full REST API access', '10,000 API calls/day'],
+}
+
+const PLAN_ICONS: Record<string, string> = {
+  retail: '📈',
+  advisor: '💼',
+  enterprise: '🏦',
+}
+
+export default function PricingSuccessPage() {
+  const { token } = useAuth()
+  const router = useRouter()
+  const [plan, setPlan] = useState<PlanStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [countdown, setCountdown] = useState(5)
+
+  useEffect(() => {
+    if (!token) return
+    fetch(`${API}/api/subscription/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setPlan(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [token])
+
+  // 5-second countdown then redirect to /dashboard
+  useEffect(() => {
+    if (loading) return
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(interval)
+          router.push('/dashboard')
+          return 0
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [loading, router])
+
+  const tier = plan?.subscription_tier || 'retail'
+  const features = PLAN_FEATURES[tier] || PLAN_FEATURES.retail
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex flex-col">
+      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center">
+          <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
+        </div>
+      </nav>
+
+      <main className="flex-1 flex items-center justify-center px-6 py-16">
+        <div className="w-full max-w-md text-center space-y-6">
+          {loading ? (
+            <div className="flex items-center justify-center gap-3 text-blue-400">
+              <span className="inline-block w-5 h-5 border-2 border-blue-400/40 border-t-blue-400 rounded-full animate-spin" />
+              <span>Confirming your plan…</span>
+            </div>
+          ) : (
+            <>
+              <div className="text-6xl mb-2">{PLAN_ICONS[tier] || '🎉'}</div>
+              <div>
+                <h1 className="text-3xl font-extrabold text-white mb-2">
+                  Welcome to {plan?.plan_name || 'NeuFin'}!
+                </h1>
+                <p className="text-gray-400">Your subscription is now active. Here&apos;s what you can do:</p>
+              </div>
+
+              <div className="glass-card rounded-2xl p-6 text-left space-y-3">
+                {features.map((f) => (
+                  <div key={f} className="flex items-center gap-3 text-sm text-gray-300">
+                    <span className="text-green-400 shrink-0">✓</span>
+                    {f}
+                  </div>
+                ))}
+              </div>
+
+              <div className="card text-sm text-gray-500 text-center">
+                Redirecting to your dashboard in{' '}
+                <span className="text-blue-400 font-semibold">{countdown}s</span>…
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Link href="/dashboard" className="btn-primary text-center py-3">
+                  Go to Dashboard Now →
+                </Link>
+                <Link href="/pricing" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+                  ← Back to Pricing
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}

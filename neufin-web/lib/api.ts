@@ -1,3 +1,68 @@
+// ── Plans & Subscription ──────────────────────────────────────────────────────
+
+export interface Plan {
+  name: string
+  price_monthly: number
+  stripe_price_id?: string
+  dna_analyses_per_month: number
+  swarm_analyses: boolean
+  advisor_reports: boolean
+  api_access: boolean
+  multi_client?: boolean
+  advisor_reports_per_month?: number
+  api_rate_limit_per_day?: number
+}
+
+export interface PlanSubscriptionStatus {
+  subscription_tier: string
+  plan_name: string
+  price_monthly: number
+  usage: {
+    dna_analyses: number
+    swarm_analyses: number
+    api_calls: number
+  }
+  limits: {
+    dna_analyses_per_month: number
+  }
+}
+
+export async function getPlans(): Promise<Record<string, Plan>> {
+  const res = await fetch(`${API}/api/plans`)
+  if (!res.ok) throw new Error('Could not load plans')
+  return res.json()
+}
+
+export async function getPlanSubscriptionStatus(
+  token: string
+): Promise<PlanSubscriptionStatus> {
+  const res = await fetch(`${API}/api/subscription/status`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Could not load subscription status')
+  return res.json()
+}
+
+export async function submitLead(body: {
+  name: string
+  email: string
+  company: string
+  role: string
+  aum_range: string
+  message?: string
+}): Promise<{ created: boolean; lead_id: string | null }> {
+  const res = await fetch(`${API}/api/leads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Could not submit enquiry')
+  }
+  return res.json()
+}
+
 // ── Subscription status ─────────────────────────────────────────────────────
 export async function getSubscriptionStatus(token?: string | null): Promise<{ status: 'trial' | 'active' | 'expired', days_remaining?: number }> {
   const res = await fetch(`${API}/api/auth/subscription-status`, {

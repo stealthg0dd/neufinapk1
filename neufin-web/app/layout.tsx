@@ -19,20 +19,21 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neufin.com'
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: 'NeuFin — Behavioral Finance Intelligence for SEA SMEs | Singapore',
+    default: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
     template: '%s | NeuFin',
   },
   description:
-    'Stop making financial decisions on instinct. NeuFin shows Singapore SMEs and investors where cognitive biases are costing them money. MAS-compliant. Powered by Plaid.',
+    'AI-powered portfolio analysis trusted by Singapore financial advisors. MAS-compliant, institutional-grade research in 60 seconds. Free DNA score — no account required.',
   keywords: [
     'behavioral finance Singapore',
     'investment bias detection',
     'portfolio analysis Singapore',
     'Singapore fintech',
+    'financial advisor tools Singapore',
     'cognitive bias investing',
     'MAS compliant fintech',
     'SEA wealth management',
-    'SME finance tools',
+    'white-label advisor reports',
     'CFO tools Singapore',
     'Plaid portfolio analysis',
   ],
@@ -44,23 +45,23 @@ export const metadata: Metadata = {
     locale: 'en_SG',
     url: APP_URL,
     siteName: 'NeuFin',
-    title: 'NeuFin — Behavioral Finance Intelligence for SEA SMEs | Singapore',
+    title: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
     description:
-      'Stop making financial decisions on instinct. NeuFin shows Singapore SMEs and investors where cognitive biases are costing them money.',
+      'AI-powered portfolio analysis trusted by Singapore financial advisors. MAS-compliant, institutional-grade behavioral finance research in 60 seconds.',
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'NeuFin — Behavioral Finance Intelligence Platform for Singapore SMEs',
+        alt: 'NeuFin — Behavioral Finance Intelligence Platform for Singapore',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NeuFin — Behavioral Finance Intelligence for SEA SMEs',
+    title: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
     description:
-      'Stop making financial decisions on instinct. NeuFin shows Singapore SMEs where cognitive biases are costing them money.',
+      'AI-powered portfolio analysis trusted by Singapore financial advisors. MAS-compliant research in 60 seconds.',
     images: ['/og.png'],
   },
   robots: {

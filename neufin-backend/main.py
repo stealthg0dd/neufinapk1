@@ -92,6 +92,7 @@ from routers import (  # noqa: E402
     alerts,
     developer as developer_router,
     dna,
+    leads as leads_router,
     market,
     payments,
     portfolio,
@@ -279,6 +280,7 @@ PUBLIC_PREFIXES = [
     "/api/stripe/webhook",
     "/api/payments/plans",
     "/api/plans",
+    "/api/leads",
     "/api/portfolio/chart/",
     "/api/referrals/",
     "/api/emails/",
@@ -571,6 +573,7 @@ app.include_router(referrals.router)
 app.include_router(advisors.router)
 app.include_router(advisor_router.router)
 app.include_router(developer_router.router)
+app.include_router(leads_router.router)
 app.include_router(market.router)
 app.include_router(vault.router)
 app.include_router(vault.plans_router)

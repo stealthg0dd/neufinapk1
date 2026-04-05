@@ -118,6 +118,9 @@ export default function LandingPage() {
             <Link href="/swarm" className="btn-outline py-2 text-sm">
               Swarm
             </Link>
+            <Link href="/pricing" className="btn-outline py-2 text-sm">
+              Pricing
+            </Link>
             <Link href="/advisor/dashboard" className="btn-outline py-2 text-sm">
               For Advisors
             </Link>
@@ -304,6 +307,71 @@ export default function LandingPage() {
                 <p className="text-xs text-gray-500 text-center">$99 / mo for unlimited reports</p>
               </div>
             </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* B2B Singapore Section ─────────────────────────────────────── */}
+      <section className="py-20 px-6 border-t border-gray-800/60">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="text-center mb-12"
+          >
+            <motion.span variants={fadeUp} className="badge bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-4 inline-block">
+              For Financial Professionals
+            </motion.span>
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold mb-3">
+              Built for Singapore&apos;s{' '}
+              <span className="text-gradient">Financial Professionals</span>
+            </motion.h2>
+            <motion.p variants={fadeUp} className="text-gray-400 max-w-xl mx-auto">
+              MAS-compliant behavioral finance intelligence that your clients will pay for.
+            </motion.p>
+          </motion.div>
+
+          {/* Three proof points */}
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-60px' }}
+            className="grid md:grid-cols-3 gap-5 mb-12"
+          >
+            {[
+              { icon: '⚡', title: '60-second analysis', desc: 'Portfolio DNA analysis delivered in under a minute — no waiting, no batch processing.' },
+              { icon: '📄', title: 'Goldman-quality reports', desc: 'Professional white-label PDF reports your clients expect from a top-tier advisory.' },
+              { icon: '🏷️', title: 'Your brand, our intelligence', desc: 'White-label NeuFin for your practice. Your logo, your colors, your client relationships.' },
+            ].map((p) => (
+              <motion.div
+                key={p.title}
+                variants={springScale}
+                className="glass-card rounded-xl p-6 border border-purple-500/10 hover:border-purple-500/30 transition-all duration-200"
+              >
+                <div className="text-3xl mb-3">{p.icon}</div>
+                <h3 className="font-semibold text-white mb-2">{p.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">{p.desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* Social proof + CTA */}
+          <motion.div
+            variants={fadeUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="text-center"
+          >
+            <p className="text-gray-500 text-sm mb-6">
+              Join <strong className="text-gray-300">50+ advisors</strong> across Singapore and Southeast Asia
+            </p>
+            <Link href="/pricing" className="btn-primary inline-block px-8 py-4 text-base">
+              Start Your Free Advisor Trial →
+            </Link>
           </motion.div>
         </div>
       </section>
