@@ -5,11 +5,12 @@ export const dynamic = 'force-dynamic'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { leadId: string } }
+  { params }: { params: Promise<{ leadId: string }> }
 ) {
+  const { leadId } = await params
   const token = req.headers.get('authorization') ?? ''
   const body = await req.json()
-  const res = await fetch(`${BACKEND}/api/admin/leads/${params.leadId}`, {
+  const res = await fetch(`${BACKEND}/api/admin/leads/${leadId}`, {
     method: 'PATCH',
     headers: { 'content-type': 'application/json', authorization: token },
     body: JSON.stringify(body),

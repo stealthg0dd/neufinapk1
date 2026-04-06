@@ -5,10 +5,11 @@ export const dynamic = 'force-dynamic'
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params }: { params: Promise<{ keyId: string }> }
 ) {
+  const { keyId } = await params
   const token = req.headers.get('authorization') ?? ''
-  const res = await fetch(`${BACKEND}/api/developer/keys/${params.keyId}`, {
+  const res = await fetch(`${BACKEND}/api/developer/keys/${keyId}`, {
     method: 'DELETE',
     headers: { authorization: token },
   })
