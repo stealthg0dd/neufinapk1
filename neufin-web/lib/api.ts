@@ -130,7 +130,7 @@ export async function authFetch(
         // Lazy-import to avoid circular deps and keep server bundle clean
         const { supabase } = await import('./supabase')
         await supabase.auth.signOut()
-        window.location.href = '/auth?reason=session_expired'
+        window.location.href = '/login?reason=session_expired'
       }
       return null
     }
@@ -703,10 +703,14 @@ export async function getResearchRegime(): Promise<MarketRegime | null> {
   }
 }
 
-export async function getResearchNotes(token?: string | null, page = 1): Promise<ResearchNote[]> {
+export async function getResearchNotes(
+  token?: string | null,
+  page = 1,
+  perPage = 10,
+): Promise<ResearchNote[]> {
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API}/api/research/notes?page=${page}&per_page=10`, {
+  const res = await fetch(`${API}/api/research/notes?page=${page}&per_page=${perPage}`, {
     headers,
     cache: 'no-store',
   })

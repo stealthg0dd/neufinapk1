@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Geist, JetBrains_Mono, Instrument_Serif } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth-context'
 import { PostHogProvider } from '@/lib/posthog'
@@ -10,9 +10,24 @@ import { SentryUserContext } from '@/components/SentryUserContext'
 import { Toaster } from 'react-hot-toast'
 import '@/lib/env-check'
 
-// Using `variable` mode avoids the server/client className mismatch that causes
-// Next.js hydration warnings. The CSS variable is applied consistently on both sides.
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
+const geist = Geist({
+  subsets: ['latin'],
+  variable: '--font-geist',
+  display: 'swap',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains',
+  display: 'swap',
+})
+
+const instrumentSerif = Instrument_Serif({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-instrument',
+  display: 'swap',
+})
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://neufin.com'
 
@@ -81,8 +96,6 @@ export const metadata: Metadata = {
   },
 }
 
-// ── Schema.org: Organization ───────────────────────────────────────────────────
-
 const organizationSchema = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
@@ -111,8 +124,6 @@ const organizationSchema = {
     'Recency Bias',
   ],
 }
-
-// ── Schema.org: SoftwareApplication ───────────────────────────────────────────
 
 const softwareApplicationSchema = {
   '@context': 'https://schema.org',
@@ -144,11 +155,12 @@ const softwareApplicationSchema = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable}>
-      {/* suppressHydrationWarning prevents false-positive warnings from browser
-          extensions (e.g. password managers) that inject attributes into <body>. */}
+    <html
+      lang="en"
+      className={`${geist.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
+    >
       <body
-        className="bg-gray-950 text-gray-100 min-h-screen antialiased font-sans"
+        className="min-h-screen antialiased font-sans bg-[var(--canvas)] text-[var(--text-primary)]"
         suppressHydrationWarning
       >
         <script
@@ -171,11 +183,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               toastOptions={{
                 duration: 4000,
                 style: {
-                  background: '#1f2937',
-                  color: '#f3f4f6',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
+                  background: 'var(--glass-bg)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--glass-border)',
+                  borderRadius: '12px',
                   fontSize: '14px',
+                  backdropFilter: 'blur(12px)',
                 },
                 error: { duration: 6000 },
               }}

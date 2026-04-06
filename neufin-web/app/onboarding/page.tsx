@@ -58,7 +58,7 @@ function OnboardingContent() {
   useEffect(() => {
     if (!authLoading && !token) {
       const hint = searchParams.get('user_type') ? `&user_type=${searchParams.get('user_type')}` : ''
-      router.replace(`/auth?next=/onboarding${hint}`)
+      router.replace(`/login?next=/onboarding${hint}`)
     }
   }, [authLoading, token, router, searchParams])
 

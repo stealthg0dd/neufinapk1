@@ -60,7 +60,7 @@ function AuthCallbackContent() {
     const urlErrorDesc = searchParams.get('error_description')
     if (urlError) {
       logger.error({ tag: TAG, urlError, urlErrorDesc }, 'auth.callback_provider_error')
-      window.location.href = `/auth?error=${encodeURIComponent(urlErrorDesc ?? urlError)}`
+      window.location.href = `/login?error=${encodeURIComponent(urlErrorDesc ?? urlError)}`
       return
     }
 
@@ -71,7 +71,7 @@ function AuthCallbackContent() {
       if (cancelled) return
       if (error) {
         logger.error({ tag: TAG, error }, 'auth.callback_exchange_error')
-        window.location.href = `/auth?error=oauth_failed`
+        window.location.href = `/login?error=oauth_failed`
         return
       }
       if (data?.session) {
@@ -82,7 +82,7 @@ function AuthCallbackContent() {
         window.location.href = next
         return
       }
-      window.location.href = `/auth?error=oauth_failed`
+      window.location.href = `/login?error=oauth_failed`
     })()
     return () => { cancelled = true }
   }, [next, searchParams, capture])

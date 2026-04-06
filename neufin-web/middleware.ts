@@ -8,6 +8,10 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 // ── Public path prefixes — skip auth check entirely ───────────────────────
 const PUBLIC_PREFIXES = [
   '/auth',          // /auth  +  /auth/callback
+  '/login',
+  '/signup',
+  '/pricing',
+  '/contact-sales',
   '/upload',
   '/results',
   '/features',
@@ -121,7 +125,7 @@ function redirectToDashboard(request: NextRequest): NextResponse {
 }
 
 function redirectToAuth(request: NextRequest, pathname: string, clearCookie = false): NextResponse {
-  const loginUrl = new URL('/auth', request.url)
+  const loginUrl = new URL('/login', request.url)
   loginUrl.searchParams.set('next', pathname)
 
   const response = NextResponse.redirect(loginUrl)
