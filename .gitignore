@@ -71,4 +71,4 @@ neufin-mobile/*.aab
 neufin-mobile/build-*/
 *.apk
 *.aab
-expo-go-sdk51.apk
+expo-go-sdk51.apk.railway/
