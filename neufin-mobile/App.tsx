@@ -30,6 +30,8 @@ import AnalysisScreen from '@/screens/AnalysisScreen'
 import SwarmReportScreen from '@/screens/SwarmReportScreen'
 import ShareScreen from '@/screens/ShareScreen'
 import SwarmAlertsScreen from '@/screens/SwarmAlertsScreen'
+import UpgradeScreen from '@/screens/UpgradeScreen'
+import ResearchScreen from '@/screens/ResearchScreen'
 import type { PortfolioSummary, DNAResult } from '@/lib/api'
 
 export type RootStackParamList = {
@@ -40,6 +42,8 @@ export type RootStackParamList = {
   SwarmReport:   undefined
   Share:         { result: DNAResult }
   SwarmAlerts:   undefined
+  Upgrade:       { trigger?: string }
+  Research:      undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>()
@@ -145,6 +149,8 @@ export default function App() {
             <Stack.Screen name="SwarmReport"   component={SwarmReportScreen}   />
             <Stack.Screen name="Share"         component={ShareScreen}         />
             <Stack.Screen name="SwarmAlerts"   component={SwarmAlertsScreen}   />
+            <Stack.Screen name="Upgrade"       component={UpgradeScreen}       />
+            <Stack.Screen name="Research"      component={ResearchScreen}      />
           </Stack.Navigator>
         </NavigationContainer>
       </PostHogProvider>
