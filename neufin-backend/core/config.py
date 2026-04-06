@@ -128,6 +128,10 @@ class Settings(BaseSettings):
         default=None,
         description="Slack incoming webhook URL for #ctech-command.",
     )
+    RESEND_API_KEY: str | None = Field(
+        default=None,
+        description="Resend transactional email API key. resend.com → API Keys. Free tier: 100 emails/day.",
+    )
 
     # ── Observability (SENTRY_DSN required at startup) ────────────────────────
     SENTRY_DSN: str | None = Field(

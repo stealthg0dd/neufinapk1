@@ -176,3 +176,28 @@ async def get_subscribed_user(user: JWTUser = Depends(get_current_user)) -> JWTU
     Use on advisor-only endpoints that require a paid or trial account.
     """
     return require_active_subscription(user)
+
+
+async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
+    """
+    FastAPI dependency that requires a valid JWT AND is_admin=true in user_profiles.
+    Returns HTTP 403 if the user is not an admin.
+    """
+    try:
+        result = (
+            supabase.table("user_profiles")
+            .select("is_admin")
+            .eq("id", user.id)
+            .limit(1)
+            .execute()
+        )
+        is_admin = result.data[0].get("is_admin", False) if result.data else False
+    except Exception:
+        is_admin = False
+
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    return user

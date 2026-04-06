@@ -258,6 +258,15 @@ async def lifespan(app: FastAPI):
             id="daily_synthesis",
             replace_existing=True,
         )
+        # Weekly sales digest: Monday 08:00 SGT
+        from services.sales_digest import run_weekly_sales_digest
+
+        _scheduler.add_job(
+            run_weekly_sales_digest,
+            CronTrigger(day_of_week="mon", hour=8, minute=0),
+            id="weekly_sales_digest",
+            replace_existing=True,
+        )
         _scheduler.start()
         logger.info(
             "scheduler.started",
@@ -266,6 +275,7 @@ async def lifespan(app: FastAPI):
                 "news_intelligence",
                 "regime_detector",
                 "daily_synthesis",
+                "weekly_sales_digest",
             ],
         )
     except Exception as _sched_exc:
