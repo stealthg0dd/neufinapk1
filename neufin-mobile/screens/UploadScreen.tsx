@@ -13,7 +13,7 @@ type Props = {
   navigation: StackNavigationProp<RootStackParamList, 'Upload'>
 }
 
-const SAMPLE_CSV = `symbol,shares,cost_basis
+const CSV_FORMAT_EXAMPLE = `symbol,shares,cost_basis
 AAPL,10,145.50
 MSFT,5,280.00
 GOOGL,3,130.00
@@ -221,7 +221,7 @@ export default function UploadScreen({ navigation }: Props) {
       {/* Format reference */}
       <View style={styles.sampleBox}>
         <Text style={styles.sampleTitle}>Expected CSV format:</Text>
-        <Text style={styles.sampleCode}>{SAMPLE_CSV}</Text>
+        <Text style={styles.sampleCode}>{CSV_FORMAT_EXAMPLE}</Text>
       </View>
     </ScrollView>
   )

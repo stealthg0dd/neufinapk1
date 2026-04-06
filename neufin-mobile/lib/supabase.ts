@@ -17,7 +17,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
     storage:           AsyncStorage,
     autoRefreshToken:  true,
     persistSession:    true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false, // must be false in React Native — URL parsing is handled by deep-link listener in App.tsx
   },
 })
 

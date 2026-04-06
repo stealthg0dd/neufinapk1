@@ -33,29 +33,20 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
-    const sub = Linking.addEventListener('url', ({ url }) => {
-      console.log('[OAuth][DeepLink] incoming_url=', url)
+    const sub = Linking.addEventListener('url', (_event) => {
+      // Deep-link received — session will be picked up by supabase.auth.onAuthStateChange in App.tsx
     })
-
-    return () => {
-      sub.remove()
-    }
+    return () => { sub.remove() }
   }, [])
 
-  function debugRedirectUri() {
-    let makeRedirectUriValue = ''
+  function getRedirectUri(): string {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { makeRedirectUri } = require('expo-auth-session')
-      makeRedirectUriValue = makeRedirectUri({ path: 'auth/callback' })
+      return makeRedirectUri({ path: 'auth/callback' })
     } catch {
-      makeRedirectUriValue = Linking.createURL('auth/callback')
+      return getOAuthRedirectUrl()
     }
-
-    const resolvedRedirect = getOAuthRedirectUrl()
-    console.log('[OAuth][Debug] makeRedirectUri=', makeRedirectUriValue)
-    console.log('[OAuth][Debug] resolved_redirect=', resolvedRedirect)
-    return resolvedRedirect
   }
 
   async function signInWithGoogle() {
@@ -63,7 +54,7 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
     setError(null)
 
     try {
-      const redirectTo = debugRedirectUri()
+      const redirectTo = getRedirectUri()
 
       // 1. Get the OAuth URL from Supabase (skipBrowserRedirect so we can
       //    open it with expo-web-browser instead of the default behaviour).
@@ -78,15 +69,8 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
       if (oauthErr) throw oauthErr
       if (!data.url)  throw new Error('No OAuth URL returned from Supabase')
 
-      console.log('[OAuth][Debug] provider_url=', data.url)
-
       // 2. Open in the system browser, waiting for the deep-link redirect back.
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
-
-      console.log('[OAuth][Debug] browser_result_type=', result.type)
-      if (result.type === 'success') {
-        console.log('[OAuth][Debug] callback_url=', result.url)
-      }
 
       if (result.type !== 'success') {
         // User cancelled or browser was dismissed — not an error.
@@ -101,13 +85,9 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
       const query    = url.includes('?') ? url.split('?')[1].split('#')[0] : ''
       const params   = new URLSearchParams(fragment || query)
 
-      const authCode = params.get('code')
+      const authCode  = params.get('code')
       const authError = params.get('error')
       const authErrorDescription = params.get('error_description')
-
-      console.log('[OAuth][Debug] parsed_code=', authCode)
-      console.log('[OAuth][Debug] parsed_error=', authError)
-      console.log('[OAuth][Debug] parsed_error_description=', authErrorDescription)
 
       if (authError || authErrorDescription) {
         throw new Error(authErrorDescription || authError || 'OAuth redirect failed.')
