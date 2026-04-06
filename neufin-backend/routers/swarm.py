@@ -97,9 +97,7 @@ class GlobalChatRequest(BaseModel):
 
 
 # ── Background persistence helper ──────────────────────────────────────────────
-async def _persist_swarm_result(
-    report_id: str, user_id: str | None, result: dict
-) -> None:
+async def _persist_swarm_result(report_id: str, user_id: str | None, result: dict) -> None:
     """
     Persist swarm result to Supabase swarm_reports table.
     Now async and awaited directly in the analyze endpoint so the record is
@@ -138,9 +136,7 @@ async def _persist_swarm_result(
         }
         # Run the synchronous Supabase call in a thread so we don't block the event loop
         await asyncio.to_thread(
-            lambda: supabase.table("swarm_reports")
-            .upsert(row, on_conflict="id")
-            .execute()
+            lambda: supabase.table("swarm_reports").upsert(row, on_conflict="id").execute()
         )
         logger.info("swarm.persist_ok", report_id=report_id)
     except Exception as e:
@@ -284,9 +280,7 @@ async def analyze_with_swarm(
         "agent_trace": result.get("agent_trace", []),
         # FIXED: key_numbers always present — extracted from thesis for convenience
         "key_numbers": {
-            "dna_score": str(
-                thesis.get("dna_score") or thesis.get("health_score") or ""
-            ),
+            "dna_score": str(thesis.get("dna_score") or thesis.get("health_score") or ""),
             "weighted_beta": str(thesis.get("weighted_beta") or ""),
             "sharpe_ratio": str(thesis.get("sharpe_ratio") or ""),
             "regime": str(thesis.get("regime") or ""),
@@ -317,14 +311,10 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Could not fetch swarm report: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"Could not fetch swarm report: {exc}") from exc
 
     if not result.data:
-        raise HTTPException(
-            status_code=404, detail="No swarm report found for this user."
-        )
+        raise HTTPException(status_code=404, detail="No swarm report found for this user.")
 
     row = result.data[0]
 
@@ -404,13 +394,7 @@ async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional
     Used by the frontend to restore thesis state on page refresh.
     """
     try:
-        row = (
-            supabase.table("swarm_reports")
-            .select("*")
-            .eq("id", report_id)
-            .single()
-            .execute()
-        )
+        row = supabase.table("swarm_reports").select("*").eq("id", report_id).single().execute()
         if not row.data:
             raise HTTPException(status_code=404, detail="Report not found.")
         report_user_id = row.data.get("user_id")
@@ -477,9 +461,7 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning(
-                "chat.supabase_fetch_failed", record_id=body.record_id, error=str(e)
-            )
+            logger.warning("chat.supabase_fetch_failed", record_id=body.record_id, error=str(e))
         # Fall through to positions fallback if DB lookup fails
 
     # ── 3. Positions fallback (guest / no persisted report) ───────────────────
@@ -584,9 +566,7 @@ async def global_chat(body: GlobalChatRequest):
         }
 
     agent_type = body.agent_type.lower().strip() if body.agent_type else "general"
-    system_prose = _GLOBAL_AGENT_PROMPTS.get(
-        agent_type, _GLOBAL_AGENT_PROMPTS["general"]
-    )
+    system_prose = _GLOBAL_AGENT_PROMPTS.get(agent_type, _GLOBAL_AGENT_PROMPTS["general"])
 
     prompt = f"""{system_prose}
 

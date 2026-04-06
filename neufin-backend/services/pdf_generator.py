@@ -79,9 +79,7 @@ def _make_styles(bc: BrandColors):
             alignment=TA_CENTER,
             spaceAfter=6,
         ),
-        "cover_meta": ps(
-            "CoverMeta", fontSize=11, textColor=_hex("#D1D5DB"), alignment=TA_CENTER
-        ),
+        "cover_meta": ps("CoverMeta", fontSize=11, textColor=_hex("#D1D5DB"), alignment=TA_CENTER),
         "h1": ps(
             "H1",
             fontSize=18,
@@ -169,9 +167,7 @@ def _bar_row(label: str, pct: float, bc: BrandColors, bar_width: float = 3.5) ->
                 inner,
                 Paragraph(
                     f"{pct:.1f}%",
-                    ParagraphStyle(
-                        "br", fontSize=9, textColor=bc.muted, alignment=TA_RIGHT
-                    ),
+                    ParagraphStyle("br", fontSize=9, textColor=bc.muted, alignment=TA_RIGHT),
                 ),
             ]
         ],
@@ -183,9 +179,7 @@ def _bar_row(label: str, pct: float, bc: BrandColors, bar_width: float = 3.5) ->
 # ── Page header / footer callbacks ────────────────────────────────────────────
 
 
-def _make_page_callbacks(
-    bc: BrandColors, advisor_name: str, report_date: str, logo_img=None
-):
+def _make_page_callbacks(bc: BrandColors, advisor_name: str, report_date: str, logo_img=None):
     def header(canvas, doc):
         canvas.saveState()
         # Top blue rule
@@ -214,9 +208,7 @@ def _make_page_callbacks(
         # Right side
         canvas.setFont("Helvetica", 8)
         canvas.setFillColor(bc.muted)
-        canvas.drawRightString(
-            8 * inch, 10.45 * inch, f"{advisor_name}  ·  {report_date}"
-        )
+        canvas.drawRightString(8 * inch, 10.45 * inch, f"{advisor_name}  ·  {report_date}")
         canvas.restoreState()
 
     def footer(canvas, doc):
@@ -345,19 +337,13 @@ def generate_advisor_report(
     E.append(Spacer(1, 0.25 * inch))
     score_val = analysis.get("dna_score", "—")
     investor_type = analysis.get("investor_type", "—")
-    E.append(
-        Paragraph(
-            f"DNA Score: <b>{score_val}/100</b>  ·  {investor_type}", S["cover_meta"]
-        )
-    )
+    E.append(Paragraph(f"DNA Score: <b>{score_val}/100</b>  ·  {investor_type}", S["cover_meta"]))
     E.append(Spacer(1, 1.5 * inch))
     E.append(
         Paragraph(
             "This document is confidential and prepared exclusively for the named financial advisor. "
             "It is for informational purposes only and does not constitute investment advice.",
-            ParagraphStyle(
-                "CovDiscl", parent=S["body_muted"], alignment=TA_CENTER, fontSize=8
-            ),
+            ParagraphStyle("CovDiscl", parent=S["body_muted"], alignment=TA_CENTER, fontSize=8),
         )
     )
 
@@ -445,11 +431,7 @@ def generate_advisor_report(
     ]
     if metrics.get("pnl_pct") is not None:
         summary_rows.append(["Unrealised P&L", f"{metrics['pnl_pct']:+.2f}%", "", ""])
-    E.append(
-        _colored_table(
-            summary_rows, [1.8 * inch, 1.6 * inch, 1.8 * inch, 1.5 * inch], bc
-        )
-    )
+    E.append(_colored_table(summary_rows, [1.8 * inch, 1.6 * inch, 1.8 * inch, 1.5 * inch], bc))
     E.append(PageBreak())
 
     # ── PAGE 4: Holdings Overview ──────────────────────────────────────────────
@@ -588,11 +570,7 @@ def generate_advisor_report(
     if sectors:
         sec_rows = [["Sector", "Allocation %", "Assessment"]]
         for sec, pct in sorted(sectors.items(), key=lambda x: -x[1]):
-            note = (
-                "Overweight (>30%)"
-                if pct > 30
-                else "Moderate" if pct > 15 else "Low exposure"
-            )
+            note = "Overweight (>30%)" if pct > 30 else "Moderate" if pct > 15 else "Low exposure"
             sec_rows.append([sec, f"{pct:.1f}%", note])
         E.append(_colored_table(sec_rows, [2.4 * inch, 1.5 * inch, 2.8 * inch], bc))
         E.append(Spacer(1, 14))

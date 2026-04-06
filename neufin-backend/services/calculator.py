@@ -74,9 +74,7 @@ def _fetch_beta(sym: str) -> float:
     return fetch_beta(sym)
 
 
-def _fetch_historical_returns(
-    symbols: list[str], period: str = "1mo"
-) -> pd.DataFrame | None:
+def _fetch_historical_returns(symbols: list[str], period: str = "1mo") -> pd.DataFrame | None:
     """Return daily returns for *symbols*, or None when history is unavailable."""
     try:
         prices = _fetch_prices(symbols, period)
@@ -381,9 +379,7 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                         if sym in remaining:
                             remaining.remove(sym)
                 except Exception as e:
-                    logger.warning(
-                        "price.finnhub_future_error", symbol=sym, error=str(e)
-                    )
+                    logger.warning("price.finnhub_future_error", symbol=sym, error=str(e))
 
     # 6. Alpha Vantage — parallel, last resort
     if remaining and _available("alphavantage"):
@@ -468,9 +464,7 @@ def get_price_with_fallback(sym: str) -> "PriceResult":
         if alias_price and alias_price > 0:
             _PRICE_CACHE[sym] = (alias_price, time.time())
             upsert_ticker_price_cache(sym, alias_price, source=f"alias:{alias}")
-            logger.debug(
-                "price.alias_resolved", symbol=sym, alias=alias, price=alias_price
-            )
+            logger.debug("price.alias_resolved", symbol=sym, alias=alias, price=alias_price)
             return PriceResult(
                 symbol=sym,
                 price=alias_price,
@@ -495,9 +489,7 @@ def get_price_with_fallback(sym: str) -> "PriceResult":
             recorded = datetime.datetime.fromisoformat(
                 cached_row["recorded_at"].replace("Z", "+00:00")
             )
-            age_hours = (
-                datetime.datetime.now(datetime.UTC) - recorded
-            ).total_seconds() / 3600
+            age_hours = (datetime.datetime.now(datetime.UTC) - recorded).total_seconds() / 3600
         except Exception:
             age_hours = 0.0
         logger.warning(
@@ -718,9 +710,7 @@ def _tax_alpha_score(df: "pd.DataFrame") -> float:
         return 10.0
 
     df["unrealised_gain"] = (df["current_price"] - df["cost_basis"]) * df["shares"]
-    harvest_value = float(
-        df.loc[df["unrealised_gain"] < 0, "unrealised_gain"].abs().sum()
-    )
+    harvest_value = float(df.loc[df["unrealised_gain"] < 0, "unrealised_gain"].abs().sum())
     liability_value = float(df.loc[df["unrealised_gain"] > 0, "unrealised_gain"].sum())
 
     harvest_ratio = harvest_value / total_value
@@ -820,9 +810,7 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
 
     df["unrealised_gain"] = (df["current_price"] - df["cost_basis"]) * df["shares"]
     df["tax_liability"] = df["unrealised_gain"].clip(lower=0) * CGT_RATE
-    df["credit_per_share"] = (df["cost_basis"] - df["current_price"]).clip(
-        lower=0
-    ) * CGT_RATE
+    df["credit_per_share"] = (df["cost_basis"] - df["current_price"]).clip(lower=0) * CGT_RATE
 
     gainers = df[df["unrealised_gain"] > 0].nlargest(2, "tax_liability")
     losers_pool = df[df["unrealised_gain"] < 0].sort_values(
@@ -850,8 +838,7 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
             shares_needed = remaining / cps
             shares_to_sell = round(min(shares_needed, shares_available), 2)
             loss_usd = round(
-                shares_to_sell
-                * abs(float(loser["current_price"] - loser["cost_basis"])),
+                shares_to_sell * abs(float(loser["current_price"] - loser["cost_basis"])),
                 2,
             )
             credit_achieved = round(shares_to_sell * cps, 2)
@@ -983,13 +970,9 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     symbols = df["symbol"].tolist()
 
     # Resolve prices using the full waterfall (live → alias → stale → unresolvable)
-    price_results: dict[str, PriceResult] = {
-        sym: get_price_with_fallback(sym) for sym in symbols
-    }
+    price_results: dict[str, PriceResult] = {sym: get_price_with_fallback(sym) for sym in symbols}
 
-    unresolvable = [
-        sym for sym, r in price_results.items() if r.status == "unresolvable"
-    ]
+    unresolvable = [sym for sym, r in price_results.items() if r.status == "unresolvable"]
     resolved = [sym for sym in symbols if sym not in unresolvable]
 
     if not resolved:
@@ -1004,9 +987,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         if r.warning:
             price_warnings.append(r.warning)
 
-    spot_prices = {
-        sym: r.price for sym, r in price_results.items() if r.price is not None
-    }
+    spot_prices = {sym: r.price for sym, r in price_results.items() if r.price is not None}
     price_status = {sym: r.status for sym, r in price_results.items()}
 
     df["current_price"] = df["symbol"].map(spot_prices).fillna(0.0)
@@ -1020,9 +1001,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     total_value = float(df.loc[resolved_mask, "current_value"].sum())
     df["weight"] = 0.0
     if total_value > 0:
-        df.loc[resolved_mask, "weight"] = (
-            df.loc[resolved_mask, "current_value"] / total_value
-        )
+        df.loc[resolved_mask, "weight"] = df.loc[resolved_mask, "current_value"] / total_value
 
     # Scoring components
     hhi_pts = _hhi_score(df["weight"])
@@ -1048,18 +1027,10 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     if "cost_basis" in df.columns:
         df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce")
         total_cost = float((df["shares"] * df["cost_basis"]).sum())
-        pnl_pct = (
-            float((total_value - total_cost) / total_cost * 100)
-            if total_cost > 0
-            else None
-        )
+        pnl_pct = float((total_value - total_cost) / total_cost * 100) if total_cost > 0 else None
 
-    positions_out = df[
-        ["symbol", "shares", "current_price", "current_value", "weight"]
-    ].copy()
-    positions_out["price_status"] = (
-        positions_out["symbol"].map(price_status).fillna("live")
-    )
+    positions_out = df[["symbol", "shares", "current_price", "current_value", "weight"]].copy()
+    positions_out["price_status"] = positions_out["symbol"].map(price_status).fillna("live")
 
     result = {
         "total_value": float(total_value),

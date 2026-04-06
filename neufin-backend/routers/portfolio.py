@@ -105,10 +105,7 @@ def _candle(symbol: str, period_days: int) -> dict | None:
                 )
                 if rows:
                     return {
-                        "t": [
-                            int(datetime.datetime.fromisoformat(k).timestamp())
-                            for k, _ in rows
-                        ],
+                        "t": [int(datetime.datetime.fromisoformat(k).timestamp()) for k, _ in rows],
                         "o": [float(v["1. open"]) for _, v in rows],
                         "h": [float(v["2. high"]) for _, v in rows],
                         "l": [float(v["3. low"]) for _, v in rows],
@@ -140,15 +137,11 @@ async def claim_portfolio(
         )
         if result.data and len(result.data) > 0:
             return {"claimed": True, "portfolio_id": body.portfolio_id}
-        raise HTTPException(
-            status_code=404, detail="Portfolio not found or already claimed."
-        )
+        raise HTTPException(status_code=404, detail="Portfolio not found or already claimed.")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Could not claim portfolio: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Could not claim portfolio: {e}") from e
 
 
 @router.post("/create")
@@ -170,9 +163,7 @@ async def create_portfolio(body: PortfolioCreate):
         port_result = supabase.table("portfolios").insert(port_row).execute()
         portfolio_id = port_result.data[0]["id"]
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Could not save portfolio: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Could not save portfolio: {e}") from e
 
     # Insert positions
     for pos in metrics["positions"]:
@@ -248,9 +239,7 @@ async def generate_trading_signals(body: SignalRequest):
                 price_summary[symbol] = {
                     "current": round(float(closes[-1]), 2),
                     "change_3mo_pct": (
-                        round((closes[-1] - closes[0]) / closes[0] * 100, 2)
-                        if closes[0]
-                        else 0
+                        round((closes[-1] - closes[0]) / closes[0] * 100, 2) if closes[0] else 0
                     ),
                     "avg_volume": int(sum(volumes) / len(volumes)) if volumes else 0,
                 }
@@ -279,9 +268,7 @@ For each symbol return a signal. Return ONLY valid JSON:
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        raise HTTPException(
-            status_code=503, detail=f"AI signal generation failed: {e}"
-        ) from e
+        raise HTTPException(status_code=503, detail=f"AI signal generation failed: {e}") from e
 
     # Persist signals to Supabase
     saved = []
@@ -354,9 +341,7 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail=f"Could not fetch portfolios: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"Could not fetch portfolios: {exc}") from exc
 
     portfolios = port_result.data or []
     if not portfolios:
@@ -475,8 +460,7 @@ async def get_risk_report(body: RiskReportRequest):
     # Resolve weights: use provided map, fall back to equal weight
     if body.weights:
         weights = {
-            s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0))
-            for s in symbols
+            s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0)) for s in symbols
         }
     else:
         eq = 1.0 / len(symbols)
@@ -505,14 +489,10 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     try:
         shares_list = [float(s.strip()) for s in shares.split(",")]
     except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail="shares must be numeric values."
-        ) from e
+        raise HTTPException(status_code=400, detail="shares must be numeric values.") from e
 
     if len(sym_list) != len(shares_list):
-        raise HTTPException(
-            status_code=400, detail="symbols and shares counts must match."
-        )
+        raise HTTPException(status_code=400, detail="symbols and shares counts must match.")
 
     try:
         prices = _fetch_prices(sym_list, period)
@@ -522,16 +502,10 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     weight_map = dict(zip(sym_list, shares_list, strict=False))
     history = []
     for date_idx, row in prices.iterrows():
-        day_value = sum(
-            float(row.get(sym, 0) or 0) * wt for sym, wt in weight_map.items()
-        )
+        day_value = sum(float(row.get(sym, 0) or 0) * wt for sym, wt in weight_map.items())
         history.append(
             {
-                "time": (
-                    date_idx.isoformat()
-                    if hasattr(date_idx, "isoformat")
-                    else str(date_idx)
-                ),
+                "time": (date_idx.isoformat() if hasattr(date_idx, "isoformat") else str(date_idx)),
                 "value": round(day_value, 2),
             }
         )
@@ -581,9 +555,7 @@ async def validate_tickers(body: ValidateTickersRequest):
             "status": r.status,
             "warning": r.warning,
             "alias_used": r.alias_used,
-            "stale_age_hours": (
-                round(r.stale_age_hours, 1) if r.stale_age_hours else None
-            ),
+            "stale_age_hours": (round(r.stale_age_hours, 1) if r.stale_age_hours else None),
         }
 
     results = await asyncio.to_thread(lambda: [_resolve(s) for s in symbols])
@@ -620,6 +592,4 @@ async def verify_prices(body: VerifyPricesRequest):
             "warnings": [c for c in checks if c.get("warned")],
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Price integrity check failed: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Price integrity check failed: {e}") from e
