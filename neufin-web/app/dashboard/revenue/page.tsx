@@ -3,12 +3,12 @@
 /**
  * /dashboard/revenue
  *
- * NeuFin revenue dashboard — advisor only.
- * Shows monthly Stripe revenue, subscriber counts, recent purchases,
- * and a conversion funnel.
+ * NeuFin revenue command centre — admin only.
+ * Shows MRR/ARR, subscriber plan breakdown, lead pipeline, conversion funnel, recent purchases.
  */
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,12 +38,22 @@ interface RevenueStats {
   }
 }
 
+interface LeadStats {
+  total:           number
+  by_status:       Record<string, number>
+  conversion_rate: number
+  this_week:       number
+  last_week:       number
+  won_this_month:  number
+  pipeline_mrr:    number
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 function formatUSD(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n)
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n)
 }
 
 function formatDate(iso: string): string {
@@ -70,45 +80,25 @@ function Skeleton({ className = "" }: { className?: string }) {
 }
 
 function StatCard({
-  label,
-  value,
-  sub,
-  delta,
-  deltaUp,
+  label, value, sub, delta, deltaUp, accent,
 }: {
-  label:    string
-  value:    string | number
-  sub?:     string
-  delta?:   string
-  deltaUp?: boolean
+  label: string; value: string | number; sub?: string; delta?: string; deltaUp?: boolean; accent?: string
 }) {
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+    <div className={`rounded-xl border ${accent ?? "border-gray-800"} bg-gray-900 p-5`}>
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className="text-2xl font-bold tabular-nums text-gray-100">{value}</p>
       <div className="flex items-center gap-2 mt-1">
-        {sub  && <p className="text-xs text-gray-500">{sub}</p>}
+        {sub && <p className="text-xs text-gray-500">{sub}</p>}
         {delta && (
-          <span className={`text-xs font-medium ${deltaUp ? "text-emerald-400" : "text-red-400"}`}>
-            {delta}
-          </span>
+          <span className={`text-xs font-medium ${deltaUp ? "text-emerald-400" : "text-red-400"}`}>{delta}</span>
         )}
       </div>
     </div>
   )
 }
 
-function FunnelBar({
-  label,
-  value,
-  max,
-  conversion,
-}: {
-  label:      string
-  value:      number
-  max:        number
-  conversion: string
-}) {
+function FunnelBar({ label, value, max, conversion }: { label: string; value: number; max: number; conversion: string }) {
   const pct = max ? Math.round((value / max) * 100) : 0
   return (
     <div className="space-y-1.5">
@@ -116,19 +106,30 @@ function FunnelBar({
         <span className="text-gray-300">{label}</span>
         <div className="flex items-center gap-3">
           <span className="tabular-nums text-gray-100 font-medium">{value.toLocaleString()}</span>
-          {conversion !== "—" && (
-            <span className="text-gray-500">{conversion} CVR</span>
-          )}
+          {conversion !== "—" && <span className="text-gray-500">{conversion} CVR</span>}
         </div>
       </div>
       <div className="h-2 w-full rounded-full bg-gray-800">
-        <div
-          className="h-2 rounded-full bg-blue-500 transition-all duration-700"
-          style={{ width: `${pct}%` }}
-        />
+        <div className="h-2 rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  new:            "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+  contacted:      "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30",
+  demo_scheduled: "bg-purple-500/20 text-purple-300 border border-purple-500/30",
+  demo_done:      "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30",
+  proposal_sent:  "bg-orange-500/20 text-orange-300 border border-orange-500/30",
+  won:            "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
+  lost:           "bg-red-500/20 text-red-300 border border-red-500/30",
+  nurture:        "bg-gray-500/20 text-gray-300 border border-gray-500/30",
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  new: "New", contacted: "Contacted", demo_scheduled: "Demo Sched.",
+  demo_done: "Demo Done", proposal_sent: "Proposal", won: "Won", lost: "Lost", nurture: "Nurture",
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,9 +138,10 @@ function FunnelBar({
 
 export default function RevenuePage() {
   const { getAccessToken } = useAuth()
-  const [stats, setStats]   = useState<RevenueStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState<string | null>(null)
+  const [stats, setStats]       = useState<RevenueStats | null>(null)
+  const [leads, setLeads]       = useState<LeadStats | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -147,13 +149,15 @@ export default function RevenuePage() {
     try {
       const token = await getAccessToken()
       if (!token) { setError("Not authenticated"); return }
-      const res = await fetch("/api/revenue/stats", {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: "no-store",
-      })
-      if (res.status === 403) { setError("Advisor role required."); return }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setStats(await res.json())
+      const authHdr = { Authorization: `Bearer ${token}` }
+      const [revRes, leadRes] = await Promise.all([
+        fetch("/api/revenue/stats", { headers: authHdr, cache: "no-store" }),
+        fetch("/api/admin/leads/stats", { headers: authHdr, cache: "no-store" }),
+      ])
+      if (revRes.status === 403) { setError("Admin role required."); return }
+      if (!revRes.ok) throw new Error(`Revenue HTTP ${revRes.status}`)
+      setStats(await revRes.json())
+      if (leadRes.ok) setLeads(await leadRes.json())
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -172,9 +176,7 @@ export default function RevenuePage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
-        </div>
+        <Skeleton className="h-48" />
         <Skeleton className="h-64" />
       </div>
     )
@@ -186,9 +188,7 @@ export default function RevenuePage() {
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
           <p className="font-semibold text-red-400">Revenue data unavailable</p>
           <p className="text-sm text-red-400/70 mt-1">{error}</p>
-          <button onClick={load} className="mt-4 text-xs text-red-400 border border-red-500/30 rounded-md px-3 py-1.5 hover:bg-red-500/10 transition-colors">
-            Retry
-          </button>
+          <button onClick={load} className="mt-4 text-xs text-red-400 border border-red-500/30 rounded-md px-3 py-1.5 hover:bg-red-500/10 transition-colors">Retry</button>
         </div>
       </div>
     )
@@ -197,6 +197,8 @@ export default function RevenuePage() {
   if (!stats) return null
 
   const { pct: revDeltaPct, up: revDeltaUp } = revDelta(stats.revenue_this_month_usd, stats.revenue_last_month_usd)
+  const mrr = stats.revenue_this_month_usd
+  const arr = mrr * 12
   const totalUsers = stats.active_subscribers + stats.trial_users + stats.expired_users
 
   return (
@@ -206,77 +208,110 @@ export default function RevenuePage() {
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Revenue</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Revenue Command Centre</h1>
             <p className="text-sm text-gray-400 mt-0.5">{month} · Stripe + Supabase</p>
           </div>
-          <button
-            onClick={load}
-            className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500 transition-colors"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/admin/leads" className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500 transition-colors">
+              Leads →
+            </Link>
+            <button onClick={load} className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500 transition-colors">
+              Refresh
+            </button>
+          </div>
         </div>
 
-        {/* ── ROW 1 — Revenue + subscribers ─────────────────────────────── */}
+        {/* ── ROW 1 — MRR / ARR / Subscribers ─────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
-            label="Revenue This Month"
-            value={formatUSD(stats.revenue_this_month_usd)}
+            label="MRR"
+            value={formatUSD(mrr)}
             sub={`vs ${formatUSD(stats.revenue_last_month_usd)} last month`}
             delta={revDeltaPct}
             deltaUp={revDeltaUp}
+            accent="border-blue-500/30"
           />
+          <StatCard label="ARR (run rate)" value={formatUSD(arr)} sub="MRR × 12" accent="border-blue-500/20" />
           <StatCard
             label="Active Subscribers"
             value={stats.active_subscribers}
-            sub="unlimited plan"
+            sub="paid plans"
           />
           <StatCard
-            label="Trial Users"
-            value={stats.trial_users}
-            sub="14-day free trial"
-          />
-          <StatCard
-            label="Expired / Churned"
-            value={stats.expired_users}
-            sub={`${totalUsers ? ((stats.expired_users / totalUsers) * 100).toFixed(1) : "0"}% of total`}
+            label="Trial / Churned"
+            value={`${stats.trial_users} / ${stats.expired_users}`}
+            sub={`${totalUsers ? ((stats.expired_users / totalUsers) * 100).toFixed(1) : "0"}% churn`}
           />
         </div>
 
-        {/* ── ROW 2 — Conversion funnel ──────────────────────────────────── */}
+        {/* ── ROW 2 — Lead Pipeline ─────────────────────────────────────── */}
+        {leads && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                B2B Lead Pipeline
+              </h2>
+              <Link href="/dashboard/admin/leads" className="text-xs text-blue-400 hover:text-blue-300">
+                Manage leads →
+              </Link>
+            </div>
+            <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+              {/* Stats bar */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-gray-100">{leads.total}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Total Leads</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-400">{leads.this_week}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">This Week</p>
+                  {leads.last_week > 0 && (
+                    <p className={`text-xs mt-0.5 ${leads.this_week >= leads.last_week ? "text-emerald-400" : "text-red-400"}`}>
+                      {leads.this_week >= leads.last_week ? "▲" : "▼"} vs {leads.last_week} last wk
+                    </p>
+                  )}
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-emerald-400">
+                    {leads.conversion_rate?.toFixed(1) ?? "0"}%
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">Conversion Rate</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-purple-400">{formatUSD(leads.pipeline_mrr)}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Pipeline MRR</p>
+                </div>
+              </div>
+              {/* Status breakdown */}
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(STATUS_LABELS).map(([key, label]) => {
+                  const count = leads.by_status?.[key] ?? 0
+                  return (
+                    <span key={key} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[key] ?? "bg-gray-700 text-gray-300"}`}>
+                      {label}
+                      <span className="font-bold">{count}</span>
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ── ROW 3 — Conversion funnel ──────────────────────────────────── */}
         <section>
           <h2 className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-3">
             Conversion Funnel — {month}
           </h2>
           <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-4">
-            <FunnelBar
-              label="Signups"
-              value={stats.funnel.signups}
-              max={stats.funnel.signups}
-              conversion="—"
-            />
-            <FunnelBar
-              label="DNA Score Generated"
-              value={stats.funnel.dna_scores}
-              max={stats.funnel.signups}
-              conversion={funnelConversion(stats.funnel.signups, stats.funnel.dna_scores)}
-            />
-            <FunnelBar
-              label="Swarm Analysis Run"
-              value={stats.funnel.swarm_runs}
-              max={stats.funnel.signups}
-              conversion={funnelConversion(stats.funnel.signups, stats.funnel.swarm_runs)}
-            />
-            <FunnelBar
-              label="Report Purchased"
-              value={stats.funnel.purchases}
-              max={stats.funnel.signups}
-              conversion={funnelConversion(stats.funnel.signups, stats.funnel.purchases)}
-            />
+            <FunnelBar label="Signups" value={stats.funnel.signups} max={stats.funnel.signups} conversion="—" />
+            <FunnelBar label="DNA Score Generated" value={stats.funnel.dna_scores} max={stats.funnel.signups} conversion={funnelConversion(stats.funnel.signups, stats.funnel.dna_scores)} />
+            <FunnelBar label="Swarm Analysis Run" value={stats.funnel.swarm_runs} max={stats.funnel.signups} conversion={funnelConversion(stats.funnel.signups, stats.funnel.swarm_runs)} />
+            <FunnelBar label="Report Purchased" value={stats.funnel.purchases} max={stats.funnel.signups} conversion={funnelConversion(stats.funnel.signups, stats.funnel.purchases)} />
           </div>
         </section>
 
-        {/* ── ROW 3 — Recent purchases table ────────────────────────────── */}
+        {/* ── ROW 4 — Recent purchases table ────────────────────────────── */}
         <section>
           <h2 className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-3">
             Recent Purchases
@@ -287,18 +322,14 @@ export default function RevenuePage() {
                 <thead className="bg-gray-900 border-b border-gray-800">
                   <tr>
                     {["User", "Plan", "Amount", "Date"].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                        {h}
-                      </th>
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/60 bg-gray-950">
                   {stats.recent_purchases.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-gray-600 text-sm">
-                        No purchases this month.
-                      </td>
+                      <td colSpan={4} className="px-4 py-8 text-center text-gray-600 text-sm">No purchases this month.</td>
                     </tr>
                   )}
                   {stats.recent_purchases.map((p, i) => (
@@ -308,19 +339,15 @@ export default function RevenuePage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          p.plan_type === "unlimited"
-                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                            : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                          p.plan_type === "advisor" ? "bg-purple-500/15 text-purple-400 border border-purple-500/30" :
+                          p.plan_type === "enterprise" ? "bg-blue-500/15 text-blue-400 border border-blue-500/30" :
+                          "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                         }`}>
                           {p.plan_type}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-100 tabular-nums font-medium">
-                        {formatUSD(p.amount_usd)}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                        {formatDate(p.purchased_at)}
-                      </td>
+                      <td className="px-4 py-3 text-gray-100 tabular-nums font-medium">{formatUSD(p.amount_usd)}</td>
+                      <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{formatDate(p.purchased_at)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -511,3 +511,217 @@ export async function createStripePortal(
   }
   return res.json()
 }
+
+// ── Admin Leads ──────────────────────────────────────────────────────────────
+
+export interface Lead {
+  id: string
+  name: string
+  email: string
+  company?: string
+  role?: string
+  aum_range?: string
+  source?: string
+  status: 'new' | 'contacted' | 'demo_scheduled' | 'demo_done' | 'proposal_sent' | 'won' | 'lost' | 'nurture'
+  notes?: string
+  interested_plan?: string
+  created_at: string
+  updated_at?: string
+  contacted_at?: string
+  won_at?: string
+}
+
+export interface LeadStats {
+  total: number
+  by_status: Record<string, number>
+  conversion_rate: number
+  this_week: number
+  last_week: number
+  won_this_month: number
+  pipeline_mrr: number
+}
+
+export async function getAdminLeads(
+  token: string,
+  params?: { status?: string; page?: number; per_page?: number }
+): Promise<{ leads: Lead[]; total: number; page: number }> {
+  const qs = new URLSearchParams()
+  if (params?.status) qs.set('status', params.status)
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.per_page) qs.set('per_page', String(params.per_page))
+  const res = await fetch(`${API}/api/admin/leads?${qs}`, { headers: authHeaders(token) })
+  if (!res.ok) throw new Error('Could not load leads')
+  return res.json()
+}
+
+export async function updateLeadStatus(
+  leadId: string,
+  data: { status?: string; notes?: string },
+  token: string
+): Promise<Lead> {
+  const res = await fetch(`${API}/api/admin/leads/${leadId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('Could not update lead')
+  return res.json()
+}
+
+export async function getLeadStats(token: string): Promise<LeadStats> {
+  const res = await fetch(`${API}/api/admin/leads/stats`, { headers: authHeaders(token) })
+  if (!res.ok) throw new Error('Could not load lead stats')
+  return res.json()
+}
+
+// ── Advisor Clients ───────────────────────────────────────────────────────────
+
+export interface AdvisorClient {
+  id: string
+  client_name: string
+  client_email?: string
+  notes?: string
+  portfolio_id?: string
+  dna_score?: number
+  last_analysis?: string
+  created_at: string
+}
+
+export async function getAdvisorClients(token: string): Promise<AdvisorClient[]> {
+  const res = await fetch(`${API}/api/advisor/clients`, { headers: authHeaders(token) })
+  if (!res.ok) throw new Error('Could not load clients')
+  const data = await res.json()
+  return data.clients ?? data ?? []
+}
+
+export async function addAdvisorClient(
+  client: { client_name: string; client_email?: string; notes?: string },
+  token: string
+): Promise<AdvisorClient> {
+  const res = await fetch(`${API}/api/advisor/clients`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify(client),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Could not add client')
+  }
+  return res.json()
+}
+
+export async function getClientReports(clientId: string, token: string) {
+  const res = await fetch(`${API}/api/advisor/clients/${clientId}/reports`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Could not load client reports')
+  return res.json()
+}
+
+export async function runClientAnalysis(clientId: string, token: string) {
+  const res = await fetch(`${API}/api/advisor/clients/${clientId}/analysis`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Could not run analysis')
+  return res.json()
+}
+
+// ── Developer / API Keys ───────────────────────────────────────────────────────
+
+export interface ApiKey {
+  id: string
+  name: string
+  key_prefix?: string
+  created_at: string
+  last_used_at?: string
+  is_active: boolean
+  rate_limit_per_day: number
+}
+
+export async function getDeveloperKeys(token: string): Promise<ApiKey[]> {
+  const res = await fetch(`${API}/api/developer/keys`, { headers: authHeaders(token) })
+  if (!res.ok) throw new Error('Could not load API keys')
+  const data = await res.json()
+  return data.keys ?? data ?? []
+}
+
+export async function createDeveloperKey(
+  name: string,
+  token: string
+): Promise<{ key: ApiKey; raw_key: string }> {
+  const res = await fetch(`${API}/api/developer/keys`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail || 'Could not create key')
+  }
+  return res.json()
+}
+
+export async function deleteDeveloperKey(keyId: string, token: string): Promise<void> {
+  const res = await fetch(`${API}/api/developer/keys/${keyId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Could not revoke key')
+}
+
+// ── Research Layer ────────────────────────────────────────────────────────────
+
+export interface MarketRegime {
+  regime: string
+  confidence: number
+  started_at: string
+  supporting_signals?: Record<string, unknown>
+}
+
+export interface ResearchNote {
+  id: string
+  note_type: string
+  title: string
+  executive_summary: string
+  full_content?: string
+  key_findings?: Array<{ finding: string; data_support: string; implication: string }>
+  affected_sectors?: string[]
+  regime?: string
+  time_horizon?: string
+  confidence_score?: number
+  generated_at: string
+  is_public: boolean
+}
+
+export async function getResearchRegime(): Promise<MarketRegime | null> {
+  try {
+    const res = await fetch(`${API}/api/research/regime`, { cache: 'no-store' })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+export async function getResearchNotes(token?: string | null, page = 1): Promise<ResearchNote[]> {
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${API}/api/research/notes?page=${page}&per_page=10`, {
+    headers,
+    cache: 'no-store',
+  })
+  if (!res.ok) return []
+  const data = await res.json()
+  return data.notes ?? data ?? []
+}
+
+export async function getResearchNote(noteId: string, token?: string | null): Promise<ResearchNote | null> {
+  const headers: Record<string, string> = {}
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${API}/api/research/notes/${noteId}`, {
+    headers,
+    cache: 'no-store',
+  })
+  if (!res.ok) return null
+  return res.json()
+}

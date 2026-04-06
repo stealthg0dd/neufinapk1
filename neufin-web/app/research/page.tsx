@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import LiveResearch from './LiveResearch'
 
 export const metadata: Metadata = {
   title: 'NeuFin Research — Singapore Behavioral Finance Data',
@@ -250,6 +251,12 @@ export default function ResearchPage() {
               </div>
 
             </div>
+          </section>
+
+          {/* Live Market Intelligence */}
+          <section className="mb-14">
+            <h2 className="text-xl font-bold mb-6">Live Market Intelligence</h2>
+            <LiveResearch />
           </section>
 
           {/* Methodology note */}
