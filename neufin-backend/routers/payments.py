@@ -80,7 +80,7 @@ async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | No
     try:
         positions_result = (
             supabase.table("portfolio_positions")
-            .select("symbol, shares, cost_basis")
+            .select("symbol, shares")
             .eq("portfolio_id", portfolio_id)
             .execute()
         )
@@ -195,7 +195,6 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                             "portfolio_id": portfolio_id,
                             "symbol": pos["symbol"],
                             "shares": pos["shares"],
-                            "cost_basis": pos.get("cost_basis"),
                         }
                     ).execute()
             except Exception as e:

@@ -961,7 +961,6 @@ Return ONLY valid JSON:
                             "portfolio_id": portfolio_id,
                             "symbol": pos["symbol"],
                             "shares": pos["shares"],
-                            "cost_basis": None,
                         }
                     ).execute()
                 except Exception:
