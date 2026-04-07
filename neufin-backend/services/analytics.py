@@ -36,4 +36,4 @@ async def track(
             }
         ).execute()
     except Exception as e:
-        logger.warning("analytics.track_failed", event=event, error=str(e))
+        logger.warning("analytics.track_failed", evt=event, error=str(e))
