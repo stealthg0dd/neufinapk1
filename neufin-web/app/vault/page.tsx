@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
+import AppHeader from '@/components/AppHeader'
 import { useAuth } from '@/lib/auth-context'
 import { debugAuth } from '@/lib/auth-debug'
 import { useUser } from '@/lib/store'
@@ -107,6 +108,7 @@ export default function VaultPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-950">
+      <AppHeader />
       {/* Nav */}
       <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">

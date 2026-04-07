@@ -369,18 +369,50 @@ export default function DashboardClient() {
         )}
 
         {!portfolios?.length ? (
-          <GlassCard className="p-10 text-center max-w-lg mx-auto mt-8">
-            <p className="text-[var(--text-primary)] font-medium mb-2">No saved portfolio yet</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-6">
-              Upload a CSV to generate your DNA score and sync holdings to the dashboard.
-            </p>
-            <Link
-              href="/upload"
-              className="inline-flex px-5 py-2.5 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm"
-            >
-              Start analysis →
-            </Link>
-          </GlassCard>
+          <div className="space-y-6">
+            {/* Welcome hero */}
+            <GlassCard className="p-8 text-center border-[var(--border-accent)]">
+              <div className="text-4xl mb-4">🧬</div>
+              <h2 className="font-display text-2xl text-[var(--text-primary)] mb-2">
+                Welcome to NeuFin
+              </h2>
+              <p className="text-[var(--text-secondary)] mb-1">
+                You have <span className="text-[var(--amber)] font-semibold">14 days full access</span> — no credit card required.
+              </p>
+              <p className="text-sm text-[var(--text-muted)] mb-8">
+                Upload a portfolio CSV to generate your Investor DNA Score and unlock AI swarm analysis.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/upload"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm hover:opacity-90 transition-opacity"
+                >
+                  <span>📂</span> Upload Portfolio CSV
+                </Link>
+                <Link
+                  href="/swarm"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-[var(--glass-border)] text-[var(--text-primary)] font-semibold text-sm hover:border-[var(--border-accent)] transition-colors"
+                >
+                  <span>🤖</span> Try Swarm Analysis
+                </Link>
+              </div>
+            </GlassCard>
+
+            {/* What you get */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { icon: '🧬', title: 'DNA Score', desc: 'Behavioral bias detection across your portfolio' },
+                { icon: '🤖', title: 'AI Swarm', desc: 'Multi-model analysis: Claude, GPT-4, Gemini' },
+                { icon: '📄', title: 'PDF Report', desc: 'Professional advisor-ready report download' },
+              ].map((item) => (
+                <GlassCard key={item.title} className="p-5">
+                  <div className="text-2xl mb-2">{item.icon}</div>
+                  <p className="font-semibold text-[var(--text-primary)] text-sm mb-1">{item.title}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{item.desc}</p>
+                </GlassCard>
+              ))}
+            </div>
+          </div>
         ) : (
           <>
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">

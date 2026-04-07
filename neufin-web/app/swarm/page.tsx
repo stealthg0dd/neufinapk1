@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import React, { Suspense, useState, useCallback, useEffect, useMemo } from 'react'
+import AppHeader from '@/components/AppHeader'
 import SwarmTerminal from '@/components/SwarmTerminal'
 import CommandPalette from '@/components/CommandPalette'
 import RiskMatrix from '@/components/RiskMatrix'
@@ -780,7 +781,7 @@ export default function SwarmPage() {
 
   useBackendHealth()
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+  const API_BASE = ''
 
   const handlePaymentSuccess = useCallback(async () => {
     const sessionId = typeof window !== 'undefined'
@@ -935,6 +936,7 @@ export default function SwarmPage() {
       className="min-h-screen bg-[#080808] text-white"
       style={{ fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace" }}
     >
+      <AppHeader />
       {/* Toast */}
       {toast && (
         <div style={{

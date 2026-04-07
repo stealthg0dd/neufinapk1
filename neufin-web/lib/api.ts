@@ -90,8 +90,10 @@ export async function claimAnonymousPortfolio(
   }
   return res.json()
 }
-const API = process.env.NEXT_PUBLIC_API_URL;
-if (!API) console.warn("WARNING: NEXT_PUBLIC_API_URL is not set!");
+// Empty string = relative URL → routes through Next.js /api/* rewrite proxy to Railway.
+// In Vercel production, set NEXT_PUBLIC_API_URL=https://neufin-web.vercel.app so
+// client-side fetch calls hit the same-origin proxy. Do NOT point directly at Railway.
+const API = process.env.NEXT_PUBLIC_API_URL ?? '';
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
 function authHeaders(token?: string | null): Record<string, string> {

@@ -9,6 +9,7 @@ import { Dna, Network, BarChart3, Shield, Lock, Sparkles, Zap } from 'lucide-rea
 import { useAuth } from '@/lib/auth-context'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { HeroPortfolioDemo } from '@/components/landing/HeroPortfolioDemo'
+import GlobalChatWidget from '@/components/GlobalChatWidget'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
 
 const REGIME_LABELS: Record<string, string> = {
@@ -45,7 +46,11 @@ export default function LandingPageClient({
     if (!loading && user) router.replace('/dashboard')
   }, [loading, user, router])
 
-  if (!loading && user) return null
+  if (!loading && user) return (
+    <div className="min-h-screen bg-[var(--canvas)] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[var(--amber)]/30 border-t-[var(--amber)] rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--canvas)]">
@@ -325,6 +330,7 @@ export default function LandingPageClient({
           </p>
         </div>
       </footer>
+      <GlobalChatWidget />
     </div>
   )
 }
