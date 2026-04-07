@@ -46,15 +46,8 @@ export default function LandingPageClient({
     if (!loading && user) router.replace('/dashboard')
   }, [loading, user, router])
 
-  // When Supabase uses implicit flow and lands #access_token= on root:
-  // detectSessionInUrl:true auto-parses it → fires onAuthStateChange(SIGNED_IN)
-  // → useAuth sets user → above effect redirects to /dashboard.
-  // Just clear the hash so it doesn't sit visibly in the URL bar.
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search)
-    }
-  }, [])
+  // Hash token (#access_token=) is now handled by AuthProvider's initSession()
+  // which calls setSession() before clearing the hash. No duplicate handling needed here.
 
   if (!loading && user) return (
     <div className="min-h-screen bg-[var(--canvas)] flex items-center justify-center">

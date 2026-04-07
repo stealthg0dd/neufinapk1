@@ -35,6 +35,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   useEffect(() => {
     debugAuth('AuthProvider:mount')
+    // Handle implicit-flow tokens that land in the URL hash (e.g. /#access_token=...).
+    // detectSessionInUrl can miss these when another component clears the hash first,
+    // so we read and set the session explicitly before anything else runs.
+    const initSession = async () => {
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash
+        if (hash.includes('access_token=')) {
+          const params = new URLSearchParams(hash.slice(1))
+          const at = params.get('access_token')
+          const rt = params.get('refresh_token')
+          if (at && rt) {
+            logger.debug({ hasToken: true }, 'auth.hash_token_detected')
+            await supabase.auth.setSession({ access_token: at, refresh_token: rt })
+            window.history.replaceState(null, '', window.location.pathname + window.location.search)
+          }
+        }
+      }
+    }
+    initSession()
     supabase.auth.getSession().then(({ data }) => {
       logger.debug({
         hasSession: Boolean(data.session),
