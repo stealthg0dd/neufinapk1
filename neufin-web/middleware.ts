@@ -15,6 +15,7 @@ function log(level: 'debug' | 'info' | 'warn' | 'error', message: string, data?:
 
 // ── Public path prefixes — skip auth check entirely ───────────────────────
 const PUBLIC_PREFIXES = [
+  '/',
   '/auth',          // /auth  +  /auth/callback
   '/login',
   '/signup',
@@ -31,6 +32,8 @@ const PUBLIC_PREFIXES = [
   '/share',
   '/referrals',
   '/reports',
+  '/api/research',
+  '/api/plans',
   '/api',           // API routes handle their own auth
   '/favicon',
   '/icon',
