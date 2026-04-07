@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 import { debugAuth } from '@/lib/auth-debug'
-import { upsertAdvisorProfile } from '@/lib/api'
+import { upsertAdvisorProfile, analyzeDNA } from '@/lib/api'
 import { useNeufinAnalytics } from '@/lib/analytics'
 
 type UserType = 'investor' | 'advisor'
@@ -84,14 +84,8 @@ function OnboardingContent() {
     setUploading(true)
     setUploadError(null)
     try {
-      const formData = new FormData()
-      formData.append('file', csvFile)
-      const res = await fetch('/api/portfolio/upload', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      })
-      if (!res.ok) throw new Error('Upload failed')
+      const result = await analyzeDNA(csvFile, token)
+      localStorage.setItem('dnaResult', JSON.stringify(result))
       await supabase.auth.updateUser({
         data: { user_type: 'investor', onboarding_complete: true },
       })
