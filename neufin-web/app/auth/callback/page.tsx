@@ -66,11 +66,31 @@ function AuthCallbackContent() {
 
     let cancelled = false;
     (async () => {
-      // ── 1. Exchange code for session (primary path) ──
+      // ── 1. Fast path — session may already exist (e.g. token refresh) ──
+      const { data: existing } = await supabase.auth.getSession()
+      if (cancelled) return
+      if (existing?.session) {
+        syncAuthCookie(existing.session)
+        const method = sessionStorage.getItem('neufin_auth_method') ?? 'google'
+        sessionStorage.removeItem('neufin_auth_method')
+        capture('user_logged_in', { method })
+        window.location.href = next
+        return
+      }
+
+      // ── 2. Primary path — exchange PKCE code for session ──
+      // detectSessionInUrl is false so this is the only exchange attempt.
       const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href)
       if (cancelled) return
       if (error) {
         logger.error({ tag: TAG, error }, 'auth.callback_exchange_error')
+        // Last resort: check if session appeared (e.g. race with another tab)
+        const { data: fallback } = await supabase.auth.getSession()
+        if (fallback?.session) {
+          syncAuthCookie(fallback.session)
+          window.location.href = next
+          return
+        }
         window.location.href = `/login?error=oauth_failed`
         return
       }

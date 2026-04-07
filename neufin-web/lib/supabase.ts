@@ -14,6 +14,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     storageKey: 'neufin-auth',
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    // Disable auto-exchange: the /auth/callback page calls exchangeCodeForSession()
+    // explicitly. If detectSessionInUrl:true (default), Supabase would also try to
+    // exchange the ?code= on client init → double-exchange race where the second
+    // call fails with "code already used" → user lands on /login?error=oauth_failed.
+    detectSessionInUrl: false,
   },
 })
 
