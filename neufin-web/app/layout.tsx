@@ -1,15 +1,9 @@
 import type { Metadata } from 'next'
 import { Geist, JetBrains_Mono, Instrument_Serif } from 'next/font/google'
-import dynamic from 'next/dynamic'
 import './globals.css'
 import RootProviders from '@/app/components/RootProviders'
-import '@/lib/env-check'
-
-const AuthDebugBoot = dynamic(() => import('@/app/components/AuthDebugBoot'), { ssr: false })
-const AuthDebugPanel = dynamic(
-  () => import('@/components/AuthDebugPanel').then((m) => m.AuthDebugPanel),
-  { ssr: false },
-)
+import AuthDebugBoot from '@/app/components/AuthDebugBoot'
+import { AuthDebugPanel } from '@/components/AuthDebugPanel'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -162,6 +156,11 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const showAuthDebug = process.env.NODE_ENV !== 'production'
+  if (showAuthDebug) {
+    // Keep env validation out of production runtime path.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('@/lib/env-check')
+  }
 
   return (
     <html
@@ -169,12 +168,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geist.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
     >
       <head>
-        {/* Preconnect to external origins for faster font + API loads */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* next/font serves locally; keep only app-critical origins */}
         <link rel="preconnect" href="https://gpczchjipalfgkfqamcu.supabase.co" />
         <link rel="dns-prefetch" href="https://neufin101-production.up.railway.app" />
-        <link rel="dns-prefetch" href="https://us.i.posthog.com" />
       </head>
       <body
         className="min-h-screen antialiased font-sans bg-[var(--canvas)] text-[var(--text-primary)]"

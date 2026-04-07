@@ -5,12 +5,9 @@ import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
 import { Dna, Network, BarChart3, Shield, Lock, Sparkles, Zap } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { HeroPortfolioDemo } from '@/components/landing/HeroPortfolioDemo'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
 
-const HeroPortfolioDemo = dynamic(() => import('@/components/landing/HeroPortfolioDemo').then((m) => m.HeroPortfolioDemo), {
-  ssr: false,
-  loading: () => <div className="h-[320px] rounded-2xl bg-[var(--surface-2)]/70 border border-[var(--glass-border)]" />,
-})
 const GlobalChatWidget = dynamic(() => import('@/components/GlobalChatWidget'), { ssr: false })
 
 const REGIME_LABELS: Record<string, string> = {
@@ -20,6 +17,37 @@ const REGIME_LABELS: Record<string, string> = {
   recovery: 'Recovery',
   recession_risk: 'Recession Risk',
 }
+
+const SOCIAL_PROOF_ITEMS = [
+  { icon: Shield, t: 'MAS Compliant' },
+  { icon: Lock, t: 'Bank-grade Security' },
+  { icon: Sparkles, t: 'AI-Powered' },
+  { icon: Zap, t: '60-second Analysis' },
+]
+
+const FEATURE_ITEMS = [
+  {
+    icon: Dna,
+    color: 'text-[var(--amber)]',
+    title: 'Portfolio DNA Score',
+    desc: 'A single 0–100 read on behavioral risk, concentration, and discipline — built from live holdings.',
+    bullets: ['HHI & beta decomposition', 'Bias-aware scoring', 'Shareable snapshot'],
+  },
+  {
+    icon: Network,
+    color: 'text-[var(--blue)]',
+    title: 'AI Swarm Analysis',
+    desc: 'Multiple specialist models challenge each other before any recommendation hits your desk.',
+    bullets: ['Macro + quant + risk', 'Audit-friendly reasoning', 'Sub-90s turnaround'],
+  },
+  {
+    icon: BarChart3,
+    color: 'text-[var(--emerald)]',
+    title: 'Research Intelligence',
+    desc: 'Regime-aware notes and semantic search across our intelligence layer — not generic news feeds.',
+    bullets: ['Live regime classification', 'Executive summaries', 'Advisor-grade depth'],
+  },
+]
 
 export default function LandingPageClient({
   regime,
@@ -119,12 +147,7 @@ export default function LandingPageClient({
           AUM across Singapore and SEA
         </p>
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { icon: Shield, t: 'MAS Compliant' },
-            { icon: Lock, t: 'Bank-grade Security' },
-            { icon: Sparkles, t: 'AI-Powered' },
-            { icon: Zap, t: '60-second Analysis' },
-          ].map(({ icon: Icon, t }) => (
+          {SOCIAL_PROOF_ITEMS.map(({ icon: Icon, t }) => (
             <div
               key={t}
               className="flex items-center gap-2 justify-center text-xs sm:text-sm text-[var(--text-secondary)]"
@@ -143,29 +166,7 @@ export default function LandingPageClient({
             Everything you need to see clearly
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {[
-              {
-                icon: Dna,
-                color: 'text-[var(--amber)]',
-                title: 'Portfolio DNA Score',
-                desc: 'A single 0–100 read on behavioral risk, concentration, and discipline — built from live holdings.',
-                bullets: ['HHI & beta decomposition', 'Bias-aware scoring', 'Shareable snapshot'],
-              },
-              {
-                icon: Network,
-                color: 'text-[var(--blue)]',
-                title: 'AI Swarm Analysis',
-                desc: 'Multiple specialist models challenge each other before any recommendation hits your desk.',
-                bullets: ['Macro + quant + risk', 'Audit-friendly reasoning', 'Sub-90s turnaround'],
-              },
-              {
-                icon: BarChart3,
-                color: 'text-[var(--emerald)]',
-                title: 'Research Intelligence',
-                desc: 'Regime-aware notes and semantic search across our intelligence layer — not generic news feeds.',
-                bullets: ['Live regime classification', 'Executive summaries', 'Advisor-grade depth'],
-              },
-            ].map((f) => (
+            {FEATURE_ITEMS.map((f) => (
               <div key={f.title}>
                 <GlassCard className="p-6 h-full flex flex-col">
                   <f.icon className={`w-8 h-8 mb-4 ${f.color}`} aria-hidden />

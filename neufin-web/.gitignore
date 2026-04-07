@@ -34,5 +34,10 @@ Thumbs.db
 # ── TypeScript ────────────────────────────────────────────────────────────────
 *.tsbuildinfo
 next-env.d.ts
-.vercel
 .env*.local
+
+# ── Local QA/Audit artifacts (keep out of git) ───────────────────────────────
+lighthouse-neufin-web.report.json
+lighthouse-neufin-web.report.html
+psi-neufin-web.json
+test-results/

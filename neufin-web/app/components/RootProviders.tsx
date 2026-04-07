@@ -2,11 +2,28 @@
 
 import { useMemo } from 'react'
 import { usePathname } from 'next/navigation'
-import { AuthProvider } from '@/lib/auth-context'
-import { PostHogProvider } from '@/lib/posthog'
-import { SentryUserContext } from '@/components/SentryUserContext'
-import { WebVitals } from '@/app/components/WebVitals'
-import { Toaster } from 'react-hot-toast'
+import dynamic from 'next/dynamic'
+
+const AuthProvider = dynamic(
+  () => import('@/lib/auth-context').then((m) => m.AuthProvider),
+  { ssr: false },
+)
+const PostHogProvider = dynamic(
+  () => import('@/lib/posthog').then((m) => m.PostHogProvider),
+  { ssr: false },
+)
+const SentryUserContext = dynamic(
+  () => import('@/components/SentryUserContext').then((m) => m.SentryUserContext),
+  { ssr: false },
+)
+const WebVitals = dynamic(
+  () => import('@/app/components/WebVitals').then((m) => m.WebVitals),
+  { ssr: false },
+)
+const Toaster = dynamic(
+  () => import('react-hot-toast').then((m) => m.Toaster),
+  { ssr: false },
+)
 
 export default function RootProviders({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()

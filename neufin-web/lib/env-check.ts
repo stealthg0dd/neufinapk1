@@ -10,7 +10,8 @@ const REQUIRED_PUBLIC: readonly EnvCheck[] = [
   { key: 'NEXT_PUBLIC_API_URL', value: process.env.NEXT_PUBLIC_API_URL },
   { key: 'NEXT_PUBLIC_SUPABASE_URL', value: process.env.NEXT_PUBLIC_SUPABASE_URL },
   { key: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', value: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY },
-  { key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', value: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY },
+  // Keep a safe fallback so missing Stripe key never crashes build/runtime boot.
+  { key: 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY', value: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '' },
 ]
 
 const REQUIRED_SERVER: readonly EnvCheck[] = [

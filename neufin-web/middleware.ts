@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { logger } from '@/lib/logger'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+function log(level: 'debug' | 'info' | 'warn' | 'error', message: string, data?: unknown) {
+  // Keep middleware logging runtime-safe for Edge by using console only.
+  if (level === 'debug' && process.env.NODE_ENV === 'production') return
+  const payload = data === undefined ? message : `${message} ${JSON.stringify(data)}`
+  if (level === 'error') console.error(payload)
+  else if (level === 'warn') console.warn(payload)
+  else console.log(payload)
+}
 
 // ── Public path prefixes — skip auth check entirely ───────────────────────
 const PUBLIC_PREFIXES = [
@@ -25,6 +33,7 @@ const PUBLIC_PREFIXES = [
   '/reports',
   '/api',           // API routes handle their own auth
   '/favicon',
+  '/icon',
   '/og',
   '/manifest',
   '/sitemap',
@@ -55,12 +64,12 @@ function isJwtExpired(token: string): boolean {
 
 async function hasValidSupabaseSession(token: string): Promise<boolean> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    logger.warn({}, 'middleware.supabase_env_missing')
+    log('warn', 'middleware.supabase_env_missing')
     return false
   }
 
   if (isJwtExpired(token)) {
-    logger.debug({}, 'middleware.token_expired_or_malformed')
+    log('debug', 'middleware.token_expired_or_malformed')
     return false
   }
 
@@ -75,13 +84,13 @@ async function hasValidSupabaseSession(token: string): Promise<boolean> {
     })
 
     if (!response.ok) {
-      logger.warn({ status: response.status }, 'middleware.supabase_session_invalid')
+      log('warn', 'middleware.supabase_session_invalid', { status: response.status })
       return false
     }
 
     return true
   } catch (error) {
-    logger.error({ error }, 'middleware.supabase_session_error')
+    log('error', 'middleware.supabase_session_error', error)
     return false
   }
 }
@@ -114,7 +123,7 @@ async function hasAdvisorRole(token: string): Promise<boolean> {
     const profiles = await profileRes.json() as { role?: string }[]
     return profiles[0]?.role === 'advisor'
   } catch (error) {
-    logger.error({ error }, 'middleware.advisor_check_error')
+    log('error', 'middleware.advisor_check_error', error)
     return false
   }
 }
@@ -149,14 +158,17 @@ export async function middleware(request: NextRequest) {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next()
 
   // ── Protected path — check cookie ─────────────────────────────────────────
-  logger.debug({ pathname, cookies: request.cookies.getAll().map(c => c.name) }, '[Middleware] protected_path')
+  log('debug', 'middleware.protected_path', {
+    pathname,
+    cookies: request.cookies.getAll().map((c) => c.name),
+  })
 
   // Read neufin-auth cookie (must match syncAuthCookie)
   let authCookie = request.cookies.get('neufin-auth')
-  logger.debug({
+  log('debug', 'middleware.auth_cookie', {
     exists: !!authCookie,
     value: authCookie?.value ? `${authCookie.value.substring(0, 20)}...` : null,
-  }, '[Middleware] auth_cookie')
+  })
 
   // Fallback: check Authorization header for API routes if no cookie
   let token = authCookie?.value
@@ -164,18 +176,18 @@ export async function middleware(request: NextRequest) {
     const authHeader = request.headers.get('authorization')
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.slice(7)
-      logger.debug({ pathname }, '[Middleware] using Authorization header fallback')
+      log('debug', 'middleware.authorization_header_fallback', { pathname })
     }
   }
 
   if (!token) {
-    logger.info({ pathname }, '[Middleware] redirect_no_cookie')
+    log('info', 'middleware.redirect_no_cookie', { pathname })
     return redirectToAuth(request, pathname)
   }
 
   const isValid = await hasValidSupabaseSession(token)
   if (!isValid) {
-    logger.info({ pathname }, '[Middleware] redirect_invalid_cookie')
+    log('info', 'middleware.redirect_invalid_cookie', { pathname })
     return redirectToAuth(request, pathname, true)
   }
 
@@ -183,18 +195,18 @@ export async function middleware(request: NextRequest) {
   if (ADVISOR_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
     const isAdvisor = await hasAdvisorRole(token)
     if (!isAdvisor) {
-      logger.info({ pathname }, '[Middleware] redirect_non_advisor')
+      log('info', 'middleware.redirect_non_advisor', { pathname })
       return redirectToDashboard(request)
     }
   }
 
-  logger.info({ pathname }, '[Middleware] allow_request')
+  log('info', 'middleware.allow_request', { pathname })
   return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    // Run on all paths except Next.js internals and static files
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Run on app routes; skip internals and static/metadata assets to avoid redirect loops.
+    '/((?!api|_next/static|_next/image|favicon.ico|icon|apple-icon|manifest|sitemap|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml|json)$).*)',
   ],
 }
