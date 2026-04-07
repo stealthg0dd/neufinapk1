@@ -10,6 +10,7 @@ import RiskMatrix from '@/components/RiskMatrix'
 import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
 import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
+import { apiPost } from '@/lib/api-client'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
 import { useUser } from '@/lib/store'
 import { debugAuth } from '@/lib/auth-debug'
@@ -828,10 +829,9 @@ export default function SwarmPage() {
   const startCheckout = useCallback(async () => {
     setCheckoutLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/api/reports/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
+      const data = await apiPost<{ checkout_url?: string }>(
+        '/api/reports/checkout',
+        {
           plan: 'single',
           positions: positions.map((p) => ({
             symbol: p.symbol,
@@ -842,14 +842,13 @@ export default function SwarmPage() {
           })),
           success_url: `${window.location.origin}/swarm?checkout_success=1`,
           cancel_url: window.location.href,
-        }),
-      })
-      const data = await res.json()
+        }
+      )
       if (data.checkout_url) window.location.href = data.checkout_url
     } catch {
       setCheckoutLoading(false)
     }
-  }, [API_BASE, token, positions])
+  }, [positions])
 
   // Restore last report from localStorage on mount
   useEffect(() => {

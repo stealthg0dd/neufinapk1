@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { apiGet } from '@/lib/api-client'
 
 type PortfolioSummary = {
   portfolio_id: string
@@ -15,20 +15,8 @@ export default function PortfolioDNAClientCard() {
 
   useEffect(() => {
     const run = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const token = session?.access_token
-      if (!token) {
-        setLoading(false)
-        return
-      }
       try {
-        const res = await fetch('/api/portfolio/list', {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        })
-        const data = (await res.json().catch(() => [])) as PortfolioSummary[]
+        const data = await apiGet<PortfolioSummary[]>('/api/portfolio/list')
         if (Array.isArray(data) && data.length > 0) {
           setScore(data[0]?.dna_score ?? null)
         }

@@ -3,9 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/lib/auth-context'
-
-const API = process.env.NEXT_PUBLIC_API_URL
+import { apiGet } from '@/lib/api-client'
 
 interface PlanStatus {
   subscription_tier: string
@@ -26,24 +24,19 @@ const PLAN_ICONS: Record<string, string> = {
 }
 
 export default function PricingSuccessPage() {
-  const { token } = useAuth()
   const router = useRouter()
   const [plan, setPlan] = useState<PlanStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [countdown, setCountdown] = useState(5)
 
   useEffect(() => {
-    if (!token) return
-    fetch(`${API}/api/subscription/status`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => r.json())
+    apiGet<PlanStatus>('/api/subscription/status')
       .then((data) => {
         setPlan(data)
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [token])
+  }, [])
 
   // 5-second countdown then redirect to /dashboard
   useEffect(() => {

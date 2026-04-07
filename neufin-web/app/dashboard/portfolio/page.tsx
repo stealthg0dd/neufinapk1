@@ -3,8 +3,8 @@
 import { ChangeEvent, DragEvent, useMemo, useRef, useState } from 'react'
 import { motion, useSpring, useTransform } from 'framer-motion'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-import { analyzeDNA, type DNAAnalysisResponse } from '@/lib/api'
+import { apiPostForm } from '@/lib/api-client'
+import type { DNAAnalysisResponse } from '@/lib/api'
 
 const STAGES = [
   { label: 'Reading your holdings...', pct: 25 },
@@ -50,10 +50,9 @@ export default function PortfolioPage() {
       i += 1
     }, 1800)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      const data = await analyzeDNA(file, session?.access_token ?? null)
+      const formData = new FormData()
+      formData.append('file', file)
+      const data = await apiPostForm<DNAAnalysisResponse>('/api/analyze-dna', formData)
       setResult(data)
       scoreSpring.set(data.dna_score)
       localStorage.setItem('neufin-last-analysis', JSON.stringify(data))
