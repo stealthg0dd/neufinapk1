@@ -153,12 +153,26 @@ const softwareApplicationSchema = {
   ],
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0a0b0f',
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       className={`${geist.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
     >
+      <head>
+        {/* Preconnect to external origins for faster font + API loads */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://gpczchjipalfgkfqamcu.supabase.co" />
+        <link rel="dns-prefetch" href="https://neufin101-production.up.railway.app" />
+        <link rel="dns-prefetch" href="https://us.i.posthog.com" />
+      </head>
       <body
         className="min-h-screen antialiased font-sans bg-[var(--canvas)] text-[var(--text-primary)]"
         suppressHydrationWarning

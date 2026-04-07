@@ -259,7 +259,7 @@ function OnboardingContent() {
               >
                 {logoB64 ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoB64} alt="Logo preview" className="h-16 object-contain rounded" />
+                  <img src={logoB64} alt="Logo preview" loading="lazy" className="h-16 object-contain rounded" />
                 ) : (
                   <>
                     <span className="text-2xl">🖼️</span>
