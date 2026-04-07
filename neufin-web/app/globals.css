@@ -107,3 +107,12 @@
     transform: translate(-50%, -50%) scale(1.08);
   }
 }
+
+@keyframes grow-score {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 78%;
+  }
+}

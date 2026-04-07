@@ -1,14 +1,15 @@
 import type { Metadata } from 'next'
 import { Geist, JetBrains_Mono, Instrument_Serif } from 'next/font/google'
+import dynamic from 'next/dynamic'
 import './globals.css'
-import { AuthProvider } from '@/lib/auth-context'
-import { PostHogProvider } from '@/lib/posthog'
-import { WebVitals } from '@/app/components/WebVitals'
-import AuthDebugBoot from '@/app/components/AuthDebugBoot'
-import { AuthDebugPanel } from '@/components/AuthDebugPanel'
-import { SentryUserContext } from '@/components/SentryUserContext'
-import { Toaster } from 'react-hot-toast'
+import RootProviders from '@/app/components/RootProviders'
 import '@/lib/env-check'
+
+const AuthDebugBoot = dynamic(() => import('@/app/components/AuthDebugBoot'), { ssr: false })
+const AuthDebugPanel = dynamic(
+  () => import('@/components/AuthDebugPanel').then((m) => m.AuthDebugPanel),
+  { ssr: false },
+)
 
 const geist = Geist({
   subsets: ['latin'],
@@ -160,6 +161,8 @@ export const viewport = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const showAuthDebug = process.env.NODE_ENV !== 'production'
+
   return (
     <html
       lang="en"
@@ -185,30 +188,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
         />
-        <PostHogProvider>
-          <AuthProvider>
-            <SentryUserContext />
-            <AuthDebugBoot />
-            <WebVitals />
-            {children}
-            <AuthDebugPanel />
-            <Toaster
-              position="bottom-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: 'var(--glass-bg)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--glass-border)',
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                  backdropFilter: 'blur(12px)',
-                },
-                error: { duration: 6000 },
-              }}
-            />
-          </AuthProvider>
-        </PostHogProvider>
+        <RootProviders>
+          {showAuthDebug ? <AuthDebugBoot /> : null}
+          {children}
+          {showAuthDebug ? <AuthDebugPanel /> : null}
+        </RootProviders>
       </body>
     </html>
   )

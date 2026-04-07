@@ -1,16 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { motion, useInView } from 'framer-motion'
-import { useRef } from 'react'
+import dynamic from 'next/dynamic'
+import { useEffect, useState } from 'react'
 import { Dna, Network, BarChart3, Shield, Lock, Sparkles, Zap } from 'lucide-react'
-import { useAuth } from '@/lib/auth-context'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { HeroPortfolioDemo } from '@/components/landing/HeroPortfolioDemo'
-import GlobalChatWidget from '@/components/GlobalChatWidget'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
+
+const HeroPortfolioDemo = dynamic(() => import('@/components/landing/HeroPortfolioDemo').then((m) => m.HeroPortfolioDemo), {
+  ssr: false,
+  loading: () => <div className="h-[320px] rounded-2xl bg-[var(--surface-2)]/70 border border-[var(--glass-border)]" />,
+})
+const GlobalChatWidget = dynamic(() => import('@/components/GlobalChatWidget'), { ssr: false })
 
 const REGIME_LABELS: Record<string, string> = {
   risk_on: 'Risk-On',
@@ -20,16 +21,6 @@ const REGIME_LABELS: Record<string, string> = {
   recession_risk: 'Recession Risk',
 }
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
-}
-
-const stagger = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.1 } },
-}
-
 export default function LandingPageClient({
   regime,
   researchTeaser,
@@ -37,23 +28,16 @@ export default function LandingPageClient({
   regime: MarketRegime | null
   researchTeaser: ResearchNote[]
 }) {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  const proofRef = useRef(null)
-  const proofInView = useInView(proofRef, { once: true, margin: '-40px' })
+  const [showChatWidget, setShowChatWidget] = useState(false)
 
   useEffect(() => {
-    if (!loading && user) router.replace('/dashboard')
-  }, [loading, user, router])
+    // Defer non-critical widget so initial landing parse/hydration is lighter.
+    const id = window.setTimeout(() => setShowChatWidget(true), 1200)
+    return () => window.clearTimeout(id)
+  }, [])
 
   // Hash token (#access_token=) is now handled by AuthProvider's initSession()
   // which calls setSession() before clearing the hash. No duplicate handling needed here.
-
-  if (!loading && user) return (
-    <div className="min-h-screen bg-[var(--canvas)] flex items-center justify-center">
-      <div className="w-8 h-8 border-2 border-[var(--amber)]/30 border-t-[var(--amber)] rounded-full animate-spin" />
-    </div>
-  )
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--canvas)]">
@@ -75,21 +59,12 @@ export default function LandingPageClient({
             >
               Pricing
             </Link>
-            {user ? (
-              <Link
-                href="/dashboard"
-                className="text-sm px-4 py-1.5 rounded-lg bg-[var(--amber)] text-[var(--canvas)] font-semibold hover:opacity-90 transition-opacity"
-              >
-                Dashboard →
-              </Link>
-            ) : (
-              <Link
-                href="/login"
-                className="text-sm px-3 py-1.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-primary)] hover:border-[var(--border-accent)] transition-colors"
-              >
-                Sign in
-              </Link>
-            )}
+            <Link
+              href="/login"
+              className="text-sm px-3 py-1.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-primary)] hover:border-[var(--border-accent)] transition-colors"
+            >
+              Sign in
+            </Link>
           </div>
         </div>
       </nav>
@@ -106,25 +81,17 @@ export default function LandingPageClient({
           }}
         />
 
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="visible"
-          className="relative flex-1 max-w-xl lg:max-w-none z-10"
-        >
-          <motion.h1
-            variants={fadeUp}
-            className="font-display text-4xl sm:text-5xl md:text-6xl leading-[1.08] text-[var(--text-primary)] mb-6"
-          >
+        <div className="relative flex-1 max-w-xl lg:max-w-none z-10">
+          <h1 className="font-display text-4xl sm:text-5xl md:text-6xl leading-[1.08] text-[var(--text-primary)] mb-6">
             Intelligence that moves
             <br />
             <span className="text-[var(--amber)]">faster than markets.</span>
-          </motion.h1>
-          <motion.p variants={fadeUp} className="text-lg text-[var(--text-secondary)] leading-relaxed mb-8 max-w-lg">
+          </h1>
+          <p className="text-lg text-[var(--text-secondary)] leading-relaxed mb-8 max-w-lg">
             Behavioral finance analysis trusted by Singapore&apos;s financial professionals.
             Institutional-grade insights in 60 seconds.
-          </motion.p>
-          <motion.div variants={fadeUp} className="flex flex-col sm:flex-row gap-3">
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
             <Link
               href="/upload"
               className="inline-flex items-center justify-center px-6 py-3.5 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm hover:opacity-95 transition-opacity"
@@ -137,29 +104,20 @@ export default function LandingPageClient({
             >
               See Pricing
             </Link>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="relative z-10 w-full max-w-md lg:max-w-lg"
-        >
+        <div className="relative z-10 w-full max-w-md lg:max-w-lg">
           <HeroPortfolioDemo />
-        </motion.div>
+        </div>
       </section>
 
       {/* Social proof */}
-      <section ref={proofRef} className="border-y border-[var(--border)] py-10 px-4 sm:px-6 bg-[var(--surface-1)]/40">
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={proofInView ? { opacity: 1 } : {}}
-          className="text-center text-sm text-[var(--text-secondary)] max-w-3xl mx-auto mb-8"
-        >
+      <section className="border-y border-[var(--border)] py-10 px-4 sm:px-6 bg-[var(--surface-1)]/40">
+        <p className="text-center text-sm text-[var(--text-secondary)] max-w-3xl mx-auto mb-8">
           Trusted by financial advisors managing <span className="text-[var(--text-primary)] font-mono">$2B+</span>{' '}
           AUM across Singapore and SEA
-        </motion.p>
+        </p>
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { icon: Shield, t: 'MAS Compliant' },
@@ -167,15 +125,13 @@ export default function LandingPageClient({
             { icon: Sparkles, t: 'AI-Powered' },
             { icon: Zap, t: '60-second Analysis' },
           ].map(({ icon: Icon, t }) => (
-            <motion.div
+            <div
               key={t}
-              initial={{ opacity: 0, y: 12 }}
-              animate={proofInView ? { opacity: 1, y: 0 } : {}}
               className="flex items-center gap-2 justify-center text-xs sm:text-sm text-[var(--text-secondary)]"
             >
               <Icon className="w-4 h-4 text-[var(--amber)] shrink-0" aria-hidden />
               {t}
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -183,14 +139,9 @@ export default function LandingPageClient({
       {/* Features */}
       <section className="py-20 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="font-display text-3xl md:text-4xl text-center mb-12 text-[var(--text-primary)]"
-          >
+          <h2 className="font-display text-3xl md:text-4xl text-center mb-12 text-[var(--text-primary)]">
             Everything you need to see clearly
-          </motion.h2>
+          </h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
@@ -215,12 +166,7 @@ export default function LandingPageClient({
                 bullets: ['Live regime classification', 'Executive summaries', 'Advisor-grade depth'],
               },
             ].map((f) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-              >
+              <div key={f.title}>
                 <GlassCard className="p-6 h-full flex flex-col">
                   <f.icon className={`w-8 h-8 mb-4 ${f.color}`} aria-hidden />
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">{f.title}</h3>
@@ -234,7 +180,7 @@ export default function LandingPageClient({
                     ))}
                   </ul>
                 </GlassCard>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -243,14 +189,9 @@ export default function LandingPageClient({
       {/* Research preview */}
       <section className="py-16 px-4 sm:px-6 border-t border-[var(--border)]">
         <div className="max-w-6xl mx-auto">
-          <motion.h2
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="font-display text-3xl md:text-4xl mb-8 text-[var(--text-primary)]"
-          >
+          <h2 className="font-display text-3xl md:text-4xl mb-8 text-[var(--text-primary)]">
             Market Intelligence. Built different.
-          </motion.h2>
+          </h2>
           <GlassCard className="p-6 md:p-8 mb-8">
             {regime ? (
               <>
@@ -261,16 +202,22 @@ export default function LandingPageClient({
                 <div className="h-2 rounded-full bg-[var(--surface-3)] overflow-hidden max-w-md mb-2">
                   <div
                     className="h-full rounded-full bg-[var(--amber)]"
-                    style={{ width: `${Math.round((regime.confidence ?? 0) * 100)}%` }}
+                    style={{ width: `${Math.round(((regime.confidence ?? 0) as number) * 100)}%` }}
                   />
                 </div>
                 <p className="text-sm font-mono text-[var(--text-secondary)]">
-                  Confidence {(regime.confidence * 100).toFixed(0)}% · Updated{' '}
-                  {new Date(regime.started_at).toLocaleDateString('en-SG', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+                  {(() => {
+                    const conf = typeof regime.confidence === 'number' ? regime.confidence : 0
+                    const started = new Date(regime.started_at)
+                    const startedLabel = Number.isFinite(started.getTime())
+                      ? started.toLocaleDateString('en-SG', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : '—'
+                    return (
+                      <>
+                        Confidence {(conf * 100).toFixed(0)}% · Updated {startedLabel}
+                      </>
+                    )
+                  })()}
                 </p>
               </>
             ) : (
@@ -342,7 +289,7 @@ export default function LandingPageClient({
           </p>
         </div>
       </footer>
-      <GlobalChatWidget />
+      {showChatWidget ? <GlobalChatWidget /> : null}
     </div>
   )
 }
