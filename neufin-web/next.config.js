@@ -44,7 +44,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.railway.app https://api.stripe.com https://us.i.posthog.com https://*.sentry.io https://o*.ingest.sentry.io https://polygon.io https://finnhub.io https://financialmodelingprep.com https://api.twelvedata.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.railway.app https://api.stripe.com https://us.i.posthog.com https://*.sentry.io https://polygon.io https://finnhub.io https://financialmodelingprep.com https://api.twelvedata.com",
               "frame-src https://js.stripe.com https://hooks.stripe.com https://accounts.google.com",
               "object-src 'none'",
               "base-uri 'self'",

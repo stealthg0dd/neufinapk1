@@ -110,7 +110,7 @@ export default function AppHeader() {
         <div className="flex items-center gap-3 shrink-0">
           <TrialBadge status={subscriptionStatus} daysRemaining={daysRemaining} />
 
-          {user && (
+          {user ? (
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((o) => !o)}
@@ -168,6 +168,13 @@ export default function AppHeader() {
                 </div>
               )}
             </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-sm px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:border-amber-500/60 transition-colors"
+            >
+              Sign in
+            </Link>
           )}
         </div>
       </div>

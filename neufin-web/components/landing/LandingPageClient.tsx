@@ -72,12 +72,21 @@ export default function LandingPageClient({
             >
               Pricing
             </Link>
-            <Link
-              href="/login"
-              className="text-sm px-3 py-1.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-primary)] hover:border-[var(--border-accent)] transition-colors"
-            >
-              Sign in
-            </Link>
+            {user ? (
+              <Link
+                href="/dashboard"
+                className="text-sm px-4 py-1.5 rounded-lg bg-[var(--amber)] text-[var(--canvas)] font-semibold hover:opacity-90 transition-opacity"
+              >
+                Dashboard →
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm px-3 py-1.5 rounded-lg border border-[var(--glass-border)] text-[var(--text-primary)] hover:border-[var(--border-accent)] transition-colors"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       </nav>

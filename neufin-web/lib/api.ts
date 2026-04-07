@@ -185,6 +185,7 @@ export interface DNAAnalysisResponse {
   share_token: string
   share_url: string
   record_id: string | null
+  portfolio_id: string | null
   /** Non-blocking warnings: stale prices, alias resolutions, excluded tickers */
   warnings?: string[]
   /** Tickers that could not be priced and were excluded from analysis */
@@ -364,10 +365,18 @@ export async function createCheckoutSession(
       weight: p.weight,
     }))
     : undefined
+  // Prefer the stored portfolio_id (correct portfolios table UUID) over
+  // record_id (which is the dna_scores table ID and cannot be used as portfolio_id)
+  const storedPortfolioId = (parsedResult as any)?.portfolio_id as string | null | undefined
+
   const data = await createCheckout(
     {
       plan:         'single',
-      ...(positions?.length ? { positions } : { portfolio_id: recordId }),
+      ...(storedPortfolioId
+        ? { portfolio_id: storedPortfolioId }
+        : positions?.length
+          ? { positions }
+          : { portfolio_id: recordId }),
       ref_token:    refToken,              // backend field name
       success_url:  `${origin}/reports/success`,
       cancel_url:   `${origin}/results`,

@@ -111,6 +111,7 @@ export default function ResultsContent() {
   const [pdfUrl, setPdfUrl]               = useState<string | null>(null)
   const [fulfillLoading, setFulfillLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [refToken, setRefToken]           = useState<string | null>(null)
   const [refDiscount, setRefDiscount]     = useState(false)
   const [daysRemaining, setDaysRemaining] = useState<number | undefined>()
@@ -206,6 +207,7 @@ export default function ResultsContent() {
       document.getElementById('unlock-report')?.scrollIntoView({ behavior: 'smooth' })
       return
     }
+    setCheckoutError(null)
     setCheckoutLoading(true)
     track('checkout_started', { record_id: result.record_id })
     capture('advisor_report_checkout_started', { plan_type: 'advisor_report', price: 29, record_id: result.record_id })
@@ -214,7 +216,9 @@ export default function ResultsContent() {
       await createCheckoutSession(result.record_id, token)
       // createCheckoutSession redirects — execution stops here on success
     } catch (e) {
-      track('checkout_error', { error: e instanceof Error ? e.message : 'unknown' })
+      const msg = e instanceof Error ? e.message : 'Checkout failed. Please try again.'
+      track('checkout_error', { error: msg })
+      setCheckoutError(msg)
       setCheckoutLoading(false)
     }
   }
@@ -640,6 +644,12 @@ export default function ResultsContent() {
                         'Unlock Professional Report · $29 →'
                       )}
                     </button>
+                  )}
+
+                  {checkoutError && (
+                    <p className="mt-3 text-xs text-red-400 text-center">
+                      ⚠ {checkoutError}
+                    </p>
                   )}
 
                   <p className="text-center text-xs text-gray-600 mt-3">
