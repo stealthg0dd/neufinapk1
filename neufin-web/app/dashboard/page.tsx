@@ -36,18 +36,21 @@ async function DashboardServerPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="border border-amber-500/20 bg-[#0F1420] rounded-lg p-5 hover:border-amber-500/40 transition-all duration-200 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
           <p className="text-sm text-[var(--text-2)] mb-2">Market Regime</p>
           <p className="text-[var(--amber)] text-3xl font-semibold capitalize">{regimeLabel.replace('_', ' ')}</p>
           <div className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden">
             <div className="h-full bg-[var(--amber)]" style={{ width: `${Math.round(confidence * 100)}%` }} />
           </div>
         </div>
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="border border-amber-500/20 bg-[#0F1420] rounded-lg p-5 hover:border-amber-500/40 transition-all duration-200 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
           <p className="text-sm text-[var(--text-2)] mb-2">Portfolio DNA</p>
           <PortfolioDNAClientCard />
         </div>
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="border border-amber-500/20 bg-[#0F1420] rounded-lg p-5 hover:border-amber-500/40 transition-all duration-200 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
           <p className="text-sm text-[var(--text-2)] mb-2">Research Notes</p>
           <p className="font-mono text-4xl text-[var(--text)]">{notes.length}</p>
         </div>
@@ -58,7 +61,8 @@ async function DashboardServerPage() {
         <ResearchFeedClient notes={notes.slice(0, 5)} />
       </section>
 
-      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 border-dashed border-[var(--amber)]/60">
+      <div className="border border-amber-500/20 bg-[#0F1420] rounded-lg p-5 hover:border-amber-500/40 transition-all duration-200 relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
         <h3 className="text-xl font-semibold mb-2">Analyze your portfolio</h3>
         <p className="text-sm text-[var(--text-2)] mb-4">
           Upload a CSV of your holdings to get your Portfolio DNA Score, risk analysis, and AI-generated insights.

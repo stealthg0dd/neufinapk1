@@ -30,7 +30,12 @@ export default function DashboardSidebar() {
 
   return (
     <aside className="w-[240px] shrink-0 border-r border-[var(--border)] bg-[var(--surface)] px-4 py-5 flex flex-col">
-      <p className="text-[var(--amber)] font-semibold text-xl mb-8">NeuFin</p>
+      <div className="flex items-center gap-2 px-4 py-5">
+        <div className="w-8 h-8 rounded bg-amber-500 flex items-center justify-center font-mono font-black text-black text-sm">
+          N
+        </div>
+        <span className="font-mono font-bold text-amber-400 tracking-widest text-sm">NEUFIN</span>
+      </div>
       <nav className="space-y-1.5 flex-1">
         {NAV.map((item) => {
           const active = pathname === item.href

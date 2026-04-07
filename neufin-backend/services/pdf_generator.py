@@ -185,6 +185,10 @@ def _make_page_callbacks(bc: BrandColors, advisor_name: str, report_date: str, l
         # Top blue rule
         canvas.setFillColor(bc.primary)
         canvas.rect(0.5 * inch, 10.4 * inch, 7.5 * inch, 0.04 * inch, fill=1, stroke=0)
+        # Consistent report watermark text in header area
+        canvas.setFont("Helvetica-Bold", 7.5)
+        canvas.setFillColor(_hex("#94A3B8"))
+        canvas.drawCentredString(4.25 * inch, 10.73 * inch, "NEUFIN INTELLIGENCE")
         # Logo or brand text
         if logo_img:
             try:
@@ -200,11 +204,11 @@ def _make_page_callbacks(bc: BrandColors, advisor_name: str, report_date: str, l
             except Exception:
                 canvas.setFont("Helvetica-Bold", 11)
                 canvas.setFillColor(bc.primary)
-                canvas.drawString(0.5 * inch, 10.45 * inch, "Neufin")
+                canvas.drawString(0.5 * inch, 10.45 * inch, "NEUFIN")
         else:
             canvas.setFont("Helvetica-Bold", 11)
             canvas.setFillColor(bc.primary)
-            canvas.drawString(0.5 * inch, 10.45 * inch, "Neufin")
+            canvas.drawString(0.5 * inch, 10.45 * inch, "NEUFIN")
         # Right side
         canvas.setFont("Helvetica", 8)
         canvas.setFillColor(bc.muted)
