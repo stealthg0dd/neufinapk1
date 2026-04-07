@@ -14,11 +14,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     storageKey: 'neufin-auth',
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    // PKCE: OAuth returns ?code= to /auth/callback (not #access_token= to root).
-    // detectSessionInUrl:false prevents double-exchange — only /auth/callback
-    // calls exchangeCodeForSession() explicitly.
+    // PKCE flow: OAuth returns ?code= to /auth/callback.
+    // detectSessionInUrl:true lets the Supabase client auto-exchange the code
+    // AND auto-parse any #access_token= hash (implicit flow fallback).
+    // The /auth/callback page only listens for onAuthStateChange — no manual exchange.
     flowType: 'pkce',
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
   },
 })
 

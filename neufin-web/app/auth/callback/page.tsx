@@ -5,22 +5,9 @@ export const dynamic = 'force-dynamic'
 /**
  * OAuth / Magic-Link callback handler.
  *
- * Supabase redirects here after:
- *   - Google OAuth sign-in  (PKCE: ?code=... in the URL)
- *   - Magic link click from email  (hash fragment: #access_token=...)
- *
- * Flow:
- *   1. Fast path — if a session is already established on mount, redirect immediately.
- *   2. Primary path — wait for SIGNED_IN / TOKEN_REFRESHED via onAuthStateChange.
- *      The Supabase JS client v2 exchanges the PKCE code automatically when it
- *      initialises with detectSessionInUrl:true (the default).
- *   3. Error path — if the URL contains ?error= (provider cancelled / denied),
- *      or the code exchange fails, redirects to /auth?error=<message>.
- *      The auth page reads this param and displays it to the user.
- *
- * The previous 10-second timeout was removed: it caused a race condition where
- * the redirect fired before the PKCE exchange completed on slow connections,
- * landing the user on a protected page with no session.
+ * With detectSessionInUrl:true, the Supabase client auto-exchanges the
+ * PKCE ?code= or parses the implicit #access_token= on page load.
+ * We just wait for the SIGNED_IN event and redirect to the next page.
  */
 
 import { Suspense, useEffect } from 'react'
@@ -55,7 +42,7 @@ function AuthCallbackContent() {
   const { capture }  = useNeufinAnalytics()
 
   useEffect(() => {
-    // ── 0. Check for provider-level error in URL params ───────────────
+    // Check for provider-level error in URL params
     const urlError = searchParams.get('error')
     const urlErrorDesc = searchParams.get('error_description')
     if (urlError) {
@@ -64,46 +51,54 @@ function AuthCallbackContent() {
       return
     }
 
-    let cancelled = false;
-    (async () => {
-      // ── 1. Fast path — session may already exist (e.g. token refresh) ──
-      const { data: existing } = await supabase.auth.getSession()
+    let cancelled = false
+
+    const finish = (session: { access_token: string; refresh_token: string }) => {
       if (cancelled) return
-      if (existing?.session) {
-        syncAuthCookie(existing.session)
-        const method = sessionStorage.getItem('neufin_auth_method') ?? 'google'
-        sessionStorage.removeItem('neufin_auth_method')
-        capture('user_logged_in', { method })
-        window.location.href = next
+      syncAuthCookie(session as Parameters<typeof syncAuthCookie>[0])
+      const method = sessionStorage.getItem('neufin_auth_method') ?? 'google'
+      sessionStorage.removeItem('neufin_auth_method')
+      capture('user_logged_in', { method })
+      window.location.href = next
+    }
+
+    // Fast path: session may already be set by detectSessionInUrl auto-exchange
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return
+      if (data?.session) {
+        finish(data.session)
         return
       }
 
-      // ── 2. Primary path — exchange PKCE code for session ──
-      // detectSessionInUrl is false so this is the only exchange attempt.
-      const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href)
-      if (cancelled) return
-      if (error) {
-        logger.error({ tag: TAG, error }, 'auth.callback_exchange_error')
-        // Last resort: check if session appeared (e.g. race with another tab)
-        const { data: fallback } = await supabase.auth.getSession()
-        if (fallback?.session) {
-          syncAuthCookie(fallback.session)
-          window.location.href = next
-          return
+      // Primary path: wait for auto-exchange to fire SIGNED_IN event
+      // (detectSessionInUrl:true handles the ?code= or #access_token= exchange)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (cancelled) return
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+          subscription.unsubscribe()
+          finish(session)
         }
-        window.location.href = `/login?error=oauth_failed`
-        return
+        if (event === 'SIGNED_OUT') {
+          subscription.unsubscribe()
+          logger.error({ tag: TAG }, 'auth.callback_signed_out')
+          window.location.href = '/login?error=oauth_failed'
+        }
+      })
+
+      // Timeout fallback: if no event fires in 10s, redirect to login
+      const timeout = setTimeout(() => {
+        if (cancelled) return
+        subscription.unsubscribe()
+        logger.error({ tag: TAG }, 'auth.callback_timeout')
+        window.location.href = '/login?error=timeout'
+      }, 10_000)
+
+      return () => {
+        clearTimeout(timeout)
+        subscription.unsubscribe()
       }
-      if (data?.session) {
-        syncAuthCookie(data.session)
-        const method = sessionStorage.getItem('neufin_auth_method') ?? 'google'
-        sessionStorage.removeItem('neufin_auth_method')
-        capture('user_logged_in', { method })
-        window.location.href = next
-        return
-      }
-      window.location.href = `/login?error=oauth_failed`
-    })()
+    })
+
     return () => { cancelled = true }
   }, [next, searchParams, capture])
 

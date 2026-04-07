@@ -104,11 +104,14 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
     setLoading(true)
     setError('')
     sessionStorage.setItem('neufin_auth_method', 'google')
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
-    const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`
+    // Always use window.location.origin — env vars may have wrong/stale values
+    // and a mismatched redirectTo causes Supabase to fall back to implicit flow
+    // (landing on /#access_token= instead of /auth/callback?code=).
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://neufin-web.vercel.app'
+    const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo },
+      options: { redirectTo, skipBrowserRedirect: false },
     })
     if (err) {
       setError(err.message)

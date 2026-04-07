@@ -46,29 +46,14 @@ export default function LandingPageClient({
     if (!loading && user) router.replace('/dashboard')
   }, [loading, user, router])
 
-  // Fallback: handle implicit-flow redirect where Supabase sends #access_token=
-  // to the root instead of /auth/callback (happens when flowType wasn't 'pkce').
+  // When Supabase uses implicit flow and lands #access_token= on root:
+  // detectSessionInUrl:true auto-parses it → fires onAuthStateChange(SIGNED_IN)
+  // → useAuth sets user → above effect redirects to /dashboard.
+  // Just clear the hash so it doesn't sit visibly in the URL bar.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const hash = window.location.hash
-    if (!hash.includes('access_token=')) return
-    const params = new URLSearchParams(hash.slice(1))
-    const accessToken = params.get('access_token')
-    const refreshToken = params.get('refresh_token')
-    if (!accessToken || !refreshToken) return
-    // Clear the hash immediately to prevent re-processing
-    window.history.replaceState(null, '', window.location.pathname)
-    import('@/lib/supabase').then(({ supabase }) => {
-      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-        .then(({ data }) => {
-          if (data.session) {
-            import('@/lib/sync-auth-cookie').then(({ syncAuthCookie }) => {
-              syncAuthCookie(data.session!)
-              window.location.replace('/dashboard')
-            })
-          }
-        })
-    })
+    if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
   }, [])
 
   if (!loading && user) return (
