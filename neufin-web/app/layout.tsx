@@ -1,26 +1,19 @@
 import type { Metadata } from 'next'
-import { Geist, JetBrains_Mono, Instrument_Serif } from 'next/font/google'
+import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import RootProviders from '@/app/components/RootProviders'
 import AuthDebugBoot from '@/app/components/AuthDebugBoot'
 import { AuthDebugPanel } from '@/components/AuthDebugPanel'
 
-const geist = Geist({
+const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
-  variable: '--font-geist',
+  variable: '--font-sans',
   display: 'swap',
 })
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  variable: '--font-jetbrains',
-  display: 'swap',
-})
-
-const instrumentSerif = Instrument_Serif({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-instrument',
+  variable: '--font-mono',
   display: 'swap',
 })
 
@@ -165,7 +158,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <head>
         {/* next/font serves locally; keep only app-critical origins */}

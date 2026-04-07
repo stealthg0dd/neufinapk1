@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 :root {
+  --bg: #080b14;
+  --surface: #0f1420;
+  --surface-2: #161d2e;
+  --border: rgba(255, 255, 255, 0.07);
+  --amber: #f5a623;
+  --emerald: #00d97e;
+  --red: #ff4d6a;
+  --text: #f0f4ff;
+  --text-2: #8b95b0;
   --canvas: #080b14;
   --surface-1: #0f1420;
   --surface-2: #161d2e;
