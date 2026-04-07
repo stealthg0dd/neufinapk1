@@ -125,3 +125,18 @@
     width: 78%;
   }
 }
+
+@keyframes grid-move {
+  to {
+    background-position: 60px 60px;
+  }
+}
+
+@keyframes score-ring {
+  from {
+    stroke-dashoffset: 339;
+  }
+  to {
+    stroke-dashoffset: 74.58;
+  }
+}
