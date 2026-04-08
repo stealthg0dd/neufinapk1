@@ -5,9 +5,10 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
 import { Brain, Check, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react'
-import { apiFetch, apiGet, apiPost, apiPostForm } from '@/lib/api-client'
+import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import type { DNAAnalysisResponse } from '@/lib/api'
 import { KPICard } from '@/components/ui/KPICard'
+import { supabase } from '@/lib/supabase'
 
 const STAGES = [
   { label: 'Reading your holdings...', pct: 25, sub: 'Parsing CSV rows and mapping tickers' },
@@ -73,7 +74,36 @@ export default function PortfolioPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const data = await apiPostForm<DNAAnalysisResponse>('/api/analyze-dna', formData)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const res = await fetch('/api/analyze-dna', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      })
+
+      if (res.status === 402) {
+        const payload = await res.json().catch(() => ({} as any))
+        const checkoutUrl =
+          payload?.checkout_url ?? payload?.detail?.checkout_url ?? payload?.detail?.upgrade_url ?? null
+        if (typeof checkoutUrl === 'string' && checkoutUrl) {
+          window.location.href = checkoutUrl
+          return
+        }
+        toast.error('Trial expired. Subscribe to upload a new portfolio.')
+        return
+      }
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({} as any))
+        toast.error(typeof payload?.detail === 'string' ? payload.detail : 'Upload failed. Try again.')
+        return
+      }
+
+      const data = (await res.json()) as DNAAnalysisResponse
       setResult(data)
       localStorage.setItem('neufin-last-analysis', JSON.stringify(data))
       setProgress(100)

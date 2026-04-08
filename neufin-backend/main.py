@@ -27,6 +27,7 @@ import os  # noqa: E402
 import sentry_sdk  # noqa: E402
 from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
 from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
+import stripe  # noqa: E402
 
 _SENTRY_ENV: str = os.getenv("ENVIRONMENT", "production")
 _SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
@@ -762,11 +763,69 @@ async def analyze_dna(
             )
 
     # ── 2.1 Subscription usage gate ─────────────────────────────────────────────
-    # For authenticated users, enforce monthly DNA analysis limits based on plan.
+    # Paywall rules:
+    # - Viewing existing portfolios/metrics is soft-paywall (handled by other endpoints).
+    # - Upload + analysis is hard-paywall after trial expiry: return 402 + checkout_url.
+    # - During trial: treat as Advisor-tier (full access).
     if user_id:
         try:
             from routers.vault import PLAN_DNA_LIMITS
             from services.usage_tracker import check_dna_limit
+            from services.auth_dependency import get_subscription_status as _sub_status
+
+            sub = _sub_status(user_id)
+            status_val = sub.get("status")
+            tier_val = str(sub.get("tier") or "").lower()
+
+            if status_val == "expired" and tier_val not in ("retail", "advisor", "enterprise"):
+                # Trial expired and no paid subscription: block new analyses and provide Stripe checkout URL.
+                price_id = settings.STRIPE_PRICE_ADVISOR_MONTHLY or settings.STRIPE_PRICE_ADVISOR_REPORT_ONETIME
+                if not (settings.STRIPE_SECRET_KEY and price_id):
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "message": "Trial expired. Subscribe to upload a new portfolio.",
+                            "upgrade_url": "/pricing",
+                        },
+                    )
+
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                mode = "subscription" if settings.STRIPE_PRICE_ADVISOR_MONTHLY else "payment"
+                session_params: dict = {
+                    "line_items": [{"price": price_id, "quantity": 1}],
+                    "mode": mode,
+                    "success_url": f"{settings.APP_BASE_URL}/dashboard?billing=success&session_id={{CHECKOUT_SESSION_ID}}",
+                    "cancel_url": f"{settings.APP_BASE_URL}/dashboard/portfolio?billing=cancelled",
+                    "metadata": {
+                        "plan": "unlimited" if mode == "subscription" else "single",
+                        "user_id": user_id,
+                    },
+                }
+                try:
+                    session = await asyncio.to_thread(lambda: stripe.checkout.Session.create(**session_params))
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "message": "Trial expired. Subscribe to upload a new portfolio.",
+                            "checkout_url": session.url,
+                        },
+                    )
+                except stripe.StripeError as e:
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "message": "Trial expired. Subscribe to continue.",
+                            "upgrade_url": "/pricing",
+                            "stripe_error": e.user_message,
+                        },
+                    ) from e
+
+            # Trial override for usage limits (treat as advisor tier).
+            if status_val == "trial":
+                tier_val = "advisor"
 
             _profile = (
                 supabase.table("user_profiles")
@@ -775,9 +834,10 @@ async def analyze_dna(
                 .limit(1)
                 .execute()
             )
-            _tier = (
+            stored_tier = (
                 _profile.data[0].get("subscription_tier") if _profile.data else None
             ) or "free"
+            _tier = tier_val or str(stored_tier).lower()
             _limit = PLAN_DNA_LIMITS.get(_tier, 3)
             _check = check_dna_limit(user_id, _limit)
             if not _check["allowed"]:
