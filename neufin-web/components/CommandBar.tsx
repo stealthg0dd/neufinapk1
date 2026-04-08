@@ -110,7 +110,7 @@ export function CommandBar({
     <>
       <header className="grid h-11 w-full shrink-0 grid-cols-1 items-center gap-2 border-b border-[hsl(var(--border)/0.4)] bg-command px-4 sm:grid-cols-[1fr_minmax(0,28rem)_1fr] sm:gap-0">
         <div className="flex min-w-0 items-center gap-3">
-          <Image src="/logo.png" alt="NeuFin" width={70} height={20} className="hidden h-5 w-auto md:block" />
+          <Image src="/logo.png" alt="NeuFin" width={120} height={40} className="hidden h-8 w-auto md:block" />
           <span className="hidden h-4 w-px shrink-0 bg-[hsl(var(--border))] sm:block" aria-hidden />
           <span
             className={`truncate text-[10px] font-mono font-medium tracking-wider ${regimeBadgeClasses(regime.variant)} rounded px-2 py-0.5`}

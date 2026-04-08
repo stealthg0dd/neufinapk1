@@ -20,8 +20,8 @@ export default function LandingNav() {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex h-14 items-center justify-between gap-3">
-          <Link href="/" className="flex min-w-0 shrink items-center gap-3" onClick={() => setOpen(false)}>
-            <Image src="/logo.png" alt="NeuFin" width={100} height={30} className="h-7 w-auto" />
+          <Link href="/" className="flex min-w-0 flex-none items-center gap-3" onClick={() => setOpen(false)}>
+            <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-10 w-auto" />
           </Link>
 
           <div className="hidden flex-1 items-center justify-center gap-8 md:flex">
