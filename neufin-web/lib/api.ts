@@ -93,7 +93,34 @@ export async function claimAnonymousPortfolio(
 // Empty string = relative URL → routes through Next.js /api/* rewrite proxy to Railway.
 // In Vercel production, set NEXT_PUBLIC_API_URL=https://neufin-web.vercel.app so
 // client-side fetch calls hit the same-origin proxy. Do NOT point directly at Railway.
-const API = process.env.NEXT_PUBLIC_API_URL ?? '';
+const API = process.env.NEXT_PUBLIC_API_URL ?? ''
+
+/** Absolute origin for server-side fetch to this deployment (RSC / ISR). Relative `/api` can throw without a base. */
+function resolveServerFetchOrigin(): string {
+  const app = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (app) {
+    try {
+      return new URL(app.includes('://') ? app : `https://${app}`).origin
+    } catch {
+      /* fall through */
+    }
+  }
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel}`
+  return ''
+}
+
+/** Research + server fetches: use explicit API base, else same-origin absolute URL on Vercel. */
+function researchRequestUrl(path: string): string {
+  const p = path.startsWith('/') ? path : `/${path}`
+  if (API) {
+    const base = API.replace(/\/$/, '')
+    return `${base}${p}`
+  }
+  const origin = resolveServerFetchOrigin()
+  if (origin) return `${origin}${p}`
+  return p
+}
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
 function authHeaders(token?: string | null): Record<string, string> {
@@ -706,9 +733,9 @@ export interface ResearchNote {
 
 export async function getResearchRegime(): Promise<MarketRegime | null> {
   try {
-    const res = await fetch(`${API}/api/research/regime`, { cache: 'no-store' })
+    const res = await fetch(researchRequestUrl('/api/research/regime'), { cache: 'no-store' })
     if (!res.ok) return null
-    return res.json()
+    return await res.json()
   } catch {
     return null
   }
@@ -719,24 +746,35 @@ export async function getResearchNotes(
   page = 1,
   perPage = 10,
 ): Promise<ResearchNote[]> {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API}/api/research/notes?page=${page}&per_page=${perPage}`, {
-    headers,
-    cache: 'no-store',
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return data.notes ?? data ?? []
+  try {
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(
+      researchRequestUrl(`/api/research/notes?page=${page}&per_page=${perPage}`),
+      {
+        headers,
+        cache: 'no-store',
+      },
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.notes ?? data ?? []
+  } catch {
+    return []
+  }
 }
 
 export async function getResearchNote(noteId: string, token?: string | null): Promise<ResearchNote | null> {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API}/api/research/notes/${noteId}`, {
-    headers,
-    cache: 'no-store',
-  })
-  if (!res.ok) return null
-  return res.json()
+  try {
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(researchRequestUrl(`/api/research/notes/${noteId}`), {
+      headers,
+      cache: 'no-store',
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }

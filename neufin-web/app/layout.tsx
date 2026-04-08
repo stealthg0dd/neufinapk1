@@ -19,7 +19,25 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 })
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://neufin.com').trim()
+/**
+ * Safe site URL for metadataBase / OG. Avoids `new URL('')` when env is whitespace-only
+ * or malformed (common misconfig on Vercel).
+ */
+function resolveAppUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (raw) {
+    try {
+      return new URL(raw.includes('://') ? raw : `https://${raw}`).origin
+    } catch {
+      /* fall through */
+    }
+  }
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel}`
+  return 'https://neufin.com'
+}
+
+const APP_URL = resolveAppUrl()
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
