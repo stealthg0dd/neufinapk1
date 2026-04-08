@@ -731,11 +731,17 @@ export interface ResearchNote {
   is_public: boolean
 }
 
+const RESEARCH_FETCH_MS = 3000
+
 export async function getResearchRegime(): Promise<MarketRegime | null> {
   try {
-    const res = await fetch(researchRequestUrl('/api/research/regime'), { cache: 'no-store' })
+    const res = await fetch(researchRequestUrl('/api/research/regime'), {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(RESEARCH_FETCH_MS),
+    })
     if (!res.ok) return null
-    return await res.json()
+    const body = await res.json()
+    return body && typeof body === 'object' ? body : null
   } catch {
     return null
   }
@@ -754,11 +760,13 @@ export async function getResearchNotes(
       {
         headers,
         cache: 'no-store',
+        signal: AbortSignal.timeout(RESEARCH_FETCH_MS),
       },
     )
     if (!res.ok) return []
     const data = await res.json()
-    return data.notes ?? data ?? []
+    const raw = data?.notes ?? data
+    return Array.isArray(raw) ? raw : []
   } catch {
     return []
   }
@@ -771,6 +779,7 @@ export async function getResearchNote(noteId: string, token?: string | null): Pr
     const res = await fetch(researchRequestUrl(`/api/research/notes/${noteId}`), {
       headers,
       cache: 'no-store',
+      signal: AbortSignal.timeout(RESEARCH_FETCH_MS),
     })
     if (!res.ok) return null
     return await res.json()

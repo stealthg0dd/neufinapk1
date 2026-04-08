@@ -39,6 +39,20 @@ function noteStripeClass(noteType?: string) {
 
 const DEMO_DNA = 78
 
+/** API may return flat MarketRegime or nested `{ current: { regime, confidence, ... } }`. */
+function normalizeRegime(regime: MarketRegime | null) {
+  const r = regime as (MarketRegime & { current?: Partial<MarketRegime> }) | null
+  const slug = (r?.current?.regime ?? r?.regime ?? '').toString().trim()
+  const raw = r?.current?.confidence ?? r?.confidence
+  let confidence: number | null = null
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const x = raw > 1 ? raw / 100 : raw
+    confidence = Math.max(0, Math.min(1, x))
+  }
+  const startedAt = r?.current?.started_at ?? r?.started_at
+  return { slug, confidence, startedAt }
+}
+
 export default function HomeLandingPage({
   regime,
   researchTeaser,
@@ -46,11 +60,10 @@ export default function HomeLandingPage({
   regime: MarketRegime | null
   researchTeaser: ResearchNote[]
 }) {
-  const conf =
-    typeof regime?.confidence === 'number' ? Math.max(0, Math.min(1, regime.confidence)) : null
-  const confPct = conf !== null ? Math.round(conf * 100) : null
-  const regimeLabel = regime ? formatRegimeName(regime.regime) : null
-  const tone = regime ? regimeTone(regime.regime) : { dot: 'bg-muted-foreground', text: 'text-muted-foreground' }
+  const { slug: regimeSlug, confidence: regimeConf, startedAt: regimeStartedAt } = normalizeRegime(regime)
+  const confPct = regimeConf !== null ? Math.round(regimeConf * 100) : null
+  const regimeLabel = regimeSlug ? formatRegimeName(regimeSlug) : null
+  const tone = regimeSlug ? regimeTone(regimeSlug) : { dot: 'bg-muted-foreground', text: 'text-muted-foreground' }
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
@@ -285,8 +298,8 @@ export default function HomeLandingPage({
             </div>
             <p className="mt-3 font-mono text-[10px] text-muted-foreground/60">
               Last updated:{' '}
-              {regime?.started_at
-                ? new Date(regime.started_at).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' })
+              {regimeStartedAt
+                ? new Date(regimeStartedAt).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' })
                 : '—'}
             </p>
           </div>
@@ -295,36 +308,46 @@ export default function HomeLandingPage({
         <div className="mx-auto mt-12 max-w-5xl px-6">
           {researchTeaser.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {researchTeaser.map((note) => {
-                const stripe = noteStripeClass(note.note_type)
-                const nconf = Math.round((note.confidence_score ?? 0) * 100)
-                return (
-                  <div
-                    key={note.id}
-                    className="relative overflow-hidden rounded-lg border border-border bg-surface p-4 pl-5 transition-colors hover:border-primary/20"
-                  >
-                    <div className={`absolute bottom-3 left-0 top-3 w-0.5 rounded-full ${stripe}`} aria-hidden />
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                        {(note.note_type ?? 'note').replace(/_/g, ' ')}
-                      </span>
-                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{nconf}% conf</span>
+              {researchTeaser
+                .filter((note): note is ResearchNote => Boolean(note?.id))
+                .map((note) => {
+                  const stripe = noteStripeClass(note?.note_type)
+                  const nconf = Math.round((note?.confidence_score ?? 0) * 100)
+                  const genAt = note?.generated_at
+                  return (
+                    <div
+                      key={note.id}
+                      className="relative overflow-hidden rounded-lg border border-border bg-surface p-4 pl-5 transition-colors hover:border-primary/20"
+                    >
+                      <div className={`absolute bottom-3 left-0 top-3 w-0.5 rounded-full ${stripe}`} aria-hidden />
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+                          {(note?.note_type ?? 'note').replace(/_/g, ' ')}
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{nconf}% conf</span>
+                      </div>
+                      <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-foreground">
+                        {note?.title ?? 'Untitled'}
+                      </h3>
+                      <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
+                        {note?.executive_summary ?? ''}
+                      </p>
+                      <div className="mt-2.5 flex items-center justify-between">
+                        <span className="font-mono text-[10px] text-muted-foreground/60">
+                          {genAt
+                            ? new Date(genAt).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })
+                            : '—'}
+                        </span>
+                        <Link
+                          href={`/research/${note.id}`}
+                          className="cursor-pointer text-[11px] text-primary"
+                        >
+                          Read →
+                        </Link>
+                      </div>
                     </div>
-                    <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-foreground">{note.title}</h3>
-                    <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
-                      {note.executive_summary}
-                    </p>
-                    <div className="mt-2.5 flex items-center justify-between">
-                      <span className="font-mono text-[10px] text-muted-foreground/60">
-                        {new Date(note.generated_at).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
-                      <Link href={`/research/${note.id}`} className="cursor-pointer text-[11px] text-primary">
-                        Read →
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </div>
           ) : (
             <p className="text-center text-sm text-muted-foreground">
