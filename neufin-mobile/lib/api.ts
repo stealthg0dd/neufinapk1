@@ -79,6 +79,9 @@ export interface SwarmReport {
   briefing: string
   regime: string
   dna_score: number | null
+  investor_type?: string | null
+  agent_trace?: Record<string, unknown> | null
+  top_risks?: string[] | null
   market_regime: Record<string, any> | null
   strategist_intel: Record<string, any> | null
   quant_analysis: Record<string, any> | null
@@ -95,4 +98,62 @@ export async function getLatestSwarmReport(token: string): Promise<SwarmReport |
   if (res.status === 404) return null
   if (!res.ok) throw new Error('Swarm report unavailable')
   return res.json()
+}
+
+export interface RegimeResponse {
+  regime: string
+  confidence: number
+  updated_at?: string
+  created_at?: string
+}
+
+export interface RecentAlert {
+  id: string
+  type?: string
+  title: string
+  body: string
+  regime?: string
+  timestamp: string
+}
+
+export interface ResearchNoteLite {
+  id: string
+  title: string
+  executive_summary: string
+  note_type?: string
+  generated_at?: string
+  created_at?: string
+}
+
+export async function getResearchRegime(): Promise<RegimeResponse | null> {
+  try {
+    const res = await fetch(`${API}/api/research/regime`)
+    if (!res.ok) return null
+    const data = await res.json()
+    return (data?.current_regime ?? data) as RegimeResponse
+  } catch {
+    return null
+  }
+}
+
+export async function getRecentAlerts(limit = 10): Promise<RecentAlert[]> {
+  try {
+    const res = await fetch(`${API}/api/alerts/recent?limit=${limit}`)
+    if (!res.ok) return []
+    const data = await res.json()
+    return (Array.isArray(data) ? data : data?.alerts ?? []) as RecentAlert[]
+  } catch {
+    return []
+  }
+}
+
+export async function getResearchNotes(limit = 3): Promise<ResearchNoteLite[]> {
+  try {
+    const res = await fetch(`${API}/api/research/notes?per_page=${limit}`)
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data?.notes ?? data ?? []) as ResearchNoteLite[]
+  } catch {
+    return []
+  }
 }

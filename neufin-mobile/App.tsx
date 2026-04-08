@@ -20,11 +20,14 @@ import { StatusBar } from 'expo-status-bar'
 import { View, ActivityIndicator } from 'react-native'
 import { NavigationContainer, DefaultTheme, NavigationContainerRef } from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { PostHogProvider } from 'posthog-react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
 import { posthog, trackMobileEvent } from '@/lib/analytics'
 import LoginScreen from '@/screens/LoginScreen'
+import HomeScreen from '@/screens/HomeScreen'
 import PortfolioSyncScreen from '@/screens/PortfolioSyncScreen'
 import AnalysisScreen from '@/screens/AnalysisScreen'
 import SwarmReportScreen from '@/screens/SwarmReportScreen'
@@ -32,9 +35,14 @@ import ShareScreen from '@/screens/ShareScreen'
 import SwarmAlertsScreen from '@/screens/SwarmAlertsScreen'
 import UpgradeScreen from '@/screens/UpgradeScreen'
 import ResearchScreen from '@/screens/ResearchScreen'
+import AlertsScreen from '@/screens/AlertsScreen'
 import type { PortfolioSummary, DNAResult } from '@/lib/api'
+import { getRecentAlerts } from '@/lib/api'
+import { colors } from '@/lib/theme'
 
 export type RootStackParamList = {
+  MainTabs:      undefined
+  Home:          undefined
   PortfolioSync: undefined
   Upload:        undefined
   Analysis:      { portfolio: PortfolioSummary }
@@ -44,21 +52,64 @@ export type RootStackParamList = {
   SwarmAlerts:   undefined
   Upgrade:       { trigger?: string }
   Research:      undefined
+  Alerts:        undefined
+}
+
+export type MainTabParamList = {
+  Home: undefined
+  Portfolio: undefined
+  Swarm: undefined
+  Alerts: undefined
+  Research: undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>()
+const Tab = createBottomTabNavigator<MainTabParamList>()
 
 const DarkTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background:   '#030712',
-    card:         '#0d1117',
-    text:         '#f1f5f9',
-    border:       '#1f2937',
-    primary:      '#3b82f6',
-    notification: '#3b82f6',
+    background:   colors.background,
+    card:         colors.surface,
+    text:         colors.foreground,
+    border:       colors.border,
+    primary:      colors.primary,
+    notification: colors.primary,
   },
+}
+
+function MainTabs() {
+  const [alertCount, setAlertCount] = useState(0)
+  useEffect(() => {
+    void getRecentAlerts(10).then((a) => setAlertCount(a.length))
+  }, [])
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedForeground,
+        tabBarIcon: ({ color, size }) => {
+          const name =
+            route.name === 'Home' ? 'home-outline' :
+            route.name === 'Portfolio' ? 'pie-chart-outline' :
+            route.name === 'Swarm' ? 'flash-outline' :
+            route.name === 'Alerts' ? 'notifications-outline' :
+            'book-outline'
+          return <Ionicons name={name as any} size={size} color={color} />
+        },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Portfolio" component={PortfolioSyncScreen} />
+      <Tab.Screen name="Swarm" component={SwarmReportScreen} />
+      <Tab.Screen name="Alerts" component={AlertsScreen} options={{ tabBarBadge: alertCount > 0 ? alertCount : undefined }} />
+      <Tab.Screen name="Research" component={ResearchScreen} />
+    </Tab.Navigator>
+  )
 }
 
 export default function App() {
@@ -132,10 +183,10 @@ export default function App() {
         >
           <StatusBar style="light" />
           <Stack.Navigator
-            initialRouteName="PortfolioSync"
+            initialRouteName="MainTabs"
             screenOptions={{
               headerShown:         false,
-              cardStyle:           { backgroundColor: '#030712' },
+              cardStyle:           { backgroundColor: colors.background },
               cardStyleInterpolator: ({ current, layouts }) => ({
                 cardStyle: {
                   opacity: current.progress,
@@ -144,13 +195,17 @@ export default function App() {
               }),
             }}
           >
+            <Stack.Screen name="MainTabs"      component={MainTabs} />
+            <Stack.Screen name="Home"          component={HomeScreen} />
             <Stack.Screen name="PortfolioSync" component={PortfolioSyncScreen} />
+            <Stack.Screen name="Upload"        component={PortfolioSyncScreen} />
             <Stack.Screen name="Analysis"      component={AnalysisScreen}      />
             <Stack.Screen name="SwarmReport"   component={SwarmReportScreen}   />
             <Stack.Screen name="Share"         component={ShareScreen}         />
             <Stack.Screen name="SwarmAlerts"   component={SwarmAlertsScreen}   />
             <Stack.Screen name="Upgrade"       component={UpgradeScreen}       />
             <Stack.Screen name="Research"      component={ResearchScreen}      />
+            <Stack.Screen name="Alerts"        component={AlertsScreen}        />
           </Stack.Navigator>
         </NavigationContainer>
       </PostHogProvider>
