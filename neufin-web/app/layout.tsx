@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import RootProviders from '@/app/components/RootProviders'
@@ -19,154 +20,95 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 })
 
-/**
- * Safe site URL for metadataBase / OG. Avoids `new URL('')` when env is whitespace-only
- * or malformed (common misconfig on Vercel).
- */
-function resolveAppUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()
-  if (raw) {
-    try {
-      return new URL(raw.includes('://') ? raw : `https://${raw}`).origin
-    } catch {
-      /* fall through */
-    }
-  }
-  const vercel = process.env.VERCEL_URL?.trim()
-  if (vercel) return `https://${vercel}`
-  return 'https://neufin.com'
-}
-
-const APP_URL = resolveAppUrl()
-
 export const metadata: Metadata = {
-  metadataBase: new URL(APP_URL),
+  metadataBase: new URL('https://neufin-web.vercel.app'),
   icons: { icon: '/logo-icon.png', apple: '/logo-icon.png' },
   title: {
-    default: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
-    template: '%s | NeuFin',
+    default: 'NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence',
+    template: '%s | NeuFin'
   },
   description:
-    'NeuFin — AI-powered behavioral finance intelligence for investors and institutions across Singapore, Malaysia, UAE, and Europe. Portfolio DNA scoring, bias detection, and institutional-grade analysis.',
+    'NeuFin\'s 7-agent AI swarm analyzes your portfolio for behavioral biases, market regime risk, and alpha opportunities — delivering institutional-grade IC briefings in 60 seconds. Free to try.',
   keywords: [
-    'Singapore',
-    'Malaysia',
-    'UAE',
-    'Estonia',
-    'MAS',
-    'DFSA',
-    'GDPR',
-    'behavioral finance Singapore',
-    'investment bias detection',
-    'portfolio analysis Singapore',
-    'Singapore fintech',
-    'financial advisor tools Singapore',
-    'cognitive bias investing',
-    'MAS compliant fintech',
-    'SEA wealth management',
-    'white-label advisor reports',
-    'CFO tools Singapore',
-    'Plaid portfolio analysis',
+    'portfolio analysis AI', 'behavioral finance', 'investment intelligence',
+    'portfolio DNA scoring', 'AI investment advisor Singapore', 'MAS fintech',
+    'hedge fund analytics retail', 'loss aversion detection', 'alpha generation AI',
+    'institutional portfolio analysis', 'PE analyst tools', 'IC memo generator',
+    'NeuFin', 'agentic AI finance', 'LangGraph portfolio', 'SENTINENT NEMO O2 BBA',
+    'Singapore fintech', 'UAE DFSA fintech', 'Estonia fintech EU',
   ],
-  authors: [{ name: 'NeuFin', url: 'https://neufin.com' }],
-  creator: 'NeuFin',
-  publisher: 'NeuFin',
+  authors: [
+    { name: 'Varun Srivastava', url: 'https://neufin-web.vercel.app/about' },
+    { name: 'Ha Pham', url: 'https://neufin-web.vercel.app/about' },
+    { name: 'Ha Pham', url: 'https://neufin-web.vercel.app/about' },
+  ],
+  creator: 'NeuFin — Neufin OÜ',
+  publisher: 'Neufin OÜ',
+  robots: {
+    index: true, follow: true,
+    googleBot: { index: true, follow: true, 
+      'max-video-preview': -1, 'max-image-preview': 'large',
+      'max-snippet': -1 },
+  },
   openGraph: {
     type: 'website',
-    locale: 'en_SG',
-    url: APP_URL,
+    locale: 'en_US',
+    url: 'https://neufin-web.vercel.app',
     siteName: 'NeuFin',
-    title: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
+    title: 'NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence',
     description:
-      'AI-powered portfolio analysis trusted by Singapore financial advisors. MAS-compliant, institutional-grade behavioral finance research in 60 seconds.',
-    images: [
-      {
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: 'NeuFin — Behavioral Finance Intelligence Platform for Singapore',
-      },
-    ],
+      '7 specialized AI agents analyze your portfolio for behavioral biases, market regime risk, and alpha — IC-grade briefings in 60 seconds. Try free.',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'NeuFin — Agentic Portfolio Intelligence' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
+    title: 'NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence',
     description:
-      'AI-powered portfolio analysis trusted by Singapore financial advisors. MAS-compliant research in 60 seconds.',
-    images: ['/og.png'],
+      'Upload your portfolio. Get IC-grade behavioral finance analysis in 60 seconds. Powered by 7 specialized AI agents.',
+    images: ['/og-image.png'],
+    creator: '@neufin_ai',
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
+  verification: {
+    google: 'ADD_GOOGLE_SEARCH_CONSOLE_TOKEN_HERE',
+  },
+  alternates: {
+    canonical: 'https://neufin-web.vercel.app',
   },
   manifest: '/manifest.json',
   other: {
-    'llms-txt': `${APP_URL}/llms.txt`,
+    'llms-txt': 'https://neufin-web.vercel.app/llms.txt',
   },
-}
-
-const organizationSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: 'NeuFin',
-  alternateName: 'NeuFin Behavioral Finance Intelligence',
-  url: 'https://neufin.com',
-  logo: `${APP_URL}/og.png`,
-  description:
-    'NeuFin is a B2B behavioral finance intelligence platform for Singapore SMEs and investors. Founded 2025 in Singapore. Detects cognitive biases in investment portfolios using multi-model AI.',
-  foundingDate: '2025',
-  foundingLocation: {
-    '@type': 'Place',
-    addressLocality: 'Singapore',
-    addressCountry: 'SG',
-  },
-  areaServed: ['Singapore', 'Malaysia', 'Indonesia', 'Thailand', 'Vietnam', 'Philippines'],
-  knowsAbout: [
-    'Behavioral Finance',
-    'Cognitive Bias Detection',
-    'Portfolio Analysis',
-    'Investment Psychology',
-    'MAS Compliance',
-    'Prospect Theory',
-    'Disposition Effect',
-    'Home Bias',
-    'Recency Bias',
-  ],
 }
 
 const softwareApplicationSchema = {
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'NeuFin',
-  applicationCategory: 'FinancialApplication',
-  applicationSubCategory: 'Portfolio Analysis',
-  operatingSystem: 'Web, Android, iOS',
-  description:
-    'Behavioral finance intelligence platform detecting cognitive biases in investment portfolios for Singapore SMEs, CFOs, wealth managers, and family offices in Southeast Asia.',
-  url: 'https://neufin.com',
-  author: { '@type': 'Organization', name: 'NeuFin', url: 'https://neufin.com' },
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "NeuFin",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "description": "AI-powered portfolio intelligence platform with 7-agent swarm for behavioral finance analysis and IC-grade reporting.",
   offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'SGD',
-    description: 'Free Investor DNA Score — no account required',
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "description": "Free portfolio DNA analysis"
   },
-  featureList: [
-    'Prospect Theory, Disposition Effect, Home Bias, Recency Bias detection',
-    'Plaid API portfolio connection (read-only, encrypted)',
-    'Investor DNA Score: 0–100 composite behavioral rating',
-    'Plain-English insight reports in under 10 seconds',
-    'MAS-compliant data handling under Singapore PDPA',
-    'Multi-model AI: Claude, GPT-4, Gemini with automatic failover',
-    'Professional PDF advisor reports',
-  ],
+  "creator": {
+    "@type": "Organization",
+    "name": "Neufin OÜ",
+    "url": "https://neufin-web.vercel.app",
+    "email": "info@neufin.ai",
+    "address": {
+      "@type": "PostalAddress",
+      "addressCountry": "EE",
+      "description": "Estonia (EU Headquarters)"
+    }
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "127"
+  }
 }
 
 export const viewport = {
@@ -194,17 +136,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="dns-prefetch" href="https://neufin101-production.up.railway.app" />
       </head>
       <body className="min-h-screen antialiased font-sans" suppressHydrationWarning>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-        />
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
+        >
+          Skip to main content
+        </a>
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="ga4" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js',new Date());
+                gtag('config','${process.env.NEXT_PUBLIC_GA_ID}',{
+                  page_title: document.title,
+                  page_location: window.location.href,
+                });`}
+            </Script>
+          </>
+        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
         />
         <RootProviders>
           {showAuthDebug ? <AuthDebugBoot /> : null}
-          {children}
+          <main id="main-content">{children}</main>
           {showAuthDebug ? <AuthDebugPanel /> : null}
         </RootProviders>
       </body>

@@ -236,8 +236,9 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
 
           <form onSubmit={handlePassword} className="space-y-4">
             <div>
-              <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Email</label>
+              <label htmlFor="auth-email" className="block text-xs text-[var(--text-secondary)] mb-1.5">Email</label>
               <input
+                id="auth-email"
                 type="email"
                 required
                 value={email}
@@ -248,8 +249,9 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
               />
             </div>
             <div>
-              <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Password</label>
+              <label htmlFor="auth-password" className="block text-xs text-[var(--text-secondary)] mb-1.5">Password</label>
               <input
+                id="auth-password"
                 type="password"
                 required
                 minLength={6}

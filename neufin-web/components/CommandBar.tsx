@@ -123,6 +123,7 @@ export function CommandBar({
           <button
             type="button"
             onClick={onSearchClick}
+            aria-label="Search portfolios and research"
             className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface)/0.8)] px-3 py-1.5 text-left text-xs text-[hsl(var(--muted-foreground))] focus:bg-[hsl(var(--surface))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--primary)/0.5)]"
           >
             Search portfolios, assets, research... ⌘K
@@ -167,6 +168,7 @@ export function CommandBar({
               <input
                 autoFocus
                 placeholder="Search portfolios, assets, research..."
+                aria-label="Search portfolios and research"
                 className="flex-1 bg-transparent text-sm text-[hsl(var(--foreground))] outline-none placeholder:text-[hsl(var(--muted-foreground)/0.6)]"
               />
               <kbd className="rounded border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-1.5 py-0.5 text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
