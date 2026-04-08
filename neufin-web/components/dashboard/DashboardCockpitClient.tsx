@@ -201,6 +201,32 @@ export default function DashboardCockpitClient({
             </Link>
           </div>
           <ResearchFeedClient notes={notes.slice(0, 5)} />
+
+          <div className="mt-6 rounded-xl border border-[hsl(var(--border))] bg-surface p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+                Market overview
+              </h3>
+              <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Regime confidence</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{regimeLabel}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Live regime signal confidence level</p>
+              </div>
+              <p className="shrink-0 font-mono text-sm tabular-nums text-foreground">
+                {Math.round(confidence * 100)}%
+              </p>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className={`h-full rounded-full ${
+                  variant === 'risk' ? 'bg-risk' : variant === 'positive' ? 'bg-positive' : 'bg-warning'
+                }`}
+                style={{ width: `${Math.round(confidence * 100)}%` }}
+              />
+            </div>
+          </div>
         </div>
 
         <aside className="w-full shrink-0 lg:w-80">
