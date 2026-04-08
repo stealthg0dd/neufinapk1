@@ -26,6 +26,7 @@ import structlog
 
 from database import supabase
 from services.ai_router import get_ai_analysis
+from services.research.slug_utils import slugify
 
 logger = structlog.get_logger("neufin.regime_detector")
 
@@ -339,6 +340,7 @@ async def _trigger_regime_change_note(
                     "rationale": rationale,
                 },
                 "signals": signals,
+                "slug_hint": slugify(f"Regime change {old_regime or 'unknown'} to {new_regime}"),
             },
         )
         logger.info("regime_detector.regime_note_generated", regime=new_regime)

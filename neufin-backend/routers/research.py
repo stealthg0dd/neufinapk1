@@ -25,6 +25,7 @@ from database import supabase
 from services.auth_dependency import get_current_user, get_subscribed_user
 from services.jwt_auth import JWTUser
 from services.research.regime_detector import get_current_regime_summary
+from services.research.slug_utils import estimate_read_time_minutes, slugify
 
 logger = structlog.get_logger("neufin.research")
 
@@ -84,6 +85,19 @@ class GenerateNoteRequest(BaseModel):
         "macro_outlook"  # macro_outlook|sector_analysis|regime_change|risk_alert
     )
     context_days: int = 7
+
+
+class PublicBlogNote(BaseModel):
+    id: str
+    slug: str
+    title: str
+    executive_summary: str
+    note_type: str
+    confidence_score: float | None = None
+    created_at: str
+    read_time_minutes: int
+    asset_tickers: list[str]
+    meta_description: str
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -167,6 +181,151 @@ async def list_notes(
         "per_page": per_page,
         "authenticated": user_id is not None,
         "full_access": show_all,
+    }
+
+
+@router.get("/blog", response_model=list[PublicBlogNote])
+async def list_blog_notes(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+    type: str | None = Query(None, alias="type"),
+):
+    """
+    Public SEO feed of research notes for blog pages.
+    Query params:
+      - page
+      - limit
+      - type=MACRO_OUTLOOK|REGIME_CHANGE|SECTOR_ANALYSIS|BEHAVIORAL
+    """
+    offset = (page - 1) * limit
+    query = (
+        supabase.table("research_notes")
+        .select(
+            "id,slug,title,executive_summary,note_type,confidence_score,generated_at,affected_tickers,asset_tickers,full_content,content,body"
+        )
+        .eq("is_public", True)
+        .order("generated_at", desc=True)
+        .range(offset, offset + limit - 1)
+    )
+    if type:
+        query = query.eq("note_type", type.lower())
+
+    try:
+        result = query.execute()
+        rows = result.data or []
+    except Exception as exc:
+        logger.warning("research.list_blog_failed", error=str(exc))
+        rows = []
+
+    out: list[PublicBlogNote] = []
+    for n in rows:
+        title = str(n.get("title") or "Untitled")
+        summary = str(n.get("executive_summary") or "")
+        slug = str(n.get("slug") or "").strip() or slugify(title)
+        content = str(n.get("content") or n.get("body") or n.get("full_content") or "")
+        tickers = n.get("asset_tickers") or n.get("affected_tickers") or []
+        if not isinstance(tickers, list):
+            tickers = []
+        out.append(
+            PublicBlogNote(
+                id=str(n.get("id")),
+                slug=slug,
+                title=title,
+                executive_summary=summary,
+                note_type=str(n.get("note_type") or ""),
+                confidence_score=n.get("confidence_score"),
+                created_at=str(n.get("generated_at") or datetime.now(UTC).isoformat()),
+                read_time_minutes=estimate_read_time_minutes(summary, content),
+                asset_tickers=[str(t).upper() for t in tickers if isinstance(t, str)],
+                meta_description=(summary[:160] if summary else title[:160]),
+            )
+        )
+    return out
+
+
+@router.get("/blog/{slug}")
+async def get_blog_note(slug: str):
+    """Public full research note by slug with related notes."""
+    try:
+        result = (
+            supabase.table("research_notes")
+            .select("*")
+            .eq("slug", slug)
+            .eq("is_public", True)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            # Backward-compatible fallback for legacy links that still use note UUID.
+            result = (
+                supabase.table("research_notes")
+                .select("*")
+                .eq("id", slug)
+                .eq("is_public", True)
+                .limit(1)
+                .execute()
+            )
+    except Exception as exc:
+        logger.error("research.blog_note_failed", slug=slug, error=str(exc))
+        raise HTTPException(status_code=500, detail="Failed to retrieve blog note.") from exc
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Research note not found.")
+
+    note = result.data[0]
+    title = str(note.get("title") or "Untitled")
+    summary = str(note.get("executive_summary") or "")
+    note_slug = str(note.get("slug") or "").strip() or slugify(title)
+    content = note.get("content") or note.get("body") or note.get("full_content") or ""
+    if isinstance(content, dict):
+        content = json.dumps(content, indent=2)
+    elif not isinstance(content, str):
+        content = str(content)
+    tickers = note.get("asset_tickers") or note.get("affected_tickers") or []
+    if not isinstance(tickers, list):
+        tickers = []
+
+    related: list[dict[str, Any]] = []
+    try:
+        rel_res = (
+            supabase.table("research_notes")
+            .select("id,slug,title,executive_summary,note_type,generated_at,confidence_score")
+            .eq("is_public", True)
+            .eq("note_type", note.get("note_type"))
+            .neq("id", note.get("id"))
+            .order("generated_at", desc=True)
+            .limit(3)
+            .execute()
+        )
+        for r in rel_res.data or []:
+            r_title = str(r.get("title") or "Untitled")
+            related.append(
+                {
+                    "id": r.get("id"),
+                    "slug": r.get("slug") or slugify(r_title),
+                    "title": r_title,
+                    "executive_summary": r.get("executive_summary") or "",
+                    "note_type": r.get("note_type") or "",
+                    "created_at": r.get("generated_at"),
+                    "confidence_score": r.get("confidence_score"),
+                }
+            )
+    except Exception as exc:
+        logger.debug("research.blog_related_failed", error=str(exc))
+
+    return {
+        "id": note.get("id"),
+        "slug": note_slug,
+        "title": title,
+        "executive_summary": summary,
+        "content": content,
+        "note_type": note.get("note_type"),
+        "confidence_score": note.get("confidence_score"),
+        "created_at": note.get("generated_at"),
+        "read_time_minutes": estimate_read_time_minutes(summary, content),
+        "asset_tickers": [str(t).upper() for t in tickers if isinstance(t, str)],
+        "meta_description": (summary[:160] if summary else title[:160]),
+        "related_notes": related,
     }
 
 

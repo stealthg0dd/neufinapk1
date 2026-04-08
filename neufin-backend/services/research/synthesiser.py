@@ -23,6 +23,7 @@ import structlog
 from database import supabase
 from services.ai_router import get_ai_analysis
 from services.research.regime_detector import get_current_regime_summary
+from services.research.slug_utils import slugify
 
 logger = structlog.get_logger("neufin.synthesiser")
 
@@ -236,6 +237,7 @@ Return ONLY valid JSON — no markdown, no preamble:
     payload: dict[str, Any] = {
         "note_type": note_type,
         "title": title,
+        "slug": slugify(title),
         "executive_summary": executive_summary,
         "full_content": full_content,
         "key_findings": result.get("key_findings", []),
@@ -253,7 +255,17 @@ Return ONLY valid JSON — no markdown, no preamble:
         payload["embedding"] = embedding
 
     try:
-        insert_result = supabase.table("research_notes").insert(payload).execute()
+        try:
+            insert_result = supabase.table("research_notes").insert(payload).execute()
+        except Exception as exc:
+            # Migration lag safeguard: if slug column isn't deployed yet, retry without slug.
+            if "slug" in str(exc).lower():
+                payload_no_slug = {k: v for k, v in payload.items() if k != "slug"}
+                insert_result = (
+                    supabase.table("research_notes").insert(payload_no_slug).execute()
+                )
+            else:
+                raise
         note = insert_result.data[0] if insert_result.data else payload
         logger.info("synthesiser.note_saved", note_type=note_type, title=title)
         return note
