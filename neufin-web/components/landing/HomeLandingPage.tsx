@@ -1,10 +1,11 @@
-import type { CSSProperties } from 'react'
 import Link from 'next/link'
-import { Brain, Check, Dna, MessageSquareQuote, Shield, X, Zap } from 'lucide-react'
+import { Brain, Check, CheckCircle, Dna, Globe, MessageSquareQuote, Shield, X } from 'lucide-react'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
 import { GlassCard } from '@/components/ui/GlassCard'
 import LandingNav from '@/components/landing/LandingNav'
 import LandingMarketChatPanel from '@/components/landing/LandingMarketChatPanel'
+import StockTickerMarquee from '@/components/landing/StockTickerMarquee'
+import SwarmHeroTerminal from '@/components/landing/SwarmHeroTerminal'
 
 const REGIME_LABELS: Record<string, string> = {
   risk_on: 'Risk-On',
@@ -82,142 +83,116 @@ export default function HomeLandingPage({
         />
         <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 px-6 pb-20 pt-28 sm:pt-32 md:pt-24 lg:grid-cols-2">
           <div>
-            <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
-              <span
-                className="h-1.5 w-1.5 rounded-full bg-primary"
-                style={{ animation: 'pulse-dot 2s ease-in-out infinite' }}
-              />
-              PRIVATE CAPITAL INTELLIGENCE
+            <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              AGENTIC PORTFOLIO INTELLIGENCE
             </span>
-            <h1 className="mb-5 font-sans text-4xl font-bold leading-tight sm:text-5xl md:text-6xl">
-              <span className="block">
-                The{' '}
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                  decision cockpit
-                </span>
-              </span>
-              <span className="block">for private capital.</span>
-            </h1>
-            <p className="mb-8 max-w-lg text-lg leading-relaxed text-muted-foreground">
-              Portfolio monitoring, behavioral bias detection, and AI-powered IC memos. Built for PE analysts who move
-              faster than Bloomberg.
+
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary/80">
+              7 AI Agents. IC-Grade Intelligence. 60 Seconds.
             </p>
-            <div className="mb-10 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
+
+            <h1 className="mb-4 font-sans text-5xl font-bold leading-[1.1] md:text-6xl">
+              <span className="block">7 AI Agents.</span>
+              <span className="block">One portfolio.</span>
+              <span
+                className="block"
+                style={{
+                  background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                Infinite clarity.
+              </span>
+            </h1>
+
+            <p className="mb-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
+              Upload your portfolio. Our swarm of 7 specialized AI agents analyzes market regime, behavioral biases, risk
+              clusters, and alpha opportunities — delivering IC-grade intelligence in 60 seconds.
+            </p>
+
+            <div className="mb-8 flex flex-wrap gap-6">
+              <div className="flex flex-col">
+                <span className="font-mono text-2xl font-bold tabular-nums text-risk">-3.2%</span>
+                <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Annual alpha leak from biases
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-mono text-2xl font-bold tabular-nums text-risk">$8,400</span>
+                <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Average annual loss (200K portfolio)
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-mono text-2xl font-bold tabular-nums text-positive">+18%</span>
+                <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  Performance with NeuFin agents
+                </span>
+              </div>
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[
+                { k: '7 Specialized AI Agents', v: 'working in parallel on your portfolio' },
+                { k: '47 Behavioral Biases Detected', v: 'including loss aversion, anchoring' },
+                { k: 'IC-Grade Output', v: 'investment committee briefings in 60 seconds' },
+              ].map((p) => (
+                <div key={p.k} className="rounded-xl border border-border/60 bg-surface/60 p-3">
+                  <p className="text-sm font-semibold text-foreground">{p.k}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{p.v}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mb-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
               <Link
                 href="/upload"
                 className="rounded-lg bg-primary px-6 py-3 text-center text-sm font-medium text-primary-foreground transition-all hover:scale-105 hover:bg-primary/90"
               >
-                Start Free Analysis →
+                Analyze My Portfolio Free →
               </Link>
               <Link
-                href="#api-platform"
+                href="#swarm-demo"
                 className="px-4 py-3 text-center text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                Explore API Platform
+                Watch Swarm Demo
               </Link>
             </div>
-            <div className="flex flex-wrap items-center gap-6">
+
+            <p className="mb-4 text-[11px] text-muted-foreground">
+              Trusted by global investors · SOC 2 compliant · info@neufin.ai
+            </p>
+
+            <div className="flex flex-wrap items-center gap-4">
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Shield className="h-3.5 w-3.5 shrink-0" />
-                MAS Aware
+                <CheckCircle className="h-3 w-3 shrink-0 text-positive" />
+                14-day free trial
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Zap className="h-3.5 w-3.5 shrink-0" />
-                60s Analysis
+                <CheckCircle className="h-3 w-3 shrink-0 text-positive" />
+                No credit card required
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Brain className="h-3.5 w-3.5 shrink-0" />
-                Behavioral AI
+                <Shield className="h-3 w-3 shrink-0 text-primary" />
+                SOC 2 Certified
               </span>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-4">
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold tabular-nums text-foreground">2,400+</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Portfolios Analyzed</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold tabular-nums text-foreground">$4.2B</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Assets Tracked</p>
-              </div>
-              <div className="text-center">
-                <p className="font-mono text-2xl font-bold tabular-nums text-foreground">60s</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg Analysis Time</p>
-              </div>
+              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Globe className="h-3 w-3 shrink-0 text-primary" />
+                MAS · GDPR · SEC aligned
+              </span>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-2xl">
-            <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-2.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-risk/70" />
-              <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
-              <span className="h-2.5 w-2.5 rounded-full bg-positive/70" />
-              <span className="flex-1 text-center font-mono text-[10px] text-muted-foreground/50">
-                NEUFIN TERMINAL v1.0
-              </span>
-            </div>
-            <div className="p-5">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${tone.dot}`}
-                  style={{ animation: 'pulse-dot 1.5s ease-in-out infinite' }}
-                />
-                <span className="font-mono text-[10px] text-muted-foreground">REGIME:</span>
-                <span className={`font-mono text-[10px] font-bold ${tone.text}`}>
-                  {regimeLabel ?? 'NO SIGNAL'}
-                </span>
-                <span className="font-mono text-[10px] text-muted-foreground/60">
-                  {confPct !== null ? `${confPct}% conf` : '— conf'}
-                </span>
-              </div>
-              <p className="mb-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/50">
-                PORTFOLIO DNA SCORE
-              </p>
-              <div className="flex items-end gap-3">
-                <span className="font-mono text-6xl font-bold tabular-nums text-foreground">{DEMO_DNA}</span>
-                <span className="mb-2 self-end text-xl text-muted-foreground">/100</span>
-              </div>
-              <div className="mb-4 mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                  style={
-                    {
-                      '--target-width': `${DEMO_DNA}%`,
-                      animation: 'bar-fill 1.5s ease-out forwards',
-                    } as CSSProperties
-                  }
-                />
-              </div>
-              <div className="mb-4 grid grid-cols-3 gap-2">
-                {[
-                  { k: 'BETA', v: '0.82' },
-                  { k: 'SHARPE', v: '1.24' },
-                  { k: 'HHI', v: '0.34' },
-                ].map((m) => (
-                  <div key={m.k} className="rounded-lg bg-surface-2 p-2 text-center">
-                    <p className="font-mono text-[9px] uppercase text-muted-foreground/60">{m.k}</p>
-                    <p className="font-mono text-[13px] font-medium tabular-nums text-foreground">{m.v}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/5 p-3">
-                <Brain className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={2} />
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                  ⚠ Overconfidence detected. Recent strong performance may be masking concentration risk in 3 correlated
-                  positions.
-                </p>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <span className="rounded-full bg-warning/10 px-2 py-0.5 font-mono text-[9px] text-warning">
-                  ANCHORING
-                </span>
-                <span className="rounded-full bg-risk/10 px-2 py-0.5 font-mono text-[9px] text-risk">
-                  OVERCONFIDENCE
-                </span>
-                <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[9px] text-accent">HERD RISK</span>
-              </div>
-            </div>
-          </div>
+          <SwarmHeroTerminal />
         </div>
+      </section>
+
+      <StockTickerMarquee />
+
+      <section id="swarm-demo" className="scroll-mt-20">
+        <LandingMarketChatPanel />
       </section>
 
       {/* SECTION 2 — PROBLEM / SOLUTION */}
@@ -574,8 +549,6 @@ export default function HomeLandingPage({
           </div>
         </div>
       </section>
-
-      <LandingMarketChatPanel />
 
       {/* SECTION 6 — CTA FOOTER */}
       <section className="py-20">
