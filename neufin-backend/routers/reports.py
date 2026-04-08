@@ -2,13 +2,15 @@ import datetime
 import uuid
 
 import structlog
+import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
+from config import APP_BASE_URL, STRIPE_PRICE_ADVISOR_REPORT_ONETIME, STRIPE_SECRET_KEY
 from database import supabase
 from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user, require_active_subscription
+from services.auth_dependency import get_current_user, get_subscription_status, require_active_subscription
 from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
 from services.pdf_generator import generate_advisor_report
@@ -16,6 +18,22 @@ from services.pdf_generator import generate_advisor_report
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 logger = structlog.get_logger("neufin.reports")
+stripe.api_key = STRIPE_SECRET_KEY
+
+
+async def can_download_report_free(user_id: str) -> bool:
+    """
+    Free report downloads:
+      - Active 14-day trial (treated as Advisor tier)
+      - Paid Advisor/Enterprise subscription_status == active (subscription_tier set by webhook)
+    """
+    sub = get_subscription_status(user_id)
+    if sub.get("status") == "trial":
+        return True
+    if sub.get("status") == "active":
+        tier = str(sub.get("tier") or "").lower()
+        return tier in ("advisor", "enterprise")
+    return False
 
 
 class ColorScheme(BaseModel):
@@ -80,6 +98,27 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
     Generate a 10-page white-label PDF report with optional advisor logo and color scheme.
     Uploads to Supabase Storage and returns a public URL.
     """
+    # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
+    if not await can_download_report_free(user.id):
+        if not STRIPE_PRICE_ADVISOR_REPORT_ONETIME:
+            raise HTTPException(503, "Stripe single-report price is not configured.")
+        try:
+            session = stripe.checkout.Session.create(
+                line_items=[{"price": STRIPE_PRICE_ADVISOR_REPORT_ONETIME, "quantity": 1}],
+                mode="payment",
+                success_url=f"{APP_BASE_URL}/pricing/success",
+                cancel_url=f"{APP_BASE_URL}/pricing",
+                metadata={
+                    "plan": "single",
+                    "portfolio_id": body.portfolio_id,
+                    "advisor_id": user.id,
+                    "user_id": user.id,
+                },
+            )
+            return {"checkout_url": session.url}
+        except stripe.StripeError as e:
+            raise HTTPException(502, f"Stripe error: {e.user_message}") from e
+
     # 1. Fetch positions
     try:
         portfolio_result = (

@@ -1,6 +1,8 @@
 import datetime
 import json
 import time
+from datetime import timedelta
+from typing import Optional, Tuple
 from urllib.parse import unquote
 
 from fastapi import Depends, HTTPException, Request, status
@@ -26,7 +28,7 @@ def fetch_user_profile(user_id: str) -> dict:
     try:
         result = (
             supabase.table("user_profiles")
-            .select("id, trial_started_at, subscription_status")
+            .select("id, email, trial_started_at, subscription_status, subscription_tier")
             .eq("id", user_id)
             .single()
             .execute()
@@ -34,6 +36,67 @@ def fetch_user_profile(user_id: str) -> dict:
         return result.data or {}
     except Exception:
         return {}
+
+
+def _parse_iso_dt(val: str) -> Optional[datetime.datetime]:
+    try:
+        dt = datetime.datetime.fromisoformat(val.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.UTC)
+    return dt
+
+
+def _trial_active_from_profile(profile: dict) -> Tuple[bool, int]:
+    """
+    Returns (is_active, days_remaining). Trial is active if now < started + 14 days.
+    days_remaining is clamped to [0..14].
+    """
+    trial_started_at = profile.get("trial_started_at")
+    if not trial_started_at:
+        return (False, 0)
+    started = _parse_iso_dt(str(trial_started_at))
+    if not started:
+        return (False, 0)
+    now = datetime.datetime.now(datetime.UTC)
+    trial_end = started + timedelta(days=14)
+    if now >= trial_end:
+        return (False, 0)
+    remaining = int((trial_end - now).total_seconds() // 86400) + 1
+    return (True, max(0, min(14, remaining)))
+
+
+async def is_trial_active(user_id: str) -> bool:
+    profile = fetch_user_profile(user_id)
+    active, _ = _trial_active_from_profile(profile)
+    return active
+
+
+def _ensure_trial_started_at(user: JWTUser) -> None:
+    """
+    On first authenticated request, start the 14-day trial if missing.
+    Best-effort: never blocks the request path.
+    """
+    try:
+        profile = fetch_user_profile(user.id)
+        if profile.get("trial_started_at"):
+            return
+        if str(profile.get("subscription_status") or "").lower() == "active":
+            return
+        now = datetime.datetime.now(datetime.UTC).isoformat()
+        supabase.table("user_profiles").upsert(
+            {
+                "id": user.id,
+                "email": profile.get("email") or user.email,
+                "trial_started_at": now,
+                "subscription_status": "trial",
+            },
+            on_conflict="id",
+        ).execute()
+        invalidate_subscription_cache(user.id)
+    except Exception:
+        return
 
 
 def get_subscription_status(user_id: str) -> dict:
@@ -45,24 +108,18 @@ def get_subscription_status(user_id: str) -> dict:
             return status_dict
 
     profile = fetch_user_profile(user_id)
-    trial_started_at = profile.get("trial_started_at")
-    status_val = profile.get("subscription_status", "trial")
-    if trial_started_at:
-        try:
-            started = datetime.datetime.fromisoformat(
-                trial_started_at.replace("Z", "+00:00")
-            )
-            now = datetime.datetime.now(datetime.UTC)
-            trial_days = (now - started).days
-            if trial_days <= 14:
-                days_remaining = 14 - trial_days
-                result = {"status": "trial", "days_remaining": days_remaining}
-                _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
-                return result
-        except Exception:  # noqa: S110
-            pass  # malformed date — fall through to expired
+    status_val = (profile.get("subscription_status") or "trial").lower()
+
+    trial_active, days_remaining = _trial_active_from_profile(profile)
+    if trial_active:
+        # Trial users get full Advisor-tier access.
+        result = {"status": "trial", "days_remaining": days_remaining, "tier": "advisor"}
+        _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
+        return result
+
     if status_val == "active":
-        result = {"status": "active"}
+        tier = (profile.get("subscription_tier") or "").lower() or "free"
+        result = {"status": "active", "tier": tier}
         _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
         return result
     result = {"status": "expired", "days_remaining": 0}
@@ -70,11 +127,11 @@ def get_subscription_status(user_id: str) -> dict:
     return result
 
 
-def require_active_subscription(user: JWTUser | None = None) -> JWTUser:
+def require_active_subscription(user: Optional[JWTUser] = None) -> JWTUser:
     if user is None:
         raise HTTPException(status_code=401, detail="Missing user")
     sub = get_subscription_status(user.id)
-    if sub["status"] == "expired":
+    if sub.get("status") == "expired":
         raise HTTPException(
             status_code=402,
             detail={
@@ -86,7 +143,7 @@ def require_active_subscription(user: JWTUser | None = None) -> JWTUser:
 
 
 # ── Auth dependencies ───────────────────────────────────────────────────────────
-def _extract_cookie_token(raw: str | None) -> str | None:
+def _extract_cookie_token(raw: Optional[str]) -> Optional[str]:
     """Extract a usable JWT from common Supabase cookie formats."""
     if not raw:
         return None
@@ -121,7 +178,7 @@ def _extract_cookie_token(raw: str | None) -> str | None:
     return token or None
 
 
-def _extract_request_token(request: Request, strict_header: bool) -> str | None:
+def _extract_request_token(request: Request, strict_header: bool) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
     if auth_header:
         if auth_header.startswith("Bearer "):
@@ -149,6 +206,7 @@ async def get_current_user(request: Request) -> JWTUser:
         )
     try:
         user = await verify_jwt(token)
+        _ensure_trial_started_at(user)
         return user
     except Exception as err:
         raise HTTPException(
@@ -157,12 +215,14 @@ async def get_current_user(request: Request) -> JWTUser:
         ) from err
 
 
-async def get_optional_user(request: Request) -> JWTUser | None:
+async def get_optional_user(request: Request) -> Optional[JWTUser]:
     token = _extract_request_token(request, strict_header=False)
     if not token:
         return None
     try:
-        return await verify_jwt(token)
+        user = await verify_jwt(token)
+        _ensure_trial_started_at(user)
+        return user
     except Exception as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

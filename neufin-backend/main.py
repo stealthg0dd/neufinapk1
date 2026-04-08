@@ -43,7 +43,10 @@ def _scrub(obj: object) -> object:
     return [_scrub(i) for i in obj] if isinstance(obj, list) else obj
 
 
-def _before_send(event: dict, _hint: dict) -> dict | None:
+from typing import Optional
+
+
+def _before_send(event: dict, _hint: dict) -> Optional[dict]:
     """Strip sensitive fields from every Sentry event before transmission."""
     for section in ("request", "extra", "contexts"):
         if section in event:

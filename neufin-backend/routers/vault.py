@@ -18,7 +18,13 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config import APP_BASE_URL, STRIPE_SECRET_KEY
+from config import (
+    APP_BASE_URL,
+    STRIPE_PRICE_ADVISOR_MONTHLY,
+    STRIPE_PRICE_ENTERPRISE_MONTHLY,
+    STRIPE_PRICE_RETAIL_MONTHLY,
+    STRIPE_SECRET_KEY,
+)
 from database import claim_guest_data, supabase
 from services.auth_dependency import get_current_user
 from services.jwt_auth import JWTUser
@@ -37,7 +43,7 @@ PLANS: dict = {
     "retail": {
         "name": "Retail Investor",
         "price_monthly": 29,
-        "stripe_price_id": "price_1TIuPkGVXReXuoyMrADQfcSQ",
+        "stripe_price_id": STRIPE_PRICE_RETAIL_MONTHLY,
         "dna_analyses_per_month": -1,
         "swarm_analyses": True,
         "advisor_reports": False,
@@ -46,7 +52,7 @@ PLANS: dict = {
     "advisor": {
         "name": "Financial Advisor",
         "price_monthly": 299,
-        "stripe_price_id": "price_1TIuPlGVXReXuoyMICYnUmXR",
+        "stripe_price_id": STRIPE_PRICE_ADVISOR_MONTHLY,
         "dna_analyses_per_month": -1,
         "swarm_analyses": True,
         "advisor_reports": True,
@@ -57,7 +63,7 @@ PLANS: dict = {
     "enterprise": {
         "name": "Enterprise / API",
         "price_monthly": 999,
-        "stripe_price_id": "price_1TIuPlGVXReXuoyMgx5yT4Bu",
+        "stripe_price_id": STRIPE_PRICE_ENTERPRISE_MONTHLY,
         "dna_analyses_per_month": -1,
         "swarm_analyses": True,
         "advisor_reports": True,

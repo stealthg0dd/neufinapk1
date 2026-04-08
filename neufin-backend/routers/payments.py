@@ -25,6 +25,7 @@ from config import (
     APP_BASE_URL,
     STRIPE_PRICE_SINGLE,
     STRIPE_PRICE_UNLIMITED,
+    STRIPE_PRICE_ADVISOR_MONTHLY,
     STRIPE_REFERRAL_COUPON_ID,
     STRIPE_SECRET_KEY,
     STRIPE_WEBHOOK_SECRET,
@@ -154,7 +155,12 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
     if plan not in ("single", "unlimited"):
         raise HTTPException(400, "plan must be 'single' or 'unlimited'")
 
-    price_id = STRIPE_PRICE_SINGLE if plan == "single" else STRIPE_PRICE_UNLIMITED
+    # Advisor monthly plan should use STRIPE_PRICE_ADVISOR_MONTHLY (Railway env).
+    # Keep STRIPE_PRICE_UNLIMITED as backwards-compatible fallback.
+    if plan == "single":
+        price_id = STRIPE_PRICE_SINGLE
+    else:
+        price_id = STRIPE_PRICE_ADVISOR_MONTHLY or STRIPE_PRICE_UNLIMITED
     if not price_id:
         raise HTTPException(503, f"Stripe price ID for plan '{plan}' is not configured.")
 
@@ -381,6 +387,7 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
             try:
                 supabase.table("user_profiles").update(
                     {
+                        "subscription_tier": "advisor",
                         "subscription_status": "active",
                         "stripe_customer_id": stripe_customer_id,
                         "trial_started_at": None,
