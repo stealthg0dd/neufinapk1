@@ -10,7 +10,22 @@ const BLOG_POSTS = [
   'sea-wealth-management-ai',
 ]
 
-export default function sitemap(): MetadataRoute.Sitemap {
+async function fetchResearchSlugs(): Promise<string[]> {
+  try {
+    const res = await fetch(`${BASE}/api/research/blog?page=1&limit=200`, {
+      next: { revalidate: 3600 },
+      cache: 'force-cache',
+    })
+    if (!res.ok) return []
+    const data = (await res.json()) as Array<{ slug?: string }>
+    return data.map((n) => n.slug).filter((s): s is string => Boolean(s))
+  } catch {
+    return []
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const researchSlugs = await fetchResearchSlugs()
   return [
     {
       url: BASE,
@@ -47,6 +62,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
+    })),
+    ...researchSlugs.map((slug) => ({
+      url: `${BASE}/research/${slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.75,
     })),
     {
       url: `${BASE}/contact-sales`,

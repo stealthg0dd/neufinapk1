@@ -15,6 +15,7 @@ import {
 import { KPICard } from '@/components/ui/KPICard'
 import ResearchFeedClient from '@/components/dashboard/ResearchFeedClient'
 import { usePortfolioDNA } from '@/hooks/usePortfolioDNA'
+import { useState } from 'react'
 
 export type CockpitNote = {
   id: string
@@ -89,6 +90,7 @@ export default function DashboardCockpitClient({
   notes: CockpitNote[]
 }) {
   const { loading: dnaLoading, score, hasPortfolio } = usePortfolioDNA()
+  const [marketTab, setMarketTab] = useState<'S&P 500' | 'NASDAQ' | 'STI' | 'FTSE'>('S&P 500')
 
   const regimeRaw = regimeData.current?.regime ?? 'Unknown'
   const regimeLabel = formatRegimeLabel(regimeRaw)
@@ -207,12 +209,33 @@ export default function DashboardCockpitClient({
               <h3 className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
                 Market overview
               </h3>
-              <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Regime confidence</span>
+              <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Index tabs (fallback mode)</span>
+            </div>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {(['S&P 500', 'NASDAQ', 'STI', 'FTSE'] as const).map((tab) => {
+                const active = tab === marketTab
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setMarketTab(tab)}
+                    className={[
+                      'rounded px-2 py-1 font-mono text-[11px]',
+                      active ? 'bg-primary/15 text-primary' : 'text-[hsl(var(--muted-foreground))] hover:text-foreground',
+                    ].join(' ')}
+                    title="Index endpoint unavailable, showing regime-confidence fallback"
+                  >
+                    {tab}
+                  </button>
+                )
+              })}
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{regimeLabel}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Live regime signal confidence level</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {marketTab} data endpoint unavailable — showing live regime confidence fallback
+                </p>
               </div>
               <p className="shrink-0 font-mono text-sm tabular-nums text-foreground">
                 {Math.round(confidence * 100)}%
