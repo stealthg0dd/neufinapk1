@@ -22,7 +22,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from database import supabase
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_subscribed_user
+from services.jwt_auth import JWTUser
 from services.research.regime_detector import get_current_regime_summary
 
 logger = structlog.get_logger("neufin.research")
@@ -132,11 +133,8 @@ async def list_notes(
     user = getattr(request.state, "user", None)
     user_id: str | None = user.id if user else None
 
-    # Determine access level
-    show_all = False
-    if user_id:
-        plan = _get_user_plan(user_id)
-        show_all = _PLAN_RANK.get(plan, 0) >= _PLAN_RANK["retail"]
+    # Soft paywall: if authenticated, show all notes (even after trial expiry).
+    show_all = bool(user_id)
 
     offset = (page - 1) * per_page
 
@@ -173,9 +171,8 @@ async def list_notes(
 
 
 @router.get("/notes/{note_id}")
-async def get_note(note_id: str, user: dict = Depends(get_current_user)):
-    """Full research note — requires retail plan or above."""
-    _require_plan(user["id"], "retail")
+async def get_note(note_id: str, user: JWTUser = Depends(get_current_user)):
+    """Full research note — soft paywall (auth required, even if trial expired)."""
 
     try:
         result = (
@@ -206,15 +203,14 @@ async def get_note(note_id: str, user: dict = Depends(get_current_user)):
 
 @router.get("/signals")
 async def get_signals(
-    user: dict = Depends(get_current_user),
+    user: JWTUser = Depends(get_current_user),
     region: str | None = None,
     signal_type: str | None = None,
     significance: str | None = None,
     days: int = Query(30, ge=1, le=180),
     limit: int = Query(20, ge=1, le=100),
 ):
-    """Latest macro signals — requires retail plan or above."""
-    _require_plan(user["id"], "retail")
+    """Latest macro signals — soft paywall (auth required, even if trial expired)."""
 
     from datetime import timedelta
 
@@ -248,13 +244,13 @@ async def get_signals(
 
 @router.post("/query")
 async def semantic_search(
-    body: SemanticSearchRequest, user: dict = Depends(get_current_user)
+    body: SemanticSearchRequest, user: JWTUser = Depends(get_subscribed_user)
 ):
     """
     Semantic search across the knowledge base using pgvector cosine similarity.
     Requires advisor plan or above (this is the core moat endpoint).
     """
-    _require_plan(user["id"], "advisor")
+    # Hard paywall: advisor-tier feature (vector search). After trial ends, returns 402.
 
     if not body.query.strip():
         raise HTTPException(status_code=422, detail="Query cannot be empty.")
@@ -333,12 +329,11 @@ async def semantic_search(
 
 
 @router.get("/portfolio-context/{portfolio_id}")
-async def portfolio_context(portfolio_id: str, user: dict = Depends(get_current_user)):
+async def portfolio_context(portfolio_id: str, user: JWTUser = Depends(get_current_user)):
     """
     Returns all recent research notes and signals relevant to a saved portfolio's holdings.
-    Requires retail plan or above.
+    Soft paywall: allow access after trial expiry (banner handled in UI).
     """
-    _require_plan(user["id"], "retail")
 
     # Fetch portfolio holdings
     try:
@@ -346,7 +341,7 @@ async def portfolio_context(portfolio_id: str, user: dict = Depends(get_current_
             supabase.table("portfolios")
             .select("id,ticker_data")
             .eq("id", portfolio_id)
-            .eq("user_id", user["id"])
+            .eq("user_id", user.id)
             .limit(1)
             .execute()
         )
@@ -426,13 +421,13 @@ async def portfolio_context(portfolio_id: str, user: dict = Depends(get_current_
 
 @router.post("/generate")
 async def generate_note(
-    body: GenerateNoteRequest, user: dict = Depends(get_current_user)
+    body: GenerateNoteRequest, user: JWTUser = Depends(get_subscribed_user)
 ):
     """
     Trigger on-demand research note generation.
     Requires advisor plan or above.
     """
-    _require_plan(user["id"], "advisor")
+    # Hard paywall: advisor-tier AI generation. After trial ends, returns 402.
 
     valid_types = {"macro_outlook", "sector_analysis", "regime_change", "risk_alert"}
     if body.note_type not in valid_types:

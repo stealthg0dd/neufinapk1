@@ -26,7 +26,7 @@ from config import (
     STRIPE_SECRET_KEY,
 )
 from database import claim_guest_data, supabase
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_subscription_status as get_sub_status
 from services.jwt_auth import JWTUser
 
 # ── Subscription plan definitions ─────────────────────────────────────────────
@@ -103,7 +103,7 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
     try:
         result = (
             supabase.table("user_profiles")
-            .select("subscription_tier, advisor_name, firm_name")
+            .select("subscription_tier, subscription_status, trial_started_at, advisor_name, firm_name")
             .eq("id", uid)
             .single()
             .execute()
@@ -112,13 +112,25 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
     except Exception:
         data = {}
 
+    # Trial users get full Advisor-tier access for 14 days, even if subscription_tier is still 'free'.
+    sub = get_sub_status(uid)
+    status = sub.get("status") or "expired"
+    days_remaining = sub.get("days_remaining", 0)
+    trial_started_at = data.get("trial_started_at")
+
     tier = data.get("subscription_tier", "free") or "free"
+    if status == "trial":
+        tier = "advisor"
+
     plan = PLANS.get(tier, PLANS["free"])
     dna_limit = PLAN_DNA_LIMITS.get(tier, 3)
     usage = get_monthly_usage(uid)
 
     return {
         "plan": tier,
+        "status": status,
+        "days_remaining": days_remaining,
+        "trial_started_at": trial_started_at,
         "plan_details": plan,
         "usage": {
             **usage,
