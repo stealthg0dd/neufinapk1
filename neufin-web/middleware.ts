@@ -28,11 +28,13 @@ const PUBLIC_PREFIXES = [
   '/market',
   '/leaderboard',
   '/research',
+  '/feedback',
   '/privacy',
   '/share',
   '/referrals',
   '/reports',
   '/api/research',
+  '/api/feedback',
   '/api/plans',
   '/api',           // API routes handle their own auth
   '/favicon',

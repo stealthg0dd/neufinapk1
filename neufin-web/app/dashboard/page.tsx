@@ -1,4 +1,5 @@
 import DashboardCockpitClient from '@/components/dashboard/DashboardCockpitClient'
+import Link from 'next/link'
 
 export default function DashboardPage() {
   return <DashboardServerPage />
@@ -30,5 +31,24 @@ async function DashboardServerPage() {
   const notesData = notesRes as NotesResponse
   const notes = notesData.notes ?? []
 
-  return <DashboardCockpitClient regimeData={regimeData} notes={notes} />
+  return (
+    <div>
+      <DashboardCockpitClient regimeData={regimeData} notes={notes} />
+      <div className="mt-6 flex items-center justify-between rounded-xl border border-border/50 bg-surface px-5 py-4">
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            You&apos;re on NeuFin beta — your feedback shapes what we build.
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Takes 5 minutes · Read personally by the founding team
+          </p>
+        </div>
+        <Link href="/feedback" target="_blank">
+          <button className="ml-4 flex-shrink-0 rounded-lg border border-primary/30 bg-primary/15 px-4 py-2 text-xs font-medium text-primary transition-colors hover:bg-primary/25">
+            Share feedback →
+          </button>
+        </Link>
+      </div>
+    </div>
+  )
 }

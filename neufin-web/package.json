@@ -27,6 +27,7 @@
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
     "recharts": "^2.12.7",
+    "resend": "^6.10.0",
     "stripe": "^21.0.1"
   },
   "devDependencies": {

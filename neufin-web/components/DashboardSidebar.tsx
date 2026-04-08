@@ -18,6 +18,7 @@ import {
   Shield,
   LogOut,
   ChevronDown,
+  MessageSquare,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { apiGet } from '@/lib/api-client'
@@ -169,6 +170,13 @@ export default function DashboardSidebar({ user }: { user: User }) {
             {item.label}
           </Link>
         ))}
+        <Link href="/feedback" target="_blank">
+          <div className="mx-2 flex items-center gap-2.5 rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground">
+            <MessageSquare className="h-[15px] w-[15px]" />
+            <span>Give feedback</span>
+            <span className="ml-auto rounded bg-amber-500/20 px-1.5 py-0.5 font-mono text-[9px] text-amber-400">BETA</span>
+          </div>
+        </Link>
         {showAdmin ? (
           <Link href="/dashboard/admin" className={linkClass('/dashboard/admin')}>
             <Shield className="h-[15px] w-[15px] shrink-0" />
