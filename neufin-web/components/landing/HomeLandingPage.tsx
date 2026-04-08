@@ -191,8 +191,194 @@ export default function HomeLandingPage({
 
       <StockTickerMarquee />
 
-      <section id="swarm-demo" className="scroll-mt-20">
-        <LandingMarketChatPanel />
+      <section id="swarm-demo" className="relative scroll-mt-20 py-24">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-16 text-center">
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary">AGENTIC AI SYSTEM</p>
+            <h2 className="text-4xl font-bold text-foreground">
+              7 AI agents working in parallel
+              <br />
+              on every portfolio decision.
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+              Most platforms give you data. NeuFin gives you a team. Seven specialized AI agents run simultaneously the
+              moment you upload your portfolio — each one an expert in its domain.
+            </p>
+          </div>
+
+          {(() => {
+            const agents = [
+              {
+                id: 'market_regime',
+                name: 'MARKET REGIME',
+                emoji: '🌍',
+                tagline: 'Reads the macro environment',
+                description:
+                  'Monitors VIX, PMI, yield curve, and inflation signals via FRED API to classify the current market regime across 5 categories.',
+                output: 'Current: Risk-Off · Confidence 82%',
+                color: 'risk',
+              },
+              {
+                id: 'strategist',
+                name: 'STRATEGIST',
+                emoji: '🧠',
+                tagline: 'Turns macro into narrative',
+                description:
+                  'Synthesizes Finnhub news + FRED signals into a coherent macro narrative and positioning thesis for your specific holdings.',
+                output: 'Defensive rotation recommended',
+                color: 'warning',
+              },
+              {
+                id: 'quant',
+                name: 'QUANT',
+                emoji: '📊',
+                tagline: "Numbers don't lie",
+                description:
+                  'Computes HHI concentration, weighted beta across 6 data providers, Sharpe ratio, and correlation cluster analysis.',
+                output: 'Sharpe 1.24 · Beta 0.82 · 3 clusters',
+                color: 'primary',
+              },
+              {
+                id: 'tax_arch',
+                name: 'TAX ARCHITECT',
+                emoji: '🏛️',
+                tagline: 'Protects after-tax alpha',
+                description:
+                  'Calculates per-position CGT liability and after-tax alpha. Flags positions approaching long-term capital gains thresholds.',
+                output: 'CGT exposure: $4,200',
+                color: 'warning',
+              },
+              {
+                id: 'risk_sentinel',
+                name: 'RISK SENTINEL',
+                emoji: '🛡️',
+                tagline: 'Independent risk layer',
+                description:
+                  'Runs a completely independent risk assessment — not influenced by the other agents. Provides a second opinion on concentration and tail risk.',
+                output: 'Risk: HIGH · Tech cluster 67%',
+                color: 'risk',
+              },
+              {
+                id: 'alpha_scout',
+                name: 'ALPHA SCOUT',
+                emoji: '⚡',
+                tagline: "Finds what you're missing",
+                description:
+                  "Scans for alpha opportunities your current portfolio isn't capturing — sector rotations, momentum signals, and underweighted positions relative to regime.",
+                output: '2 opportunities identified',
+                color: 'positive',
+              },
+              {
+                id: 'synthesizer',
+                name: 'SYNTHESIZER',
+                emoji: '✦',
+                tagline: 'Produces the IC briefing',
+                description:
+                  'Aggregates all agent outputs into a single institutional-grade Investment Committee briefing — actionable, cited, and audit-ready.',
+                output: 'IC Briefing → PDF ready',
+                color: 'accent',
+              },
+            ] as const
+
+            const colorVar = (c: string) => (['risk', 'warning', 'primary', 'positive', 'accent'].includes(c) ? c : 'primary')
+            const borderHover = (c: string) => `hover:border-[hsl(var(--${colorVar(c)})/0.4)]`
+            const pillText = (c: string) => `text-[hsl(var(--${colorVar(c)}))]`
+
+            const firstRow = agents.slice(0, 4)
+            const secondRow = agents.slice(4)
+
+            const Card = (a: (typeof agents)[number]) => (
+              <div
+                key={a.id}
+                className={[
+                  'rounded-xl border border-border bg-surface p-5 transition-colors',
+                  borderHover(a.color),
+                ].join(' ')}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl leading-none" aria-hidden>
+                    {a.emoji}
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{a.name}</span>
+                </div>
+                <p className="mt-2 text-sm font-semibold text-foreground">{a.tagline}</p>
+                <p className="mb-3 mt-1 text-[12px] leading-relaxed text-muted-foreground">{a.description}</p>
+                <span className={['inline-flex items-center rounded bg-surface-2 px-2 py-1 font-mono text-[10px]', pillText(a.color)].join(' ')}>
+                  → {a.output}
+                </span>
+              </div>
+            )
+
+            return (
+              <>
+                <div className="mb-12">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {firstRow.map((a) => Card(a))}
+                  </div>
+                  <div className="mx-auto mt-4 max-w-5xl">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {secondRow.map((a) => Card(a))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mx-auto mt-8 max-w-4xl">
+                  <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
+                    <div className="w-full rounded-xl border border-border/60 border-dashed bg-surface/40 p-4 text-center md:w-[28%]">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Your Portfolio CSV</p>
+                    </div>
+
+                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
+                    <div className="hidden text-muted-foreground/60 md:block" aria-hidden>
+                      →
+                    </div>
+                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
+
+                    <div className="w-full rounded-xl border border-border/60 bg-surface p-4 text-center md:w-[44%]">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">7 Agents</p>
+                      <div className="mt-3 grid grid-cols-4 gap-2">
+                        {['primary', 'accent', 'warning', 'risk', 'positive', 'primary', 'accent'].map((c, i) => (
+                          <span
+                            key={`${c}-${i}`}
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: `hsl(var(--${c}))` }}
+                            aria-hidden
+                          />
+                        ))}
+                      </div>
+                      <p className="mt-3 text-[11px] text-muted-foreground">in parallel</p>
+                    </div>
+
+                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
+                    <div className="hidden text-muted-foreground/60 md:block" aria-hidden>
+                      →
+                    </div>
+                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
+
+                    <div className="w-full rounded-xl border border-primary/40 bg-primary/5 p-4 text-center md:w-[28%]">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-primary">IC-Grade Briefing</p>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-center text-sm text-muted-foreground">⚡ Average analysis time: 60 seconds</p>
+                </div>
+
+                <div className="mt-12 text-center">
+                  <h3 className="text-2xl font-bold text-foreground">Ready to see your agents work?</h3>
+                  <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <Link
+                      href="/upload"
+                      className="rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-all hover:scale-105 hover:bg-primary/90"
+                    >
+                      Upload Portfolio — It&apos;s Free
+                    </Link>
+                  </div>
+                  <p className="mt-3 text-sm text-muted-foreground">No account required for your first analysis</p>
+                </div>
+              </>
+            )
+          })()}
+        </div>
       </section>
 
       {/* SECTION 2 — PROBLEM / SOLUTION */}
@@ -549,6 +735,8 @@ export default function HomeLandingPage({
           </div>
         </div>
       </section>
+
+      <LandingMarketChatPanel />
 
       {/* SECTION 6 — CTA FOOTER */}
       <section className="py-20">
