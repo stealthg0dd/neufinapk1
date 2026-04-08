@@ -271,6 +271,99 @@ export default function HomeLandingPage({
         </div>
       </section>
 
+      {/* Multi-Region Compliance */}
+      <section className="border-y border-border/40 bg-surface/20 py-16">
+        <div className="mx-auto max-w-6xl px-6">
+          <div className="mb-10 text-center">
+            <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-primary">REGULATORY FRAMEWORK</p>
+            <h2 className="text-2xl font-bold text-foreground">Compliance Across Every Market We Operate</h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+              Neufin is built for global institutional deployment with jurisdiction-specific compliance frameworks.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                flag: '🇸🇬',
+                region: 'Singapore',
+                regulatory: 'MAS (Monetary Authority of Singapore)',
+                items: ['Capital Markets Services regime awareness'],
+                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
+              },
+              {
+                flag: '🇲🇾',
+                region: 'Malaysia',
+                regulatory: 'Securities Commission Malaysia (SC)',
+                items: ['CMSA compliance framework'],
+                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
+              },
+              {
+                flag: '🇹🇭',
+                region: 'Thailand',
+                regulatory: 'SEC Thailand oversight',
+                items: ['Investment Advisory Act alignment'],
+                status: { label: 'Launching 2026', tone: 'bg-warning/10 text-warning border-warning/30' },
+              },
+              {
+                flag: '🇻🇳',
+                region: 'Vietnam',
+                regulatory: 'SSC (State Securities Commission)',
+                items: ['Securities Law 2019 framework'],
+                status: { label: 'Launching 2026', tone: 'bg-warning/10 text-warning border-warning/30' },
+              },
+              {
+                flag: '🇦🇪',
+                region: 'UAE',
+                regulatory: 'ADGM / DFSA regulatory framework',
+                items: ['FinTech permission alignment'],
+                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
+              },
+              {
+                flag: '🇪🇺',
+                region: 'European Union / Estonia HQ',
+                regulatory: 'GDPR compliance (full)',
+                items: ['MiFID II awareness', 'ESMA regulatory alignment', 'Neufin OÜ registered entity'],
+                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
+              },
+              {
+                flag: '🇺🇸',
+                region: 'United States',
+                regulatory: 'SEC Reg S-P, FINRA 4512 alignment',
+                items: ['SOC 2 Type II certified', 'CCPA compliant', 'Registered office: USA'],
+                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
+              },
+            ].map((c) => (
+              <div key={c.region} className="rounded-xl border border-border bg-surface p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl leading-none" aria-hidden>
+                      {c.flag}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{c.region}</p>
+                      <p className="mt-1 font-mono text-[11px] text-primary">{c.regulatory}</p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] ${c.status.tone}`}>
+                    {c.status.label}
+                  </span>
+                </div>
+
+                <ul className="mt-4 space-y-2">
+                  {c.items.map((it) => (
+                    <li key={it} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive" />
+                      <span>{it}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* SECTION 3 — MARKET INTELLIGENCE */}
       <section className="border-y border-border/40 bg-surface/30 py-20">
         <p className="mb-2 text-center font-mono text-[11px] uppercase tracking-widest text-primary">
@@ -504,11 +597,30 @@ export default function HomeLandingPage({
               Book a Demo
             </Link>
           </div>
-          <p className="mx-auto mt-8 max-w-xl text-center text-[11px] leading-relaxed text-muted-foreground/50">
-            NeuFin provides financial data and analysis tools for informational and educational purposes only. This is
-            not financial advice. Past performance does not indicate future results. NeuFin aligns with MAS guidelines on
-            fintech and data services.
-          </p>
+          <div className="mt-8 border-t border-border/40 pt-6">
+            <div className="grid grid-cols-1 gap-4 text-[11px] text-muted-foreground/60 md:grid-cols-2">
+              <div className="text-left">
+                <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">
+                  REGISTERED ENTITIES
+                </p>
+                <p>Neufin OÜ — Registered in Estonia (EU) · HQ</p>
+                <p>Neufin Inc. — Registered Office, United States</p>
+                <p>Singapore · Malaysia · UAE · Thailand · Vietnam (Coming 2026)</p>
+              </div>
+              <div className="text-left md:text-right">
+                <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">LEGAL</p>
+                <p>© 2025 Neufin OÜ. All rights reserved.</p>
+                <p>A unit of CTech Ventures</p>
+                <p>info@neufin.ai · www.neufin.ai</p>
+              </div>
+            </div>
+
+            <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground/40">
+              NeuFin provides financial data and analysis tools for informational and educational purposes only. This is
+              not financial advice. Past performance does not indicate future results. NeuFin aligns with MAS guidelines
+              on fintech and data services.
+            </p>
+          </div>
         </div>
       </section>
     </div>

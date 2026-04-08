@@ -47,8 +47,15 @@ export const metadata: Metadata = {
     template: '%s | NeuFin',
   },
   description:
-    'AI-powered portfolio analysis trusted by Singapore financial advisors. MAS-compliant, institutional-grade research in 60 seconds. Free DNA score — no account required.',
+    'NeuFin — AI-powered behavioral finance intelligence for investors and institutions across Singapore, Malaysia, UAE, and Europe. Portfolio DNA scoring, bias detection, and institutional-grade analysis.',
   keywords: [
+    'Singapore',
+    'Malaysia',
+    'UAE',
+    'Estonia',
+    'MAS',
+    'DFSA',
+    'GDPR',
     'behavioral finance Singapore',
     'investment bias detection',
     'portfolio analysis Singapore',
