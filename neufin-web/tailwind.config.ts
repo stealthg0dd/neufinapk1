@@ -19,6 +19,17 @@ const config: Config = {
           purple: '#8b5cf6',
           dark: '#030712',
         },
+        positive: 'hsl(var(--positive))',
+        risk: 'hsl(var(--risk))',
+        warning: 'hsl(var(--warning) / <alpha-value>)',
+        sidebar: 'hsl(var(--sidebar))',
+        copilot: 'hsl(var(--copilot))',
+        command: 'hsl(var(--command))',
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          2: 'hsl(var(--surface-2))',
+          3: 'hsl(var(--surface-3))',
+        },
       },
       animation: {
         'spin-slow': 'spin 2s linear',

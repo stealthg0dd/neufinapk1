@@ -8,12 +8,14 @@ import { AuthDebugPanel } from '@/components/AuthDebugPanel'
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 })
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
+  weight: ['400', '500', '600'],
   display: 'swap',
 })
 
@@ -144,7 +146,7 @@ const softwareApplicationSchema = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#0a0b0f',
+  themeColor: '#0B0F14',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -158,17 +160,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} dark`}
     >
       <head>
         {/* next/font serves locally; keep only app-critical origins */}
         <link rel="preconnect" href="https://gpczchjipalfgkfqamcu.supabase.co" />
         <link rel="dns-prefetch" href="https://neufin101-production.up.railway.app" />
       </head>
-      <body
-        className="min-h-screen antialiased font-sans bg-[var(--canvas)] text-[var(--text-primary)]"
-        suppressHydrationWarning
-      >
+      <body className="min-h-screen antialiased font-sans" suppressHydrationWarning>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}

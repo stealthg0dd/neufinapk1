@@ -3,30 +3,87 @@
 @tailwind utilities;
 
 :root {
-  --bg: #080b14;
-  --surface: #0f1420;
-  --surface-2: #161d2e;
-  --border: rgba(255, 255, 255, 0.07);
-  --amber: #f5a623;
-  --emerald: #00d97e;
-  --red: #ff4d6a;
-  --text: #f0f4ff;
-  --text-2: #8b95b0;
-  --canvas: #080b14;
-  --surface-1: #0f1420;
-  --surface-2: #161d2e;
-  --surface-3: #1e2640;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-accent: rgba(245, 162, 35, 0.3);
-  --text-primary: #f0f4ff;
-  --text-secondary: #8b95b0;
-  --text-muted: #4a5568;
-  --amber: #f5a623;
-  --emerald: #00d97e;
-  --red: #ff4d6a;
-  --blue: #4d9fff;
-  --glass-bg: rgba(15, 20, 32, 0.7);
+  /* ── NeuFin Institutional Dark System ── */
+
+  /* Canvas surfaces */
+  --background: 222 47% 7%; /* #0B0F14 deep graphite */
+  --surface: 222 40% 10%; /* #121821 lifted surface */
+  --surface-2: 222 35% 13%; /* #181f2e elevated */
+  --surface-3: 222 30% 17%; /* #1e2a3d highest elevation */
+
+  /* Borders */
+  --border: 222 30% 18%; /* low-contrast structural */
+  --border-accent: 191 70% 45%; /* cyan accent border */
+
+  /* Text */
+  --foreground: 214 32% 91%; /* #E2E8F0 primary */
+  --muted-foreground: 215 20% 65%; /* #94A3B8 secondary */
+  --subtle: 215 15% 45%; /* tertiary/hints */
+
+  /* Semantic finance colors */
+  --primary: 191 70% 45%; /* cyan #1EB8CC — actions, links */
+  --primary-foreground: 222 47% 7%;
+  --accent: 262 60% 55%; /* violet #7C3AED — AI, selected */
+  --accent-foreground: 214 32% 91%;
+
+  /* Finance semantic */
+  --positive: 145 65% 42%; /* muted green */
+  --positive-foreground: 145 65% 90%;
+  --warning: 38 90% 55%; /* amber */
+  --warning-foreground: 38 90% 15%;
+  --risk: 0 72% 50%; /* restrained red */
+  --risk-foreground: 0 72% 95%;
+
+  /* Special zones */
+  --sidebar: 222 50% 6%; /* darker nav rail #0D1117 */
+  --copilot: 262 25% 10%; /* violet-leaning AI panel */
+  --command: 222 45% 8%; /* command bar surface */
+
+  /* shadcn compatibility */
+  --card: 222 40% 10%;
+  --card-foreground: 214 32% 91%;
+  --popover: 222 35% 12%;
+  --popover-foreground: 214 32% 91%;
+  --secondary: 222 30% 17%;
+  --secondary-foreground: 214 32% 91%;
+  --muted: 222 30% 15%;
+  --destructive: 0 62% 45%;
+  --destructive-foreground: 214 32% 91%;
+  --input: 222 35% 15%;
+  --ring: 191 70% 45%;
+  --radius: 0.5rem;
+
+  /* next/font + tailwind.config font stacks */
+  --font-geist: var(--font-sans);
+  --font-jetbrains: var(--font-mono);
+
+  /* Legacy flat tokens (Tailwind arbitrary [var(...)] + inline styles) */
+  --glass-bg: rgba(18, 24, 36, 0.75);
   --glass-border: rgba(255, 255, 255, 0.08);
+  --text-primary: hsl(214 32% 91%);
+  --text-secondary: hsl(215 20% 65%);
+  --text-muted: hsl(215 15% 45%);
+  --text: hsl(214 32% 91%);
+  --canvas: hsl(222 47% 7%);
+  --amber: hsl(191 70% 45%);
+  --blue: hsl(191 70% 45%);
+  --text-2: hsl(215 20% 65%);
+  --bg: hsl(222 47% 7%);
+  --red: hsl(0 72% 50%);
+}
+
+/* Force dark mode — no light mode for MVP */
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans), 'Inter', system-ui, sans-serif;
+  font-feature-settings: 'ss01', 'ss02', 'cv01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @layer base {
@@ -36,56 +93,109 @@
   html {
     scroll-behavior: smooth;
   }
-  body {
-    background-color: var(--canvas);
-    color: var(--text-primary);
+}
+
+/* Finance number utility */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mono for financial data */
+.font-finance {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+}
+
+/* Institutional card */
+.card-institutional {
+  background: hsl(var(--surface));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+}
+
+/* Semantic color utilities */
+.text-positive {
+  color: hsl(var(--positive));
+}
+.text-risk {
+  color: hsl(var(--risk));
+}
+.text-warning {
+  color: hsl(var(--warning));
+}
+.text-primary-accent {
+  color: hsl(var(--primary));
+}
+.text-ai-accent {
+  color: hsl(var(--accent));
+}
+
+.bg-positive\/10 {
+  background: hsl(var(--positive) / 0.1);
+}
+.bg-risk\/10 {
+  background: hsl(var(--risk) / 0.1);
+}
+.bg-warning\/10 {
+  background: hsl(var(--warning) / 0.1);
+}
+.bg-primary\/10 {
+  background: hsl(var(--primary) / 0.1);
+}
+.bg-accent\/10 {
+  background: hsl(var(--accent) / 0.1);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Grid animation for landing */
+@keyframes grid-move {
+  to {
+    background-position: 60px 60px;
   }
 }
 
-@layer utilities {
-  .text-gradient {
-    @apply bg-gradient-to-r from-[var(--amber)] to-[var(--blue)] bg-clip-text text-transparent;
+/* Score ring animation */
+@keyframes score-ring {
+  from {
+    stroke-dashoffset: 339;
   }
-  .neufin-grid-bg {
-    background-image:
-      linear-gradient(rgba(245, 166, 35, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(245, 166, 35, 0.03) 1px, transparent 1px);
-    background-size: 48px 48px;
-    animation: neufin-grid-drift 80s linear infinite;
+  to {
+    stroke-dashoffset: var(--target-offset, 75);
   }
-  .shimmer {
-    @apply relative overflow-hidden rounded-lg bg-[var(--surface-2)];
+}
+
+/* Pulse for live indicators */
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
   }
-  .shimmer::after {
-    content: '';
-    @apply absolute inset-0;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.06) 50%,
-      transparent 100%
-    );
-    animation: shimmer-sweep 1.6s infinite;
+  50% {
+    opacity: 0.3;
   }
-  .focus-amber:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--border-accent), 0 0 20px -4px rgba(245, 162, 35, 0.4);
+}
+
+/* Confidence bar fill */
+@keyframes bar-fill {
+  from {
+    width: 0%;
   }
-  /* Legacy utility classes used across older routes */
-  .card {
-    @apply rounded-xl border border-[var(--border)] bg-[var(--surface-1)] p-5;
-  }
-  .btn-primary {
-    @apply bg-[var(--amber)] hover:opacity-95 text-[var(--canvas)] font-semibold px-6 py-3 rounded-lg transition-opacity;
-  }
-  .btn-outline {
-    @apply border border-[var(--glass-border)] hover:border-[var(--border-accent)] text-[var(--text-primary)] font-semibold px-6 py-3 rounded-lg transition-colors;
-  }
-  .badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
-  }
-  .input {
-    @apply w-full rounded-lg bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-amber;
+  to {
+    width: var(--target-width, 100%);
   }
 }
 
@@ -126,17 +236,139 @@
   }
 }
 
-@keyframes grid-move {
-  to {
-    background-position: 60px 60px;
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))] bg-clip-text text-transparent;
   }
-}
+  .neufin-grid-bg {
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    animation: neufin-grid-drift 80s linear infinite;
+  }
+  .shimmer {
+    @apply relative overflow-hidden rounded-lg bg-[hsl(var(--surface-2))];
+  }
+  .shimmer::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      transparent 100%
+    );
+    animation: shimmer-sweep 1.6s infinite;
+  }
+  .focus-amber:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px hsl(var(--border-accent)),
+      0 0 20px -4px hsl(var(--primary) / 0.4);
+  }
+  .card {
+    @apply rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface))] p-5;
+  }
+  .btn-primary {
+    @apply bg-[hsl(var(--primary))] hover:opacity-95 text-[hsl(var(--primary-foreground))] font-semibold px-6 py-3 rounded-lg transition-opacity;
+  }
+  .btn-outline {
+    @apply border border-[var(--glass-border)] hover:border-[hsl(var(--border-accent))] text-[var(--text-primary)] font-semibold px-6 py-3 rounded-lg transition-colors;
+  }
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  }
+  .input {
+    @apply w-full rounded-lg bg-surface-2 border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-amber;
+  }
 
-@keyframes score-ring {
-  from {
-    stroke-dashoffset: 339;
+  /* Channel tokens used in Tailwind arbitrary [var(...)] without hsl() — resolve here */
+  .border-\[var\(--border\)\] {
+    border-color: hsl(var(--border)) !important;
   }
-  to {
-    stroke-dashoffset: 74.58;
+  .border-\[var\(--border-accent\)\] {
+    border-color: hsl(var(--border-accent)) !important;
+  }
+  .hover\:border-\[var\(--border-accent\)\]:hover {
+    border-color: hsl(var(--border-accent)) !important;
+  }
+  .bg-\[var\(--canvas\)\] {
+    background-color: hsl(var(--background)) !important;
+  }
+  .bg-\[var\(--canvas\)\]\/90 {
+    background-color: hsl(var(--background) / 0.9) !important;
+  }
+  .bg-\[var\(--surface\)\] {
+    background-color: hsl(var(--surface)) !important;
+  }
+  .bg-\[var\(--surface-1\)\]\/50 {
+    background-color: hsl(var(--surface) / 0.5) !important;
+  }
+  .bg-\[var\(--surface-1\)\]\/40 {
+    background-color: hsl(var(--surface) / 0.4) !important;
+  }
+  .bg-\[var\(--surface-1\)\]\/95 {
+    background-color: hsl(var(--surface) / 0.95) !important;
+  }
+  .bg-\[var\(--surface-2\)\] {
+    background-color: hsl(var(--surface-2)) !important;
+  }
+  .bg-\[var\(--surface-2\)\]\/80 {
+    background-color: hsl(var(--surface-2) / 0.8) !important;
+  }
+  .bg-\[var\(--surface-2\)\]\/60 {
+    background-color: hsl(var(--surface-2) / 0.6) !important;
+  }
+  .bg-\[var\(--surface-3\)\] {
+    background-color: hsl(var(--surface-3)) !important;
+  }
+  .bg-\[var\(--surface-3\)\]\/50 {
+    background-color: hsl(var(--surface-3) / 0.5) !important;
+  }
+  .bg-\[var\(--border\)\] {
+    background-color: hsl(var(--border)) !important;
+  }
+  .text-\[var\(--text-primary\)\] {
+    color: hsl(var(--foreground)) !important;
+  }
+  .text-\[var\(--text-secondary\)\] {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+  .text-\[var\(--text-muted\)\] {
+    color: hsl(var(--subtle)) !important;
+  }
+  .text-\[var\(--text\)\] {
+    color: hsl(var(--foreground)) !important;
+  }
+  .text-\[var\(--text-2\)\] {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+  .text-\[var\(--blue\)\] {
+    color: hsl(var(--primary)) !important;
+  }
+  .placeholder\:text-\[var\(--text-muted\)\]::placeholder {
+    color: hsl(var(--subtle)) !important;
+  }
+  .hover\:text-\[var\(--text-primary\)\]:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+  .hover\:text-\[var\(--text\)\]:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+  .hover\:text-\[var\(--text-secondary\)\]:hover {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+  .border-t-\[var\(--amber\)\] {
+    border-top-color: hsl(var(--primary)) !important;
+  }
+  .border-t-\[var\(--canvas\)\] {
+    border-top-color: hsl(var(--background)) !important;
+  }
+  .border-\[var\(--canvas\)\]\/30 {
+    border-color: hsl(var(--background) / 0.3) !important;
+  }
+  .border-\[var\(--amber\)\]\/30 {
+    border-color: hsl(var(--primary) / 0.3) !important;
   }
 }
