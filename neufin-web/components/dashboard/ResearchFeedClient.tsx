@@ -1,47 +1,74 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import Link from 'next/link'
+import { Loader2 } from 'lucide-react'
 
-type Note = {
+export type ResearchFeedNote = {
   id: string
   title: string
   executive_summary: string
   confidence_score?: number
   generated_at: string
+  note_type?: string
 }
 
-export default function ResearchFeedClient({ notes }: { notes: Note[] }) {
+function stripeClass(noteType?: string) {
+  const u = (noteType ?? '').toUpperCase()
+  if (u.includes('MACRO')) return 'bg-warning'
+  if (u.includes('SECTOR')) return 'bg-[hsl(var(--primary))]'
+  if (u.includes('REGIME')) return 'bg-risk'
+  return 'bg-[hsl(var(--accent))]'
+}
+
+export default function ResearchFeedClient({ notes }: { notes: ResearchFeedNote[] }) {
   if (!notes.length) {
     return (
-      <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
-        <p className="text-[var(--text-2)] text-sm">Research layer is analyzing markets. Check back soon.</p>
+      <div className="flex flex-col items-center justify-center rounded-lg border border-[hsl(var(--border))] bg-surface py-12">
+        <Loader2 className="mb-3 h-6 w-6 animate-spin text-[hsl(var(--muted-foreground))]" />
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">Research layer analyzing markets...</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-3">
-      {notes.map((note, index) => (
-        <motion.div
-          key={note.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: index * 0.1 }}
-          className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-4 border-l-4 border-l-[var(--amber)]"
-        >
-          <p className="font-semibold text-[var(--text)]">{note.title}</p>
-          <p className="text-sm text-[var(--text-2)] line-clamp-2 mt-1">{note.executive_summary}</p>
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-[10px] px-2 py-1 rounded-full bg-white/10 text-[var(--text-2)] font-mono">
-              Confidence {Math.round((note.confidence_score ?? 0) * 100)}%
-            </span>
-            <span className="text-[10px] text-[var(--text-2)] font-mono">
-              {new Date(note.generated_at).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}
-            </span>
+      {notes.map((note) => {
+        const stripe = stripeClass(note.note_type)
+        const conf = Math.round((note.confidence_score ?? 0) * 100)
+        return (
+          <div
+            key={note.id}
+            className="relative overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-surface p-4 pl-5 transition-colors hover:border-[hsl(var(--primary)/0.2)]"
+          >
+            <div
+              className={`absolute bottom-3 left-0 top-3 w-0.5 rounded-full ${stripe}`}
+              aria-hidden
+            />
+            <div className="flex items-start justify-between gap-2">
+              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+                {(note.note_type ?? 'note').replace(/_/g, ' ')}
+              </span>
+              <span className="shrink-0 text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
+                {conf}% conf
+              </span>
+            </div>
+            <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-[hsl(var(--foreground))]">
+              {note.title}
+            </h3>
+            <p className="line-clamp-2 text-[12px] leading-relaxed text-[hsl(var(--muted-foreground))]">
+              {note.executive_summary}
+            </p>
+            <div className="mt-2.5 flex items-center justify-between">
+              <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground)/0.6)]">
+                {new Date(note.generated_at).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}
+              </span>
+              <Link href={`/research/${note.id}`} className="cursor-pointer text-[11px] text-[hsl(var(--primary))]">
+                Read →
+              </Link>
+            </div>
           </div>
-        </motion.div>
-      ))}
+        )
+      })}
     </div>
   )
 }
-
