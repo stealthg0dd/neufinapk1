@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import {
@@ -105,12 +106,10 @@ export default function DashboardSidebar({ user }: { user: User }) {
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-[hsl(var(--border)/0.5)] bg-sidebar">
       <div className="flex h-12 items-center border-b border-[hsl(var(--border)/0.3)] px-4">
-        <div className="flex w-7 h-7 shrink-0 items-center justify-center rounded bg-[hsl(var(--primary)/0.2)] font-mono text-sm font-bold text-[hsl(var(--primary))]">
-          N
+        <div className="flex items-center gap-2">
+          <Image src="/logo-icon.png" alt="NeuFin" width={28} height={28} className="rounded-sm" />
+          <Image src="/logo.png" alt="NeuFin" width={80} height={24} className="h-6 w-auto" />
         </div>
-        <span className="ml-3 font-mono text-sm font-bold tracking-widest text-[hsl(var(--primary))]">
-          NEUFIN
-        </span>
       </div>
 
       <div className="border-b border-[hsl(var(--border)/0.3)] px-3 py-2">

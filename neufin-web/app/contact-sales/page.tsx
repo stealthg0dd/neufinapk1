@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -212,7 +213,10 @@ export default function ContactSalesPage() {
       </main>
 
       <footer className="border-t border-gray-800/60 py-6 text-center text-sm text-gray-600">
-        Neufin © {new Date().getFullYear()} · Singapore · MAS-compliant
+        <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
+          <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="mb-3 h-6 w-auto opacity-80" />
+          <span>NeuFin © {new Date().getFullYear()} · Singapore · MAS-compliant</span>
+        </div>
       </footer>
     </div>
   )

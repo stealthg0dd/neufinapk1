@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 
@@ -19,10 +20,7 @@ export default function LandingNav() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex h-14 items-center justify-between gap-3">
           <Link href="/" className="flex min-w-0 shrink items-center gap-3" onClick={() => setOpen(false)}>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/20 font-mono text-sm font-bold text-primary">
-              N
-            </div>
-            <span className="font-mono text-sm font-bold tracking-widest text-primary">NEUFIN</span>
+            <Image src="/logo.png" alt="NeuFin" width={100} height={30} className="h-7 w-auto" />
           </Link>
 
           <div className="hidden flex-1 items-center justify-center gap-8 md:flex">

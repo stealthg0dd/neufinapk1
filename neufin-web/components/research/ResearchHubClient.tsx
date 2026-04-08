@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Lock, Search } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -250,7 +251,7 @@ export default function ResearchHubClient({
 
       <footer className="border-t border-[var(--border)] py-8 px-4 mt-12">
         <div className="max-w-5xl mx-auto flex flex-wrap justify-between gap-4 text-xs text-[var(--text-muted)]">
-          <span className="font-display text-[var(--amber)]">NeuFin</span>
+          <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="h-6 w-auto opacity-80" />
           <div className="flex gap-4">
             <Link href="/pricing" className="hover:text-[var(--text-primary)]">
               Pricing

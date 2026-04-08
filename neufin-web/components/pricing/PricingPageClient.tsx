@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
@@ -256,7 +257,10 @@ export default function PricingPageClient() {
       </section>
 
       <footer className="border-t border-[var(--border)] py-6 text-center text-xs text-[var(--text-muted)]">
-        NeuFin © {new Date().getFullYear()}
+        <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
+          <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="mb-3 h-6 w-auto opacity-80" />
+          <span>NeuFin © {new Date().getFullYear()}</span>
+        </div>
       </footer>
     </div>
   )

@@ -41,6 +41,7 @@ const APP_URL = resolveAppUrl()
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
+  icons: { icon: '/logo-icon.png', apple: '/logo-icon.png' },
   title: {
     default: 'NeuFin — Behavioral Finance Intelligence for Southeast Asia',
     template: '%s | NeuFin',
