@@ -168,6 +168,12 @@ body {
   }
 }
 
+@keyframes grid-move-50 {
+  to {
+    background-position: 50px 50px;
+  }
+}
+
 /* Score ring animation */
 @keyframes score-ring {
   from {

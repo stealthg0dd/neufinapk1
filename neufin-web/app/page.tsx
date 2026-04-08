@@ -1,9 +1,10 @@
-import LandingPageClient from '@/components/landing/LandingPageClient'
+import HomeLandingPage from '@/components/landing/HomeLandingPage'
+import { getResearchNotes, getResearchRegime } from '@/lib/api'
 
 export const revalidate = 3600
 
 export default async function HomePage() {
-  // Do not block TTFB on upstream intelligence fetches.
-  // Landing hydrates immediately, then loads regime/notes client-side.
-  return <LandingPageClient regime={null} researchTeaser={[]} />
+  const [regime, researchTeaser] = await Promise.all([getResearchRegime(), getResearchNotes(null, 1, 2)])
+
+  return <HomeLandingPage regime={regime} researchTeaser={researchTeaser} />
 }
