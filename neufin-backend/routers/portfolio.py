@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from config import ALPHA_VANTAGE_API_KEY, FINNHUB_API_KEY
 from database import decrypt_value, encrypt_value, supabase
 from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_subscribed_user
 from services.calculator import (
     _fetch_prices,
     calculate_portfolio_metrics,
@@ -187,8 +187,27 @@ async def create_portfolio(body: PortfolioCreate):
 
 
 @router.get("/{portfolio_id}/metrics")
-async def get_portfolio_metrics(portfolio_id: str):
-    """Recalculate live metrics for an existing portfolio."""
+async def get_portfolio_metrics(portfolio_id: str, user: JWTUser = Depends(get_current_user)):
+    """
+    Soft paywall: basic metrics remain accessible after trial expiry.
+    Always enforce portfolio ownership.
+    """
+    try:
+        port = (
+            supabase.table("portfolios")
+            .select("id,user_id")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+        row = port.data or {}
+        if not row or row.get("user_id") != user.id:
+            raise HTTPException(status_code=404, detail="Portfolio or positions not found.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
     try:
         positions_result = (
             supabase.table("portfolio_positions")
@@ -227,8 +246,11 @@ async def get_portfolio_metrics(portfolio_id: str):
 
 
 @router.post("/signals")
-async def generate_trading_signals(body: SignalRequest):
-    """Generate AI trading signals for a list of symbols."""
+async def generate_trading_signals(
+    body: SignalRequest,
+    user: JWTUser = Depends(get_subscribed_user),
+):
+    """Hard paywall: AI trading signals require active Advisor/Enterprise (trial counts as advisor)."""
     price_summary = {}
     for symbol in body.symbols[:10]:  # cap at 10
         try:
@@ -278,7 +300,7 @@ For each symbol return a signal. Return ONLY valid JSON:
                 supabase.table("trading_signals")
                 .insert(
                     {
-                        "user_id": body.user_id,
+                        "user_id": user.id,
                         "symbol": signal["symbol"],
                         "signal_type": signal["signal_type"],
                         "confidence": signal["confidence"],
@@ -295,9 +317,20 @@ For each symbol return a signal. Return ONLY valid JSON:
 
 
 @router.get("/{portfolio_id}/sentiment")
-async def get_portfolio_sentiment(portfolio_id: str):
-    """Return cached sentiment data for all symbols in a portfolio."""
+async def get_portfolio_sentiment(portfolio_id: str, user: JWTUser = Depends(get_current_user)):
+    """Soft paywall: cached sentiment is viewable, but enforce ownership."""
     try:
+        port = (
+            supabase.table("portfolios")
+            .select("id,user_id")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+        row = port.data or {}
+        if not row or row.get("user_id") != user.id:
+            raise HTTPException(status_code=404, detail="Portfolio not found.")
+
         positions_result = (
             supabase.table("portfolio_positions")
             .select("symbol")
@@ -397,8 +430,10 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
 
 
 @router.get("/user/{user_id}")
-async def get_user_portfolios(user_id: str):
-    """List all portfolios for a user."""
+async def get_user_portfolios(user_id: str, user: JWTUser = Depends(get_current_user)):
+    """Soft paywall: list portfolios, but only for the authenticated user (prevents data leaks)."""
+    if user_id != user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to these portfolios.")
     try:
         result = (
             supabase.table("portfolios")
@@ -443,7 +478,7 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
 
 
 @router.post("/risk-report")
-async def get_risk_report(body: RiskReportRequest):
+async def get_risk_report(body: RiskReportRequest, user: JWTUser = Depends(get_subscribed_user)):
     """
     Institutional risk report for a list of symbols.
 
@@ -479,7 +514,12 @@ async def get_risk_report(body: RiskReportRequest):
 
 
 @router.get("/value-history")
-async def get_portfolio_value_history(symbols: str, shares: str, period: str = "1mo"):
+async def get_portfolio_value_history(
+    symbols: str,
+    shares: str,
+    period: str = "1mo",
+    user: JWTUser = Depends(get_subscribed_user),
+):
     """
     Compute portfolio value over time for a line chart.
     symbols: comma-separated e.g. AAPL,MSFT
