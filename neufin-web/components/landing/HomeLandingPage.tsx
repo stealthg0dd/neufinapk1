@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { Brain, Check, Dna, MessageSquareQuote, Shield, X, Zap } from 'lucide-react'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
 import { GlassCard } from '@/components/ui/GlassCard'
-import LandingChatMount from '@/components/landing/LandingChatMount'
+import LandingNav from '@/components/landing/LandingNav'
+import LandingMarketChatPanel from '@/components/landing/LandingMarketChatPanel'
 
 const REGIME_LABELS: Record<string, string> = {
   risk_on: 'Risk-On',
@@ -53,56 +54,7 @@ export default function HomeLandingPage({
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-primary/20 font-mono text-sm font-bold text-primary">
-              N
-            </div>
-            <span className="font-mono text-sm font-bold tracking-widest text-primary">NEUFIN</span>
-          </Link>
-          <div className="hidden items-center gap-8 md:flex">
-            <Link
-              href="/features"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Features
-            </Link>
-            <Link
-              href="/research"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Research
-            </Link>
-            <Link
-              href="/pricing"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Pricing
-            </Link>
-            <Link
-              href="#api-platform"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              API
-            </Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/login"
-              className="rounded-lg px-4 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/upload"
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90"
-            >
-              Start Free
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <LandingNav />
 
       {/* SECTION 1 — HERO */}
       <section className="relative min-h-screen overflow-hidden bg-background">
@@ -115,7 +67,7 @@ export default function HomeLandingPage({
             animation: 'grid-move-50 25s linear infinite',
           }}
         />
-        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 px-6 pb-20 pt-24 lg:grid-cols-2">
+        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 px-6 pb-20 pt-28 sm:pt-32 md:pt-24 lg:grid-cols-2">
           <div>
             <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
               <span
@@ -507,6 +459,8 @@ export default function HomeLandingPage({
         </div>
       </section>
 
+      <LandingMarketChatPanel />
+
       {/* SECTION 6 — CTA FOOTER */}
       <section className="py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
@@ -534,8 +488,6 @@ export default function HomeLandingPage({
           </p>
         </div>
       </section>
-
-      <LandingChatMount />
     </div>
   )
 }
