@@ -25,9 +25,9 @@ except ImportError:
 import os  # noqa: E402
 
 import sentry_sdk  # noqa: E402
+import stripe  # noqa: E402
 from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
 from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
-import stripe  # noqa: E402
 
 _SENTRY_ENV: str = os.getenv("ENVIRONMENT", "production")
 _SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
@@ -43,11 +43,7 @@ def _scrub(obj: object) -> object:
         }
     return [_scrub(i) for i in obj] if isinstance(obj, list) else obj
 
-
-from typing import Optional
-
-
-def _before_send(event: dict, _hint: dict) -> Optional[dict]:
+def _before_send(event: dict, _hint: dict) -> dict | None:
     """Strip sensitive fields from every Sentry event before transmission."""
     for section in ("request", "extra", "contexts"):
         if section in event:
@@ -770,8 +766,8 @@ async def analyze_dna(
     if user_id:
         try:
             from routers.vault import PLAN_DNA_LIMITS
-            from services.usage_tracker import check_dna_limit
             from services.auth_dependency import get_subscription_status as _sub_status
+            from services.usage_tracker import check_dna_limit
 
             sub = _sub_status(user_id)
             status_val = sub.get("status")

@@ -2,7 +2,6 @@ import datetime
 import json
 import time
 from datetime import timedelta
-from typing import Optional, Tuple
 from urllib.parse import unquote
 
 from fastapi import Depends, HTTPException, Request, status
@@ -38,7 +37,7 @@ def fetch_user_profile(user_id: str) -> dict:
         return {}
 
 
-def _parse_iso_dt(val: str) -> Optional[datetime.datetime]:
+def _parse_iso_dt(val: str) -> datetime.datetime | None:
     try:
         dt = datetime.datetime.fromisoformat(val.replace("Z", "+00:00"))
     except Exception:
@@ -48,7 +47,7 @@ def _parse_iso_dt(val: str) -> Optional[datetime.datetime]:
     return dt
 
 
-def _trial_active_from_profile(profile: dict) -> Tuple[bool, int]:
+def _trial_active_from_profile(profile: dict) -> tuple[bool, int]:
     """
     Returns (is_active, days_remaining). Trial is active if now < started + 14 days.
     days_remaining is clamped to [0..14].
@@ -127,7 +126,7 @@ def get_subscription_status(user_id: str) -> dict:
     return result
 
 
-def require_active_subscription(user: Optional[JWTUser] = None) -> JWTUser:
+def require_active_subscription(user: JWTUser | None = None) -> JWTUser:
     if user is None:
         raise HTTPException(status_code=401, detail="Missing user")
     sub = get_subscription_status(user.id)
@@ -143,7 +142,7 @@ def require_active_subscription(user: Optional[JWTUser] = None) -> JWTUser:
 
 
 # ── Auth dependencies ───────────────────────────────────────────────────────────
-def _extract_cookie_token(raw: Optional[str]) -> Optional[str]:
+def _extract_cookie_token(raw: str | None) -> str | None:
     """Extract a usable JWT from common Supabase cookie formats."""
     if not raw:
         return None
@@ -178,7 +177,7 @@ def _extract_cookie_token(raw: Optional[str]) -> Optional[str]:
     return token or None
 
 
-def _extract_request_token(request: Request, strict_header: bool) -> Optional[str]:
+def _extract_request_token(request: Request, strict_header: bool) -> str | None:
     auth_header = request.headers.get("Authorization")
     if auth_header:
         if auth_header.startswith("Bearer "):
@@ -215,7 +214,7 @@ async def get_current_user(request: Request) -> JWTUser:
         ) from err
 
 
-async def get_optional_user(request: Request) -> Optional[JWTUser]:
+async def get_optional_user(request: Request) -> JWTUser | None:
     token = _extract_request_token(request, strict_header=False)
     if not token:
         return None

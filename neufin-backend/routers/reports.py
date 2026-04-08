@@ -1,8 +1,8 @@
 import datetime
 import uuid
 
-import structlog
 import stripe
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -10,7 +10,11 @@ from pydantic import BaseModel
 from config import APP_BASE_URL, STRIPE_PRICE_ADVISOR_REPORT_ONETIME, STRIPE_SECRET_KEY
 from database import supabase
 from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user, get_subscription_status, require_active_subscription
+from services.auth_dependency import (
+    get_current_user,
+    get_subscription_status,
+    require_active_subscription,
+)
 from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
 from services.pdf_generator import generate_advisor_report

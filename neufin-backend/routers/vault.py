@@ -26,7 +26,8 @@ from config import (
     STRIPE_SECRET_KEY,
 )
 from database import claim_guest_data, supabase
-from services.auth_dependency import get_current_user, get_subscription_status as get_sub_status
+from services.auth_dependency import get_current_user
+from services.auth_dependency import get_subscription_status as get_sub_status
 from services.jwt_auth import JWTUser
 
 # ── Subscription plan definitions ─────────────────────────────────────────────
