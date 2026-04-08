@@ -122,8 +122,9 @@ ${data.other ? `<div class="card"><h2>Other notes</h2><div class="open-answer">$
 </body>
 </html>`
 
+    const fromEmail = process.env.FEEDBACK_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
     const emailResult = await resend.emails.send({
-      from: 'NeuFin Feedback <onboarding@resend.dev>',
+      from: `NeuFin Feedback <${fromEmail}>`,
       to: ['info@neufin.ai'],
       replyTo: String(data.email || 'info@neufin.ai'),
       subject: `[Beta Feedback] ${String(data.name)} · NPS ${String(data.nps ?? '?')} · ${String(data.pay_intent || 'Undecided')}`,
@@ -131,8 +132,18 @@ ${data.other ? `<div class="card"><h2>Other notes</h2><div class="open-answer">$
     })
 
     if (emailResult.error) {
-      console.error('[feedback] Resend error:', emailResult.error)
-      return NextResponse.json({ error: 'Failed to send feedback email' }, { status: 500 })
+      console.error('[feedback] Resend error:', {
+        error: emailResult.error,
+        fromEmail,
+        to: 'info@neufin.ai',
+      })
+      return NextResponse.json(
+        {
+          error: 'Failed to send feedback email',
+          detail: 'Email delivery failed. Verify RESEND_API_KEY and FEEDBACK_FROM_EMAIL domain settings.',
+        },
+        { status: 500 },
+      )
     }
 
     try {
