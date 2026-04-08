@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import { apiFetch } from '@/lib/api-client'
 import { GlassCard } from '@/components/ui/GlassCard'
 import toast from 'react-hot-toast'
 
@@ -73,12 +74,8 @@ export default function PricingPageClient() {
         return
       }
       const origin = window.location.origin
-      const res = await fetch('/api/payments/checkout', {
+      const res = await apiFetch('/api/payments/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           plan: 'unlimited',
           success_url: `${origin}/pricing/success`,

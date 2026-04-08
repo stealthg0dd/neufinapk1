@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { apiFetch } from "@/lib/api-client"
 import type { UserAdminRow } from "@/app/api/admin/users/route"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,12 +67,10 @@ function StatCard({ label, value, sub }: { label: string; value: number | string
 
 function ExtendTrialModal({
   user,
-  token,
   onClose,
   onSuccess,
 }: {
   user: UserAdminRow
-  token: string
   onClose: () => void
   onSuccess: (msg: string) => void
 }) {
@@ -83,9 +82,8 @@ function ExtendTrialModal({
     setLoading(true)
     setErr(null)
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/extend-trial`, {
+      const res = await apiFetch(`/api/admin/users/${user.id}/extend-trial`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ days }),
       })
       const json = await res.json()
@@ -150,22 +148,15 @@ export default function AdminPage() {
   const [toast, setToast]       = useState<string | null>(null)
   const [extending, setExtending] = useState<UserAdminRow | null>(null)
   const [resending, setResending] = useState<string | null>(null)
-  const [token, setToken]       = useState<string | null>(null)
-
-  // Resolve token once
-  useEffect(() => {
-    getAccessToken().then(setToken)
-  }, [getAccessToken])
 
   const load = useCallback(async (plan: PlanFilter) => {
     const t = await getAccessToken()
-    setToken(t)
     if (!t) { setError("Not authenticated"); setLoading(false); return }
     setLoading(true)
     setError(null)
     try {
       const url = plan === "all" ? "/api/admin/users" : `/api/admin/users?plan=${plan}`
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${t}` } })
+      const res = await apiFetch(url, { cache: "no-store" })
       if (res.status === 403) { setError("Advisor role required to access admin panel."); return }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setRows(await res.json())
@@ -184,13 +175,10 @@ export default function AdminPage() {
   }
 
   async function resendOnboarding(row: UserAdminRow) {
-    const t = token
-    if (!t) return
     setResending(row.id)
     try {
-      const res = await fetch(`/api/admin/users/${row.id}/resend-onboarding`, {
+      const res = await apiFetch(`/api/admin/users/${row.id}/resend-onboarding`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${t}` },
       })
       const json = await res.json()
       showToast(json.ok ? `Onboarding email sent to ${row.email || row.id}` : "Failed to send email")
@@ -357,10 +345,9 @@ export default function AdminPage() {
       </div>
 
       {/* Extend trial modal */}
-      {extending && token && (
+      {extending && (
         <ExtendTrialModal
           user={extending}
-          token={token}
           onClose={() => setExtending(null)}
           onSuccess={showToast}
         />

@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic"
 
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { apiFetch } from "@/lib/api-client"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -221,10 +222,9 @@ export default function LeadsAdminPage() {
     try {
       const token = await getAccessToken()
       if (!token) { setError("Not authenticated"); return }
-      const hdr = { Authorization: `Bearer ${token}` }
       const [leadsRes, statsRes] = await Promise.all([
-        fetch("/api/admin/leads?per_page=200", { headers: hdr, cache: "no-store" }),
-        fetch("/api/admin/leads/stats", { headers: hdr, cache: "no-store" }),
+        apiFetch("/api/admin/leads?per_page=200", { cache: "no-store" }),
+        apiFetch("/api/admin/leads/stats", { cache: "no-store" }),
       ])
       if (leadsRes.status === 403) { setError("Admin access required."); return }
       if (!leadsRes.ok) throw new Error(`HTTP ${leadsRes.status}`)
@@ -241,18 +241,15 @@ export default function LeadsAdminPage() {
   useEffect(() => { load() }, [load])
 
   const handleStatusChange = useCallback(async (id: string, status: string, notes?: string) => {
-    const token = await getAccessToken()
-    if (!token) return
-    const res = await fetch(`/api/admin/leads/${id}`, {
+    const res = await apiFetch(`/api/admin/leads/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status, notes }),
     })
     if (!res.ok) throw new Error("Could not update lead")
     const updated = await res.json()
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)))
     setSelected((prev) => (prev?.id === id ? { ...prev, ...updated } : prev))
-  }, [getAccessToken])
+  }, [])
 
   const byStatus = (status: string) => leads.filter((l) => l.status === status)
 

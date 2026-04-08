@@ -26,6 +26,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import { apiPost } from '@/lib/api-client'
 import { authFetch, getPortfolioHistory, getResearchNotes, type ResearchNote } from '@/lib/api'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { TickerNumber } from '@/components/ui/TickerNumber'
@@ -249,22 +250,17 @@ export default function DashboardClient() {
     setAiBusy(true)
     setAiReply(null)
     try {
-      const res = await fetch('/api/swarm/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-        body: JSON.stringify({
-          message: aiQ.slice(0, 500),
-          total_value: metrics.total_value,
-          positions: metrics.positions.map((p) => ({
-            symbol: p.symbol,
-            shares: p.shares,
-            price: p.current_price,
-            value: p.current_value,
-            weight: p.weight,
-          })),
-        }),
+      const data = await apiPost<{ reply?: string }>('/api/swarm/chat', {
+        message: aiQ.slice(0, 500),
+        total_value: metrics.total_value,
+        positions: metrics.positions.map((p) => ({
+          symbol: p.symbol,
+          shares: p.shares,
+          price: p.current_price,
+          value: p.current_value,
+          weight: p.weight,
+        })),
       })
-      const data = await res.json().catch(() => ({}))
       setAiReply(typeof data.reply === 'string' ? data.reply : 'No response')
     } catch {
       setAiReply('Request failed. Try again.')

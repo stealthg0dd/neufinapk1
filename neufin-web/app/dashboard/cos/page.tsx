@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { apiFetch, apiPost } from "@/lib/api-client"
 import VentureCard from "@/components/VentureCard"
 import AgentActivityFeed from "@/components/AgentActivityFeed"
 import ProviderHealthStrip from "@/components/ProviderHealthStrip"
@@ -333,8 +334,8 @@ export default function ChiefOfStaffDashboard() {
   const fetchMain = useCallback(async () => {
     try {
       const [dashRes, tasksRes] = await Promise.all([
-        fetch("/api/dashboard", { cache: "no-store" }),
-        fetch("/api/tasks",     { cache: "no-store" }),
+        apiFetch("/api/dashboard", { cache: "no-store" }),
+        apiFetch("/api/tasks", { cache: "no-store" }),
       ])
 
       if (dashRes.ok) {
@@ -367,7 +368,7 @@ export default function ChiefOfStaffDashboard() {
     const repoVentures = VENTURE_ORDER.filter((v) => getVentureMeta(v).hasRepo)
     const results = await Promise.allSettled(
       repoVentures.map(async (v) => {
-        const res = await fetch(`/api/github/${v}`, { cache: "no-store" })
+        const res = await apiFetch(`/api/github/${v}`, { cache: "no-store" })
         if (!res.ok) return { venture: v, commits: [] }
         const d = await res.json() as { commits: GitCommit[] }
         return { venture: v, commits: d.commits ?? [] }
@@ -386,7 +387,7 @@ export default function ChiefOfStaffDashboard() {
   const refreshActivity = useCallback(async () => {
     setActivityLoading(true)
     try {
-      const res = await fetch("/api/dashboard", { cache: "no-store" })
+      const res = await apiFetch("/api/dashboard", { cache: "no-store" })
       if (res.ok) {
         const d = await res.json() as DashboardData
         setActivityLogs(d.callLogs ?? [])
@@ -419,10 +420,8 @@ export default function ChiefOfStaffDashboard() {
   // ── Mark action complete via Ror ───────────────────────────────────────────
   const markActionWithRor = useCallback(async (action: string) => {
     try {
-      await fetch("/api/agent-os/agent/ctech_corporate/chief_of_staff", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: `Mark action as complete: ${action}` }),
+      await apiPost("/api/agent-os/agent/ctech_corporate/chief_of_staff", {
+        message: `Mark action as complete: ${action}`,
       })
     } catch {
       // Fire-and-forget — UI already updated optimistically
