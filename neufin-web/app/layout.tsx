@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Script from 'next/script'
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import RootProviders from '@/app/components/RootProviders'
@@ -131,6 +130,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} dark`}
     >
       <head>
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z2E03GFJP3"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-Z2E03GFJP3');`,
+          }}
+        />
         {/* next/font serves locally; keep only app-critical origins */}
         <link rel="preconnect" href="https://gpczchjipalfgkfqamcu.supabase.co" />
         <link rel="dns-prefetch" href="https://neufin101-production.up.railway.app" />
@@ -142,23 +150,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to main content
         </a>
-        {process.env.NEXT_PUBLIC_GA_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
-              strategy="afterInteractive"
-            />
-            <Script id="ga4" strategy="afterInteractive">
-              {`window.dataLayer=window.dataLayer||[];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js',new Date());
-                gtag('config','${process.env.NEXT_PUBLIC_GA_ID}',{
-                  page_title: document.title,
-                  page_location: window.location.href,
-                });`}
-            </Script>
-          </>
-        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
