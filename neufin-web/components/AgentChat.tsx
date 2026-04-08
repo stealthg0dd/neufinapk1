@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { apiFetch } from '@/lib/api-client'
 
 const MONO = "'Fira Code','JetBrains Mono','Courier New',monospace"
 const A    = '#FFB900'
@@ -53,6 +54,14 @@ interface AgentChatProps {
   totalValue: number
   apiBase:    string
   onClose:    () => void
+  /** Hide Bloomberg header when embedded in Copilot rail */
+  embedded?: boolean
+  /** One-shot quick fill — use a new `id` each click so the same label can re-apply */
+  quickFill?: { id: number; text: string } | null
+  onQuickFillConsumed?: () => void
+  /** Copilot rail: drive agent status dots while a message is in flight */
+  onBusyChange?: (busy: boolean) => void
+  className?: string
 }
 
 // Suggested prompts seeded from common thesis risks
@@ -64,7 +73,18 @@ const SUGGESTED = [
   'Explain my alpha gap vs SPY',
 ]
 
-export default function AgentChat({ thesis, positions, totalValue, apiBase, onClose }: AgentChatProps) {
+export default function AgentChat({
+  thesis,
+  positions,
+  totalValue,
+  apiBase,
+  onClose,
+  embedded = false,
+  quickFill,
+  onQuickFillConsumed,
+  onBusyChange,
+  className,
+}: AgentChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([{
     role: 'assistant',
     text: `IC system online. I'm your Managing Director — ask me anything about this portfolio's risks, tax position, or macro exposure.`,
@@ -78,12 +98,20 @@ export default function AgentChat({ thesis, positions, totalValue, apiBase, onCl
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  useEffect(() => {
+    if (quickFill) {
+      setInput(quickFill.text)
+      onQuickFillConsumed?.()
+    }
+  }, [quickFill, onQuickFillConsumed])
+
   const send = async (question: string) => {
     if (!question.trim() || loading) return
     const q = question.trim()
     setInput('')
     setMessages(prev => [...prev, { role: 'user', text: q }])
     setLoading(true)
+    onBusyChange?.(true)
 
     // Optimistic loading placeholder
     setMessages(prev => [...prev, { role: 'assistant', text: '', loading: true }])
@@ -100,10 +128,10 @@ export default function AgentChat({ thesis, positions, totalValue, apiBase, onCl
         body.record_id = savedReportId
       }
 
-      const res = await fetch(`${apiBase}/api/swarm/chat`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
+      const chatUrl = apiBase ? `${apiBase.replace(/\/$/, '')}/api/swarm/chat` : '/api/swarm/chat'
+      const res = await apiFetch(chatUrl, {
+        method: 'POST',
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
@@ -127,6 +155,7 @@ export default function AgentChat({ thesis, positions, totalValue, apiBase, onCl
       ])
     } finally {
       setLoading(false)
+      onBusyChange?.(false)
     }
   }
 
@@ -135,35 +164,56 @@ export default function AgentChat({ thesis, positions, totalValue, apiBase, onCl
   }
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      fontFamily: MONO, background: '#0a0a0a',
-    }}>
+    <div
+      className={className}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        minHeight: 0,
+        fontFamily: MONO,
+        background: '#0a0a0a',
+      }}
+    >
       {/* Header */}
-      <div style={{
-        background: '#111', borderBottom: `1px solid #222`,
-        padding: '7px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: A, fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}>
-            Managing Director
-          </span>
-          <span style={{ color: DIM, fontSize: 9 }}>|</span>
-          <span style={{ color: DIM, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1 }}>
-            IC Q&amp;A
-          </span>
-        </div>
-        <button
-          onClick={onClose}
+      {!embedded ? (
+        <div
           style={{
-            background: 'transparent', border: 'none', color: DIM,
-            cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2,
+            background: '#111',
+            borderBottom: `1px solid #222`,
+            padding: '7px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
           }}
         >
-          ✕
-        </button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ color: A, fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}>
+              Managing Director
+            </span>
+            <span style={{ color: DIM, fontSize: 9 }}>|</span>
+            <span style={{ color: DIM, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1 }}>
+              IC Q&amp;A
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: DIM,
+              cursor: 'pointer',
+              fontSize: 14,
+              lineHeight: 1,
+              padding: 2,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      ) : null}
 
       {/* Suggested prompts — only shown when just the greeting is present */}
       {messages.length === 1 && (

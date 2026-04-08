@@ -33,9 +33,9 @@ export function DashboardShell({
         <CommandBar regimeData={regime} onToggleCopilot={() => setCopilotOpen((o) => !o)} />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <main className="flex-1 overflow-y-auto p-6">{children}</main>
-          <CopilotRail open={copilotOpen} onClose={() => setCopilotOpen(false)} />
         </div>
       </div>
+      <CopilotRail open={copilotOpen} onClose={() => setCopilotOpen(false)} />
     </div>
   )
 }

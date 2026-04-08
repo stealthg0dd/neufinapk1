@@ -146,7 +146,7 @@ export function CommandBar({
           </button>
           <button
             type="button"
-            onClick={onToggleCopilot}
+            onClick={() => onToggleCopilot?.()}
             className="rounded-md border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.15)] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--accent))] transition-colors hover:bg-[hsl(var(--accent)/0.25)]"
           >
             ✦ Copilot

@@ -29,6 +29,8 @@ interface SwarmTerminalProps {
   isRunning?: boolean
   /** Optional: compact mode removes the status bar */
   compact?: boolean
+  /** Copilot rail: cap height so the terminal fits beside chat */
+  rail?: boolean
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -309,6 +311,7 @@ export default function SwarmTerminal({
   traces,
   isRunning = false,
   compact   = false,
+  rail      = false,
 }: SwarmTerminalProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const [visibleCount, setVisibleCount] = useState(0)
@@ -345,7 +348,11 @@ export default function SwarmTerminal({
         .swarm-scroll::-webkit-scrollbar-thumb:hover { background: #444 }
       `}</style>
 
-      <div className="bg-[#0D0D0D] border border-[#2a2a2a] rounded-md overflow-hidden shadow-2xl font-mono flex flex-col h-full min-h-[420px]">
+      <div
+        className={`bg-[#0D0D0D] border border-[#2a2a2a] rounded-md overflow-hidden shadow-2xl font-mono flex flex-col h-full ${
+          rail ? 'min-h-0 max-h-44' : 'min-h-[420px]'
+        }`}
+      >
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="bg-[#141414] px-4 py-2 border-b border-[#2a2a2a] flex items-center justify-between select-none shrink-0">
