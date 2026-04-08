@@ -10,7 +10,7 @@ export default async function HomePage() {
   ]).then(([r, n]) => [
     r.status === 'fulfilled' ? r.value : null,
     n.status === 'fulfilled' && Array.isArray(n.value) ? n.value : [],
-  ])
+  ] as const)
 
   return <HomeLandingPage regime={regime} researchTeaser={researchTeaser} />
 }
