@@ -18,16 +18,20 @@ const nextConfig = {
 
   // Proxy /api/* to Railway backend — avoids CORS entirely for same-origin calls
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${RAILWAY_API}/api/:path*`,
-      },
-      {
-        source: '/health',
-        destination: `${RAILWAY_API}/health`,
-      },
-    ]
+    return {
+      // Keep Next.js filesystem/API routes working first (e.g. /api/feedback).
+      // Proxy only as a fallback when no local route is found.
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: `${RAILWAY_API}/api/:path*`,
+        },
+        {
+          source: '/health',
+          destination: `${RAILWAY_API}/health`,
+        },
+      ],
+    }
   },
 
   // Security & CORS response headers for direct cross-origin calls

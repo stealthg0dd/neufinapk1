@@ -3,6 +3,20 @@ import { NextRequest, NextResponse } from 'next/server'
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://apis.google.com https://us.posthog.com",
+  "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://apis.google.com https://us.posthog.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.railway.app https://api.stripe.com https://us.i.posthog.com https://*.sentry.io https://polygon.io https://finnhub.io https://financialmodelingprep.com https://api.twelvedata.com",
+  "frame-src https://js.stripe.com https://hooks.stripe.com https://accounts.google.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  'upgrade-insecure-requests',
+].join('; ')
 
 function log(level: 'debug' | 'info' | 'warn' | 'error', message: string, data?: unknown) {
   // Keep middleware logging runtime-safe for Edge by using console only.
@@ -135,7 +149,9 @@ async function hasAdvisorRole(token: string): Promise<boolean> {
 
 function redirectToDashboard(request: NextRequest): NextResponse {
   const dashboardUrl = new URL('/dashboard', request.url)
-  return NextResponse.redirect(dashboardUrl)
+  const res = NextResponse.redirect(dashboardUrl)
+  res.headers.set('Content-Security-Policy', CSP)
+  return res
 }
 
 function redirectToAuth(request: NextRequest, pathname: string, clearCookie = false): NextResponse {
@@ -143,6 +159,7 @@ function redirectToAuth(request: NextRequest, pathname: string, clearCookie = fa
   loginUrl.searchParams.set('next', pathname)
 
   const response = NextResponse.redirect(loginUrl)
+  response.headers.set('Content-Security-Policy', CSP)
   if (clearCookie) {
     response.cookies.set('neufin-auth', '', {
       path: '/',
@@ -157,10 +174,18 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ── Landing page: always public ───────────────────────────────────────────
-  if (pathname === '/') return NextResponse.next()
+  if (pathname === '/') {
+    const res = NextResponse.next()
+    res.headers.set('Content-Security-Policy', CSP)
+    return res
+  }
 
   // ── All other explicitly public paths ─────────────────────────────────────
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next()
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    const res = NextResponse.next()
+    res.headers.set('Content-Security-Policy', CSP)
+    return res
+  }
 
   // ── Protected path — check cookie ─────────────────────────────────────────
   log('debug', 'middleware.protected_path', {
@@ -206,7 +231,9 @@ export async function middleware(request: NextRequest) {
   }
 
   log('info', 'middleware.allow_request', { pathname })
-  return NextResponse.next()
+  const res = NextResponse.next()
+  res.headers.set('Content-Security-Policy', CSP)
+  return res
 }
 
 export const config = {
