@@ -128,8 +128,7 @@ export default function AgentChat({
         body.record_id = savedReportId
       }
 
-      const chatUrl = apiBase ? `${apiBase.replace(/\/$/, '')}/api/swarm/chat` : '/api/swarm/chat'
-      const res = await apiFetch(chatUrl, {
+      const res = await apiFetch('/api/swarm/chat', {
         method: 'POST',
         body: JSON.stringify(body),
       })

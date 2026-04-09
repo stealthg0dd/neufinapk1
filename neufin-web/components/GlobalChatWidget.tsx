@@ -12,8 +12,6 @@
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
-
 // ── Agent definitions ─────────────────────────────────────────────────────────
 const AGENTS = [
   { value: 'general',   label: 'General',    fullLabel: 'General Agent',        emoji: '🤖', color: 'text-blue-400',   accent: 'border-blue-400/60',  ring: 'ring-blue-400/30'  },
@@ -90,7 +88,7 @@ export default function GlobalChatWidget() {
     setMessages(prev => [...prev, { role: 'assistant', text: '', agent, loading: true }])
 
     try {
-      const res = await fetch(`${API_BASE}/api/swarm/global-chat`, {
+      const res = await fetch('/api/swarm/global-chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ message: q, agent_type: agent }),

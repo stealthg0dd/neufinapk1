@@ -20,6 +20,10 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 })
 
+export function createClient() {
+  return supabase
+}
+
 export function attachSupabaseAuthDebug() {
   if (typeof window === 'undefined') return () => {}
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

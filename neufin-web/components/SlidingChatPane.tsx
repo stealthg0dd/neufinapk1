@@ -46,7 +46,6 @@ export interface SlidingChatPaneProps {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
 const MONO = "'Fira Code','JetBrains Mono','Courier New',monospace"
 
 const SUGGESTED_QUESTIONS = [
@@ -179,8 +178,6 @@ export function SlidingChatPane({
   totalValue,
   apiBase,
 }: SlidingChatPaneProps) {
-  const base = apiBase || API
-
   const [messages, setMessages] = useState<Message[]>([{
     role:    'assistant',
     content: "IC system online. I'm the Managing Director — I've reviewed the swarm's stress tests and risk clusters. Ask me anything about this portfolio's risk exposure, tax position, or regime sensitivity.",
@@ -218,7 +215,7 @@ export function SlidingChatPane({
       if (positions?.length)      body.positions      = positions
       if (totalValue !== undefined) body.total_value  = totalValue
 
-      const res = await fetch(`${base}/api/swarm/chat`, {
+      const res = await fetch('/api/swarm/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(body),

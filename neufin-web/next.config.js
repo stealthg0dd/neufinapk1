@@ -1,5 +1,4 @@
 /** @type {import('next').NextConfig} */
-const RAILWAY_API = process.env.RAILWAY_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
 const nextConfig = {
   reactStrictMode: true,
@@ -18,20 +17,16 @@ const nextConfig = {
 
   // Proxy /api/* to Railway backend — avoids CORS entirely for same-origin calls
   async rewrites() {
-    return {
-      // Keep Next.js filesystem/API routes working first (e.g. /api/feedback).
-      // Proxy only as a fallback when no local route is found.
-      fallback: [
-        {
-          source: '/api/:path*',
-          destination: `${RAILWAY_API}/api/:path*`,
-        },
-        {
-          source: '/health',
-          destination: `${RAILWAY_API}/health`,
-        },
-      ],
-    }
+    const railwayBase =
+      process.env.RAILWAY_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'https://neufin101-production.up.railway.app'
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${railwayBase}/api/:path*`,
+      },
+    ]
   },
 
   // Security & CORS response headers for direct cross-origin calls
