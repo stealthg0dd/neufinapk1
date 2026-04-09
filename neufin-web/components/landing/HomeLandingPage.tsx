@@ -103,32 +103,33 @@ export default function HomeLandingPage({
                   WebkitTextFillColor: 'transparent',
                 }}
               >
-                Infinite clarity.
+                Institutional clarity.
               </span>
             </h1>
 
             <p className="mb-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
               Upload your portfolio. Our swarm of 7 specialized AI agents analyzes market regime, behavioral biases, risk
-              clusters, and alpha opportunities — delivering IC-grade intelligence in 60 seconds.
+              clusters, and alpha opportunities — delivering an IC-grade investment brief in 60 seconds. No Bloomberg
+              subscription required.
             </p>
 
             <div className="mb-8 flex flex-wrap gap-6">
               <div className="flex flex-col">
-                <span className="font-mono text-2xl font-bold tabular-nums text-risk">-3.2%</span>
+                <span className="font-mono text-2xl font-bold tabular-nums text-risk">60s</span>
                 <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Annual alpha leak from biases
+                  IC-grade portfolio brief, from CSV upload
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="font-mono text-2xl font-bold tabular-nums text-risk">$8,400</span>
+                <span className="font-mono text-2xl font-bold tabular-nums text-risk">47</span>
                 <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Average annual loss (200K portfolio)
+                  Behavioral biases tracked per portfolio
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="font-mono text-2xl font-bold tabular-nums text-positive">+18%</span>
+                <span className="font-mono text-2xl font-bold tabular-nums text-positive">7</span>
                 <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Performance with NeuFin agents
+                  Specialized AI agents running in parallel
                 </span>
               </div>
             </div>
@@ -162,7 +163,7 @@ export default function HomeLandingPage({
             </div>
 
             <p className="mb-4 text-[11px] text-muted-foreground">
-              Trusted by global investors · SOC 2 compliant · info@neufin.ai
+              In beta with advisors across SG, UAE & UK · Enterprise-grade security · info@neufin.ai
             </p>
 
             <div className="flex flex-wrap items-center gap-4">
@@ -176,11 +177,11 @@ export default function HomeLandingPage({
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Shield className="h-3 w-3 shrink-0 text-primary" />
-                SOC 2 Certified
+                Enterprise-grade security
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <Globe className="h-3 w-3 shrink-0 text-primary" />
-                MAS · GDPR · SEC aligned
+                MAS · GDPR · MiFID II aligned
               </span>
             </div>
           </div>
@@ -384,25 +385,19 @@ export default function HomeLandingPage({
       {/* SECTION 2 — PROBLEM / SOLUTION */}
       <section className="py-20">
         <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="text-3xl font-bold text-foreground">
-            Why PE teams are switching
-            <br />
-            <span className="text-foreground">
-              from <span className="text-muted-foreground">legacy terminals</span>
-            </span>
-          </h2>
+          <h2 className="text-3xl font-bold text-foreground">Why advisors and PE teams choose to switch</h2>
         </div>
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
           <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
             <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
               <X className="h-4 w-4 text-risk" strokeWidth={2} />
-              <span className="text-risk">What you lose 6 hours a day to</span>
+              <span className="text-risk">What you're losing right now</span>
             </h3>
             <ul className="space-y-3">
               {[
-                'Copying data between 4 systems to build one IC deck',
-                'No visibility into behavioral bias in your own decisions',
-                'Private portfolio companies invisible to market terminals',
+                '3 hours building one quarterly client report — manually',
+                "No behavioral explanation when clients ask 'why is my portfolio down?'",
+                'Losing clients to robo-advisors who charge 0.25% vs your 1% AUM fee',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
@@ -418,9 +413,52 @@ export default function HomeLandingPage({
             </h3>
             <ul className="space-y-3">
               {[
-                'Portfolio DNA + IC memo in under 60 seconds',
-                'Behavioral bias detection built into every decision view',
-                'Public equities + private holdings in one normalized view',
+                "Portfolio DNA brief in 60 seconds — branded with your name, not NeuFin's",
+                "Behavioral bias detection: 'Your client shows Overconfidence — here's the dollar impact'",
+                'IC-grade output that justifies your advisory fee vs any robo-competitor',
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section className="py-20">
+        <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
+          <h2 className="text-3xl font-bold text-foreground">Why B2B platforms choose NeuFin over building in-house</h2>
+        </div>
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
+          <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <X className="h-4 w-4 text-risk" strokeWidth={2} />
+              <span className="text-risk">What your engineering team quotes you</span>
+            </h3>
+            <ul className="space-y-3">
+              {[
+                '6–12 months to build a behavioral intelligence layer',
+                '3 engineers, $200K+ in development cost',
+                'Churn spikes 15–25% every market correction with no intervention tool',
+              ].map((t) => (
+                <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-positive/20 bg-positive/5 p-6">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Check className="h-4 w-4 text-positive" strokeWidth={2} />
+              <span className="text-positive">What you get with NeuFin API</span>
+            </h3>
+            <ul className="space-y-3">
+              {[
+                'REST API integration in a weekend — not 6 months',
+                'DNA Score + behavioral bias flags per user portfolio',
+                'Churn risk detection before users panic-sell',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
@@ -491,7 +529,7 @@ export default function HomeLandingPage({
                 flag: '🇺🇸',
                 region: 'United States',
                 regulatory: 'SEC Reg S-P, FINRA 4512 alignment',
-                items: ['SOC 2 Type II certified', 'CCPA compliant', 'Registered office: USA'],
+                items: ['SOC 2 Type II in preparation', 'CCPA aligned', 'Registered office: USA'],
                 status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
               },
             ].map((c) => (
@@ -619,24 +657,26 @@ export default function HomeLandingPage({
       {/* SECTION 4 — API PLATFORM */}
       <section id="api-platform" className="scroll-mt-20 py-20">
         <div className="mx-auto max-w-5xl px-6">
-          <h2 className="text-center text-3xl font-bold text-foreground">Embed intelligence into your platform</h2>
-          <p className="mt-2 text-center text-muted-foreground">Neufin as a behavioral intelligence API layer</p>
+          <h2 className="text-center text-3xl font-bold text-foreground">Embed behavioral intelligence into your platform</h2>
+          <p className="mt-2 text-center text-muted-foreground">
+            Three API endpoints. One weekend integration. No behavioral layer to build.
+          </p>
           <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
             {[
               {
                 icon: Dna,
                 name: 'DNA Score API',
-                desc: 'Portfolio DNA score and factor breakdown for any uploaded book.',
+                desc: 'DNA Score (0–100) + behavioral archetype + top bias flags for any portfolio CSV.',
               },
               {
                 icon: Brain,
                 name: 'Behavioral Bias API',
-                desc: 'Structured bias flags and severity scores for decision workflows.',
+                desc: '47 behavioral bias flags with severity scores and dollar impact per position.',
               },
               {
                 icon: MessageSquareQuote,
                 name: 'Regime Commentary API',
-                desc: 'Macro regime classification with confidence and narrative hooks.',
+                desc: 'Live macro regime (Risk-On / Risk-Off / Neutral) with natural-language commentary.',
               },
             ].map(({ icon: Icon, name, desc }) => (
               <div
@@ -697,7 +737,13 @@ export default function HomeLandingPage({
               <p className="mb-1 font-display text-4xl font-normal text-[var(--amber)]">$299</p>
               <p className="mb-6 text-sm text-muted-foreground">per month</p>
               <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
-                {['Unlimited analyses', '10 advisor reports / mo', 'Multi-client workspace', 'API access'].map((f) => (
+                {[
+                  'Unlimited portfolio analyses',
+                  'Unlimited advisor client briefs (white-label PDF)',
+                  'Multi-client workspace',
+                  'Behavioral bias reports per client',
+                  'API access (3 endpoints)',
+                ].map((f) => (
                   <li key={f} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
                     {f}
@@ -718,7 +764,13 @@ export default function HomeLandingPage({
               <p className="mb-2 text-sm text-muted-foreground">per month</p>
               <p className="mb-6 text-xs text-[var(--blue)]">Custom pricing available</p>
               <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
-                {['Everything in Advisor', 'Unlimited reports', 'White-label', 'Dedicated support'].map((f) => (
+                {[
+                  'Everything in Advisor',
+                  'Unlimited reports + white-label output',
+                  'API embed for your platform (portal / reporting / CRM layer)',
+                  'Revenue share model available',
+                  'Dedicated integration support + SLA',
+                ].map((f) => (
                   <li key={f} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
                     {f}
@@ -742,7 +794,7 @@ export default function HomeLandingPage({
       <section className="py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <p className="text-xl font-semibold text-foreground md:text-2xl">
-            Start in 60 seconds. No Bloomberg subscription required.
+            IC-grade portfolio intelligence in 60 seconds. No Bloomberg. No analyst. No waiting.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
@@ -770,16 +822,17 @@ export default function HomeLandingPage({
               </div>
               <div className="text-left md:text-right">
                 <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">LEGAL</p>
-                <p>© 2025 Neufin OÜ. All rights reserved.</p>
+                <p>© 2026 Neufin OÜ. All rights reserved.</p>
                 <p>A unit of CTech Ventures</p>
                 <p>info@neufin.ai · www.neufin.ai</p>
               </div>
             </div>
 
             <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground/40">
-              NeuFin provides financial data and analysis tools for informational and educational purposes only. This is
-              not financial advice. Past performance does not indicate future results. NeuFin aligns with MAS guidelines
-              on fintech and data services.
+              NeuFin provides financial data and portfolio analysis tools for informational purposes only. This is not
+              investment advice, and no output from NeuFin constitutes a recommendation to buy, sell, or hold any
+              security. Past performance does not indicate future results. NeuFin OÜ is registered in Estonia (EU).
+              NeuFin aligns with MAS guidelines on fintech and data services.
             </p>
           </div>
         </div>
