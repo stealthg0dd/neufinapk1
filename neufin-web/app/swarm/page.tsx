@@ -10,7 +10,7 @@ import RiskMatrix from '@/components/RiskMatrix'
 import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
 import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
-import { apiPost } from '@/lib/api-client'
+import { apiFetch, apiPost } from '@/lib/api-client'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
 import { useUser } from '@/lib/store'
 import { debugAuth } from '@/lib/auth-debug'
@@ -755,7 +755,7 @@ export default function SwarmPage() {
   const [positions,       setPositions]       = useState<SwarmPosition[]>([])
   const [totalValue,      setTotalValue]      = useState(0)
 
-  const { isPro, token, loading: authLoading, user } = useUser()
+  const { isPro, loading: authLoading, user } = useUser()
   const { capture } = useNeufinAnalytics()
   const isTrialBypass = useMemo(() => {
     const createdAt = user?.created_at
@@ -789,11 +789,10 @@ export default function SwarmPage() {
       ? localStorage.getItem('neufin-session-id')
       : null
 
-    if (sessionId && token) {
+    if (sessionId) {
       try {
-        await fetch(`${API_BASE}/api/vault/claim-session`, {
+        await apiFetch(`${API_BASE}/api/vault/claim-session`, {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body:    JSON.stringify({ session_id: sessionId }),
         })
         localStorage.removeItem('neufin-session-id')
@@ -810,7 +809,7 @@ export default function SwarmPage() {
       window.history.replaceState({}, '', url.toString())
     }
     setTimeout(() => setToast(null), 5000)
-  }, [API_BASE, token])
+  }, [API_BASE])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -855,9 +854,7 @@ export default function SwarmPage() {
     if (typeof window === 'undefined') return
     const savedId = localStorage.getItem('neufin-swarm-report-id')
     if (!savedId || thesis) return
-    fetch(`${API_BASE}/api/swarm/report/${savedId}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
+    apiFetch(`${API_BASE}/api/swarm/report/${savedId}`, { method: 'GET' })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.investment_thesis) {
@@ -867,7 +864,7 @@ export default function SwarmPage() {
       })
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_BASE, token])
+  }, [API_BASE])
 
   const runSwarm = async () => {
     if (positions.length === 0) return
@@ -882,14 +879,8 @@ export default function SwarmPage() {
     perfTimer.start('swarm')
 
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      }
-
-      const res = await fetch(`${API_BASE}/api/swarm/analyze`, {
+      const res = await apiFetch(`${API_BASE}/api/swarm/analyze`, {
         method: 'POST',
-        headers,
         body: JSON.stringify({
           positions,
           total_value: totalValue

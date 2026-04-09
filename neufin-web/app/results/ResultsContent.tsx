@@ -18,6 +18,7 @@ import type { DNAAnalysisResponse } from '@/lib/api'
 import PaywallOverlay from '@/components/PaywallOverlay'
 
 const PortfolioPie = nextDynamic(() => import('@/components/PortfolioPie'), { ssr: false })
+const REF_STORAGE_KEY = 'ref_token'
 
 
 const TYPE_COLORS: Record<string, string> = {
@@ -134,10 +135,10 @@ export default function ResultsContent() {
     trackEvent(EVENTS.UPLOAD_COMPLETE, { dna_score: parsed.dna_score, investor_type: parsed.investor_type })
 
     // Referral token from URL or storage
-    const ref = searchParams.get('ref') || localStorage.getItem('ref_token')
+    const ref = searchParams.get('ref') || localStorage.getItem(REF_STORAGE_KEY)
     if (ref) {
       setRefToken(ref)
-      localStorage.setItem('ref_token', ref)
+      localStorage.setItem(REF_STORAGE_KEY, ref)
       fetch(`/api/referrals/validate/${ref}`)
         .then(r => r.json())
         .then(d => setRefDiscount(d.valid))

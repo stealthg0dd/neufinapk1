@@ -4,8 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth-context'
-
-const API = process.env.NEXT_PUBLIC_API_URL
+import { apiGet } from '@/lib/api-client'
 
 interface ClientReport {
   id: string
@@ -27,7 +26,7 @@ function Skeleton({ className = '' }: { className?: string }) {
 }
 
 export default function AdvisorReportsPage() {
-  const { user, token } = useAuth()
+  const { user } = useAuth()
   const [reports, setReports]   = useState<ClientReport[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -35,16 +34,14 @@ export default function AdvisorReportsPage() {
   const REPORT_LIMIT = 10
 
   const load = useCallback(async () => {
-    if (!user || !token) { setLoading(false); return }
+    if (!user) { setLoading(false); return }
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API}/api/reports/advisor/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const data = await apiGet<{ reports?: ClientReport[] }>(
+        `/api/reports/advisor/${user.id}`,
+        { cache: 'no-store' }
+      )
       const allReports: ClientReport[] = data.reports ?? []
       setReports(allReports)
       // Count reports generated this calendar month
@@ -55,7 +52,7 @@ export default function AdvisorReportsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user, token])
+  }, [user])
 
   useEffect(() => { load() }, [load])
 
