@@ -250,7 +250,7 @@ export default function DashboardClient() {
     setAiBusy(true)
     setAiReply(null)
     try {
-      const data = await apiPost<{ reply?: string }>('/api/swarm/chat', {
+      const data = await apiPost<{ reply?: string; response?: { answer?: string }; answer?: string; message?: string; content?: string }>('/api/swarm/chat', {
         message: aiQ.slice(0, 500),
         total_value: metrics.total_value,
         positions: metrics.positions.map((p) => ({
@@ -261,7 +261,14 @@ export default function DashboardClient() {
           weight: p.weight,
         })),
       })
-      setAiReply(typeof data.reply === 'string' ? data.reply : 'No response')
+      const reply =
+        data?.reply
+        || data?.response?.answer
+        || data?.answer
+        || data?.message
+        || data?.content
+        || 'No response received'
+      setAiReply(reply)
     } catch {
       setAiReply('Request failed. Try again.')
     } finally {

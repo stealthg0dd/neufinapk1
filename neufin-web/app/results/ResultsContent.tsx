@@ -138,7 +138,7 @@ export default function ResultsContent() {
     if (ref) {
       setRefToken(ref)
       localStorage.setItem('ref_token', ref)
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/referrals/validate/${ref}`)
+      fetch(`/api/referrals/validate/${ref}`)
         .then(r => r.json())
         .then(d => setRefDiscount(d.valid))
         .catch(() => {})

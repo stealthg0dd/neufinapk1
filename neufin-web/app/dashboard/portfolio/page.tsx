@@ -182,19 +182,19 @@ export default function PortfolioPage() {
         if (!res.ok) {
           throw new Error('Report generation failed')
         }
-        const data = (await res.json()) as { pdf_url?: string }
-        if (!data.pdf_url) {
-          throw new Error('PDF URL missing')
+        const data = (await res.json()) as { pdf_url?: string; url?: string; download_url?: string; report_url?: string }
+        const pdfUrl = data?.pdf_url
+          || data?.url
+          || data?.download_url
+          || data?.report_url
+          || null
+
+        if (pdfUrl) {
+          window.open(pdfUrl, '_blank')
+        } else {
+          console.error('[report] No PDF URL in response:', data)
+          toast.error('Report URL unavailable. Try again.')
         }
-        const pdfRes = await fetch(data.pdf_url)
-        if (!pdfRes.ok) throw new Error('Could not download generated report')
-        const blob = await pdfRes.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `neufin-report-${Date.now()}.pdf`
-        a.click()
-        URL.revokeObjectURL(url)
       } else {
         const { checkout_url } = await apiPost<{ checkout_url: string }>(
           '/api/reports/checkout',

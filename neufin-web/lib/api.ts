@@ -282,7 +282,7 @@ export async function getPortfolioHistory(
     shares: shares.join(','),
     period,
   })
-  const res = await fetch(`${API}/api/portfolio/value-history?${params}`, {
+  const res = await fetch(`/api/portfolio/value-history?${params}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) throw new Error('Portfolio history unavailable')
@@ -332,7 +332,7 @@ export async function createCheckout(
   body: CheckoutRequest,
   token?: string | null
 ): Promise<{ checkout_url: string; report_id?: string }> {
-  const res = await fetch(`${API}/api/reports/checkout`, {
+  const res = await fetch('/api/reports/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(body),
@@ -348,7 +348,7 @@ export async function fulfillReport(
   reportId: string,
   token?: string | null
 ): Promise<{ pdf_url: string }> {
-  const res = await fetch(`${API}/api/reports/fulfill?report_id=${reportId}`, {
+  const res = await fetch(`/api/reports/fulfill?report_id=${reportId}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) {
@@ -463,7 +463,7 @@ export async function generateWhiteLabelReport(
   body: WhiteLabelReportRequest,
   token?: string | null
 ): Promise<{ report_id: string | null; pdf_url: string | null; pdf_size_bytes: number; pages: number }> {
-  const res = await fetch(`${API}/api/reports/generate`, {
+  const res = await fetch('/api/reports/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(body),
