@@ -21,6 +21,9 @@ const nextConfig = {
       process.env.RAILWAY_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       'https://neufin101-production.up.railway.app'
+    // Local proxy routes in app/api/** take priority over this rewrite.
+    // This rewrite only catches routes that have no local handler.
+    // All known routes should have local handlers in app/api/.
     return [
       {
         source: '/api/:path*',

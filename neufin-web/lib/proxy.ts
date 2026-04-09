@@ -4,6 +4,16 @@ const RAILWAY_BASE = process.env.RAILWAY_API_URL
   || process.env.NEXT_PUBLIC_API_URL
   || 'https://neufin101-production.up.railway.app'
 
+// Validate at startup
+try {
+  new URL(RAILWAY_BASE)
+} catch {
+  console.error(
+    `[proxy] RAILWAY_API_URL is not a valid URL: "${RAILWAY_BASE}". ` +
+    `Falling back to hardcoded Railway URL.`
+  )
+}
+
 export async function proxyToRailway(
   req: NextRequest,
   backendPath: string,

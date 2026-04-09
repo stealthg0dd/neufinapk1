@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'See the highest-scoring investor portfolios on Neufin. Where do you rank?',
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+const API = process.env.NEXT_PUBLIC_API_URL || ''
 
 async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   try {

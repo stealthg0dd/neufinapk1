@@ -10,7 +10,7 @@ interface LeaderboardEntry {
   created_at:    string
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+const API = process.env.NEXT_PUBLIC_API_URL || ''
 
 const TYPE_EMOJI: Record<string, string> = {
   'Diversified Strategist': '⚖️',

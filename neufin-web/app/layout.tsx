@@ -141,7 +141,6 @@ gtag('config', 'G-Z2E03GFJP3');`,
         />
         {/* next/font serves locally; keep only app-critical origins */}
         <link rel="preconnect" href="https://gpczchjipalfgkfqamcu.supabase.co" />
-        <link rel="dns-prefetch" href="https://neufin101-production.up.railway.app" />
       </head>
       <body className="min-h-screen antialiased font-sans" suppressHydrationWarning>
         <a

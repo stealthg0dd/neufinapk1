@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+const API = process.env.NEXT_PUBLIC_API_URL || ''
 
 // ── Session ID — stable per browser tab ───────────────────────────────────────
 

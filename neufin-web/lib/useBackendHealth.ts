@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+const API = process.env.NEXT_PUBLIC_API_URL || ''
 
 export interface BackendHealth {
   isOnline:   boolean

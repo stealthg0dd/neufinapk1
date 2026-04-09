@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 
 // ── Data fetching ──────────────────────────────────────────────────────────────
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+const API = process.env.NEXT_PUBLIC_API_URL || ''
 
 const EMPTY_HEALTH: MarketHealth = {
   total_portfolios: 0,
