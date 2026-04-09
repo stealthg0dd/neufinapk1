@@ -41,6 +41,20 @@ function resolvePriceId(plan: 'single' | 'unlimited'): string | undefined {
  * Backend exposes POST /api/reports/checkout with plan: "single" | "unlimited".
  */
 export async function POST(req: NextRequest) {
+  const requiredEnvs = [
+    'STRIPE_SECRET_KEY',
+    'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
+  ]
+  for (const key of requiredEnvs) {
+    if (!process.env[key]) {
+      console.error(`[checkout] Missing env var: ${key}`)
+      return NextResponse.json(
+        { error: `Server misconfigured: ${key} missing` },
+        { status: 500 }
+      )
+    }
+  }
+
   const backend = resolveBackendBase(req)
   let body: Record<string, unknown>
   try {
