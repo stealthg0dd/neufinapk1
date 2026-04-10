@@ -937,7 +937,7 @@ def _build_pdf_sync(
                 ),
                 Paragraph(f"{float(v):.1f}%", styles["body"]),
             ]
-            for lab, v in zip(labels_pie, vals_pie, strict=True)
+            for lab, v in zip(labels_pie, vals_pie)
         ]
         left = Table(
             alloc_rows,

@@ -88,7 +88,7 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
         and len(syms) > 0
     ):
         out = []
-        for s, w in zip(syms, wts, strict=True):
+        for s, w in zip(syms, wts):
             try:
                 wf = float(w)
             except (TypeError, ValueError):
