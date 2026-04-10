@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { createServerClient } from '@supabase/ssr'
 
 function resolveServerFetchOrigin(req: NextRequest): string {
   const app = process.env.NEXT_PUBLIC_APP_URL?.trim()
@@ -63,9 +65,70 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ detail: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const token =
-    req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
-    req.cookies.get('neufin-auth')?.value
+  const authHeaderToken = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+  const cookieStore = await cookies()
+  const supabaseCookieNames = cookieStore
+    .getAll()
+    .map((c) => c.name)
+    .filter((name) => /^sb-.*-auth-token$/.test(name))
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('[payments/checkout] Missing Supabase envs for SSR auth client', {
+      hasSupabaseUrl: Boolean(supabaseUrl),
+      hasSupabaseAnonKey: Boolean(supabaseAnonKey),
+    })
+    return NextResponse.json({ detail: 'Auth misconfigured' }, { status: 500 })
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll()
+      },
+      setAll(cookiesToSet) {
+        for (const cookie of cookiesToSet) {
+          try {
+            cookieStore.set(cookie.name, cookie.value, cookie.options)
+          } catch {
+            // Route handlers may not always be able to mutate cookies; read path is enough here.
+          }
+        }
+      },
+    },
+  })
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  const sessionToken = sessionData.session?.access_token ?? null
+  let token = sessionToken ?? authHeaderToken ?? null
+
+  if (!token) {
+    console.error('[payments/checkout] auth_missing_cookie', {
+      hasLegacyNeufinCookie: Boolean(cookieStore.get('neufin-auth')?.value),
+      hasSupabaseAuthCookie: supabaseCookieNames.length > 0,
+      hasAuthorizationHeader: Boolean(authHeaderToken),
+      authCookieNames: supabaseCookieNames,
+      allCookieNames: cookieStore.getAll().map((c) => c.name),
+    })
+    return NextResponse.json({ detail: 'Unauthorized: Missing Cookie' }, { status: 401 })
+  }
+
+  if (sessionError || !sessionData.session) {
+    // We allow Authorization header fallback if present, but log clear diagnosis.
+    console.error('[payments/checkout] auth_invalid_token', {
+      hasAuthorizationHeader: Boolean(authHeaderToken),
+      hasSupabaseAuthCookie: supabaseCookieNames.length > 0,
+      authCookieNames: supabaseCookieNames,
+      allCookieNames: cookieStore.getAll().map((c) => c.name),
+      sessionError: sessionError?.message ?? null,
+      tokenSource: sessionToken ? 'supabase_session' : authHeaderToken ? 'authorization_header' : 'unknown',
+    })
+    if (!authHeaderToken) {
+      return NextResponse.json({ detail: 'Unauthorized: Invalid Token' }, { status: 401 })
+    }
+    token = authHeaderToken
+  }
 
   const plan = typeof body.plan === 'string' ? body.plan : 'unlimited'
   if (plan !== 'single' && plan !== 'unlimited') {
@@ -91,8 +154,13 @@ export async function POST(req: NextRequest) {
     advisor_id: body.advisor_id ?? 'anonymous',
     ref_token: body.ref_token,
     success_url:
-      body.success_url ?? `${req.nextUrl.origin}/pricing/success`,
-    cancel_url: body.cancel_url ?? `${req.nextUrl.origin}/pricing`,
+      typeof body.success_url === 'string' && body.success_url.length > 0
+        ? body.success_url
+        : `${req.nextUrl.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:
+      typeof body.cancel_url === 'string' && body.cancel_url.length > 0
+        ? body.cancel_url
+        : `${req.nextUrl.origin}/pricing`,
   }
 
   try {
