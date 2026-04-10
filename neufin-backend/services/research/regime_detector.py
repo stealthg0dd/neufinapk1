@@ -340,7 +340,9 @@ async def _trigger_regime_change_note(
                     "rationale": rationale,
                 },
                 "signals": signals,
-                "slug_hint": slugify(f"Regime change {old_regime or 'unknown'} to {new_regime}"),
+                "slug_hint": slugify(
+                    f"Regime change {old_regime or 'unknown'} to {new_regime}"
+                ),
             },
         )
         logger.info("regime_detector.regime_note_generated", regime=new_regime)

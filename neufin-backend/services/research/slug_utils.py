@@ -17,4 +17,3 @@ def estimate_read_time_minutes(*chunks: str) -> int:
             words += len(c.split())
     # Average reading speed ~200 wpm; never show 0.
     return max(1, round(words / 200))
-

@@ -43,6 +43,7 @@ def _scrub(obj: object) -> object:
         }
     return [_scrub(i) for i in obj] if isinstance(obj, list) else obj
 
+
 def _before_send(event: dict, _hint: dict) -> dict | None:
     """Strip sensitive fields from every Sentry event before transmission."""
     for section in ("request", "extra", "contexts"):
@@ -773,9 +774,16 @@ async def analyze_dna(
             status_val = sub.get("status")
             tier_val = str(sub.get("tier") or "").lower()
 
-            if status_val == "expired" and tier_val not in ("retail", "advisor", "enterprise"):
+            if status_val == "expired" and tier_val not in (
+                "retail",
+                "advisor",
+                "enterprise",
+            ):
                 # Trial expired and no paid subscription: block new analyses and provide Stripe checkout URL.
-                price_id = settings.STRIPE_PRICE_ADVISOR_MONTHLY or settings.STRIPE_PRICE_ADVISOR_REPORT_ONETIME
+                price_id = (
+                    settings.STRIPE_PRICE_ADVISOR_MONTHLY
+                    or settings.STRIPE_PRICE_ADVISOR_REPORT_ONETIME
+                )
                 if not (settings.STRIPE_SECRET_KEY and price_id):
                     raise HTTPException(
                         status_code=402,
@@ -787,7 +795,11 @@ async def analyze_dna(
                     )
 
                 stripe.api_key = settings.STRIPE_SECRET_KEY
-                mode = "subscription" if settings.STRIPE_PRICE_ADVISOR_MONTHLY else "payment"
+                mode = (
+                    "subscription"
+                    if settings.STRIPE_PRICE_ADVISOR_MONTHLY
+                    else "payment"
+                )
                 session_params: dict = {
                     "line_items": [{"price": price_id, "quantity": 1}],
                     "mode": mode,
@@ -799,7 +811,9 @@ async def analyze_dna(
                     },
                 }
                 try:
-                    session = await asyncio.to_thread(lambda: stripe.checkout.Session.create(**session_params))
+                    session = await asyncio.to_thread(
+                        lambda: stripe.checkout.Session.create(**session_params)
+                    )
                     raise HTTPException(
                         status_code=402,
                         detail={

@@ -267,7 +267,9 @@ async def get_blog_note(slug: str):
             )
     except Exception as exc:
         logger.error("research.blog_note_failed", slug=slug, error=str(exc))
-        raise HTTPException(status_code=500, detail="Failed to retrieve blog note.") from exc
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve blog note."
+        ) from exc
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Research note not found.")
@@ -289,7 +291,9 @@ async def get_blog_note(slug: str):
     try:
         rel_res = (
             supabase.table("research_notes")
-            .select("id,slug,title,executive_summary,note_type,generated_at,confidence_score")
+            .select(
+                "id,slug,title,executive_summary,note_type,generated_at,confidence_score"
+            )
             .eq("is_public", True)
             .eq("note_type", note.get("note_type"))
             .neq("id", note.get("id"))
@@ -488,7 +492,9 @@ async def semantic_search(
 
 
 @router.get("/portfolio-context/{portfolio_id}")
-async def portfolio_context(portfolio_id: str, user: JWTUser = Depends(get_current_user)):
+async def portfolio_context(
+    portfolio_id: str, user: JWTUser = Depends(get_current_user)
+):
     """
     Returns all recent research notes and signals relevant to a saved portfolio's holdings.
     Soft paywall: allow access after trial expiry (banner handled in UI).

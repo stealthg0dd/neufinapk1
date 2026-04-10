@@ -29,7 +29,13 @@ router = APIRouter(prefix="", tags=["admin"])
 def require_advisor_role(user: JWTUser) -> None:
     """Raise HTTP 403 if the authenticated user does not have role='advisor'."""
     try:
-        result = supabase.table("user_profiles").select("role").eq("id", user.id).single().execute()
+        result = (
+            supabase.table("user_profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single()
+            .execute()
+        )
         profile = result.data or {}
     except Exception as exc:
         logger.warning("admin.role_check_failed", user_id=user.id, error=str(exc))
@@ -81,7 +87,10 @@ async def list_users(
     dna_counts: dict[str, int] = {}
     try:
         dna_result = (
-            supabase.table("dna_scores").select("user_id").in_("user_id", user_ids).execute()
+            supabase.table("dna_scores")
+            .select("user_id")
+            .in_("user_id", user_ids)
+            .execute()
         )
         for row in dna_result.data or []:
             uid = row["user_id"]
@@ -201,7 +210,9 @@ async def resend_onboarding(
             body=resp.text[:200],
         )
     except Exception as exc:
-        logger.warning("admin.resend_onboarding.failed", user_id=user_id, error=str(exc))
+        logger.warning(
+            "admin.resend_onboarding.failed", user_id=user_id, error=str(exc)
+        )
 
     # Best-effort fallback — log and return queued
     logger.info("admin.resend_onboarding.queued", user_id=user_id)

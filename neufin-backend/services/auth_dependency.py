@@ -27,7 +27,9 @@ def fetch_user_profile(user_id: str) -> dict:
     try:
         result = (
             supabase.table("user_profiles")
-            .select("id, email, trial_started_at, subscription_status, subscription_tier")
+            .select(
+                "id, email, trial_started_at, subscription_status, subscription_tier"
+            )
             .eq("id", user_id)
             .single()
             .execute()
@@ -112,7 +114,11 @@ def get_subscription_status(user_id: str) -> dict:
     trial_active, days_remaining = _trial_active_from_profile(profile)
     if trial_active:
         # Trial users get full Advisor-tier access.
-        result = {"status": "trial", "days_remaining": days_remaining, "tier": "advisor"}
+        result = {
+            "status": "trial",
+            "days_remaining": days_remaining,
+            "tier": "advisor",
+        }
         _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
         return result
 

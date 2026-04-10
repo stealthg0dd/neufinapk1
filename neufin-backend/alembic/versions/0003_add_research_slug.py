@@ -32,4 +32,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS research_notes_slug_idx;")
     op.execute("ALTER TABLE research_notes DROP COLUMN IF EXISTS slug;")
-
