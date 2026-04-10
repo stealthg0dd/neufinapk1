@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch } from '@/lib/api-client'
-import { createClient } from '@/lib/supabase'
+import { getSupabaseClient } from '@/lib/supabase'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Position {
@@ -79,7 +79,7 @@ async function callSwarmChat(
   positions:   Position[],
   total_value: number,
 ): Promise<ChatResult> {
-  const supabase = createClient()
+  const supabase = getSupabaseClient()
   const { data: { session } } = await supabase.auth.getSession()
   const token = session?.access_token
 

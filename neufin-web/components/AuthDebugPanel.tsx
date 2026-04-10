@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
+import { getSupabaseClient } from '@/lib/supabase'
 
 // Only rendered in development — zero bundle cost in production.
 export function AuthDebugPanel() {
@@ -23,7 +23,7 @@ export function AuthDebugPanel() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     void supabase.auth.getSession().then(({ data: { session } }) => {
       const sessionToken = session?.access_token ?? null
       setSessionKey(sessionToken ? 'supabase-session' : null)
