@@ -5,12 +5,13 @@ export const dynamic = 'force-dynamic'
 import React, { Suspense, useState, useCallback, useEffect, useMemo } from 'react'
 import AppHeader from '@/components/AppHeader'
 import SwarmTerminal from '@/components/SwarmTerminal'
+import type { AgentTraceItem } from '@/components/SwarmTerminal'
 import CommandPalette from '@/components/CommandPalette'
 import RiskMatrix from '@/components/RiskMatrix'
 import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
 import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
-import { apiFetch, apiPost } from '@/lib/api-client'
+import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
 import { useUser } from '@/lib/store'
 import { debugAuth } from '@/lib/auth-debug'
@@ -65,6 +66,8 @@ function TypewriterText({ text, speed = 8 }: { text: string; speed?: number }) {
 
 // Positions are loaded from localStorage (set by the upload flow) — no hardcoded values
 type SwarmPosition = { symbol: string; shares: number; price: number; value: number; weight: number }
+type JobStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed'
+type SwarmResult = Record<string, any>
 
 function loadPortfolioFromStorage(): { positions: SwarmPosition[]; totalValue: number } | null {
   if (typeof window === 'undefined') return null
@@ -744,9 +747,12 @@ function ScorePill({ label, value, max, color }: { label: string; value: number;
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function SwarmPage() {
-  const [traces,          setTraces]         = useState<string[]>([])
-  const [isRunning,       setIsRunning]       = useState(false)
-  const [thesis,          setThesis]          = useState<Record<string, any> | null>(null)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobStatus, setJobStatus] = useState<JobStatus>('idle')
+  const [agentTrace, setAgentTrace] = useState<AgentTraceItem[]>([])
+  const [result, setResult] = useState<SwarmResult | null>(null)
+  const [pollIntervalRef, setPollIntervalRef] = useState<ReturnType<typeof setInterval> | null>(null)
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [unlockedLocally, setUnlockedLocally] = useState(false)
   const [toast,           setToast]           = useState<string | null>(null)
@@ -754,6 +760,8 @@ export default function SwarmPage() {
   const [failedTickers,   setFailedTickers]   = useState<string[]>([])
   const [positions,       setPositions]       = useState<SwarmPosition[]>([])
   const [totalValue,      setTotalValue]      = useState(0)
+  const thesis = (result?.investment_thesis ?? result) as Record<string, any> | null
+  const isRunning = jobStatus === 'queued' || jobStatus === 'running'
 
   const { isPro, loading: authLoading, user } = useUser()
   const { capture } = useNeufinAnalytics()
@@ -849,28 +857,37 @@ export default function SwarmPage() {
     }
   }, [positions])
 
-  // Restore last report from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const savedId = localStorage.getItem('neufin-swarm-report-id')
-    if (!savedId || thesis) return
-    apiFetch(`${API_BASE}/api/swarm/report/${savedId}`, { method: 'GET' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.investment_thesis) {
-          setThesis(data.investment_thesis)
-          setTraces(['[System] Previous session report restored.'])
-        }
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_BASE])
+  async function pollStatus(id: string) {
+    try {
+      const status = await apiGet<{
+        status: JobStatus
+        agent_trace?: AgentTraceItem[]
+      }>(`/api/swarm/status/${id}`)
 
-  const runSwarm = async () => {
+      setJobStatus(status.status)
+      setAgentTrace(Array.isArray(status.agent_trace) ? status.agent_trace : [])
+
+      if (status.status === 'complete') {
+        if (pollIntervalRef) clearInterval(pollIntervalRef)
+        setPollIntervalRef(null)
+        const fullResult = await apiGet<SwarmResult>(`/api/swarm/result/${id}`)
+        setResult(fullResult)
+        localStorage.setItem('neufin-swarm-job-id', id)
+      } else if (status.status === 'failed') {
+        if (pollIntervalRef) clearInterval(pollIntervalRef)
+        setPollIntervalRef(null)
+      }
+    } catch (err: any) {
+      console.error('[swarm] Poll error:', err)
+    }
+  }
+
+  const startSwarm = async () => {
     if (positions.length === 0) return
-    setTraces([])
-    setThesis(null)
-    setIsRunning(true)
+    setJobStatus('queued')
+    setAgentTrace([])
+    setResult(null)
+    setStartedAtMs(Date.now())
 
     const portfolioId = typeof window !== 'undefined'
       ? (JSON.parse(localStorage.getItem('dnaResult') ?? 'null')?.record_id ?? undefined)
@@ -879,37 +896,45 @@ export default function SwarmPage() {
     perfTimer.start('swarm')
 
     try {
-      const res = await apiFetch(`${API_BASE}/api/swarm/analyze`, {
-        method: 'POST',
-        body: JSON.stringify({
-          positions,
-          total_value: totalValue
-        }),
+      const data = await apiPost<{ job_id: string; status: JobStatus }>('/api/swarm/analyze', {
+        positions: positions.map((p) => ({
+          symbol: p.symbol,
+          shares: p.shares,
+          price: p.price,
+          value: p.value,
+          weight: p.weight,
+        })),
+        total_value: totalValue,
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
-      const data = await res.json()
-      const newThesis = data.investment_thesis ?? null
-      setTraces(data.agent_trace ?? [])
-      setThesis(newThesis)
-      if (data.failed_tickers?.length) setFailedTickers(data.failed_tickers)
-
-      const swarmDurationMs = perfTimer.end('swarm') ?? 0
-      capture('swarm_analysis_completed', {
-        report_id:   newThesis?.swarm_report_id,
-        duration_ms: swarmDurationMs,
-      })
-      captureSentrySlowOp('swarm_analysis', swarmDurationMs)
-
-      if (newThesis?.swarm_report_id && typeof window !== 'undefined') {
-        localStorage.setItem('neufin-swarm-report-id', newThesis.swarm_report_id)
-      }
+      setJobId(data.job_id)
+      setJobStatus(data.status ?? 'queued')
+      const interval = setInterval(() => {
+        void pollStatus(data.job_id)
+      }, 3000)
+      setPollIntervalRef(interval)
+      void pollStatus(data.job_id)
     } catch (e: any) {
       perfTimer.end('swarm') // clean up timer
-      setTraces(prev => [...prev, `[System] ERROR: ${e.message}`])
-    } finally {
-      setIsRunning(false)
+      setJobStatus('failed')
+      console.error('[swarm] Failed to start:', e)
     }
   }
+
+  useEffect(() => {
+    if (jobStatus !== 'complete' || !result) return
+    const swarmDurationMs = perfTimer.end('swarm') ?? 0
+    capture('swarm_analysis_completed', {
+      report_id: thesis?.swarm_report_id,
+      duration_ms: swarmDurationMs,
+    })
+    captureSentrySlowOp('swarm_analysis', swarmDurationMs)
+  }, [jobStatus, result, capture, thesis?.swarm_report_id])
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef) clearInterval(pollIntervalRef)
+    }
+  }, [pollIntervalRef])
 
   const sb = thesis?.score_breakdown ?? {}
 
@@ -955,7 +980,15 @@ export default function SwarmPage() {
             <CommandPalette
               positions={positions}
               total_value={totalValue}
-              onResponse={r => setTraces(prev => [...prev, ...r.thinking_steps])}
+              onResponse={r => setAgentTrace(prev => [
+                ...prev,
+                ...(r.thinking_steps ?? []).map((step: string) => ({
+                  agent: 'synthesizer',
+                  status: 'complete' as const,
+                  summary: step,
+                  ts: new Date().toISOString(),
+                })),
+              ])}
             />
           </Suspense>
           {thesis && (
@@ -972,17 +1005,27 @@ export default function SwarmPage() {
             </button>
           )}
           <button
-            onClick={runSwarm}
+            onClick={startSwarm}
             disabled={isRunning || positions.length === 0}
             title={positions.length === 0 ? 'Upload a portfolio on neufin.app first' : undefined}
             className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded border transition-all disabled:opacity-40"
             style={{
-              background:  isRunning ? 'transparent' : '#FFB900',
-              color:       isRunning ? '#FFB900'     : '#000',
-              borderColor: '#FFB900',
+              background: jobStatus === 'failed' ? '#7f1d1d' : isRunning ? 'transparent' : '#06b6d4',
+              color: isRunning ? '#FFB900' : jobStatus === 'failed' ? '#fecaca' : '#000',
+              borderColor: isRunning ? '#FFB900' : jobStatus === 'failed' ? '#ef4444' : '#06b6d4',
             }}
           >
-            {isRunning ? '● RUNNING...' : positions.length === 0 ? '▶ NO PORTFOLIO' : '▶ RUN SWARM'}
+            {positions.length === 0
+              ? '▶ NO PORTFOLIO'
+              : jobStatus === 'queued'
+                ? 'Queuing...'
+                : jobStatus === 'running'
+                  ? `Agents running... ${agentTrace.filter((t) => t.status === 'complete').length}/7`
+                  : jobStatus === 'complete'
+                    ? '▶ Run New Analysis'
+                    : jobStatus === 'failed'
+                      ? '▶ Retry Analysis'
+                      : '▶ Run IC Analysis'}
           </button>
         </div>
       </nav>
@@ -992,7 +1035,7 @@ export default function SwarmPage() {
 
         {/* Agent trace terminal */}
         <div className="xl:col-span-5">
-          <SwarmTerminal traces={traces} isRunning={isRunning} />
+          <SwarmTerminal status={jobStatus} trace={agentTrace} onRetry={startSwarm} />
         </div>
 
         {/* IC Briefing */}
@@ -1158,6 +1201,49 @@ export default function SwarmPage() {
       </div>
 
       {/* ── Research Intelligence Grid ────────────────────────────────────────── */}
+      {thesis && (
+        <div className="max-w-[1600px] mx-auto px-4 pb-6">
+          <div className="mb-4 grid gap-3 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] p-4 md:grid-cols-4">
+            <div className="flex items-center gap-3">
+              <svg viewBox="0 0 120 120" className="h-16 w-16">
+                <circle cx="60" cy="60" r="52" stroke="#1f2937" strokeWidth="10" fill="none" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  stroke="#22d3ee"
+                  strokeWidth="10"
+                  fill="none"
+                  strokeDasharray={`${Math.max(0, Math.min(100, Number(thesis?.dna_score ?? 0))) * 3.27} 999`}
+                  transform="rotate(-90 60 60)"
+                />
+                <text x="60" y="65" textAnchor="middle" className="fill-white text-xl font-bold">
+                  {Number(thesis?.dna_score ?? 0)}
+                </text>
+              </svg>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-[#666]">DNA Score</p>
+                <p className="text-xs text-[#9ca3af]">Institutional fit signal</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">Investor Archetype</p>
+              <p className="mt-1 text-sm text-white">{thesis?.investor_type ?? 'Advisor'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">Market Regime</p>
+              <p className="mt-1 text-sm text-cyan-300">{thesis?.regime ?? 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">Elapsed</p>
+              <p className="mt-1 text-sm text-white">
+                {startedAtMs ? Math.max(1, Math.round((Date.now() - startedAtMs) / 1000)) : 0}s
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {thesis && (
         <div className="max-w-[1600px] mx-auto px-4 pb-8">
           <div className="border-t border-[#1e1e1e] pt-5 mb-4 flex items-center gap-3">
