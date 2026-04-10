@@ -14,22 +14,52 @@ const nextConfig = {
   // Required for the production Docker image (copies only what node server.js needs).
   // Has no effect on `next dev` — safe to leave on at all times.
   output: 'standalone',
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+      },
+    ],
+  },
 
-  // Proxy /api/* to Railway backend — avoids CORS entirely for same-origin calls
+  // Sentry pulls @opentelemetry/instrumentation; webpack warns on dynamic requires (harmless).
+  webpack: (config) => {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /@opentelemetry\/instrumentation/,
+        message: /Critical dependency: the request of a dependency is an expression/,
+      },
+    ]
+    return config
+  },
+
+  // Proxy /api/* to Railway only when no local App Router handler exists.
+  // IMPORTANT: use `fallback` so /api/stripe/webhook (and every app/api/**/route.ts)
+  // is never proxied — `afterFiles`-style rewrites can run before some API matches and
+  // break Stripe signature verification (wrong host + wrong STRIPE_WEBHOOK_SECRET).
   async rewrites() {
     const railwayBase =
       process.env.RAILWAY_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       'https://neufin101-production.up.railway.app'
-    // Local proxy routes in app/api/** take priority over this rewrite.
-    // This rewrite only catches routes that have no local handler.
-    // All known routes should have local handlers in app/api/.
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${railwayBase}/api/:path*`,
-      },
-    ]
+    return {
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: `${railwayBase}/api/:path*`,
+        },
+      ],
+    }
   },
 
   // Security & CORS response headers for direct cross-origin calls

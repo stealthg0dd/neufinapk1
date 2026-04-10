@@ -130,6 +130,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} dark`}
     >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if (typeof window !== 'undefined') { if (history.scrollRestoration) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0); }`,
+          }}
+        />
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z2E03GFJP3"></script>
         <script
           dangerouslySetInnerHTML={{
