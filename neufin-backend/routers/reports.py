@@ -49,7 +49,7 @@ class ColorScheme(BaseModel):
 class ReportRequest(BaseModel):
     portfolio_id: str
     advisor_id: str
-    advisor_name: str = "Neufin Advisor"
+    advisor_name: str = "NeuFin"
     logo_base64: str | None = None  # base64-encoded PNG/JPG advisor logo
     color_scheme: ColorScheme | None = None
 

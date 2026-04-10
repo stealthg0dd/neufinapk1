@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { GenerateIcReportButton } from '@/components/dashboard/GenerateIcReportButton'
 
 type VaultReport = {
   id: string
+  portfolio_id?: string | null
   portfolio_name?: string
   created_at?: string
   pdf_url?: string | null
@@ -67,7 +69,12 @@ export default async function DashboardReportsPage() {
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{r.portfolio_name || 'Portfolio'}</p>
-                <p className="text-xs text-muted-foreground">{r.id}</p>
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  {r.portfolio_id || r.id}
+                  {!r.portfolio_id && (
+                    <span className="ml-1 text-amber-500/80">(link a portfolio via analysis)</span>
+                  )}
+                </p>
               </div>
               <div className="text-xs text-muted-foreground">
                 {r.created_at
@@ -95,9 +102,7 @@ export default async function DashboardReportsPage() {
                     Download PDF
                   </a>
                 ) : (
-                  <Link href="/dashboard/portfolio" className="text-xs text-primary hover:underline">
-                    Generate Report
-                  </Link>
+                  <GenerateIcReportButton portfolioId={r.portfolio_id} className="text-xs text-primary hover:underline" />
                 )}
               </div>
             </div>

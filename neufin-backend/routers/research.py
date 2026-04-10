@@ -348,6 +348,14 @@ async def get_blog_note(slug: str):
     except Exception as exc:
         logger.debug("research.blog_related_failed", error=str(exc))
 
+    ds = note.get("data_sources")
+    if isinstance(ds, str):
+        try:
+            ds = json.loads(ds)
+        except (json.JSONDecodeError, TypeError):
+            ds = []
+    macro_signal_count = len(ds) if isinstance(ds, list) else 0
+
     return {
         "id": note.get("id"),
         "slug": note_slug,
@@ -355,12 +363,14 @@ async def get_blog_note(slug: str):
         "executive_summary": summary,
         "content": content,
         "note_type": note.get("note_type"),
+        "regime": note.get("regime"),
         "confidence_score": note.get("confidence_score"),
         "created_at": note.get("generated_at"),
         "read_time_minutes": estimate_read_time_minutes(summary, content),
         "asset_tickers": [str(t).upper() for t in tickers if isinstance(t, str)],
         "meta_description": (summary[:160] if summary else title[:160]),
         "related_notes": related,
+        "macro_signal_count": macro_signal_count,
     }
 
 

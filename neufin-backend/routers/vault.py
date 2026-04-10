@@ -156,22 +156,73 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
     """
     Return all DNA scores for the authenticated user, newest first.
     Excludes positions/raw data — just the scored records.
+
+    Enriches each row with portfolio_id, portfolio_name (from portfolios),
+    and the latest advisor_reports pdf_url / is_paid for that portfolio when
+    the report belongs to this user.
     """
     uid = user.id
     try:
         result = (
             supabase.table("dna_scores")
             .select(
-                "id, dna_score, investor_type, recommendation, share_token, total_value, created_at"
+                "id, dna_score, investor_type, recommendation, share_token, total_value, created_at, portfolio_id"
             )
             .eq("user_id", uid)
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
         )
-        return {"history": result.data or []}
+        rows = result.data or []
     except Exception as e:
         raise HTTPException(500, f"Could not fetch history: {e}") from e
+
+    pids = list({str(r["portfolio_id"]) for r in rows if r.get("portfolio_id")})
+    names: dict[str, str | None] = {}
+    if pids:
+        try:
+            pr = (
+                supabase.table("portfolios")
+                .select("id, name")
+                .in_("id", pids)
+                .execute()
+            )
+            for p in pr.data or []:
+                names[str(p["id"])] = p.get("name")
+        except Exception:
+            pass
+
+    pdf_by_pid: dict[str, str | None] = {}
+    paid_by_pid: dict[str, bool] = {}
+    if pids:
+        try:
+            rep = (
+                supabase.table("advisor_reports")
+                .select("portfolio_id, pdf_url, is_paid, created_at")
+                .eq("advisor_id", uid)
+                .in_("portfolio_id", pids)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            for r in rep.data or []:
+                pid = str(r.get("portfolio_id") or "")
+                if pid and pid not in pdf_by_pid:
+                    pdf_by_pid[pid] = r.get("pdf_url")
+                    paid_by_pid[pid] = bool(r.get("is_paid"))
+        except Exception:
+            pass
+
+    enriched = []
+    for r in rows:
+        pid = r.get("portfolio_id")
+        pid_str = str(pid) if pid else None
+        row = dict(r)
+        row["portfolio_name"] = names.get(pid_str) if pid_str else None
+        row["pdf_url"] = pdf_by_pid.get(pid_str) if pid_str else None
+        row["is_paid"] = paid_by_pid.get(pid_str, False) if pid_str else False
+        enriched.append(row)
+
+    return {"history": enriched}
 
 
 # ── Claim anonymous record (single, by record_id) ──────────────────────────────

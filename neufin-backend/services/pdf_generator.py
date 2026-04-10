@@ -257,7 +257,7 @@ def _make_page_callbacks(
 def generate_advisor_report(
     portfolio_data: dict,
     analysis: dict,
-    advisor_name: str = "Neufin Advisor",
+    advisor_name: str = "NeuFin",
     logo_base64: str | None = None,
     color_scheme: dict | None = None,
 ) -> bytes:
