@@ -924,10 +924,10 @@ def _build_pdf_sync(
     else:
         alloc_rows = [
             [
-                Paragraph(_xml(str(lab)), styles["body"]),
+                Paragraph(_xml(str(labels_pie[i])), styles["body"]),
                 Table(
                     [[""]],
-                    colWidths=[max(20, min(120, float(v) * 1.2))],
+                    colWidths=[max(20, min(120, float(vals_pie[i]) * 1.2))],
                     rowHeights=[10],
                     style=TableStyle(
                         [
@@ -935,9 +935,9 @@ def _build_pdf_sync(
                         ]
                     ),
                 ),
-                Paragraph(f"{float(v):.1f}%", styles["body"]),
+                Paragraph(f"{float(vals_pie[i]):.1f}%", styles["body"]),
             ]
-            for lab, v in zip(labels_pie, vals_pie)
+            for i in range(len(labels_pie))
         ]
         left = Table(
             alloc_rows,
