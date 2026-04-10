@@ -121,6 +121,60 @@ Return ONLY valid JSON:
         return None
 
 
+async def _get_portfolio_for_report(portfolio_id: str) -> dict:
+    positions_result = (
+        supabase.table("portfolio_positions")
+        .select("symbol, shares")
+        .eq("portfolio_id", portfolio_id)
+        .execute()
+    )
+    if not positions_result.data:
+        raise RuntimeError("No portfolio positions found for report generation.")
+    metrics = calculate_portfolio_metrics(positions_result.data)
+    prompt = f"""You are a senior portfolio strategist.
+Portfolio metrics: {metrics}
+Return ONLY valid JSON:
+{{
+  "dna_score": <0-100>,
+  "investor_type": "<Diversified Strategist | Conviction Growth | Momentum Trader | Defensive Allocator | Speculative Investor>",
+  "strengths": ["s1","s2","s3"],
+  "weaknesses": ["w1","w2"],
+  "recommendation": "<actionable recommendation>",
+  "risk_assessment": "<2-sentence risk overview>",
+  "market_outlook": "<2-sentence market positioning>",
+  "action_items": ["a1","a2","a3"]
+}}"""
+    analysis = await get_ai_analysis(prompt)
+    return {"portfolio_data": {"metrics": metrics}, "analysis": analysis}
+
+
+async def _generate_pdf_background(report_id: str, portfolio_id: str):
+    """Runs after webhook response. Generates PDF and updates status."""
+    try:
+        payload = await _get_portfolio_for_report(portfolio_id)
+        pdf_bytes = generate_advisor_report(
+            payload["portfolio_data"], payload["analysis"]
+        )
+        pdf_url = _upload_pdf(pdf_bytes, report_id)
+        if not pdf_url:
+            raise RuntimeError("PDF upload failed")
+        supabase.table("advisor_reports").update(
+            {
+                "pdf_url": pdf_url,
+                "status": "ready",
+                "generation_completed_at": datetime.datetime.utcnow().isoformat(),
+                "error_message": None,
+            }
+        ).eq("id", report_id).execute()
+    except Exception as e:
+        supabase.table("advisor_reports").update(
+            {
+                "status": "failed",
+                "error_message": str(e),
+            }
+        ).eq("id", report_id).execute()
+
+
 def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
     try:
         portfolio_result = (
@@ -389,15 +443,19 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
         stripe_customer_id = session.get("customer")
 
         if plan == "single" and report_id:
-            # Mark paid synchronously — fast DB call
-            supabase.table("advisor_reports").update({"is_paid": True}).eq(
-                "id", report_id
-            ).execute()
-            # Queue PDF generation as background task so we return 200 to Stripe
-            # immediately — PDF generation can take 3-30 seconds.
+            # Mark as paid and set async generation state.
+            supabase.table("advisor_reports").update(
+                {
+                    "is_paid": True,
+                    "status": "generating",
+                    "generation_started_at": datetime.datetime.utcnow().isoformat(),
+                    "error_message": None,
+                }
+            ).eq("id", report_id).execute()
+            # Queue PDF generation in background to return to Stripe immediately.
             if portfolio_id:
                 background_tasks.add_task(
-                    _generate_and_store_pdf, portfolio_id, report_id
+                    _generate_pdf_background, report_id, portfolio_id
                 )
 
         elif plan == "unlimited" and advisor_id and advisor_id != "anonymous":
@@ -446,13 +504,25 @@ async def fulfill_report(
 ):
     """
     Called from the frontend success page.
-    If the report is paid but has no PDF yet, generates it now.
-    Returns { pdf_url } or triggers generation.
+    Returns explicit report status state for polling UX.
     """
+    # Supabase migration to run before deploying this flow:
+    # /*
+    # ALTER TABLE advisor_reports
+    #   ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending',
+    #   ADD COLUMN IF NOT EXISTS error_message TEXT,
+    #   ADD COLUMN IF NOT EXISTS generation_started_at TIMESTAMPTZ,
+    #   ADD COLUMN IF NOT EXISTS generation_completed_at TIMESTAMPTZ;
+    #
+    # CREATE INDEX IF NOT EXISTS idx_advisor_reports_status
+    #   ON advisor_reports(status);
+    # */
     try:
         result = (
             supabase.table("advisor_reports")
-            .select("id, portfolio_id, advisor_id, is_paid, pdf_url")
+            .select(
+                "id, portfolio_id, advisor_id, is_paid, pdf_url, status, error_message, created_at"
+            )
             .eq("id", report_id)
             .single()
             .execute()
@@ -467,21 +537,15 @@ async def fulfill_report(
             raise HTTPException(401, "Authentication required for this report.")
         if record.get("advisor_id") != user.id:
             raise HTTPException(404, "Report not found.")
-    if not record["is_paid"]:
-        raise HTTPException(
-            402, "Payment not yet confirmed. Please wait a moment and retry."
-        )
 
-    # Already has PDF
-    if record.get("pdf_url"):
-        return {"pdf_url": record["pdf_url"], "ready": True}
-
-    # Generate now
-    pdf_url = await _generate_and_store_pdf(record["portfolio_id"], report_id)
-    if not pdf_url:
-        raise HTTPException(500, "PDF generation failed. Please contact support.")
-
-    return {"pdf_url": pdf_url, "ready": True}
+    return {
+        "report_id": report_id,
+        "status": record.get("status", "pending"),  # pending|generating|ready|failed
+        "is_paid": record.get("is_paid", False),
+        "pdf_url": record.get("pdf_url"),
+        "error": record.get("error_message"),
+        "created_at": record.get("created_at"),
+    }
 
 
 @router.get("/api/payments/plans")

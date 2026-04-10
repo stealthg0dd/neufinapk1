@@ -484,6 +484,7 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
 # Swarm async job cache (Redis)
 # ══════════════════════════════════════════════════════════════════════════════
 SWARM_JOB_TTL = 86_400  # 24 hours
+_SWARM_JOB_MEMORY: dict[str, dict] = {}
 
 
 async def get_redis():
@@ -518,36 +519,47 @@ async def create_swarm_job(user_id: str | None, session_id: str) -> str:
             SWARM_JOB_TTL,
             json.dumps(job),
         )
+    else:
+        # Fallback for environments where Redis is temporarily unavailable.
+        # Keeps job polling functional on single-worker deployments.
+        _SWARM_JOB_MEMORY[job_id] = job
+        logger.warning("swarm.job_store_fallback_memory", job_id=job_id)
     return job_id
 
 
 async def update_swarm_job(job_id: str, **kwargs) -> None:
     """Patch fields on a swarm job. Call after each agent completes."""
     redis = await get_redis()
-    if not redis:
-        return
     import asyncio
 
-    raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
-    if not raw:
-        return
-    job = json.loads(raw)
+    if redis:
+        raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+        if not raw:
+            return
+        job = json.loads(raw)
+    else:
+        job = _SWARM_JOB_MEMORY.get(job_id)
+        if not job:
+            return
     job.update(kwargs)
     job["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
-    await asyncio.to_thread(
-        redis.setex,
-        f"swarm:job:{job_id}",
-        SWARM_JOB_TTL,
-        json.dumps(job),
-    )
+    if redis:
+        await asyncio.to_thread(
+            redis.setex,
+            f"swarm:job:{job_id}",
+            SWARM_JOB_TTL,
+            json.dumps(job),
+        )
+    else:
+        _SWARM_JOB_MEMORY[job_id] = job
 
 
 async def get_swarm_job(job_id: str) -> dict | None:
     """Fetch swarm job state."""
     redis = await get_redis()
-    if not redis:
-        return None
     import asyncio
 
-    raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
-    return json.loads(raw) if raw else None
+    if redis:
+        raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+        return json.loads(raw) if raw else None
+    return _SWARM_JOB_MEMORY.get(job_id)
