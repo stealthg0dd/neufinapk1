@@ -17,6 +17,7 @@ import datetime
 import json
 import math
 import time
+import uuid
 from dataclasses import dataclass
 
 import pandas as pd
@@ -477,3 +478,76 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
             "market_cache.pricecache_get_failed", symbol=symbol, error=str(e)
         )
         return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Swarm async job cache (Redis)
+# ══════════════════════════════════════════════════════════════════════════════
+SWARM_JOB_TTL = 86_400  # 24 hours
+
+
+async def get_redis():
+    """Async wrapper around the module Redis singleton getter."""
+    import asyncio
+
+    return await asyncio.to_thread(_get_redis)
+
+
+async def create_swarm_job(user_id: str | None, session_id: str) -> str:
+    """Create a new swarm job, return job_id."""
+    job_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    job = {
+        "job_id": job_id,
+        "user_id": user_id,
+        "session_id": session_id,
+        "status": "queued",  # queued | running | complete | failed
+        "agent_trace": [],  # list of {agent, status, summary, ts}
+        "result": None,
+        "error": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    redis = await get_redis()
+    if redis:
+        import asyncio
+
+        await asyncio.to_thread(
+            redis.setex,
+            f"swarm:job:{job_id}",
+            SWARM_JOB_TTL,
+            json.dumps(job),
+        )
+    return job_id
+
+
+async def update_swarm_job(job_id: str, **kwargs) -> None:
+    """Patch fields on a swarm job. Call after each agent completes."""
+    redis = await get_redis()
+    if not redis:
+        return
+    import asyncio
+
+    raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+    if not raw:
+        return
+    job = json.loads(raw)
+    job.update(kwargs)
+    job["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+    await asyncio.to_thread(
+        redis.setex,
+        f"swarm:job:{job_id}",
+        SWARM_JOB_TTL,
+        json.dumps(job),
+    )
+
+
+async def get_swarm_job(job_id: str) -> dict | None:
+    """Fetch swarm job state."""
+    redis = await get_redis()
+    if not redis:
+        return None
+    import asyncio
+
+    raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+    return json.loads(raw) if raw else None

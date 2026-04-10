@@ -12,7 +12,7 @@ import re
 import uuid
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 # ── Prompt injection patterns ─────────────────────────────────────────────────
@@ -58,6 +58,11 @@ from services.auth_dependency import (  # noqa: E402
     require_active_subscription,
 )
 from services.jwt_auth import JWTUser  # noqa: E402
+from services.market_cache import (  # noqa: E402
+    create_swarm_job,
+    get_swarm_job,
+    update_swarm_job,
+)
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
@@ -78,6 +83,7 @@ class SwarmAnalyzeRequest(BaseModel):
     positions: list[Position]
     total_value: float
     user_id: str | None = None
+    session_id: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -99,7 +105,7 @@ class GlobalChatRequest(BaseModel):
 # ── Background persistence helper ──────────────────────────────────────────────
 async def _persist_swarm_result(
     report_id: str, user_id: str | None, result: dict
-) -> None:
+) -> str:
     """
     Persist swarm result to Supabase swarm_reports table.
     Now async and awaited directly in the analyze endpoint so the record is
@@ -145,6 +151,7 @@ async def _persist_swarm_result(
         logger.info("swarm.persist_ok", report_id=report_id)
     except Exception as e:
         logger.warning("swarm.persist_failed", report_id=report_id, error=str(e))
+    return report_id
 
 
 # ── MD context builder ─────────────────────────────────────────────────────────
@@ -231,8 +238,9 @@ Return ONLY valid JSON (no markdown):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 @router.post("/analyze")
-async def analyze_with_swarm(
-    body: SwarmAnalyzeRequest,
+async def start_swarm_analysis(
+    payload: SwarmAnalyzeRequest,
+    background_tasks: BackgroundTasks,
     user: JWTUser | None = Depends(get_optional_user),
 ):
     """
@@ -246,35 +254,149 @@ async def analyze_with_swarm(
     A `swarm_report_id` is injected into investment_thesis so the frontend
     can tie subsequent chat calls to this specific analysis.
     """
+    if not payload.positions:
+        raise HTTPException(status_code=400, detail="positions list must not be empty.")
+    if user:
+        require_active_subscription(user)
+
+    return {
+        **(
+            await _start_swarm_job(
+                payload=payload,
+                background_tasks=background_tasks,
+                user=user,
+            )
+        )
+    }
+
+
+async def _start_swarm_job(
+    payload: SwarmAnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    user: JWTUser | None,
+) -> dict:
+    user_id = str(user.id) if user else None
+    session_id = payload.session_id or str(uuid.uuid4())
+
+    # Create job record in Redis
+    job_id = await create_swarm_job(user_id, session_id)
+
+    # Fire swarm in background — does NOT block response
+    background_tasks.add_task(
+        _run_swarm_background,
+        job_id=job_id,
+        positions=[p.model_dump() for p in payload.positions],
+        total_value=payload.total_value,
+        user_id=user_id,
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "poll_url": f"/api/swarm/status/{job_id}",
+        "estimated_seconds": 75,
+    }
+
+
+async def _run_swarm_background(
+    job_id: str,
+    positions: list[dict],
+    total_value: float,
+    user_id: str | None,
+):
+    """Runs in background after response is sent."""
+    try:
+        await update_swarm_job(job_id, status="running")
+
+        # Prepare ticker data exactly as before
+        ticker_data = {p["symbol"]: p for p in positions}
+
+        # Run swarm — now passes job_id for live trace updates
+        result = await run_swarm(
+            ticker_data=ticker_data,
+            total_value=total_value,
+            job_id=job_id,
+        )
+
+        # Persist to Supabase (existing _persist_swarm_result)
+        report_id = await _persist_swarm_result(str(uuid.uuid4()), user_id, result)
+        thesis = result.get("investment_thesis", {}) if isinstance(result, dict) else {}
+        if isinstance(thesis, dict):
+            thesis["swarm_report_id"] = report_id
+        result["swarm_report_id"] = report_id
+
+        # Final job state update
+        await update_swarm_job(
+            job_id,
+            status="complete",
+            result=result,
+        )
+    except Exception as e:
+        import traceback
+
+        await update_swarm_job(
+            job_id,
+            status="failed",
+            error=str(e),
+            error_detail=traceback.format_exc(),
+        )
+
+
+@router.get("/status/{job_id}")
+async def get_swarm_status(job_id: str):
+    """Poll this every 3s to get live agent trace and job status."""
+    job = await get_swarm_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found or expired")
+
+    result = job.get("result") or {}
+    thesis = result.get("investment_thesis", {}) if isinstance(result, dict) else {}
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],  # queued|running|complete|failed
+        "agent_trace": job.get("agent_trace", []),
+        "error": job.get("error"),
+        "created_at": job["created_at"],
+        "updated_at": job["updated_at"],
+        "dna_score": (
+            thesis.get("dna_score")
+            if isinstance(thesis, dict)
+            else result.get("dna_score")
+        ),
+        "headline": (thesis.get("headline") if isinstance(thesis, dict) else None),
+    }
+
+
+@router.get("/result/{job_id}")
+async def get_swarm_result(job_id: str):
+    """Fetch full result when status == complete."""
+    job = await get_swarm_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found or expired")
+    if job["status"] != "complete":
+        raise HTTPException(202, "Job not yet complete")
+    return job["result"]
+
+
+@router.post("/analyze-sync")
+async def analyze_with_swarm_sync(
+    body: SwarmAnalyzeRequest,
+    user: JWTUser | None = Depends(get_optional_user),
+):
+    """
+    Backward-compatible synchronous endpoint retained for internal fallback.
+    """
     if not body.positions:
         raise HTTPException(status_code=400, detail="positions list must not be empty.")
     if user:
         require_active_subscription(user)
 
     ticker_data = [p.model_dump() for p in body.positions]
-
-    try:
-        result = await run_swarm(ticker_data, body.total_value)
-    except Exception as e:
-        logger.warning("swarm.analyze_exception", error=str(e))
-        return {
-            "investment_thesis": {"error": str(e), "status": "failed"},
-            "risk_metrics": {},
-            "tax_analysis": {},
-            "macro_context": "",
-            "critique": "",
-            "agent_trace": [f"ERROR: {e}"],
-            # FIXED: key_numbers always present so frontend never crashes on undefined
-            "key_numbers": {"score": 0, "status": "unavailable"},
-        }
-
-    report_id = str(uuid.uuid4())
+    result = await run_swarm(ticker_data=ticker_data, total_value=body.total_value)
+    report_id = await _persist_swarm_result(str(uuid.uuid4()), body.user_id, result)
     thesis = result.get("investment_thesis", {})
-    thesis["swarm_report_id"] = report_id
-
-    # Always persist — user_id is NULL for anonymous users (allowed by schema)
-    await _persist_swarm_result(report_id, body.user_id, result)
-
+    if isinstance(thesis, dict):
+        thesis["swarm_report_id"] = report_id
     return {
         "investment_thesis": thesis,
         "risk_metrics": result.get("risk_metrics", {}),
@@ -282,7 +404,6 @@ async def analyze_with_swarm(
         "macro_context": result.get("macro_context", ""),
         "critique": result.get("critique", ""),
         "agent_trace": result.get("agent_trace", []),
-        # FIXED: key_numbers always present — extracted from thesis for convenience
         "key_numbers": {
             "dna_score": str(
                 thesis.get("dna_score") or thesis.get("health_score") or ""

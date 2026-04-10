@@ -66,6 +66,7 @@ from services.risk_engine import (  # noqa: E402
     format_clusters_for_ai,
 )
 from services.stress_tester import StressTester, compute_factor_metrics  # noqa: E402
+from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
 
 
 # alerts router is in routers/ — import lazily to avoid circular dependency at
@@ -1631,14 +1632,37 @@ else:
     swarm = None
 
 
-async def run_swarm(ticker_data: list[dict], total_value: float) -> dict:
+async def run_swarm(
+    ticker_data: list[dict] | dict,
+    total_value: float,
+    job_id: str | None = None,
+) -> dict:
     """
     Primary entry point: run the full 7-agent swarm and return the final state.
 
     Works whether or not langgraph is installed.
     """
+    normalized_ticker_data = (
+        list(ticker_data.values()) if isinstance(ticker_data, dict) else ticker_data
+    )
+
+    async def _trace(agent: str, status: str, summary: str = ""):
+        if not job_id:
+            return
+        job = await get_swarm_job(job_id)
+        trace = job.get("agent_trace", []) if job else []
+        trace.append(
+            {
+                "agent": agent,
+                "status": status,  # running | complete | failed
+                "summary": summary,
+                "ts": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
+        )
+        await update_swarm_job(job_id, agent_trace=trace)
+
     initial: dict = {
-        "ticker_data": ticker_data,
+        "ticker_data": normalized_ticker_data,
         "total_value": total_value,
         "macro_context": "",
         "market_regime": {},
@@ -1654,8 +1678,96 @@ async def run_swarm(ticker_data: list[dict], total_value: float) -> dict:
     }
 
     if swarm is not None:
-        return await swarm.ainvoke(initial)  # type: ignore[union-attr]
-    return await _run_sequential(initial)
+        # Manual orchestration with trace hooks to emit per-agent progress.
+        state: dict = dict(initial)
+        nodes: list[tuple[str, callable]] = [
+            ("market_regime", market_regime_node),
+            ("strategist", strategist_node),
+            ("quant", quant_node),
+            ("tax_architect", tax_arch_node),
+            ("risk_sentinel", risk_sentinel_node),
+            ("alpha_scout", alpha_scout_node),
+            ("critic", critic_node),
+        ]
+        for agent, node_fn in nodes:
+            if agent != "critic":
+                await _trace(agent, "running")
+            update = await node_fn(state)  # type: ignore[arg-type]
+            for k, v in update.items():
+                if k == "agent_trace":
+                    state["agent_trace"] = state.get("agent_trace", []) + v
+                else:
+                    state[k] = v
+            if agent != "critic":
+                await _trace(agent, "complete")
+            if (
+                agent == "critic"
+                and state.get("needs_revision")
+                and state.get("revision_count", 0) <= 1
+            ):
+                # Keep existing behavior: quant->tax->risk->alpha->critic second pass.
+                for revision_agent, revision_fn in [
+                    ("quant", quant_node),
+                    ("tax_architect", tax_arch_node),
+                    ("risk_sentinel", risk_sentinel_node),
+                    ("alpha_scout", alpha_scout_node),
+                    ("critic", critic_node),
+                ]:
+                    if revision_agent != "critic":
+                        await _trace(
+                            revision_agent,
+                            "running",
+                            "revision pass triggered by critic",
+                        )
+                    revision_update = await revision_fn(state)  # type: ignore[arg-type]
+                    for k, v in revision_update.items():
+                        if k == "agent_trace":
+                            state["agent_trace"] = state.get("agent_trace", []) + v
+                        else:
+                            state[k] = v
+                    if revision_agent != "critic":
+                        await _trace(
+                            revision_agent, "complete", "revision pass complete"
+                        )
+
+        await _trace("synthesizer", "running")
+        synth_update = await synthesizer_node(state)  # type: ignore[arg-type]
+        for k, v in synth_update.items():
+            if k == "agent_trace":
+                state["agent_trace"] = state.get("agent_trace", []) + v
+            else:
+                state[k] = v
+        await _trace("synthesizer", "complete")
+        final_output = state
+        if job_id:
+            await update_swarm_job(job_id, status="complete", result=final_output)
+        return final_output
+
+    # Sequential fallback runtime (langgraph unavailable).
+    state = dict(initial)
+    for agent, node_fn in [
+        ("market_regime", market_regime_node),
+        ("strategist", strategist_node),
+        ("quant", quant_node),
+        ("tax_architect", tax_arch_node),
+        ("risk_sentinel", risk_sentinel_node),
+        ("alpha_scout", alpha_scout_node),
+        ("critic", critic_node),
+        ("synthesizer", synthesizer_node),
+    ]:
+        if agent != "critic":
+            await _trace(agent, "running")
+        update = await node_fn(state)  # type: ignore[arg-type]
+        for k, v in update.items():
+            if k == "agent_trace":
+                state["agent_trace"] = state.get("agent_trace", []) + v
+            else:
+                state[k] = v
+        if agent != "critic":
+            await _trace(agent, "complete")
+    if job_id:
+        await update_swarm_job(job_id, status="complete", result=state)
+    return state
 
 
 # ══════════════════════════════════════════════════════════════════════════════
