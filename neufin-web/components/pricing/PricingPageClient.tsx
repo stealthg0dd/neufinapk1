@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth-context'
 import { apiFetch } from '@/lib/api-client'
 import { GlassCard } from '@/components/ui/GlassCard'
 import toast from 'react-hot-toast'
+import { stripeSuccessUrlDashboard } from '@/lib/stripe-checkout-urls'
 
 const faqs = [
   {
@@ -79,7 +80,7 @@ export default function PricingPageClient() {
         method: 'POST',
         body: JSON.stringify({
           plan: 'unlimited',
-          success_url: `${origin}/pricing/success`,
+          success_url: stripeSuccessUrlDashboard(origin),
           cancel_url: `${origin}/pricing`,
         }),
       })

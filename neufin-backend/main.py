@@ -149,6 +149,15 @@ def _check_supabase_connected() -> bool:
 _heartbeat_task: asyncio.Task | None = None
 
 
+def _first_present_env(*names: str) -> str:
+    """Return first env name that is present/non-empty, else MISSING."""
+    for name in names:
+        val = os.getenv(name)
+        if val and val.strip():
+            return name
+    return "MISSING"
+
+
 async def _register_with_router_system() -> None:
     """POST service registration to the Agent OS router-system on startup."""
     if not settings.AGENT_OS_API_KEY:
@@ -186,9 +195,19 @@ async def _heartbeat_loop() -> None:
         if not settings.AGENT_OS_API_KEY:
             continue
         try:
+            payload = {
+                "service": "neufin-backend",
+                "status": "ok",
+                "version": settings.APP_VERSION,
+                "environment": settings.ENVIRONMENT,
+                "uptime_seconds": round(time.monotonic() - _startup_time, 1),
+                "base_url": settings.APP_BASE_URL,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
                     f"{settings.AGENT_OS_URL}/api/heartbeat/neufin-backend",
+                    json=payload,
                     headers={"x-api-key": settings.AGENT_OS_API_KEY},
                 )
                 resp.raise_for_status()
@@ -211,6 +230,16 @@ async def lifespan(app: FastAPI):
         version=settings.APP_VERSION,
         environment=settings.ENVIRONMENT,
         sentry_active=bool(settings.SENTRY_DSN),
+    )
+    logger.info(
+        "env.alias_resolution",
+        anthropic_key_source=_first_present_env("ANTHROPIC_API_KEY", "ANTHROPIC_KEY_1"),
+        gemini_key_source=_first_present_env("GEMINI_KEY", "GOOGLE_API_KEY"),
+        openai_key_source=_first_present_env("OPENAI_KEY", "OPENAI_API_KEY"),
+        supabase_service_key_source=_first_present_env(
+            "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"
+        ),
+        agent_os_key_source=_first_present_env("AGENT_OS_API_KEY", "ROUTER_SECRET_KEY"),
     )
 
     # Register with router-system (non-blocking — warning on failure)

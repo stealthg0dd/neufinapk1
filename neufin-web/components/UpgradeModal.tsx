@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { apiPost } from '@/lib/api-client'
+import { stripeSuccessUrlDashboard } from '@/lib/stripe-checkout-urls'
 
 const PLAN_OPTIONS = [
   {
@@ -57,7 +58,7 @@ export default function UpgradeModal() {
         {
           plan: selectedPlan,
           price_id: plan.priceId,
-          success_url: `${origin}/pricing/success`,
+          success_url: stripeSuccessUrlDashboard(origin),
           cancel_url: `${origin}/pricing`,
         }
       )
