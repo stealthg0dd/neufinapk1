@@ -95,6 +95,7 @@ CREATE POLICY "anon_read_market_events" ON market_events
 -- AI-synthesised research output: macro outlooks, sector analysis, risk alerts.
 CREATE TABLE IF NOT EXISTS research_notes (
     id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug              TEXT,
     note_type         TEXT        NOT NULL,  -- 'macro_outlook','sector_analysis','regime_change','risk_alert'
     title             TEXT        NOT NULL,
     executive_summary TEXT        NOT NULL,
@@ -122,6 +123,10 @@ CREATE INDEX IF NOT EXISTS research_notes_public_idx
 CREATE INDEX IF NOT EXISTS research_notes_regime_idx
     ON research_notes (regime, generated_at DESC)
     WHERE regime IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS research_notes_slug_idx
+    ON research_notes (slug)
+    WHERE slug IS NOT NULL;
 
 ALTER TABLE research_notes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all_research_notes" ON research_notes

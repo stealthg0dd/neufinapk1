@@ -71,6 +71,19 @@ def _require_plan(user_id: str, min_plan: str) -> str:
     return plan
 
 
+def _coerce_pagination(
+    value: str | None, *, default: int, minimum: int, maximum: int
+) -> int:
+    """Parse pagination query params defensively to avoid 422s from malformed input."""
+    if value is None or value == "":
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
+
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 
@@ -186,8 +199,8 @@ async def list_notes(
 
 @router.get("/blog", response_model=list[PublicBlogNote])
 async def list_blog_notes(
-    page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=50),
+    page: str | None = Query("1"),
+    limit: str | None = Query("10"),
     type: str | None = Query(None, alias="type"),
 ):
     """
@@ -197,25 +210,43 @@ async def list_blog_notes(
       - limit
       - type=MACRO_OUTLOOK|REGIME_CHANGE|SECTOR_ANALYSIS|BEHAVIORAL
     """
-    offset = (page - 1) * limit
-    query = (
-        supabase.table("research_notes")
-        .select(
+    page_num = _coerce_pagination(page, default=1, minimum=1, maximum=10_000)
+    limit_num = _coerce_pagination(limit, default=10, minimum=1, maximum=50)
+    offset = (page_num - 1) * limit_num
+
+    def _build_query(include_slug: bool):
+        select_fields = (
             "id,slug,title,executive_summary,note_type,confidence_score,generated_at,affected_tickers,asset_tickers,full_content,content,body"
+            if include_slug
+            else "id,title,executive_summary,note_type,confidence_score,generated_at,affected_tickers,asset_tickers,full_content,content,body"
         )
-        .eq("is_public", True)
-        .order("generated_at", desc=True)
-        .range(offset, offset + limit - 1)
-    )
-    if type:
-        query = query.eq("note_type", type.lower())
+        q = (
+            supabase.table("research_notes")
+            .select(select_fields)
+            .eq("is_public", True)
+            .order("generated_at", desc=True)
+            .range(offset, offset + limit_num - 1)
+        )
+        if type:
+            q = q.eq("note_type", type.lower())
+        return q
 
     try:
-        result = query.execute()
+        result = _build_query(include_slug=True).execute()
         rows = result.data or []
     except Exception as exc:
-        logger.warning("research.list_blog_failed", error=str(exc))
-        rows = []
+        message = str(exc).lower()
+        if "slug" in message and "does not exist" in message:
+            logger.warning("research.list_blog_slug_missing_fallback", error=str(exc))
+            try:
+                result = _build_query(include_slug=False).execute()
+                rows = result.data or []
+            except Exception as fallback_exc:
+                logger.warning("research.list_blog_failed", error=str(fallback_exc))
+                rows = []
+        else:
+            logger.warning("research.list_blog_failed", error=str(exc))
+            rows = []
 
     out: list[PublicBlogNote] = []
     for n in rows:
