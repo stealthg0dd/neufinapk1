@@ -50,12 +50,13 @@ const DEFAULT_REGIME: RegimeResponse = {
 }
 
 async function DashboardServerPage() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_API_URL || 'https://neufin-web.vercel.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'https://neufin-web.vercel.app'
+  const appOrigin = appUrl.startsWith('http') ? appUrl : `https://${appUrl}`
   const cookieHeader = (await cookies()).getAll().map((c) => `${c.name}=${c.value}`).join('; ')
 
   async function safeFetchJson<T>(path: string): Promise<T | null> {
     try {
-      const res = await fetch(`${appUrl}${path}`, {
+      const res = await fetch(`${appOrigin}${path}`, {
         cache: 'no-store',
         headers: cookieHeader ? { cookie: cookieHeader } : undefined,
       })

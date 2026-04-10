@@ -113,6 +113,12 @@ function resolveServerFetchOrigin(): string {
 /** Research + server fetches: use explicit API base, else same-origin absolute URL on Vercel. */
 function researchRequestUrl(path: string): string {
   const p = path.startsWith('/') ? path : `/${path}`
+  // During server rendering/build, always prefer same-deployment origin.
+  // This avoids static generation hitting stale NEXT_PUBLIC_API_URL hosts.
+  if (typeof window === 'undefined') {
+    const origin = resolveServerFetchOrigin()
+    if (origin) return `${origin}${p}`
+  }
   if (API) {
     const base = API.replace(/\/$/, '')
     return `${base}${p}`
@@ -396,6 +402,7 @@ export async function createCheckoutSession(
   // record_id (which is the dna_scores table ID and cannot be used as portfolio_id)
   const storedPortfolioId = (parsedResult as any)?.portfolio_id as string | null | undefined
 
+  const { stripeSuccessUrlReports } = await import('@/lib/stripe-checkout-urls')
   const data = await createCheckout(
     {
       plan:         'single',
@@ -405,7 +412,7 @@ export async function createCheckoutSession(
           ? { positions }
           : { portfolio_id: recordId }),
       ref_token:    refToken,              // backend field name
-      success_url:  `${origin}/reports/success`,
+      success_url:  stripeSuccessUrlReports(origin),
       cancel_url:   `${origin}/results`,
     },
     token
