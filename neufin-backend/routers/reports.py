@@ -88,7 +88,7 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
         and len(syms) > 0
     ):
         out = []
-        for s, w in zip(syms, wts):
+        for s, w in zip(syms, wts, strict=True):
             try:
                 wf = float(w)
             except (TypeError, ValueError):
@@ -98,9 +98,7 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
     return []
 
 
-def _synthesis_payload(
-    dna: dict | None, metrics: dict, swarm_row: dict | None
-) -> dict:
+def _synthesis_payload(dna: dict | None, metrics: dict, swarm_row: dict | None) -> dict:
     """Client-facing summary from DNA + metrics + swarm (no LLM)."""
     dna = dna or {}
     s = swarm_row or {}
@@ -179,7 +177,9 @@ async def generate_report(
         # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
         if not await can_download_report_free(user.id):
             if not STRIPE_PRICE_ADVISOR_REPORT_ONETIME:
-                raise HTTPException(503, "Stripe single-report price is not configured.")
+                raise HTTPException(
+                    503, "Stripe single-report price is not configured."
+                )
             try:
                 session = stripe.checkout.Session.create(
                     line_items=[
@@ -288,7 +288,9 @@ async def generate_report(
 
         portfolio_payload = {
             "name": portfolio.get("name") or "Portfolio Analysis",
-            "total_value": float(portfolio.get("total_value") or metrics.get("total_value") or 0),
+            "total_value": float(
+                portfolio.get("total_value") or metrics.get("total_value") or 0
+            ),
             "metrics": metrics,
         }
 
@@ -364,7 +366,7 @@ async def generate_report(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Report generation failed: {str(e)}",
+            detail=f"Report generation failed: {e!s}",
         ) from e
 
 

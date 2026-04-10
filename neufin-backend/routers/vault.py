@@ -15,6 +15,7 @@ GET  /api/subscription/status    → current user's plan + monthly usage (auth r
 """
 
 import stripe
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -29,6 +30,8 @@ from database import claim_guest_data, supabase
 from services.auth_dependency import get_current_user
 from services.auth_dependency import get_subscription_status as get_sub_status
 from services.jwt_auth import JWTUser
+
+logger = structlog.get_logger("neufin.vault")
 
 # ── Subscription plan definitions ─────────────────────────────────────────────
 # stripe_price_id values are populated after running scripts/setup_stripe_products.py
@@ -189,8 +192,8 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
             )
             for p in pr.data or []:
                 names[str(p["id"])] = p.get("name")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("vault.portfolio_names_enrich_failed", error=str(e))
 
     pdf_by_pid: dict[str, str | None] = {}
     paid_by_pid: dict[str, bool] = {}
@@ -209,8 +212,8 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
                 if pid and pid not in pdf_by_pid:
                     pdf_by_pid[pid] = r.get("pdf_url")
                     paid_by_pid[pid] = bool(r.get("is_paid"))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("vault.advisor_reports_enrich_failed", error=str(e))
 
     enriched = []
     for r in rows:

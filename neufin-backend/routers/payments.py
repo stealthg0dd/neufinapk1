@@ -101,8 +101,8 @@ async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | No
                 .execute()
             )
             dna_row = dna_result.data[0] if dna_result.data else None
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("payments.dna_lookup_skipped", error=str(e))
         try:
             pr = (
                 supabase.table("portfolios")
@@ -116,7 +116,9 @@ async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | No
             prow = {}
         portfolio_payload = {
             "name": prow.get("name") or "Portfolio",
-            "total_value": float(prow.get("total_value") or metrics.get("total_value") or 0),
+            "total_value": float(
+                prow.get("total_value") or metrics.get("total_value") or 0
+            ),
             "metrics": metrics,
         }
         advisor_config = {
@@ -164,8 +166,8 @@ async def _get_portfolio_for_report(portfolio_id: str) -> dict:
             .execute()
         )
         dna_row = dna_result.data[0] if dna_result.data else None
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("payments.dna_lookup_skipped", error=str(e))
     try:
         pr = (
             supabase.table("portfolios")
@@ -180,7 +182,9 @@ async def _get_portfolio_for_report(portfolio_id: str) -> dict:
     return {
         "portfolio_data": {
             "name": prow.get("name") or "Portfolio",
-            "total_value": float(prow.get("total_value") or metrics.get("total_value") or 0),
+            "total_value": float(
+                prow.get("total_value") or metrics.get("total_value") or 0
+            ),
             "metrics": metrics,
         },
         "dna_data": dna_row or {},
@@ -393,15 +397,15 @@ async def create_checkout(
                 "ref_token": body.ref_token or "",
             },
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("payments.track_checkout_init_failed", error=str(e))
 
     # Log referral use
     if discounts and body.ref_token:
         try:
             await track("referral_used", {"ref_token": body.ref_token, "plan": plan})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("payments.track_referral_failed", error=str(e))
 
     return {
         "checkout_url": session.url,
@@ -491,8 +495,8 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
                     "ref_token": meta.get("ref_token", ""),
                 },
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("payments.track_payment_completed_failed", error=str(e))
         report_id = meta.get("report_id") or None
         portfolio_id = meta.get("portfolio_id") or None
         advisor_id = meta.get("advisor_id")

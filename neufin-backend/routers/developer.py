@@ -109,10 +109,7 @@ async def get_api_key_usage(user: JWTUser = Depends(get_current_user)):
     seven_days_ago = (now - datetime.timedelta(days=6)).date()
     try:
         keys_res = (
-            supabase.table("api_keys")
-            .select("id")
-            .eq("user_id", user.id)
-            .execute()
+            supabase.table("api_keys").select("id").eq("user_id", user.id).execute()
         )
         key_ids = [k["id"] for k in (keys_res.data or []) if k.get("id")]
         if not key_ids:

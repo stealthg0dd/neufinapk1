@@ -20,11 +20,10 @@ import datetime
 import io
 import uuid
 from typing import Any
+from xml.sax.saxutils import escape
 
 import httpx
 import structlog
-from xml.sax.saxutils import escape
-
 from reportlab.graphics import renderPM
 from reportlab.graphics.charts.piecharts import Pie
 from reportlab.graphics.shapes import Drawing, Rect, String
@@ -107,7 +106,7 @@ def _coerce_list(val: Any, max_n: int | None = None) -> list[str]:
         out = [str(x) for x in val if x is not None]
     else:
         out = [str(val)]
-    return out[: max_n] if max_n else out
+    return out[:max_n] if max_n else out
 
 
 class ICBrand:
@@ -124,7 +123,11 @@ class ICBrand:
         self.MUTED = HexColor(b.get("muted", "#94A3B8"))
         self.SURFACE = HexColor(b.get("surface", "#161D2E"))
         # legacy keys from API ColorScheme
-        if brand_colors and "secondary" in brand_colors and "surface" not in brand_colors:
+        if (
+            brand_colors
+            and "secondary" in brand_colors
+            and "surface" not in brand_colors
+        ):
             self.SURFACE = HexColor(brand_colors["secondary"])
 
     def as_dict(self) -> dict[str, str]:
@@ -189,7 +192,9 @@ def _normalize_swarm(swarm: dict | None) -> dict[str, Any]:
     return {
         "investment_thesis": inv,
         "market_regime": (inv.get("market_regime") or row.get("market_regime") or {}),
-        "quant_analysis": (inv.get("quant_analysis") or row.get("quant_analysis") or {}),
+        "quant_analysis": (
+            inv.get("quant_analysis") or row.get("quant_analysis") or {}
+        ),
         "tax_report": (inv.get("tax_report") or row.get("tax_report") or {}),
         "risk_sentinel": (inv.get("risk_sentinel") or row.get("risk_sentinel") or {}),
         "alpha_scout": (inv.get("alpha_scout") or row.get("alpha_scout") or {}),
@@ -231,8 +236,8 @@ async def _fetch_logo_bytes(advisor_config: dict) -> bytes | None:
     if b64:
         try:
             return base64.b64decode(b64)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("pdf.logo_base64_decode_failed", error=str(e))
     return None
 
 
@@ -273,7 +278,7 @@ def try_render_pie_chart(
         pie.width = min(width - 30, height - 30)
         pie.height = pie.width
         pie.data = [max(v, 0.0) for v in values]
-        pie.labels = [str(l)[:10] for l in labels]
+        pie.labels = [str(lab)[:10] for lab in labels]
         for i in range(len(pie.data)):
             pie.slices[i].fillColor = palette[i % len(palette)]
             pie.slices[i].strokeColor = colors.white
@@ -354,11 +359,15 @@ def _heatmap_image(
         return None
 
 
-def _gauge_image(score: int, bc: ICBrand, w: float = 180, h: float = 88) -> Image | None:
+def _gauge_image(
+    score: int, bc: ICBrand, w: float = 180, h: float = 88
+) -> Image | None:
     score = max(0, min(100, int(score)))
     d = Drawing(w, h)
     col = _dna_score_color(score, bc)
-    d.add(Rect(0, 20, w, 36, fillColor=bc.SURFACE, strokeColor=bc.MUTED, strokeWidth=0.5))
+    d.add(
+        Rect(0, 20, w, 36, fillColor=bc.SURFACE, strokeColor=bc.MUTED, strokeWidth=0.5)
+    )
     fill_w = max(1.0, (w - 4) * (score / 100.0))
     d.add(Rect(2, 22, fill_w, 32, fillColor=col, strokeColor=col))
     d.add(
@@ -422,7 +431,9 @@ def _styles(bc: ICBrand):
             fontName="Helvetica",
             leading=10,
         ),
-        "body": ps("b", fontSize=9, textColor=bc.WHITE, leading=13, fontName="Helvetica"),
+        "body": ps(
+            "b", fontSize=9, textColor=bc.WHITE, leading=13, fontName="Helvetica"
+        ),
         "h_section": ps(
             "hs",
             fontSize=11,
@@ -486,21 +497,18 @@ def _build_pdf_sync(
 
     dna = dna_data or {}
     dna_score = int(
-        dna.get("dna_score")
-        or thesis.get("dna_score")
-        or metrics.get("dna_score")
-        or 0
+        dna.get("dna_score") or thesis.get("dna_score") or metrics.get("dna_score") or 0
     )
     archetype = (
-        dna.get("investor_type")
-        or thesis.get("headline")
-        or "PORTFOLIO INVESTOR"
+        dna.get("investor_type") or thesis.get("headline") or "PORTFOLIO INVESTOR"
     )
     strengths = _coerce_list(dna.get("strengths"), 5)
     weaknesses = _coerce_list(dna.get("weaknesses"), 5)
 
     regime_raw = mkt.get("regime") or swarm_norm.get("regime") or thesis.get("regime")
-    regime_label, regime_color = _regime_display(str(regime_raw) if regime_raw else None)
+    regime_label, regime_color = _regime_display(
+        str(regime_raw) if regime_raw else None
+    )
     conf_pct = 0.0
     try:
         conf_pct = float(mkt.get("confidence") or 0) * 100
@@ -521,14 +529,16 @@ def _build_pdf_sync(
     ts_full = now.isoformat()
 
     swarm_note = not swarm_data_present or not (
-        thesis.get("headline") or thesis.get("briefing") or swarm_norm.get("quant_analysis")
+        thesis.get("headline")
+        or thesis.get("briefing")
+        or swarm_norm.get("quant_analysis")
     )
 
     # --- Thesis body ---
     body_text = thesis.get("body") or thesis.get("briefing") or ""
     if not body_text.strip():
         body_text = (
-            f"Portfolio DNA score is {dna_score}/100 under a {str(regime_raw or 'mixed')} regime. "
+            f"Portfolio DNA score is {dna_score}/100 under a {regime_raw or 'mixed'!s} regime. "
             f"Weighted beta is {_fnum(thesis.get('weighted_beta') or metrics.get('weighted_beta'))}. "
             f"Sharpe ratio: {_fnum(thesis.get('sharpe_ratio') or metrics.get('sharpe_ratio'))}."
         )
@@ -623,9 +633,12 @@ def _build_pdf_sync(
                     label,
                     _fpct(stress[i].get("probability")),
                     str(stress[i].get("regime", regime_label)),
-                    str(stress[i].get("portfolio_impact", stress[i].get("portfolio_return_pct", "")))[
-                        :40
-                    ],
+                    str(
+                        stress[i].get(
+                            "portfolio_impact",
+                            stress[i].get("portfolio_return_pct", ""),
+                        )
+                    )[:40],
                 ]
             )
         else:
@@ -653,7 +666,7 @@ def _build_pdf_sync(
         opps = [
             {
                 "title": "Consider defensive sector rotation",
-                "impact": "+1–2% risk-adjusted (illustrative)",
+                "impact": "+1-2% risk-adjusted (illustrative)",
                 "regime": regime_label,
                 "action": "Evaluate utilities / staples vs. high-beta growth.",
                 "confidence": 0.55,
@@ -759,7 +772,9 @@ def _build_pdf_sync(
             canvas.drawString(MARGIN, y - 25, (firm_name or advisor_name)[:42])
         canvas.setFont("Helvetica-Bold", 26)
         canvas.setFillColor(bc.ACCENT)
-        canvas.drawCentredString(A4_W / 2, A4_H / 2 + 40, "PORTFOLIO INTELLIGENCE REPORT")
+        canvas.drawCentredString(
+            A4_W / 2, A4_H / 2 + 40, "PORTFOLIO INTELLIGENCE REPORT"
+        )
         canvas.setFont("Helvetica", 13)
         canvas.setFillColor(bc.MUTED)
         canvas.drawCentredString(
@@ -787,7 +802,9 @@ def _build_pdf_sync(
         if not white_label:
             canvas.setFont("Helvetica", 9)
             canvas.setFillColor(bc.MUTED)
-            canvas.drawCentredString(A4_W / 2, MARGIN + 20, "Powered by NeuFin Intelligence")
+            canvas.drawCentredString(
+                A4_W / 2, MARGIN + 20, "Powered by NeuFin Intelligence"
+            )
         canvas.restoreState()
 
     cover_frame = Frame(0, 0, A4_W, A4_H, id="cover")
@@ -827,15 +844,21 @@ def _build_pdf_sync(
             [
                 Paragraph(
                     f'<font color="{_html_hex(dna_col)}"><b>{dna_score}</b></font><br/><font size="8" color="#94A3B8">Portfolio Health</font>',
-                    ParagraphStyle("c1", alignment=TA_CENTER, fontSize=12, textColor=bc.WHITE),
+                    ParagraphStyle(
+                        "c1", alignment=TA_CENTER, fontSize=12, textColor=bc.WHITE
+                    ),
                 ),
                 Paragraph(
                     f"<b>{_xml(regime_label)}</b><br/><font size='8' color='#94A3B8'>Confidence {conf_pct:.0f}%</font>",
-                    ParagraphStyle("c2", alignment=TA_CENTER, fontSize=10, textColor=regime_color),
+                    ParagraphStyle(
+                        "c2", alignment=TA_CENTER, fontSize=10, textColor=regime_color
+                    ),
                 ),
                 Paragraph(
                     f"<b>{alpha_n} opportunities</b><br/><font size='8' color='#94A3B8'>Alpha Potential</font>",
-                    ParagraphStyle("c3", alignment=TA_CENTER, fontSize=10, textColor=bc.WHITE),
+                    ParagraphStyle(
+                        "c3", alignment=TA_CENTER, fontSize=10, textColor=bc.WHITE
+                    ),
                 ),
             ]
         ],
@@ -864,7 +887,9 @@ def _build_pdf_sync(
         clr = bc.DANGER if pri == "HIGH" else (bc.AMBER if pri == "MED" else bc.ACCENT)
         rec_data.append(
             [
-                Paragraph(f'<font color="{_html_hex(clr)}">{icon}</font>', styles["body"]),
+                Paragraph(
+                    f'<font color="{_html_hex(clr)}">{icon}</font>', styles["body"]
+                ),
                 Paragraph(_xml(r.get("action", "")), styles["body"]),
                 Paragraph(_xml(r.get("why", "")), styles["body"]),
             ]
@@ -912,7 +937,7 @@ def _build_pdf_sync(
                 ),
                 Paragraph(f"{float(v):.1f}%", styles["body"]),
             ]
-            for lab, v in zip(labels_pie, vals_pie)
+            for lab, v in zip(labels_pie, vals_pie, strict=True)
         ]
         left = Table(
             alloc_rows,
@@ -964,9 +989,7 @@ def _build_pdf_sync(
         except (TypeError, ValueError):
             dc_f = None
         dc_color = (
-            bc.MUTED
-            if dc_f is None
-            else (bc.SUCCESS if dc_f >= 0 else bc.DANGER)
+            bc.MUTED if dc_f is None else (bc.SUCCESS if dc_f >= 0 else bc.DANGER)
         )
         hold.append(
             [
@@ -1016,7 +1039,11 @@ def _build_pdf_sync(
     )
     row_dna = [[g or Spacer(1, 1), desc]]
     elems.append(
-        Table(row_dna, colWidths=[200, A4_W - 2 * MARGIN - 200], style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        Table(
+            row_dna,
+            colWidths=[200, A4_W - 2 * MARGIN - 200],
+            style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]),
+        )
     )
     elems.append(Spacer(1, 10))
     elems.append(Paragraph("<b>Strengths</b>", styles["h_section"]))
@@ -1033,7 +1060,10 @@ def _build_pdf_sync(
             [
                 Paragraph(
                     _xml(
-                        sentinel.get("primary_risks", ["Recency / concentration — review top holdings"])[0]
+                        sentinel.get(
+                            "primary_risks",
+                            ["Recency / concentration — review top holdings"],
+                        )[0]
                         if sentinel.get("primary_risks")
                         else "No specific behavioral bias flags — see DNA weaknesses."
                     ),
@@ -1062,7 +1092,9 @@ def _build_pdf_sync(
                 Paragraph(
                     f"<b>CURRENT REGIME: {_xml(regime_label)}</b><br/>"
                     f"<font size='9'>Confidence: {conf_pct:.0f}% · Last updated: {_xml(ts_full[:19])}</font>",
-                    ParagraphStyle("bn", textColor=colors.white, alignment=TA_CENTER, fontSize=14),
+                    ParagraphStyle(
+                        "bn", textColor=colors.white, alignment=TA_CENTER, fontSize=14
+                    ),
                 )
             ]
         ],
@@ -1083,7 +1115,10 @@ def _build_pdf_sync(
     for i, name in enumerate(macro_names):
         val = drivers[i] if i < len(drivers) else "—"
         macro_cells.append(
-            Paragraph(f"<b>{name}</b><br/>{ _xml(str(val)[:40]) }<br/><font size='8' color='#94A3B8'>See swarm run for detail</font>", styles["body"])
+            Paragraph(
+                f"<b>{name}</b><br/>{ _xml(str(val)[:40]) }<br/><font size='8' color='#94A3B8'>See swarm run for detail</font>",
+                styles["body"],
+            )
         )
     grid = Table(
         [
@@ -1111,7 +1146,10 @@ def _build_pdf_sync(
         )
     )
     elems.append(Spacer(1, 8))
-    scen = [["Scenario", "Probability", "Regime", "Portfolio Impact"]] + scenarios_rows
+    scen = [
+        ["Scenario", "Probability", "Regime", "Portfolio Impact"],
+        *scenarios_rows,
+    ]
     elems.append(
         Table(
             scen,
@@ -1147,7 +1185,11 @@ def _build_pdf_sync(
     max_dd = quant.get("max_drawdown") or metrics.get("max_drawdown")
     risk_tbl = [
         ["Metric", "Value", "Status"],
-        ["VaR (95%, 1-day)", _fpct(var_95) if var_95 is not None else "—", "See quant run"],
+        [
+            "VaR (95%, 1-day)",
+            _fpct(var_95) if var_95 is not None else "—",
+            "See quant run",
+        ],
         ["Max Drawdown (est.)", _fpct(max_dd) if max_dd is not None else "—", "Normal"],
         ["Concentration (HHI)", f"{hhi:.4f}", "⚠ High" if hhi > 0.25 else "Normal"],
     ]
@@ -1245,9 +1287,19 @@ def _build_pdf_sync(
     )
     elems.append(Spacer(1, 8))
     hv = "Consider tax-loss harvesting on: " + ", ".join(
-        str(h.get("symbol", h)) for h in (harvest if isinstance(harvest, list) else [])[:5]
+        str(h.get("symbol", h))
+        for h in (harvest if isinstance(harvest, list) else [])[:5]
     )
-    elems.append(Paragraph(_xml(hv if harvest else "No harvest list in swarm output — add cost basis for detail."), styles["body"]))
+    elems.append(
+        Paragraph(
+            _xml(
+                hv
+                if harvest
+                else "No harvest list in swarm output — add cost basis for detail."
+            ),
+            styles["body"],
+        )
+    )
     elems.append(PageBreak())
 
     # PAGE 8 Alpha
@@ -1257,10 +1309,12 @@ def _build_pdf_sync(
         elems.append(
             Paragraph(
                 "<i>Run Swarm IC Analysis for full intelligence.</i>",
-                ParagraphStyle("sn", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9),
+                ParagraphStyle(
+                    "sn", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9
+                ),
             )
         )
-    for opp in (opps[:5] if opps else []):
+    for opp in opps[:5] if opps else []:
         if isinstance(opp, dict):
             title = opp.get("title") or opp.get("symbol") or "Opportunity"
             impact = opp.get("impact") or opp.get("reason") or ""
@@ -1273,7 +1327,12 @@ def _build_pdf_sync(
             [
                 [Paragraph(f"<b>{_xml(str(title)[:80])}</b>", styles["body"])],
                 [Paragraph(_xml(str(impact)[:200]), styles["body"])],
-                [Paragraph(f"Regime: {_xml(str(regime_o))} · Confidence {conf:.0%}", styles["body"])],
+                [
+                    Paragraph(
+                        f"Regime: {_xml(str(regime_o))} · Confidence {conf:.0%}",
+                        styles["body"],
+                    )
+                ],
                 [Paragraph(f"Action: {_xml(str(action)[:200])}", styles["body"])],
                 [_confidence_bar(conf, bc)],
             ],
@@ -1302,14 +1361,18 @@ def _build_pdf_sync(
         elems.append(
             Paragraph(
                 "<i>Limited agent trace — run Swarm IC Analysis for full detail.</i>",
-                ParagraphStyle("sn2", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9),
+                ParagraphStyle(
+                    "sn2", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9
+                ),
             )
         )
     elems.append(Spacer(1, 6))
     elems.append(
         Table(
-            [["Agent", "Key Input", "Key Output", "Confidence", "Trace"]]
-            + agent_rows,
+            [
+                ["Agent", "Key Input", "Key Output", "Confidence", "Trace"],
+                *agent_rows,
+            ],
             colWidths=[78, 78, 78, 52, 120],
             style=TableStyle(
                 [
@@ -1355,7 +1418,11 @@ def _build_pdf_sync(
         prio.append(
             [
                 str(i + 1),
-                _xml(str(a)[:80]) if not isinstance(a, dict) else _xml(str(a.get("action", a))[:80]),
+                (
+                    _xml(str(a)[:80])
+                    if not isinstance(a, dict)
+                    else _xml(str(a.get("action", a))[:80])
+                ),
                 _xml("IC synthesis"),
                 "Medium",
                 "90 days",
@@ -1428,9 +1495,11 @@ def _build_pdf_sync(
                 "This report is generated by NeuFin AI intelligence and is provided for informational purposes only. "
                 "This is not investment advice and should not be construed as a recommendation to buy, sell, or hold any security. "
                 "Past performance does not guarantee future results. NeuFin OÜ is registered in Estonia (EU). "
-                + (f"{firm_footer} is responsible for validating these insights against their regulatory obligations."
-                   if firm_footer
-                   else "")
+                + (
+                    f"{firm_footer} is responsible for validating these insights against their regulatory obligations."
+                    if firm_footer
+                    else ""
+                )
             ),
             ParagraphStyle(
                 "ft",

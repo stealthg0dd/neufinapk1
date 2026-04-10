@@ -649,7 +649,9 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
         }
 
     # Dashboard / copilot with message only: market intelligence (no 400 loop)
-    return await global_chat(GlobalChatRequest(message=clean_message, agent_type="general"))
+    return await global_chat(
+        GlobalChatRequest(message=clean_message, agent_type="general")
+    )
 
 
 # ── System prompts per agent type ──────────────────────────────────────────────
