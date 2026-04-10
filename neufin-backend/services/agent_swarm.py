@@ -57,6 +57,7 @@ from services.calculator import (  # noqa: E402
     get_tax_impact_analysis,
     get_tax_neutral_pairs,
 )
+from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,
     build_correlation_matrix_from_series,
@@ -66,7 +67,6 @@ from services.risk_engine import (  # noqa: E402
     format_clusters_for_ai,
 )
 from services.stress_tester import StressTester, compute_factor_metrics  # noqa: E402
-from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
 
 
 # alerts router is in routers/ — import lazily to avoid circular dependency at
