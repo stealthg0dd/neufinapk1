@@ -8,6 +8,8 @@ from __future__ import annotations
 import base64
 import datetime
 import io
+import structlog
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
@@ -25,6 +27,35 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+
+logger = structlog.get_logger("neufin.pdf_generator")
+
+
+def _xml_para(text: str | None) -> str:
+    """Escape text for ReportLab Paragraph (subset of HTML)."""
+    if text is None:
+        return ""
+    t = str(text).strip()
+    if not t:
+        return ""
+    return escape(t, entities={'"': "&quot;", "'": "&apos;"}).replace("\n", "<br/>")
+
+
+def _coerce_str_list(val) -> list[str]:
+    if val is None:
+        return []
+    if isinstance(val, list):
+        return [str(x) for x in val if x is not None]
+    return [str(val)]
+
+
+def _safe_metrics_val(metrics: dict, key: str, default: float = 0.0) -> float:
+    v = metrics.get(key, default)
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
 
 # ── Default brand palette ──────────────────────────────────────────────────────
 DEFAULTS = {
@@ -267,8 +298,30 @@ def generate_advisor_report(
     """
     bc = BrandColors(color_scheme)
     S = _make_styles(bc)
-    metrics = portfolio_data.get("metrics", {})
-    positions = metrics.get("positions", [])
+    metrics = portfolio_data.get("metrics", {}) or {}
+    if not isinstance(metrics, dict):
+        metrics = {}
+    swarm_raw = portfolio_data.get("swarm_data") or {}
+    swarm_data = swarm_raw if isinstance(swarm_raw, dict) else {}
+
+    analysis = analysis if isinstance(analysis, dict) else {}
+    strengths = _coerce_str_list(analysis.get("strengths"))
+    weaknesses = _coerce_str_list(analysis.get("weaknesses"))
+    action_items = _coerce_str_list(analysis.get("action_items"))
+
+    positions = metrics.get("positions") or []
+    if not isinstance(positions, list):
+        positions = []
+
+    _inv = swarm_data.get("investment_thesis")
+    _inv_d = _inv if isinstance(_inv, dict) else {}
+    briefing_headline = _inv_d.get("headline") or _inv_d.get("title")
+    if not briefing_headline:
+        briefing_headline = (
+            "Portfolio analysis complete. Run Swarm IC analysis for "
+            "full investment committee briefing."
+        )
+
     now = datetime.datetime.utcnow()
     report_date = now.strftime("%B %d, %Y")
 
@@ -348,10 +401,11 @@ def generate_advisor_report(
     E.append(Paragraph(report_date, S["cover_meta"]))
     E.append(Spacer(1, 0.25 * inch))
     score_val = analysis.get("dna_score", "—")
-    investor_type = analysis.get("investor_type", "—")
+    investor_type = _xml_para(analysis.get("investor_type")) or "—"
     E.append(
         Paragraph(
-            f"DNA Score: <b>{score_val}/100</b>  ·  {investor_type}", S["cover_meta"]
+            f"DNA Score: <b>{_xml_para(str(score_val))}/100</b>  ·  {investor_type}",
+            S["cover_meta"],
         )
     )
     E.append(Spacer(1, 1.5 * inch))
@@ -424,27 +478,45 @@ def generate_advisor_report(
         )
     )
     E.append(score_tbl)
+    E.append(Spacer(1, 10))
+    E.append(
+        Paragraph(
+            f"<b>IC briefing:</b> {_xml_para(briefing_headline)}",
+            S["body_muted"],
+        )
+    )
     E.append(Spacer(1, 14))
+
+    conc_risk = metrics.get("concentration_risk")
+    if conc_risk is None:
+        conc_risk = _safe_metrics_val(metrics, "hhi", 0.0)
+    div_score = metrics.get("diversification_score")
+    if div_score is None:
+        sb = metrics.get("score_breakdown") or {}
+        if isinstance(sb, dict):
+            div_score = sb.get("correlation")
+        if div_score is None:
+            div_score = 0.0
 
     summary_rows = [
         ["Metric", "Value", "Metric", "Value"],
         [
             "Total Value",
-            f"${metrics.get('total_value', 0):,.0f}",
+            f"${_safe_metrics_val(metrics, 'total_value', 0):,.0f}",
             "Positions",
-            str(metrics.get("num_positions", 0)),
+            str(int(metrics.get("num_positions", 0) or 0)),
         ],
         [
             "Max Position",
-            f"{metrics.get('max_position_pct', 0):.1f}%",
-            "Concentration Risk",
-            f"{metrics.get('concentration_risk', 0):.1f}",
+            f"{_safe_metrics_val(metrics, 'max_position_pct', 0):.1f}%",
+            "Concentration (HHI)",
+            f"{float(conc_risk):.4f}",
         ],
         [
             "Diversification",
-            f"{metrics.get('diversification_score', 0)}/30",
+            f"{float(div_score):.1f}/30",
             "Annualised Vol",
-            f"{metrics.get('annualized_volatility', 0):.1f}%",
+            f"{_safe_metrics_val(metrics, 'annualized_volatility', 0):.1f}%",
         ],
     ]
     if metrics.get("pnl_pct") is not None:
@@ -536,18 +608,21 @@ def generate_advisor_report(
         "correlation matrices, and sector exposure. The key risk indicators available are "
         "summarised in the performance section.",
     )
-    E.append(Paragraph(risk_text, S["body"]))
+    E.append(Paragraph(_xml_para(str(risk_text)), S["body"]))
     E.append(Spacer(1, 14))
     # Concentration risk visual bars
     if positions:
         E.append(Paragraph("Position Concentration", S["h2"]))
         E.append(Spacer(1, 6))
         for p in sorted(positions, key=lambda x: x.get("weight", 0), reverse=True)[:8]:
-            raw_w = p.get("weight", 0)
-            w_pct = raw_w * 100 if raw_w <= 1 else raw_w
-            bar = _bar_row(p.get("symbol", ""), w_pct, bc)
-            E.append(bar)
-            E.append(Spacer(1, 3))
+            try:
+                raw_w = p.get("weight", 0)
+                w_pct = raw_w * 100 if raw_w <= 1 else raw_w
+                bar = _bar_row(str(p.get("symbol", "")), float(w_pct), bc)
+                E.append(bar)
+                E.append(Spacer(1, 3))
+            except Exception as e:
+                logger.warning("chart_generation_failed", chart="bar", error=str(e))
     E.append(PageBreak())
 
     # ── PAGE 7: Sector Allocation ──────────────────────────────────────────────
@@ -601,8 +676,11 @@ def generate_advisor_report(
         E.append(_colored_table(sec_rows, [2.4 * inch, 1.5 * inch, 2.8 * inch], bc))
         E.append(Spacer(1, 14))
         for sec, pct in sorted(sectors.items(), key=lambda x: -x[1])[:6]:
-            E.append(_bar_row(sec, pct, bc, bar_width=3.0))
-            E.append(Spacer(1, 4))
+            try:
+                E.append(_bar_row(sec, pct, bc, bar_width=3.0))
+                E.append(Spacer(1, 4))
+            except Exception as e:
+                logger.warning("chart_generation_failed", chart="sector_bar", error=str(e))
     E.append(PageBreak())
 
     # ── PAGE 8: AI Strengths ───────────────────────────────────────────────────
@@ -617,12 +695,12 @@ def generate_advisor_report(
         )
     )
     E.append(Spacer(1, 12))
-    for i, strength in enumerate(analysis.get("strengths", []), 1):
+    for i, strength in enumerate(strengths, 1):
         blk = Table(
             [
                 [
                     Paragraph(f"<b>{i}</b>", S["center"]),
-                    Paragraph(f"<b>{strength}</b>", S["body"]),
+                    Paragraph(f"<b>{_xml_para(strength)}</b>", S["body"]),
                 ]
             ],
             colWidths=[0.4 * inch, 6.8 * inch],
@@ -659,8 +737,8 @@ def generate_advisor_report(
         )
     )
     E.append(Spacer(1, 12))
-    for w in analysis.get("weaknesses", []):
-        E.append(Paragraph(f"⚠  {w}", S["bullet"]))
+    for w in weaknesses:
+        E.append(Paragraph(f"⚠  {_xml_para(w)}", S["bullet"]))
         E.append(Spacer(1, 6))
     E.append(Spacer(1, 14))
     E.append(Paragraph("Key Recommendation", S["h2"]))
@@ -692,13 +770,18 @@ def generate_advisor_report(
         "Market conditions and portfolio positioning should be reviewed regularly. "
         "Consider the current macroeconomic environment when evaluating concentration risk.",
     )
-    E.append(Paragraph(outlook, S["body"]))
+    E.append(Paragraph(_xml_para(str(outlook)), S["body"]))
     E.append(Spacer(1, 14))
     E.append(Paragraph("Recommended Action Items", S["h2"]))
     E.append(Spacer(1, 6))
-    for i, action in enumerate(analysis.get("action_items", []), 1):
+    for i, action in enumerate(action_items, 1):
         row = Table(
-            [[Paragraph(f"<b>{i}</b>", S["center"]), Paragraph(action, S["body"])]],
+            [
+                [
+                    Paragraph(f"<b>{i}</b>", S["center"]),
+                    Paragraph(_xml_para(action), S["body"]),
+                ]
+            ],
             colWidths=[0.4 * inch, 6.8 * inch],
             rowHeights=[0.34 * inch],
         )
@@ -758,5 +841,9 @@ def generate_advisor_report(
     if not switched:
         final_elements.insert(0, NextPageTemplate("Body"))
 
-    doc.build(final_elements)
+    try:
+        doc.build(final_elements)
+    except Exception as e:
+        logger.error("pdf.doc_build_failed", error=str(e))
+        raise
     return buffer.getvalue()

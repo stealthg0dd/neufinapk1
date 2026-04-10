@@ -147,6 +147,7 @@ def _check_supabase_connected() -> bool:
 
 # ── Router-system registration + heartbeat ────────────────────────────────────
 _heartbeat_task: asyncio.Task | None = None
+_heartbeat_422_logged = False
 
 
 def _first_present_env(*names: str) -> str:
@@ -190,6 +191,8 @@ async def _heartbeat_loop() -> None:
     """Send a heartbeat to the Agent OS router-system every 60 seconds."""
     import httpx
 
+    global _heartbeat_422_logged
+
     while True:
         await asyncio.sleep(60)
         if not settings.AGENT_OS_API_KEY:
@@ -210,8 +213,18 @@ async def _heartbeat_loop() -> None:
                     json=payload,
                     headers={"x-api-key": settings.AGENT_OS_API_KEY},
                 )
-                resp.raise_for_status()
-                logger.debug("router_system.heartbeat_sent", status=resp.status_code)
+                if resp.status_code == 422:
+                    if not _heartbeat_422_logged:
+                        logger.warning(
+                            "router_system.heartbeat_schema_mismatch_with_agent_os",
+                            status=resp.status_code,
+                        )
+                        _heartbeat_422_logged = True
+                else:
+                    resp.raise_for_status()
+                    logger.debug(
+                        "router_system.heartbeat_sent", status=resp.status_code
+                    )
         except Exception as exc:
             logger.warning("router_system.heartbeat_failed", error=str(exc))
 

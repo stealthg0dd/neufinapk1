@@ -337,18 +337,24 @@ async def create_checkout(
         raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
     # Funnel event: checkout initiated
-    await track(
-        "checkout_initiated",
-        {
-            "plan": plan,
-            "has_referral": bool(discounts),
-            "ref_token": body.ref_token or "",
-        },
-    )
+    try:
+        await track(
+            "checkout_initiated",
+            {
+                "plan": plan,
+                "has_referral": bool(discounts),
+                "ref_token": body.ref_token or "",
+            },
+        )
+    except Exception:
+        pass
 
     # Log referral use
     if discounts and body.ref_token:
-        await track("referral_used", {"ref_token": body.ref_token, "plan": plan})
+        try:
+            await track("referral_used", {"ref_token": body.ref_token, "plan": plan})
+        except Exception:
+            pass
 
     return {
         "checkout_url": session.url,
@@ -429,14 +435,17 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
         meta = session.get("metadata", {})
         plan = meta.get("plan")
         # Funnel event: payment confirmed
-        await track(
-            "payment_completed",
-            {
-                "plan": plan,
-                "amount_total": session.get("amount_total"),
-                "ref_token": meta.get("ref_token", ""),
-            },
-        )
+        try:
+            await track(
+                "payment_completed",
+                {
+                    "plan": plan,
+                    "amount_total": session.get("amount_total"),
+                    "ref_token": meta.get("ref_token", ""),
+                },
+            )
+        except Exception:
+            pass
         report_id = meta.get("report_id") or None
         portfolio_id = meta.get("portfolio_id") or None
         advisor_id = meta.get("advisor_id")

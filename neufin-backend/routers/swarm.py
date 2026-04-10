@@ -426,7 +426,8 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
       market_regime, quant_analysis, tax_report,
       risk_sentinel, alpha_scout, strategist_intel, created_at
 
-    Returns 404 if the user has never run a swarm analysis.
+    Returns 200 with status=no_report when the user has never run a swarm analysis
+    (avoids noisy 404s on first login).
     """
     try:
         result = (
@@ -443,9 +444,11 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
         ) from exc
 
     if not result.data:
-        raise HTTPException(
-            status_code=404, detail="No swarm report found for this user."
-        )
+        return {
+            "status": "no_report",
+            "message": "No analysis yet",
+            "report": None,
+        }
 
     row = result.data[0]
 
@@ -503,7 +506,7 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
     alpha_scout = row.get("alpha_scout") or {"opportunities": [], "watchlist": []}
     strategist_intel = row.get("strategist_intel") or {}
 
-    return {
+    shaped = {
         "swarm_report_id": row["id"],
         "briefing": row.get("briefing") or row.get("headline"),
         "regime": row.get("regime"),
@@ -515,6 +518,11 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
         "alpha_scout": alpha_scout,
         "strategist_intel": strategist_intel,
         "created_at": row.get("created_at"),
+    }
+    return {
+        "status": "found",
+        "report": {**shaped, "id": row["id"]},
+        **shaped,
     }
 
 

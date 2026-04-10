@@ -1,4 +1,19 @@
+# RUN IN SUPABASE SQL EDITOR (see services/analytics.py for actual column names):
+#
+# CREATE TABLE IF NOT EXISTS analytics_events (
+#   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+#   event_name TEXT NOT NULL,
+#   user_id UUID,
+#   session_id TEXT,
+#   properties JSONB DEFAULT '{}',
+#   created_at TIMESTAMPTZ DEFAULT NOW()
+# );
+# CREATE INDEX IF NOT EXISTS idx_analytics_events_user ON analytics_events(user_id);
+# CREATE INDEX IF NOT EXISTS idx_analytics_events_name ON analytics_events(event_name);
+
+import base64
 import datetime
+import traceback
 import uuid
 
 import stripe
@@ -54,6 +69,56 @@ class ReportRequest(BaseModel):
     color_scheme: ColorScheme | None = None
 
 
+def _positions_from_dna_row(dna: dict | None) -> list[dict]:
+    """Best-effort rows for calculator when portfolio_positions is empty."""
+    if not dna:
+        return []
+    syms = dna.get("symbols") or dna.get("tickers")
+    wts = dna.get("weights")
+    if (
+        isinstance(syms, list)
+        and isinstance(wts, list)
+        and len(syms) == len(wts)
+        and len(syms) > 0
+    ):
+        out = []
+        for s, w in zip(syms, wts):
+            try:
+                wf = float(w)
+            except (TypeError, ValueError):
+                wf = 0.0
+            out.append({"symbol": str(s).upper(), "shares": 1.0, "weight": wf})
+        return out
+    return []
+
+
+def _normalize_analysis(raw: dict) -> dict:
+    """Coerce AI JSON into shapes safe for ReportLab / metrics display."""
+
+    def _list_str(key: str) -> list[str]:
+        v = raw.get(key)
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return [str(x) for x in v if x is not None]
+        return [str(v)]
+
+    out = dict(raw)
+    out["strengths"] = _list_str("strengths")
+    out["weaknesses"] = _list_str("weaknesses")
+    out["action_items"] = _list_str("action_items")
+    ds = out.get("dna_score")
+    if ds is not None and not isinstance(ds, int):
+        try:
+            out["dna_score"] = int(float(ds))
+        except (TypeError, ValueError):
+            out["dna_score"] = None
+    for k in ("risk_assessment", "market_outlook", "recommendation", "investor_type"):
+        if out.get(k) is not None:
+            out[k] = str(out[k])
+    return out
+
+
 def _upload_to_storage(pdf_bytes: bytes, filename: str) -> str | None:
     """Upload PDF to Supabase Storage 'advisor-reports' bucket.
     Returns a 1-hour signed URL (falls back to public URL if signing fails)."""
@@ -106,84 +171,86 @@ async def generate_report(
     Generate a 10-page white-label PDF report with optional advisor logo and color scheme.
     Uploads to Supabase Storage and returns a public URL.
     """
-    # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
-    if not await can_download_report_free(user.id):
-        if not STRIPE_PRICE_ADVISOR_REPORT_ONETIME:
-            raise HTTPException(503, "Stripe single-report price is not configured.")
+    try:
+        # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
+        if not await can_download_report_free(user.id):
+            if not STRIPE_PRICE_ADVISOR_REPORT_ONETIME:
+                raise HTTPException(503, "Stripe single-report price is not configured.")
+            try:
+                session = stripe.checkout.Session.create(
+                    line_items=[
+                        {"price": STRIPE_PRICE_ADVISOR_REPORT_ONETIME, "quantity": 1}
+                    ],
+                    mode="payment",
+                    success_url=f"{APP_BASE_URL}/pricing/success",
+                    cancel_url=f"{APP_BASE_URL}/pricing",
+                    metadata={
+                        "plan": "single",
+                        "portfolio_id": body.portfolio_id,
+                        "advisor_id": user.id,
+                        "user_id": user.id,
+                    },
+                )
+                return {"checkout_url": session.url}
+            except stripe.StripeError as e:
+                raise HTTPException(502, f"Stripe error: {e.user_message}") from e
+
+        # 1. Fetch portfolio + DNA (DNA used if positions missing)
         try:
-            session = stripe.checkout.Session.create(
-                line_items=[
-                    {"price": STRIPE_PRICE_ADVISOR_REPORT_ONETIME, "quantity": 1}
-                ],
-                mode="payment",
-                success_url=f"{APP_BASE_URL}/pricing/success",
-                cancel_url=f"{APP_BASE_URL}/pricing",
-                metadata={
-                    "plan": "single",
-                    "portfolio_id": body.portfolio_id,
-                    "advisor_id": user.id,
-                    "user_id": user.id,
-                },
+            portfolio_result = (
+                supabase.table("portfolios")
+                .select("id, user_id")
+                .eq("id", body.portfolio_id)
+                .single()
+                .execute()
             )
-            return {"checkout_url": session.url}
-        except stripe.StripeError as e:
-            raise HTTPException(502, f"Stripe error: {e.user_message}") from e
+            portfolio = portfolio_result.data
+            if not portfolio:
+                raise HTTPException(status_code=404, detail="Portfolio not found.")
+            if portfolio.get("user_id") and portfolio.get("user_id") != user.id:
+                raise HTTPException(
+                    status_code=403, detail="You do not have access to this portfolio."
+                )
 
-    # 1. Fetch positions
-    try:
-        portfolio_result = (
-            supabase.table("portfolios")
-            .select("id, user_id")
-            .eq("id", body.portfolio_id)
-            .single()
-            .execute()
-        )
-        portfolio = portfolio_result.data
-        if not portfolio:
-            raise HTTPException(status_code=404, detail="Portfolio not found.")
-        if portfolio.get("user_id") and portfolio.get("user_id") != user.id:
+            dna_result = (
+                supabase.table("dna_scores")
+                .select("*")
+                .eq("portfolio_id", body.portfolio_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            existing_dna = dna_result.data[0] if dna_result.data else None
+
+            positions_result = (
+                supabase.table("portfolio_positions")
+                .select("symbol, shares, cost_basis")
+                .eq("portfolio_id", body.portfolio_id)
+                .execute()
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+        positions_raw = list(positions_result.data or [])
+        if not positions_raw:
+            positions_raw = _positions_from_dna_row(existing_dna)
+
+        if not positions_raw:
             raise HTTPException(
-                status_code=403, detail="You do not have access to this portfolio."
+                status_code=404,
+                detail="No positions found for this portfolio.",
             )
 
-        positions_result = (
-            supabase.table("portfolio_positions")
-            .select("symbol, shares, cost_basis")
-            .eq("portfolio_id", body.portfolio_id)
-            .execute()
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        # 2. Calculate metrics
+        try:
+            metrics = calculate_portfolio_metrics(positions_raw)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=str(e)) from e
 
-    if not positions_result.data:
-        raise HTTPException(
-            status_code=404, detail="No positions found for this portfolio."
-        )
-
-    # 2. Calculate metrics
-    try:
-        metrics = calculate_portfolio_metrics(positions_result.data)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
-
-    # 3. Check for existing DNA score
-    try:
-        dna_result = (
-            supabase.table("dna_scores")
-            .select("*")
-            .eq("portfolio_id", body.portfolio_id)
-            .order("created_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-        existing_dna = dna_result.data[0] if dna_result.data else None
-    except Exception:
-        existing_dna = None
-
-    # 4. AI deep analysis
-    prompt = f"""You are a senior portfolio strategist preparing a professional client report.
+        # 4. AI deep analysis
+        prompt = f"""You are a senior portfolio strategist preparing a professional client report.
 
 Portfolio metrics:
 {metrics}
@@ -204,56 +271,83 @@ Return ONLY valid JSON:
 
 Be specific, data-driven, and professional."""
 
-    try:
-        analysis = await get_ai_analysis(prompt)
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
+        try:
+            analysis = await get_ai_analysis(prompt)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
 
-    # 5. Generate 10-page PDF with custom branding
-    try:
+        if not isinstance(analysis, dict):
+            analysis = {}
+        analysis = _normalize_analysis(analysis)
+
+        portfolio_payload = {
+            "metrics": metrics,
+            "swarm_data": {},
+        }
+
+        # 5. Generate 10-page PDF with custom branding
         color_dict = body.color_scheme.model_dump() if body.color_scheme else None
         pdf_bytes = generate_advisor_report(
-            portfolio_data={"metrics": metrics},
+            portfolio_data=portfolio_payload,
             analysis=analysis,
             advisor_name=body.advisor_name,
             logo_base64=body.logo_base64,
             color_scheme=color_dict,
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"PDF generation failed: {e}"
-        ) from e
 
-    # 6. Upload to Supabase Storage
-    filename = f"report-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}.pdf"
-    pdf_url = _upload_to_storage(pdf_bytes, filename)
+        # 6. Upload to Supabase Storage
+        filename = f"report-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}.pdf"
+        pdf_url = _upload_to_storage(pdf_bytes, filename)
 
-    # 7. Save report record with public URL
-    try:
-        report_result = (
-            supabase.table("advisor_reports")
-            .insert(
-                {
-                    "portfolio_id": body.portfolio_id,
-                    "advisor_id": user.id,
-                    "pdf_url": pdf_url,
-                    "is_paid": False,
-                }
+        # 7. Save report record with public URL
+        try:
+            report_result = (
+                supabase.table("advisor_reports")
+                .insert(
+                    {
+                        "portfolio_id": body.portfolio_id,
+                        "advisor_id": user.id,
+                        "pdf_url": pdf_url,
+                        "is_paid": False,
+                    }
+                )
+                .execute()
             )
-            .execute()
-        )
-        report_id = report_result.data[0]["id"] if report_result.data else None
-    except Exception as e:
-        logger.warning("reports.save_record_failed", error=str(e))
-        report_id = None
+            report_id = report_result.data[0]["id"] if report_result.data else None
+        except Exception as e:
+            logger.warning("reports.save_record_failed", error=str(e))
+            report_id = None
 
-    return {
-        "report_id": report_id,
-        "pdf_url": pdf_url,
-        "pdf_size_bytes": len(pdf_bytes),
-        "analysis": analysis,
-        "pages": 10,
-    }
+        out: dict = {
+            "report_id": report_id,
+            "pdf_size_bytes": len(pdf_bytes),
+            "analysis": analysis,
+            "pages": 10,
+        }
+        if pdf_url:
+            out["pdf_url"] = pdf_url
+            out["delivery"] = "url"
+        else:
+            out["pdf_base64"] = base64.b64encode(pdf_bytes).decode("ascii")
+            out["delivery"] = "base64"
+            out["filename"] = filename
+        return out
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(
+            "report_generation_failed",
+            error=str(e),
+            traceback=tb,
+            portfolio_id=getattr(body, "portfolio_id", "unknown"),
+            user_id=str(user.id) if user else "unknown",
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Report generation failed: {str(e)}",
+        ) from e
 
 
 @router.get("/{report_id}/download")
