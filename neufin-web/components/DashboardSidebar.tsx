@@ -12,6 +12,7 @@ import {
   CreditCard,
   Bot,
   LogOut,
+  Code2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { apiGet } from '@/lib/api-client'
@@ -127,6 +128,20 @@ export default function DashboardSidebar({ user }: { user: User }) {
             {item.label}
           </Link>
         ))}
+        {isActivePaid && (
+          <>
+            <div className="mx-3 my-3 border-t border-[hsl(var(--border)/0.35)]" />
+            <Link href="/developer" className={linkClass('/developer')}>
+              <Code2 className="h-[15px] w-[15px] shrink-0" />
+              <span className="flex items-center gap-2">
+                Developer
+                <span className="rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-blue-300">
+                  beta
+                </span>
+              </span>
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="border-t border-[hsl(var(--border)/0.3)] px-3 py-3">
