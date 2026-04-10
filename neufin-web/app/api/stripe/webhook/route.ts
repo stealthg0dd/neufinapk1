@@ -25,16 +25,21 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
-})
+/** Lazy init — avoids Stripe/Supabase constructor at module load (CI builds often omit secrets). */
+function getStripe(): Stripe | null {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) return null
+  return new Stripe(key, { apiVersion: '2024-12-18.acacia' })
+}
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(url, key)
+}
 
 export async function POST(req: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -42,6 +47,15 @@ export async function POST(req: NextRequest) {
     console.error('[webhook] STRIPE_WEBHOOK_SECRET not set')
     return NextResponse.json(
       { error: 'Webhook secret not configured' },
+      { status: 500 }
+    )
+  }
+
+  const stripe = getStripe()
+  if (!stripe) {
+    console.error('[webhook] STRIPE_SECRET_KEY not set')
+    return NextResponse.json(
+      { error: 'Stripe not configured' },
       { status: 500 }
     )
   }
@@ -68,6 +82,12 @@ export async function POST(req: NextRequest) {
   }
 
   console.log(`[webhook] Received: ${event.type}`)
+
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    console.error('[webhook] Supabase service client not configured (URL or SUPABASE_SERVICE_ROLE_KEY missing)')
+    return NextResponse.json({ received: true })
+  }
 
   try {
     switch (event.type) {
@@ -156,9 +176,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ received: true })
-}
-
-// IMPORTANT: Stripe requires raw body — disable Next.js body parsing
-export const config = {
-  api: { bodyParser: false },
 }
