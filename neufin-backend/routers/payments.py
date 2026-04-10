@@ -31,7 +31,6 @@ from config import (
     STRIPE_WEBHOOK_SECRET,
 )
 from database import supabase
-from services.ai_router import get_ai_analysis
 from services.analytics import track
 from services.auth_dependency import get_optional_user, invalidate_subscription_cache
 from services.calculator import calculate_portfolio_metrics
@@ -91,23 +90,46 @@ async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | No
             return None
 
         metrics = calculate_portfolio_metrics(positions_result.data)
-
-        prompt = f"""You are a senior portfolio strategist.
-Portfolio metrics: {metrics}
-Return ONLY valid JSON:
-{{
-  "dna_score": <0-100>,
-  "investor_type": "<Diversified Strategist | Conviction Growth | Momentum Trader | Defensive Allocator | Speculative Investor>",
-  "strengths": ["s1","s2","s3"],
-  "weaknesses": ["w1","w2"],
-  "recommendation": "<actionable recommendation>",
-  "risk_assessment": "<2-sentence risk overview>",
-  "market_outlook": "<2-sentence market positioning>",
-  "action_items": ["a1","a2","a3"]
-}}"""
-
-        analysis = await get_ai_analysis(prompt)
-        pdf_bytes = generate_advisor_report({"metrics": metrics}, analysis)
+        dna_row = None
+        try:
+            dna_result = (
+                supabase.table("dna_scores")
+                .select("*")
+                .eq("portfolio_id", portfolio_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            dna_row = dna_result.data[0] if dna_result.data else None
+        except Exception:
+            pass
+        try:
+            pr = (
+                supabase.table("portfolios")
+                .select("name, total_value")
+                .eq("id", portfolio_id)
+                .single()
+                .execute()
+            )
+            prow = pr.data or {}
+        except Exception:
+            prow = {}
+        portfolio_payload = {
+            "name": prow.get("name") or "Portfolio",
+            "total_value": float(prow.get("total_value") or metrics.get("total_value") or 0),
+            "metrics": metrics,
+        }
+        advisor_config = {
+            "advisor_name": "NeuFin Intelligence",
+            "firm_name": "",
+            "report_run_id": report_id[:8],
+        }
+        pdf_bytes = await generate_advisor_report(
+            portfolio_payload,
+            dna_row or {},
+            None,
+            advisor_config,
+        )
         pdf_url = _upload_pdf(pdf_bytes, report_id)
 
         if pdf_url:
@@ -131,29 +153,54 @@ async def _get_portfolio_for_report(portfolio_id: str) -> dict:
     if not positions_result.data:
         raise RuntimeError("No portfolio positions found for report generation.")
     metrics = calculate_portfolio_metrics(positions_result.data)
-    prompt = f"""You are a senior portfolio strategist.
-Portfolio metrics: {metrics}
-Return ONLY valid JSON:
-{{
-  "dna_score": <0-100>,
-  "investor_type": "<Diversified Strategist | Conviction Growth | Momentum Trader | Defensive Allocator | Speculative Investor>",
-  "strengths": ["s1","s2","s3"],
-  "weaknesses": ["w1","w2"],
-  "recommendation": "<actionable recommendation>",
-  "risk_assessment": "<2-sentence risk overview>",
-  "market_outlook": "<2-sentence market positioning>",
-  "action_items": ["a1","a2","a3"]
-}}"""
-    analysis = await get_ai_analysis(prompt)
-    return {"portfolio_data": {"metrics": metrics}, "analysis": analysis}
+    dna_row = None
+    try:
+        dna_result = (
+            supabase.table("dna_scores")
+            .select("*")
+            .eq("portfolio_id", portfolio_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        dna_row = dna_result.data[0] if dna_result.data else None
+    except Exception:
+        pass
+    try:
+        pr = (
+            supabase.table("portfolios")
+            .select("name, total_value")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+        prow = pr.data or {}
+    except Exception:
+        prow = {}
+    return {
+        "portfolio_data": {
+            "name": prow.get("name") or "Portfolio",
+            "total_value": float(prow.get("total_value") or metrics.get("total_value") or 0),
+            "metrics": metrics,
+        },
+        "dna_data": dna_row or {},
+        "swarm_data": None,
+    }
 
 
 async def _generate_pdf_background(report_id: str, portfolio_id: str):
     """Runs after webhook response. Generates PDF and updates status."""
     try:
         payload = await _get_portfolio_for_report(portfolio_id)
-        pdf_bytes = generate_advisor_report(
-            payload["portfolio_data"], payload["analysis"]
+        pdf_bytes = await generate_advisor_report(
+            payload["portfolio_data"],
+            payload["dna_data"],
+            payload["swarm_data"],
+            {
+                "advisor_name": "NeuFin Intelligence",
+                "firm_name": "",
+                "report_run_id": report_id[:8],
+            },
         )
         pdf_url = _upload_pdf(pdf_bytes, report_id)
         if not pdf_url:

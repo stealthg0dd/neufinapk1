@@ -24,7 +24,6 @@ from pydantic import BaseModel
 
 from config import APP_BASE_URL, STRIPE_PRICE_ADVISOR_REPORT_ONETIME, STRIPE_SECRET_KEY
 from database import supabase
-from services.ai_router import get_ai_analysis
 from services.auth_dependency import (
     get_current_user,
     get_subscription_status,
@@ -56,17 +55,22 @@ async def can_download_report_free(user_id: str) -> bool:
 
 
 class ColorScheme(BaseModel):
-    primary: str = "#1A56DB"
-    secondary: str = "#8B5CF6"
-    accent: str = "#F97316"
+    primary: str = "#0B0F14"
+    secondary: str = "#161D2E"
+    accent: str = "#1EB8CC"
 
 
 class ReportRequest(BaseModel):
     portfolio_id: str
     advisor_id: str
-    advisor_name: str = "NeuFin"
-    logo_base64: str | None = None  # base64-encoded PNG/JPG advisor logo
+    advisor_name: str = "NeuFin Intelligence"
+    logo_base64: str | None = None
     color_scheme: ColorScheme | None = None
+    client_name: str = "Confidential"
+    firm_name: str = ""
+    advisor_logo_url: str | None = None
+    advisor_email: str = "info@neufin.ai"
+    white_label: bool = False
 
 
 def _positions_from_dna_row(dna: dict | None) -> list[dict]:
@@ -92,31 +96,26 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
     return []
 
 
-def _normalize_analysis(raw: dict) -> dict:
-    """Coerce AI JSON into shapes safe for ReportLab / metrics display."""
-
-    def _list_str(key: str) -> list[str]:
-        v = raw.get(key)
-        if v is None:
-            return []
-        if isinstance(v, list):
-            return [str(x) for x in v if x is not None]
-        return [str(v)]
-
-    out = dict(raw)
-    out["strengths"] = _list_str("strengths")
-    out["weaknesses"] = _list_str("weaknesses")
-    out["action_items"] = _list_str("action_items")
-    ds = out.get("dna_score")
-    if ds is not None and not isinstance(ds, int):
-        try:
-            out["dna_score"] = int(float(ds))
-        except (TypeError, ValueError):
-            out["dna_score"] = None
-    for k in ("risk_assessment", "market_outlook", "recommendation", "investor_type"):
-        if out.get(k) is not None:
-            out[k] = str(out[k])
-    return out
+def _synthesis_payload(
+    dna: dict | None, metrics: dict, swarm_row: dict | None
+) -> dict:
+    """Client-facing summary from DNA + metrics + swarm (no LLM)."""
+    dna = dna or {}
+    s = swarm_row or {}
+    action_plan = s.get("action_plan")
+    if not isinstance(action_plan, list):
+        action_plan = []
+    return {
+        "dna_score": dna.get("dna_score") or metrics.get("dna_score"),
+        "investor_type": dna.get("investor_type"),
+        "strengths": list(dna.get("strengths") or []),
+        "weaknesses": list(dna.get("weaknesses") or []),
+        "recommendation": dna.get("recommendation"),
+        "risk_assessment": s.get("risk_sentinel"),
+        "market_outlook": s.get("regime"),
+        "action_items": action_plan,
+        "swarm_headline": s.get("headline"),
+    }
 
 
 def _upload_to_storage(pdf_bytes: bytes, filename: str) -> str | None:
@@ -168,8 +167,8 @@ async def generate_report(
     body: ReportRequest, user: JWTUser = Depends(get_current_user)
 ):
     """
-    Generate a 10-page white-label PDF report with optional advisor logo and color scheme.
-    Uploads to Supabase Storage and returns a public URL.
+    Generate a 10-page IC PDF from portfolio metrics, DNA scores, and latest swarm output.
+    No extra LLM calls — formatting and synthesis only.
     """
     try:
         # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
@@ -195,11 +194,10 @@ async def generate_report(
             except stripe.StripeError as e:
                 raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
-        # 1. Fetch portfolio + DNA (DNA used if positions missing)
         try:
             portfolio_result = (
                 supabase.table("portfolios")
-                .select("id, user_id")
+                .select("id, user_id, name, total_value")
                 .eq("id", body.portfolio_id)
                 .single()
                 .execute()
@@ -228,6 +226,25 @@ async def generate_report(
                 .eq("portfolio_id", body.portfolio_id)
                 .execute()
             )
+
+            swarm_result = (
+                supabase.table("swarm_reports")
+                .select("*")
+                .eq("user_id", user.id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            swarm_row = swarm_result.data[0] if swarm_result.data else None
+
+            profile_result = (
+                supabase.table("user_profiles")
+                .select("display_name, email, avatar_url")
+                .eq("id", user.id)
+                .limit(1)
+                .execute()
+            )
+            profile = (profile_result.data or [None])[0] or {}
         except HTTPException:
             raise
         except Exception as e:
@@ -243,63 +260,43 @@ async def generate_report(
                 detail="No positions found for this portfolio.",
             )
 
-        # 2. Calculate metrics
         try:
             metrics = calculate_portfolio_metrics(positions_raw)
         except Exception as e:
             raise HTTPException(status_code=422, detail=str(e)) from e
 
-        # 4. AI deep analysis
-        prompt = f"""You are a senior portfolio strategist preparing a professional client report.
-
-Portfolio metrics:
-{metrics}
-
-Existing DNA assessment (if any): {existing_dna}
-
-Return ONLY valid JSON:
-{{
-  "dna_score": <integer 0-100>,
-  "investor_type": "<Diversified Strategist | Conviction Growth | Momentum Trader | Defensive Allocator | Speculative Investor>",
-  "strengths": ["<strength1>", "<strength2>", "<strength3>"],
-  "weaknesses": ["<weakness1>", "<weakness2>"],
-  "recommendation": "<one specific, high-impact recommendation>",
-  "risk_assessment": "<brief paragraph on overall risk profile>",
-  "market_outlook": "<brief paragraph on portfolio positioning vs current market>",
-  "action_items": ["<action1>", "<action2>", "<action3>"]
-}}
-
-Be specific, data-driven, and professional."""
-
-        try:
-            analysis = await get_ai_analysis(prompt)
-        except Exception as e:
-            raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
-
-        if not isinstance(analysis, dict):
-            analysis = {}
-        analysis = _normalize_analysis(analysis)
-
-        portfolio_payload = {
-            "metrics": metrics,
-            "swarm_data": {},
+        run_id = uuid.uuid4().hex[:8]
+        brand = body.color_scheme.model_dump() if body.color_scheme else None
+        advisor_config = {
+            "firm_name": body.firm_name or profile.get("display_name") or "",
+            "logo_url": body.advisor_logo_url or profile.get("avatar_url"),
+            "logo_base64": body.logo_base64,
+            "brand_colors": brand,
+            "advisor_name": body.advisor_name,
+            "client_name": body.client_name,
+            "advisor_email": body.advisor_email
+            or profile.get("email")
+            or "info@neufin.ai",
+            "white_label": body.white_label,
+            "report_run_id": run_id,
         }
 
-        # 5. Generate 10-page PDF with custom branding
-        color_dict = body.color_scheme.model_dump() if body.color_scheme else None
-        pdf_bytes = generate_advisor_report(
-            portfolio_data=portfolio_payload,
-            analysis=analysis,
-            advisor_name=body.advisor_name,
-            logo_base64=body.logo_base64,
-            color_scheme=color_dict,
+        portfolio_payload = {
+            "name": portfolio.get("name") or "Portfolio Analysis",
+            "total_value": float(portfolio.get("total_value") or metrics.get("total_value") or 0),
+            "metrics": metrics,
+        }
+
+        pdf_bytes = await generate_advisor_report(
+            portfolio_payload,
+            existing_dna or {},
+            swarm_row,
+            advisor_config,
         )
 
-        # 6. Upload to Supabase Storage
         filename = f"report-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}.pdf"
         pdf_url = _upload_to_storage(pdf_bytes, filename)
 
-        # 7. Save report record with public URL
         try:
             report_result = (
                 supabase.table("advisor_reports")
@@ -317,6 +314,8 @@ Be specific, data-driven, and professional."""
         except Exception as e:
             logger.warning("reports.save_record_failed", error=str(e))
             report_id = None
+
+        analysis = _synthesis_payload(existing_dna, metrics, swarm_row)
 
         out: dict = {
             "report_id": report_id,
