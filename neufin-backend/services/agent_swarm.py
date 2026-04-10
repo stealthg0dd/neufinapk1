@@ -29,7 +29,8 @@ import asyncio
 import datetime
 import json
 import operator
-from typing import Annotated, TypedDict
+import time
+from typing import Annotated, Any, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -1632,6 +1633,57 @@ else:
     swarm = None
 
 
+def _build_swarm_sources(state: dict[str, Any]) -> dict[str, Any]:
+    """
+    Explainability payload: data sources and methodology (not legal advice).
+    """
+    symbols: list[str] = []
+    for t in state.get("ticker_data") or []:
+        if isinstance(t, dict) and t.get("symbol"):
+            symbols.append(str(t["symbol"]).upper())
+    symbols = list(dict.fromkeys(symbols))[:50]
+    return {
+        "items": [
+            {
+                "id": "fred",
+                "label": "FRED (St. Louis Fed)",
+                "description": "CPI and macro series for regime classification.",
+            },
+            {
+                "id": "finnhub",
+                "label": "Finnhub",
+                "description": "Company news flow for strategist context.",
+            },
+            {
+                "id": "market_data",
+                "label": "Multi-provider price history",
+                "description": (
+                    "Alpha Vantage, Finnhub, Polygon, or cached series (Redis/Supabase) "
+                    "for returns, beta, correlation, Sharpe."
+                ),
+            },
+            {
+                "id": "neufin_risk",
+                "label": "NeuFin risk engine",
+                "description": "Concentration (HHI), stress tests, DNA score components.",
+            },
+            {
+                "id": "llm",
+                "label": "Multi-model AI synthesis",
+                "description": (
+                    "Claude → OpenAI → Gemini → Groq fallback for IC briefing "
+                    "and structured thesis."
+                ),
+            },
+        ],
+        "tickers": symbols,
+        "disclaimer": (
+            "Outputs are model-assisted and for informational purposes only; "
+            "not investment advice. Verify material facts independently."
+        ),
+    }
+
+
 async def run_swarm(
     ticker_data: list[dict] | dict,
     total_value: float,
@@ -1646,20 +1698,54 @@ async def run_swarm(
         list(ticker_data.values()) if isinstance(ticker_data, dict) else ticker_data
     )
 
-    async def _trace(agent: str, status: str, summary: str = ""):
+    step_log: list[dict[str, Any]] = []
+
+    async def _trace(
+        agent: str,
+        status: str,
+        summary: str = "",
+        *,
+        duration_ms: float | None = None,
+        step_meta: dict[str, Any] | None = None,
+    ) -> None:
+        entry: dict[str, Any] = {
+            "agent": agent,
+            "status": status,
+            "summary": summary,
+            "ts": datetime.datetime.now(datetime.UTC).isoformat(),
+        }
+        if duration_ms is not None:
+            entry["duration_ms"] = round(duration_ms, 2)
+        if step_meta:
+            entry["meta"] = step_meta
+        step_log.append(entry)
+
+        log_kw: dict[str, Any] = {
+            "job_id": job_id,
+            "agent": agent,
+            "status": status,
+            "duration_ms": duration_ms,
+        }
+        if summary:
+            log_kw["summary_preview"] = summary[:200]
+        if step_meta:
+            log_kw["step_meta"] = step_meta
+        logger.info("swarm.step", **log_kw)
+
         if not job_id:
             return
         job = await get_swarm_job(job_id)
         trace = job.get("agent_trace", []) if job else []
-        trace.append(
-            {
-                "agent": agent,
-                "status": status,  # running | complete | failed
-                "summary": summary,
-                "ts": datetime.datetime.now(datetime.UTC).isoformat(),
-            }
-        )
+        trace.append(entry)
         await update_swarm_job(job_id, agent_trace=trace)
+
+    def _attach_observability(out: dict[str, Any]) -> None:
+        out["sources"] = _build_swarm_sources(out)
+        out["observability"] = {
+            "steps": step_log,
+            "pipeline": "7-agent",
+            "runtime": "langgraph" if swarm is not None else "sequential",
+        }
 
     initial: dict = {
         "ticker_data": normalized_ticker_data,
@@ -1690,16 +1776,21 @@ async def run_swarm(
             ("critic", critic_node),
         ]
         for agent, node_fn in nodes:
-            if agent != "critic":
-                await _trace(agent, "running")
+            t0 = time.perf_counter()
+            await _trace(agent, "running")
             update = await node_fn(state)  # type: ignore[arg-type]
             for k, v in update.items():
                 if k == "agent_trace":
                     state["agent_trace"] = state.get("agent_trace", []) + v
                 else:
                     state[k] = v
-            if agent != "critic":
-                await _trace(agent, "complete")
+            await _trace(
+                agent,
+                "complete",
+                "",
+                duration_ms=(time.perf_counter() - t0) * 1000,
+                step_meta={"phase": "primary"},
+            )
             if (
                 agent == "critic"
                 and state.get("needs_revision")
@@ -1713,23 +1804,27 @@ async def run_swarm(
                     ("alpha_scout", alpha_scout_node),
                     ("critic", critic_node),
                 ]:
-                    if revision_agent != "critic":
-                        await _trace(
-                            revision_agent,
-                            "running",
-                            "revision pass triggered by critic",
-                        )
+                    rt0 = time.perf_counter()
+                    await _trace(
+                        revision_agent,
+                        "running",
+                        "revision pass triggered by critic",
+                    )
                     revision_update = await revision_fn(state)  # type: ignore[arg-type]
                     for k, v in revision_update.items():
                         if k == "agent_trace":
                             state["agent_trace"] = state.get("agent_trace", []) + v
                         else:
                             state[k] = v
-                    if revision_agent != "critic":
-                        await _trace(
-                            revision_agent, "complete", "revision pass complete"
-                        )
+                    await _trace(
+                        revision_agent,
+                        "complete",
+                        "revision pass complete",
+                        duration_ms=(time.perf_counter() - rt0) * 1000,
+                        step_meta={"phase": "revision"},
+                    )
 
+        st0 = time.perf_counter()
         await _trace("synthesizer", "running")
         synth_update = await synthesizer_node(state)  # type: ignore[arg-type]
         for k, v in synth_update.items():
@@ -1737,8 +1832,14 @@ async def run_swarm(
                 state["agent_trace"] = state.get("agent_trace", []) + v
             else:
                 state[k] = v
-        await _trace("synthesizer", "complete")
+        await _trace(
+            "synthesizer",
+            "complete",
+            "",
+            duration_ms=(time.perf_counter() - st0) * 1000,
+        )
         final_output = state
+        _attach_observability(final_output)
         if job_id:
             await update_swarm_job(job_id, status="complete", result=final_output)
         return final_output
@@ -1755,16 +1856,22 @@ async def run_swarm(
         ("critic", critic_node),
         ("synthesizer", synthesizer_node),
     ]:
-        if agent != "critic":
-            await _trace(agent, "running")
+        t0 = time.perf_counter()
+        await _trace(agent, "running")
         update = await node_fn(state)  # type: ignore[arg-type]
         for k, v in update.items():
             if k == "agent_trace":
                 state["agent_trace"] = state.get("agent_trace", []) + v
             else:
                 state[k] = v
-        if agent != "critic":
-            await _trace(agent, "complete")
+        await _trace(
+            agent,
+            "complete",
+            "",
+            duration_ms=(time.perf_counter() - t0) * 1000,
+            step_meta={"phase": "sequential"},
+        )
+    _attach_observability(state)
     if job_id:
         await update_swarm_job(job_id, status="complete", result=state)
     return state

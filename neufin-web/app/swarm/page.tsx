@@ -10,6 +10,11 @@ import CommandPalette from '@/components/CommandPalette'
 import RiskMatrix from '@/components/RiskMatrix'
 import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
+import {
+  SwarmSourcesPanel,
+  type SwarmObservabilityPayload,
+  type SwarmSourcesPayload,
+} from '@/components/swarm/SwarmSourcesPanel'
 import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
@@ -1243,6 +1248,15 @@ export default function SwarmPage() {
           </div>
         </div>
       )}
+
+      {jobStatus === 'complete' && result ? (
+        <SwarmSourcesPanel
+          sources={(result as Record<string, unknown>).sources as SwarmSourcesPayload | undefined}
+          observability={
+            (result as Record<string, unknown>).observability as SwarmObservabilityPayload | undefined
+          }
+        />
+      ) : null}
 
       {thesis && (
         <div className="max-w-[1600px] mx-auto px-4 pb-8">
