@@ -84,13 +84,15 @@ function behavioralSignals(regimeRaw: string, hasPortfolio: boolean) {
 
 export default function DashboardCockpitClient({
   regimeData,
-  notes,
+  researchNotes,
 }: {
   regimeData: RegimePayload
-  notes: CockpitNote[]
+  researchNotes: CockpitNote[]
 }) {
   const { loading: dnaLoading, score, hasPortfolio } = usePortfolioDNA()
   const [marketTab, setMarketTab] = useState<'S&P 500' | 'NASDAQ' | 'STI' | 'FTSE'>('S&P 500')
+
+  const notes = researchNotes ?? []
 
   const regimeRaw = regimeData.current?.regime ?? 'Unknown'
   const regimeLabel = formatRegimeLabel(regimeRaw)
@@ -304,7 +306,7 @@ export default function DashboardCockpitClient({
               </span>
             </div>
             <div className="space-y-0">
-              {signals.map((s) => (
+              {(signals ?? []).map((s) => (
                 <div
                   key={s.key}
                   className="flex items-start gap-2.5 border-b border-[hsl(var(--border)/0.4)] py-2 last:border-0"

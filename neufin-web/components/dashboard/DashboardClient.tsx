@@ -253,7 +253,7 @@ export default function DashboardClient() {
       const data = await apiPost<{ reply?: string; response?: { answer?: string }; answer?: string; message?: string; content?: string }>('/api/swarm/chat', {
         message: aiQ.slice(0, 500),
         total_value: metrics.total_value,
-        positions: metrics.positions.map((p) => ({
+        positions: (metrics.positions ?? []).map((p) => ({
           symbol: p.symbol,
           shares: p.shares,
           price: p.current_price,
@@ -427,7 +427,7 @@ export default function DashboardClient() {
                     onChange={(e) => setSelectedId(e.target.value)}
                     className="appearance-none font-mono text-sm bg-[var(--surface-2)] border border-[var(--glass-border)] rounded-lg pl-3 pr-9 py-2 text-[var(--text-primary)] focus-amber"
                   >
-                    {portfolios.map((p) => (
+                    {(portfolios ?? []).map((p) => (
                       <option key={p.portfolio_id} value={p.portfolio_id}>
                         {p.portfolio_name || p.portfolio_id.slice(0, 8)}
                       </option>
@@ -577,7 +577,7 @@ export default function DashboardClient() {
                   </thead>
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {sortedPositions.map((p) => (
+                      {(sortedPositions ?? []).map((p) => (
                         <motion.tr
                           key={p.symbol}
                           layout
@@ -624,7 +624,7 @@ export default function DashboardClient() {
         <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1 mb-4">
           {loadNotes
             ? [1, 2, 3].map((i) => <div key={i} className="h-20 rounded-xl shimmer" />)
-            : notes.map((n) => (
+            : (notes ?? []).map((n) => (
                 <GlassCard key={n.id} className="p-3 border-l-2 border-l-[var(--amber)]">
                   <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{n.title}</p>
                   <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1">{n.executive_summary}</p>

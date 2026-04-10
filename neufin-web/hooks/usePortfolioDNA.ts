@@ -15,15 +15,19 @@ export function usePortfolioDNA() {
   const [loading, setLoading] = useState(true)
   const [score, setScore] = useState<number | null>(null)
   const [hasPortfolioList, setHasPortfolioList] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     const run = async () => {
       try {
+        setError(null)
         const data = await apiGet<PortfolioSummary[]>('/api/portfolio/list')
         if (Array.isArray(data) && data.length > 0) {
           setHasPortfolioList(true)
           setScore(data[0]?.dna_score ?? null)
         }
+      } catch (e) {
+        setError(e instanceof Error ? e : new Error(String(e)))
       } finally {
         setLoading(false)
       }
@@ -31,5 +35,5 @@ export function usePortfolioDNA() {
     void run()
   }, [])
 
-  return { loading, score, hasPortfolio: hasPortfolioList }
+  return { loading, score, hasPortfolio: hasPortfolioList, error }
 }

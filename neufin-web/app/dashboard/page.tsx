@@ -1,6 +1,8 @@
 import DashboardCockpitClient from '@/components/dashboard/DashboardCockpitClient'
 import Link from 'next/link'
 
+export const dynamic = 'force-dynamic'
+
 export default function DashboardPage() {
   return <DashboardServerPage />
 }
@@ -20,20 +22,39 @@ type NotesResponse = {
   }>
 }
 
+const DEFAULT_REGIME: RegimeResponse = {
+  current: { regime: 'unknown', confidence: 0 },
+}
+
 async function DashboardServerPage() {
   const appUrl = process.env.NEXT_PUBLIC_API_URL || 'https://neufin-web.vercel.app'
-  const [regimeRes, notesRes] = await Promise.all([
-    fetch(`${appUrl}/api/research/regime`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
-    fetch(`${appUrl}/api/research/notes?limit=5`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({})),
-  ])
 
-  const regimeData = regimeRes as RegimeResponse
-  const notesData = notesRes as NotesResponse
-  const notes = notesData.notes ?? []
+  const regime = await fetch(`${appUrl}/api/research/regime`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch((err) => {
+      console.error('[dashboard] regime fetch failed:', err)
+      return null
+    })
+
+  const notes = await fetch(`${appUrl}/api/research/notes?limit=5`, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch((err) => {
+      console.error('[dashboard] notes fetch failed:', err)
+      return null
+    })
+
+  const regimeData: RegimeResponse =
+    regime != null && typeof regime === 'object' ? (regime as RegimeResponse) : DEFAULT_REGIME
+
+  const researchNotes = Array.isArray(notes)
+    ? notes
+    : notes != null && typeof notes === 'object' && Array.isArray((notes as NotesResponse).notes)
+      ? (notes as NotesResponse).notes!
+      : []
 
   return (
     <div>
-      <DashboardCockpitClient regimeData={regimeData} notes={notes} />
+      <DashboardCockpitClient regimeData={regimeData} researchNotes={researchNotes} />
       <div className="mt-6 flex items-center justify-between rounded-xl border border-border/50 bg-surface px-5 py-4">
         <div>
           <p className="text-sm font-medium text-foreground">

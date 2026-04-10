@@ -21,7 +21,8 @@ function stripeClass(noteType?: string) {
 }
 
 export default function ResearchFeedClient({ notes }: { notes: ResearchFeedNote[] }) {
-  if (!notes.length) {
+  const safeNotes = notes ?? []
+  if (!safeNotes.length) {
     return (
       <div className="flex flex-col items-center justify-center rounded-lg border border-[hsl(var(--border))] bg-surface py-12">
         <Loader2 className="mb-3 h-6 w-6 animate-spin text-[hsl(var(--muted-foreground))]" />
@@ -32,7 +33,7 @@ export default function ResearchFeedClient({ notes }: { notes: ResearchFeedNote[
 
   return (
     <div className="space-y-3">
-      {notes.map((note) => {
+      {safeNotes.map((note) => {
         const stripe = stripeClass(note.note_type)
         const conf = Math.round((note.confidence_score ?? 0) * 100)
         return (
