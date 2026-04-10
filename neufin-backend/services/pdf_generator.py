@@ -1,6 +1,16 @@
 """
 NeuFin IC-grade 10-page PDF (ReportLab, A4, white-label).
 Uses portfolio metrics, DNA scores, and swarm agent outputs only — no LLM calls here.
+
+Orchestration model
+-------------------
+``generate_advisor_report`` is an **orchestrator**:
+  1. **Async** — resolve logo bytes (HTTP ``logo_url`` / ``advisor_logo_url``, optional
+     ``logo_base64``); optional Pillow validation of image bytes.
+  2. **Sync** — ``_build_pdf_sync`` runs the full ReportLab story (layout only).
+
+Charts (pie, gauge, heatmap) use ``renderPM`` when available; on failure we **degrade**
+to Tables / Paragraphs so the 10-page report still builds.
 """
 
 from __future__ import annotations
@@ -40,10 +50,18 @@ logger = structlog.get_logger("neufin.pdf_generator")
 
 A4_W, A4_H = A4
 MARGIN = 40
-FOOTER_DISCLAIMER = (
-    "Confidential. For informational purposes only. Not investment advice. Past performance does not "
-    "guarantee future results."
-)
+
+# Default IC palette (strings for merging with advisor_config["brand_colors"])
+DEFAULT_IC_BRAND_COLORS: dict[str, str] = {
+    "primary": "#0B0F14",
+    "accent": "#1EB8CC",
+    "danger": "#EF4444",
+    "success": "#22C55E",
+    "amber": "#F5A623",
+    "white": "#F0F4FF",
+    "muted": "#94A3B8",
+    "surface": "#161D2E",
+}
 
 
 def _xml(text: str | None) -> str:
@@ -93,10 +111,10 @@ def _coerce_list(val: Any, max_n: int | None = None) -> list[str]:
 
 
 class ICBrand:
-    """Design system colors; advisor overrides via brand_colors dict."""
+    """Design system colors; built from ``advisor_config['brand_colors']`` merged with defaults."""
 
     def __init__(self, brand_colors: dict | None = None):
-        b = brand_colors or {}
+        b = {**DEFAULT_IC_BRAND_COLORS, **(brand_colors or {})}
         self.PRIMARY = HexColor(b.get("primary", "#0B0F14"))
         self.ACCENT = HexColor(b.get("accent", "#1EB8CC"))
         self.DANGER = HexColor(b.get("danger", "#EF4444"))
@@ -106,8 +124,21 @@ class ICBrand:
         self.MUTED = HexColor(b.get("muted", "#94A3B8"))
         self.SURFACE = HexColor(b.get("surface", "#161D2E"))
         # legacy keys from API ColorScheme
-        if "secondary" in b and "surface" not in (brand_colors or {}):
-            self.SURFACE = HexColor(b["secondary"])
+        if brand_colors and "secondary" in brand_colors and "surface" not in brand_colors:
+            self.SURFACE = HexColor(brand_colors["secondary"])
+
+    def as_dict(self) -> dict[str, str]:
+        """Hex strings suitable for logging / API (not ReportLab Color objects)."""
+        return {
+            "primary": f"#{self.PRIMARY.hexval() & 0xFFFFFF:06x}",
+            "accent": f"#{self.ACCENT.hexval() & 0xFFFFFF:06x}",
+            "danger": f"#{self.DANGER.hexval() & 0xFFFFFF:06x}",
+            "success": f"#{self.SUCCESS.hexval() & 0xFFFFFF:06x}",
+            "amber": f"#{self.AMBER.hexval() & 0xFFFFFF:06x}",
+            "white": f"#{self.WHITE.hexval() & 0xFFFFFF:06x}",
+            "muted": f"#{self.MUTED.hexval() & 0xFFFFFF:06x}",
+            "surface": f"#{self.SURFACE.hexval() & 0xFFFFFF:06x}",
+        }
 
 
 def _normalize_swarm(swarm: dict | None) -> dict[str, Any]:
@@ -205,33 +236,52 @@ async def _fetch_logo_bytes(advisor_config: dict) -> bytes | None:
     return None
 
 
-def _pie_image(
+def _prepare_logo_bytes(raw: bytes | None) -> bytes | None:
+    """Optional Pillow validation so corrupt uploads do not break the cover canvas."""
+    if not raw:
+        return None
+    try:
+        from PIL import Image as PILImage
+
+        im = PILImage.open(io.BytesIO(raw))
+        im.load()
+        return raw
+    except Exception as e:
+        logger.warning("pdf.logo_pil_rejected", error=str(e))
+        return None
+
+
+def try_render_pie_chart(
     labels: list[str],
     values: list[float],
     bc: ICBrand,
     width: float = 200,
     height: float = 160,
 ) -> Image | None:
+    """
+    Attempt ReportLab Pie → PNG via renderPM (needs rlPyCairo/Pillow stack in many envs).
+    Returns None on any failure so callers can use allocation table fallback.
+    """
     if not values or sum(abs(v) for v in values) < 1e-9:
         return None
-    palette = [bc.ACCENT, bc.AMBER, bc.SUCCESS, bc.DANGER, bc.MUTED]
-    d = Drawing(width, height)
-    pie = Pie()
-    pie.x = 15
-    pie.y = 15
-    pie.width = min(width - 30, height - 30)
-    pie.height = pie.width
-    pie.data = [max(v, 0.0) for v in values]
-    pie.labels = [str(l)[:10] for l in labels]
-    for i in range(len(pie.data)):
-        pie.slices[i].fillColor = palette[i % len(palette)]
-        pie.slices[i].strokeColor = colors.white
-    d.add(pie)
     try:
+        palette = [bc.ACCENT, bc.AMBER, bc.SUCCESS, bc.DANGER, bc.MUTED]
+        d = Drawing(width, height)
+        pie = Pie()
+        pie.x = 15
+        pie.y = 15
+        pie.width = min(width - 30, height - 30)
+        pie.height = pie.width
+        pie.data = [max(v, 0.0) for v in values]
+        pie.labels = [str(l)[:10] for l in labels]
+        for i in range(len(pie.data)):
+            pie.slices[i].fillColor = palette[i % len(palette)]
+            pie.slices[i].strokeColor = colors.white
+        d.add(pie)
         buf = renderPM.drawToString(d, fmt="PNG", dpi=120)
         return Image(io.BytesIO(buf), width=width, height=height)
     except Exception as e:
-        logger.warning("pdf.pie_render_failed", error=str(e))
+        logger.warning("pdf.pie_failed", error=str(e))
         return None
 
 
@@ -841,7 +891,7 @@ def _build_pdf_sync(
     elems.append(Spacer(1, 8))
     pie_img = None
     try:
-        pie_img = _pie_image(labels_pie, vals_pie, bc)
+        pie_img = try_render_pie_chart(labels_pie, vals_pie, bc)
     except Exception as e:
         logger.warning("pdf.pie_failed", error=str(e))
     if pie_img:
@@ -1403,10 +1453,16 @@ async def generate_advisor_report(
     advisor_config: dict,
 ) -> bytes:
     """
-    Returns PDF bytes. Caller handles upload/delivery.
+    Orchestrator: async asset resolution, then synchronous PDF build.
+
+    1. **Async**: fetch ``logo_url`` / decode ``logo_base64``; Pillow-validate bytes.
+    2. **Sync**: ``_build_pdf_sync`` — BaseDocTemplate + 10-page story (no I/O).
+
+    Returns raw PDF bytes; caller uploads or returns ``Response(content=...)``.
     Swarm data may be None; DNA may be empty — report still renders 10 pages.
     """
-    logo_bytes = await _fetch_logo_bytes(advisor_config)
+    raw_logo = await _fetch_logo_bytes(advisor_config)
+    logo_bytes = _prepare_logo_bytes(raw_logo)
     swarm_norm = _normalize_swarm(swarm_data)
     try:
         return _build_pdf_sync(

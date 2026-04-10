@@ -19,7 +19,7 @@ import uuid
 import stripe
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
 from config import APP_BASE_URL, STRIPE_PRICE_ADVISOR_REPORT_ONETIME, STRIPE_SECRET_KEY
@@ -71,6 +71,8 @@ class ReportRequest(BaseModel):
     advisor_logo_url: str | None = None
     advisor_email: str = "info@neufin.ai"
     white_label: bool = False
+    # When True, response is raw PDF bytes (media_type application/pdf) instead of JSON metadata.
+    inline_pdf: bool = False
 
 
 def _positions_from_dna_row(dna: dict | None) -> list[dict]:
@@ -169,6 +171,9 @@ async def generate_report(
     """
     Generate a 10-page IC PDF from portfolio metrics, DNA scores, and latest swarm output.
     No extra LLM calls — formatting and synthesis only.
+
+    Set ``inline_pdf: true`` to receive ``Response(content=pdf_bytes, media_type="application/pdf")``
+    instead of JSON (optional ``X-Report-Id``, ``X-PDF-URL`` headers when available).
     """
     try:
         # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
@@ -316,6 +321,20 @@ async def generate_report(
             report_id = None
 
         analysis = _synthesis_payload(existing_dna, metrics, swarm_row)
+
+        if body.inline_pdf:
+            headers = {
+                "Content-Disposition": f'inline; filename="{filename}"',
+            }
+            if report_id:
+                headers["X-Report-Id"] = str(report_id)
+            if pdf_url:
+                headers["X-PDF-URL"] = pdf_url
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers=headers,
+            )
 
         out: dict = {
             "report_id": report_id,
