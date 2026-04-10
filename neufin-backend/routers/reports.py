@@ -102,7 +102,10 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
 def _synthesis_payload(dna: dict | None, metrics: dict, swarm_row: dict | None) -> dict:
     """Client-facing summary from DNA + metrics + swarm (no LLM)."""
     dna = dna or {}
-    s = swarm_row or {}
+    if isinstance(swarm_row, dict):
+        s = swarm_row
+    else:
+        s = {}
     action_plan = s.get("action_plan")
     if not isinstance(action_plan, list):
         action_plan = []

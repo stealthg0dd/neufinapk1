@@ -18,6 +18,7 @@ from __future__ import annotations
 import base64
 import datetime
 import io
+import json
 import uuid
 from typing import Any
 from xml.sax.saxutils import escape
@@ -40,6 +41,7 @@ from reportlab.platypus import (
     PageBreak,
     PageTemplate,
     Paragraph,
+    SimpleDocTemplate,
     Spacer,
     Table,
     TableStyle,
@@ -144,12 +146,61 @@ class ICBrand:
         }
 
 
-def _normalize_swarm(swarm: dict | None) -> dict[str, Any]:
+def _empty_swarm_norm() -> dict[str, Any]:
+    """Stable shape when swarm is missing or unreadable (nested keys used by the PDF story)."""
+    return {
+        "investment_thesis": {
+            "headline": "Market intelligence summary unavailable",
+            "briefing": (
+                "Swarm output was not available or could not be loaded. "
+                "Run portfolio intelligence again to populate agent synthesis, "
+                "or verify your latest swarm report."
+            ),
+        },
+        "market_regime": {},
+        "quant_analysis": {},
+        "tax_report": {},
+        "risk_sentinel": {},
+        "alpha_scout": {},
+        "agent_trace": [],
+        "regime": None,
+    }
+
+
+def _normalize_swarm(swarm: Any) -> dict[str, Any]:
     """Flatten swarm_reports row + nested investment_thesis into one shape."""
-    if not swarm:
-        return {}
-    row = dict(swarm)
-    nested = row.get("investment_thesis")
+    if swarm is None:
+        return _empty_swarm_norm()
+
+    if not isinstance(swarm, dict):
+        logger.warning("pdf.swarm_invalid_type", type_name=type(swarm).__name__)
+        return _empty_swarm_norm()
+
+    try:
+        row = dict(swarm)
+    except (TypeError, ValueError) as e:
+        logger.warning("pdf.swarm_not_mapping", error=str(e))
+        return _empty_swarm_norm()
+
+    raw_thesis = row.get("investment_thesis")
+    nested: dict[str, Any] | None
+    if isinstance(raw_thesis, str):
+        st = raw_thesis.strip()
+        if st.startswith("{") and "}" in st:
+            try:
+                parsed = json.loads(st)
+                nested = parsed if isinstance(parsed, dict) else {}
+            except json.JSONDecodeError:
+                nested = {}
+        elif st:
+            nested = {"briefing": st[:8000]}
+        else:
+            nested = {}
+    elif isinstance(raw_thesis, dict) and raw_thesis:
+        nested = dict(raw_thesis)
+    else:
+        nested = None
+
     if isinstance(nested, dict) and nested:
         inv = {**nested}
         for k in (
@@ -189,18 +240,64 @@ def _normalize_swarm(swarm: dict | None) -> dict[str, Any]:
             "alpha_scout": row.get("alpha_scout"),
             "strategist_intel": row.get("strategist_intel"),
         }
+    atr = row.get("agent_trace")
+    if isinstance(atr, str):
+        agent_trace_list = [atr]
+    elif isinstance(atr, list):
+        agent_trace_list = atr
+    else:
+        agent_trace_list = []
+
+    mr = inv.get("market_regime") or row.get("market_regime") or {}
+    if not isinstance(mr, dict):
+        mr = {}
+
     return {
         "investment_thesis": inv,
-        "market_regime": (inv.get("market_regime") or row.get("market_regime") or {}),
+        "market_regime": mr,
         "quant_analysis": (
             inv.get("quant_analysis") or row.get("quant_analysis") or {}
         ),
         "tax_report": (inv.get("tax_report") or row.get("tax_report") or {}),
         "risk_sentinel": (inv.get("risk_sentinel") or row.get("risk_sentinel") or {}),
         "alpha_scout": (inv.get("alpha_scout") or row.get("alpha_scout") or {}),
-        "agent_trace": row.get("agent_trace") or [],
+        "agent_trace": agent_trace_list,
         "regime": inv.get("regime") or row.get("regime"),
     }
+
+
+def _generate_emergency_pdf(message: str, advisor_config: dict) -> bytes:
+    """Minimal one-page PDF when the main story cannot be built (avoids empty responses / opaque 500s)."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=MARGIN,
+        leftMargin=MARGIN,
+        topMargin=MARGIN,
+        bottomMargin=MARGIN,
+    )
+    styles = getSampleStyleSheet()
+    title = advisor_config.get("advisor_name") or "NeuFin Intelligence"
+    ref = advisor_config.get("report_run_id") or "—"
+    safe_msg = str(message)[:6000]
+    story = [
+        Paragraph(_xml("Portfolio intelligence report"), styles["Title"]),
+        Paragraph(_xml(title), styles["Heading2"]),
+        Paragraph(
+            _xml(
+                "The full multi-page PDF could not be rendered. "
+                "Portfolio metrics and DNA may still be available in the app; technical detail:"
+            ),
+            styles["BodyText"],
+        ),
+        Spacer(1, 14),
+        Paragraph(_xml(safe_msg), styles["BodyText"]),
+        Spacer(1, 20),
+        Paragraph(_xml(f"Reference: {ref}"), styles["Normal"]),
+    ]
+    doc.build(story)
+    return buffer.getvalue()
 
 
 def _dna_score_color(score: int, bc: ICBrand) -> HexColor:
@@ -1511,14 +1608,22 @@ def _build_pdf_sync(
         )
     )
 
-    doc.build(elems)
+    try:
+        doc.build(elems)
+    except Exception as e:
+        logger.error("pdf.doc_build_failed", error=str(e), exc_info=True)
+        try:
+            return _generate_emergency_pdf(str(e), advisor_config)
+        except Exception as e2:
+            logger.error("pdf.emergency_pdf_failed", error=str(e2), exc_info=True)
+            raise RuntimeError(f"PDF render failed: {e}") from e2
     return buffer.getvalue()
 
 
 async def generate_advisor_report(
     portfolio_data: dict,
     dna_data: dict,
-    swarm_data: dict | None,
+    swarm_data: Any | None,
     advisor_config: dict,
 ) -> bytes:
     """
@@ -1533,6 +1638,7 @@ async def generate_advisor_report(
     raw_logo = await _fetch_logo_bytes(advisor_config)
     logo_bytes = _prepare_logo_bytes(raw_logo)
     swarm_norm = _normalize_swarm(swarm_data)
+    swarm_data_present = isinstance(swarm_data, dict) and bool(swarm_data)
     try:
         return _build_pdf_sync(
             portfolio_data,
@@ -1540,8 +1646,15 @@ async def generate_advisor_report(
             swarm_norm,
             advisor_config,
             logo_bytes,
-            bool(swarm_data),
+            swarm_data_present,
         )
     except Exception as e:
-        logger.error("pdf.build_failed", error=str(e))
-        raise
+        logger.error("pdf.orchestrator_failed", error=str(e), exc_info=True)
+        try:
+            return _generate_emergency_pdf(
+                f"Report assembly failed: {e}",
+                advisor_config,
+            )
+        except Exception as e2:
+            logger.error("pdf.emergency_pdf_failed", error=str(e2), exc_info=True)
+            raise
