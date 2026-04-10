@@ -238,8 +238,7 @@ async def verify_jwt(token: str) -> JWTUser:
                     _JWT_SECRET,
                     algorithms=["HS256"],
                     audience="authenticated",
-                    options={"verify_aud": True, "verify_exp": True},
-                    leeway=_JWT_LEEWAY,
+                    options={"verify_aud": True, "verify_exp": True, "leeway": _JWT_LEEWAY},
                 )
                 user_id = payload.get("sub")
                 if not user_id:
@@ -267,8 +266,7 @@ async def verify_jwt(token: str) -> JWTUser:
             key,
             algorithms=_ALGORITHMS,
             audience="authenticated",
-            options={"verify_aud": True, "verify_exp": True},
-            leeway=_JWT_LEEWAY,
+            options={"verify_aud": True, "verify_exp": True, "leeway": _JWT_LEEWAY},
         )
 
     except ExpiredSignatureError as exc:

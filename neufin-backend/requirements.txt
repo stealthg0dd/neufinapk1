@@ -50,6 +50,7 @@ celery[redis]==5.4.0
 
 # JWT verification (ES256 via Supabase JWKS)
 python-jose[cryptography]==3.3.0
+PyJWT>=2.4.0
 
 # Field-level encryption (AES-256-GCM)
 cryptography==46.0.5
