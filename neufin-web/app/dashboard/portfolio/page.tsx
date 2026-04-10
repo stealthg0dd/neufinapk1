@@ -6,11 +6,12 @@ import Link from 'next/link'
 import { toast } from 'react-hot-toast'
 import { Brain, Check, FileSpreadsheet, Loader2, UploadCloud } from 'lucide-react'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
-import type { CandleData, DNAAnalysisResponse, Position } from '@/lib/api'
+import type { DNAAnalysisResponse, Position } from '@/lib/api'
 import { KPICard } from '@/components/ui/KPICard'
+import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
 import { supabase } from '@/lib/supabase'
-import CandlestickChart from '@/components/CandlestickChart'
 import PortfolioPie from '@/components/PortfolioPie'
+import ChartLab from '@/components/dashboard/ChartLab'
 
 const STAGES = [
   { label: 'Reading your holdings...', pct: 25, sub: 'Parsing CSV rows and mapping tickers' },
@@ -35,14 +36,7 @@ export default function PortfolioPage() {
   const [plan, setPlan] = useState<'free' | 'retail' | 'advisor' | 'enterprise'>('free')
   const [reportAt, setReportAt] = useState<string | null>(null)
 
-  // ── Holdings chart analysis ────────────────────────────────────────────────
-  const TIMEFRAMES = ['1D', '1W', '1M', '3M', '1Y'] as const
-  type Timeframe = (typeof TIMEFRAMES)[number]
-  const [timeframe, setTimeframe] = useState<Timeframe>('3M')
-  const [activeSymbol, setActiveSymbol] = useState<string | null>(null)
-  const [candleData, setCandleData] = useState<CandleData[]>([])
-  const [candleLoading, setCandleLoading] = useState(false)
-  const [candleError, setCandleError] = useState<string | null>(null)
+  const [swarmResult, setSwarmResult] = useState<Record<string, unknown> | null>(null)
 
   const fileSize = useMemo(() => (file ? `${(file.size / 1024).toFixed(1)} KB` : ''), [file])
   const portfolioId = result?.portfolio_id ?? null
@@ -154,6 +148,17 @@ export default function PortfolioPage() {
   }, [result])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem('neufin-last-swarm-result')
+      if (!raw) return
+      setSwarmResult(JSON.parse(raw) as Record<string, unknown>)
+    } catch {
+      setSwarmResult(null)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!result) {
       setReportAt(null)
       return
@@ -196,9 +201,15 @@ export default function PortfolioPage() {
           toast.error('Report URL unavailable. Try again.')
         }
       } else {
+        const origin = typeof window !== 'undefined' ? window.location.origin : ''
         const { checkout_url } = await apiPost<{ checkout_url: string }>(
           '/api/reports/checkout',
-          { plan: 'single', portfolio_id: portfolioId }
+          {
+            plan: 'single',
+            portfolio_id: portfolioId,
+            success_url: stripeSuccessUrlReports(origin),
+            cancel_url: `${origin}/dashboard/portfolio`,
+          }
         )
         window.location.href = checkout_url
       }
@@ -244,63 +255,6 @@ export default function PortfolioPage() {
     // PortfolioPie expects weight as a 0–100 percent value for its pct formatter.
     return result.positions.map((p) => ({ ...p, weight: p.weight * 100 })) as Position[]
   }, [result?.positions])
-
-  const periodForTimeframe = (tf: Timeframe): '1mo' | '3mo' | '1y' => {
-    switch (tf) {
-      case '3M':
-        return '3mo'
-      case '1Y':
-        return '1y'
-      case '1D':
-      case '1W':
-      case '1M':
-      default:
-        return '1mo'
-    }
-  }
-
-  useEffect(() => {
-    if (!result?.positions?.length) {
-      setActiveSymbol(null)
-      return
-    }
-    setActiveSymbol((prev) => prev ?? result.positions[0].symbol)
-  }, [result?.positions])
-
-  useEffect(() => {
-    if (!activeSymbol || !result) return
-    let cancelled = false
-    setCandleLoading(true)
-    setCandleError(null)
-    setCandleData([])
-    void (async () => {
-      try {
-        const period = periodForTimeframe(timeframe)
-        const res = await apiGet<{ symbol: string; period: string; data: CandleData[] }>(
-          `/api/portfolio/chart/${encodeURIComponent(activeSymbol)}?period=${encodeURIComponent(period)}`,
-        )
-        if (!cancelled) setCandleData(Array.isArray(res.data) ? res.data : [])
-      } catch {
-        if (!cancelled) setCandleError(`Price data unavailable for ${activeSymbol}`)
-      } finally {
-        if (!cancelled) setCandleLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [activeSymbol, result, timeframe])
-
-  const candleStats = useMemo(() => {
-    if (!candleData.length) return null
-    const first = candleData[0]
-    const last = candleData[candleData.length - 1]
-    const current = last.close
-    const base = first.open || first.close || 0
-    const changePct = base > 0 ? ((current - base) / base) * 100 : 0
-    const volume = last.volume
-    return { current, changePct, volume }
-  }, [candleData])
 
   return (
     <div className="space-y-5">
@@ -570,105 +524,22 @@ export default function PortfolioPage() {
             </div>
           )}
 
-          {/* Holdings Analysis */}
           {result?.positions?.length ? (
-            <div className="rounded-xl border border-[hsl(var(--border))] bg-surface p-5">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
-                  HOLDINGS CHART ANALYSIS
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {TIMEFRAMES.map((tf) => {
-                    const active = tf === timeframe
-                    return (
-                      <button
-                        key={tf}
-                        type="button"
-                        onClick={() => setTimeframe(tf)}
-                        className={[
-                          'rounded px-2 py-1 font-mono text-[11px] transition-colors',
-                          active
-                            ? 'bg-primary/15 text-primary'
-                            : 'text-muted-foreground hover:text-foreground',
-                        ].join(' ')}
-                      >
-                        {tf}
-                      </button>
-                    )
-                  })}
-                </div>
+            <section className="mt-8">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-medium text-white">Chart Lab</h2>
+                <span className="text-xs text-gray-500">AI-enriched · Swarm annotations active</span>
               </div>
-
-              <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-                {result.positions.map((p) => {
-                  const active = p.symbol === activeSymbol
-                  return (
-                    <button
-                      key={p.symbol}
-                      type="button"
-                      onClick={() => setActiveSymbol(p.symbol)}
-                      className={[
-                        'shrink-0 rounded-full border px-3 py-1.5 font-mono text-[11px] transition-colors',
-                        active
-                          ? 'bg-surface-2 border-primary/40 text-primary'
-                          : 'bg-surface border-border text-muted-foreground hover:text-foreground',
-                      ].join(' ')}
-                    >
-                      {p.symbol}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="rounded-xl border border-[hsl(var(--border))] bg-surface p-4">
-                <div className="h-64 md:h-80">
-                  {candleLoading ? (
-                    <div className="h-full w-full animate-pulse rounded-lg bg-surface-2" />
-                  ) : candleError ? (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      {candleError}
-                    </div>
-                  ) : (
-                    <CandlestickChart data={candleData} symbol={activeSymbol ?? ''} height={320} />
-                  )}
-                </div>
-
-                {candleStats ? (
-                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="rounded-lg border border-border/60 bg-surface-2 p-3">
-                      <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
-                        Current price
-                      </p>
-                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">
-                        ${candleStats.current.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-surface-2 p-3">
-                      <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
-                        Period change
-                      </p>
-                      <p
-                        className={[
-                          'mt-1 font-mono text-lg font-semibold tabular-nums',
-                          candleStats.changePct >= 0 ? 'text-positive' : 'text-risk',
-                        ].join(' ')}
-                      >
-                        {candleStats.changePct >= 0 ? '+' : ''}
-                        {candleStats.changePct.toFixed(2)}%
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-border/60 bg-surface-2 p-3">
-                      <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
-                        Volume
-                      </p>
-                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-foreground">
-                        {Number.isFinite(candleStats.volume) ? candleStats.volume.toLocaleString() : '—'}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
+              <ChartLab
+                positions={result.positions.map((p) => ({
+                  symbol: p.symbol,
+                  shares: p.shares,
+                  weight: p.weight,
+                }))}
+                portfolioId={result.portfolio_id ?? ''}
+                swarmResult={swarmResult}
+              />
+            </section>
           ) : null}
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
