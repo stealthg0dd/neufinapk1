@@ -3,7 +3,8 @@ import { proxyToRailway } from '@/lib/proxy'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { job_id: string } },
+  context: { params: Promise<{ job_id: string }> },
 ) {
-  return proxyToRailway(req, `/api/swarm/result/${params.job_id}`, 'GET')
+  const { job_id } = await context.params
+  return proxyToRailway(req, `/api/swarm/result/${job_id}`, 'GET')
 }

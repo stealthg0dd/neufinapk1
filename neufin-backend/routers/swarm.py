@@ -640,10 +640,8 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
             },
         }
 
-    raise HTTPException(
-        status_code=400,
-        detail="Provide thesis_context, record_id, or positions+total_value.",
-    )
+    # Dashboard / copilot with message only: market intelligence (no 400 loop)
+    return await global_chat(GlobalChatRequest(message=clean_message, agent_type="general"))
 
 
 # ── System prompts per agent type ──────────────────────────────────────────────

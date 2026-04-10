@@ -509,20 +509,23 @@ async def create_swarm_job(user_id: str | None, session_id: str) -> str:
         "created_at": now,
         "updated_at": now,
     }
+    # Always mirror in-process so same-worker polls succeed even if Redis is flaky
+    # or another replica has not yet observed the key.
+    _SWARM_JOB_MEMORY[job_id] = job
     redis = await get_redis()
     if redis:
         import asyncio
 
-        await asyncio.to_thread(
-            redis.setex,
-            f"swarm:job:{job_id}",
-            SWARM_JOB_TTL,
-            json.dumps(job),
-        )
+        try:
+            await asyncio.to_thread(
+                redis.setex,
+                f"swarm:job:{job_id}",
+                SWARM_JOB_TTL,
+                json.dumps(job),
+            )
+        except Exception as e:
+            logger.warning("swarm.job_redis_set_failed", job_id=job_id, error=str(e))
     else:
-        # Fallback for environments where Redis is temporarily unavailable.
-        # Keeps job polling functional on single-worker deployments.
-        _SWARM_JOB_MEMORY[job_id] = job
         logger.warning("swarm.job_store_fallback_memory", job_id=job_id)
     return job_id
 
@@ -534,24 +537,29 @@ async def update_swarm_job(job_id: str, **kwargs) -> None:
 
     if redis:
         raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
-        if not raw:
-            return
-        job = json.loads(raw)
+        if raw:
+            job = json.loads(raw)
+        else:
+            job = _SWARM_JOB_MEMORY.get(job_id)
+            if not job:
+                return
     else:
         job = _SWARM_JOB_MEMORY.get(job_id)
         if not job:
             return
     job.update(kwargs)
     job["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+    _SWARM_JOB_MEMORY[job_id] = job
     if redis:
-        await asyncio.to_thread(
-            redis.setex,
-            f"swarm:job:{job_id}",
-            SWARM_JOB_TTL,
-            json.dumps(job),
-        )
-    else:
-        _SWARM_JOB_MEMORY[job_id] = job
+        try:
+            await asyncio.to_thread(
+                redis.setex,
+                f"swarm:job:{job_id}",
+                SWARM_JOB_TTL,
+                json.dumps(job),
+            )
+        except Exception as e:
+            logger.warning("swarm.job_redis_update_failed", job_id=job_id, error=str(e))
 
 
 async def get_swarm_job(job_id: str) -> dict | None:
@@ -560,6 +568,10 @@ async def get_swarm_job(job_id: str) -> dict | None:
     import asyncio
 
     if redis:
-        raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
-        return json.loads(raw) if raw else None
+        try:
+            raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+            if raw:
+                return json.loads(raw)
+        except Exception as e:
+            logger.warning("swarm.job_redis_get_failed", job_id=job_id, error=str(e))
     return _SWARM_JOB_MEMORY.get(job_id)

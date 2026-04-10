@@ -3,12 +3,13 @@ import { proxyToRailway } from '@/lib/proxy'
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { ticker: string } },
+  context: { params: Promise<{ ticker: string }> },
 ) {
+  const { ticker } = await context.params
   const period = req.nextUrl.searchParams.get('period') || '3mo'
   return proxyToRailway(
     req,
-    `/api/portfolio/chart/${params.ticker}?period=${period}`,
+    `/api/portfolio/chart/${encodeURIComponent(ticker)}?period=${period}`,
     'GET',
   )
 }

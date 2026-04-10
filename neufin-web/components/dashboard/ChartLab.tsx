@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import CandlestickChart, { type ChartMarker } from '@/components/CandlestickChart'
 import type { CandleData } from '@/lib/api'
 import { apiGet } from '@/lib/api-client'
@@ -28,6 +28,11 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
   const [data, setData] = useState<CandleData[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const positionKey = useMemo(
+    () => positions.map((p) => p.symbol).join(','),
+    [positions],
+  )
 
   const selectedPosition = useMemo(
     () => positions.find((p) => p.symbol === selectedTicker) ?? null,
@@ -87,15 +92,19 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
     }
   }, [data, swarmResult, selectedTicker, selectedPosition])
 
-  const loadTicker = async (ticker: string, tf: Timeframe) => {
+  const loadTicker = useCallback(async (ticker: string, tf: Timeframe) => {
     setLoading(true)
     setError(null)
     try {
       const period = periodMap[tf]
-      const res = await apiGet<{ data: CandleData[] }>(
+      const res = await apiGet<{ data?: CandleData[] } & Record<string, unknown>>(
         `/api/portfolio/chart/${encodeURIComponent(ticker)}?period=${encodeURIComponent(period)}`,
       )
-      const rows = Array.isArray(res.data) ? res.data : []
+      const rows = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray((res as { candles?: CandleData[] }).candles)
+          ? (res as { candles: CandleData[] }).candles
+          : []
       setData(rows)
       if (!rows.length) setError(`Price data unavailable for ${ticker}`)
     } catch {
@@ -104,7 +113,17 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  // Initial load when portfolio positions become available (not only on chip click)
+  useEffect(() => {
+    if (!positionKey) return
+    const sym = positionKey.split(',')[0]
+    if (!sym) return
+    setSelectedTicker(sym)
+    void loadTicker(sym, '3M')
+    setTimeframe('3M')
+  }, [positionKey, loadTicker])
 
   return (
     <div className="rounded-xl border border-border/50 bg-surface p-4">

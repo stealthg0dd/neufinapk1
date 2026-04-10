@@ -173,13 +173,19 @@ export default function PortfolioPage() {
     }
     try {
       setDownloadLoading(true)
-      const statusRes = await apiGet<{ plan: 'free' | 'retail' | 'advisor' | 'enterprise' }>(
-        '/api/subscription/status'
-      )
+      const statusRes = await apiGet<{
+        plan: 'free' | 'retail' | 'advisor' | 'enterprise'
+        status?: string
+      }>('/api/subscription/status')
       const currentPlan = statusRes.plan
       setPlan(currentPlan)
 
-      if (currentPlan === 'advisor' || currentPlan === 'enterprise') {
+      const canGeneratePdf =
+        currentPlan === 'advisor' ||
+        currentPlan === 'enterprise' ||
+        statusRes.status === 'trial'
+
+      if (canGeneratePdf) {
         const res = await apiFetch('/api/reports/generate', {
           method: 'POST',
           body: JSON.stringify({ portfolio_id: portfolioId, advisor_id: 'self' }),

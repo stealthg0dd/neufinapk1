@@ -1,8 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Bot, ChevronLeft, Loader2, Send } from 'lucide-react'
-import { apiPost } from '@/lib/api-client'
+import { apiGet, apiPost } from '@/lib/api-client'
 
 type ChatMessage = {
   id: string
@@ -32,6 +32,65 @@ export function MarketDeskRail({
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  /** Prefer latest swarm report; else DNA positions from localStorage for grounded MD chat */
+  const [chatContext, setChatContext] = useState<
+    | { kind: 'record'; recordId: string }
+    | {
+        kind: 'portfolio'
+        positions: Array<{
+          symbol: string
+          shares: number
+          price: number
+          value: number
+          weight: number
+        }>
+        totalValue: number
+      }
+    | { kind: 'none' }
+  >({ kind: 'none' })
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await apiGet<{ found?: boolean; report?: { id?: string } | null }>(
+          '/api/swarm/report/latest',
+        )
+        if (cancelled) return
+        if (r?.report?.id) {
+          setChatContext({ kind: 'record', recordId: r.report.id })
+          return
+        }
+      } catch {
+        /* unauthenticated or no report */
+      }
+      try {
+        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('dnaResult') : null
+        if (!raw) return
+        const p = JSON.parse(raw) as {
+          positions?: Array<Record<string, unknown>>
+          total_value?: number
+        }
+        const positions = (p.positions ?? []).map((x) => ({
+          symbol: String(x.symbol ?? ''),
+          shares: Number(x.shares ?? 0),
+          price: Number(x.price ?? 0),
+          value: Number(x.value ?? 0),
+          weight: Number(x.weight ?? 0),
+        }))
+        const totalValue = Number(
+          p.total_value ?? positions.reduce((s, x) => s + x.value, 0),
+        )
+        if (cancelled || !positions.length) return
+        setChatContext({ kind: 'portfolio', positions, totalValue })
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const canSend = input.trim().length > 0 && !loading
 
@@ -45,10 +104,14 @@ export function MarketDeskRail({
     setInput('')
     setLoading(true)
     try {
-      const data = await apiPost<Record<string, unknown>>('/api/swarm/chat', {
-        message: text,
-        context: 'dashboard',
-      })
+      const payload: Record<string, unknown> = { message: text }
+      if (chatContext.kind === 'record') {
+        payload.record_id = chatContext.recordId
+      } else if (chatContext.kind === 'portfolio') {
+        payload.positions = chatContext.positions
+        payload.total_value = chatContext.totalValue
+      }
+      const data = await apiPost<Record<string, unknown>>('/api/swarm/chat', payload)
       const reply =
         (typeof data.reply === 'string' && data.reply) ||
         (typeof data.answer === 'string' && data.answer) ||
