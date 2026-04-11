@@ -1,164 +1,239 @@
-import DashboardCockpitClient from '@/components/dashboard/DashboardCockpitClient'
+'use client'
+
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import { Loader2 } from 'lucide-react'
+import { usePortfolioData } from '@/hooks/usePortfolioData'
+import { DnaScoreCard } from '@/components/dashboard/DnaScoreCard'
+import { RegimeCard } from '@/components/dashboard/RegimeCard'
+import { PortfolioValueCard } from '@/components/dashboard/PortfolioValueCard'
+import { SwarmBriefingPreview } from '@/components/dashboard/SwarmBriefingPreview'
+import ResearchFeedClient from '@/components/dashboard/ResearchFeedClient'
 
 export const dynamic = 'force-dynamic'
 
 export default function DashboardPage() {
-  return <DashboardServerPage />
-}
+  const {
+    portfolios,
+    latestPortfolio,
+    hasPortfolio,
+    latestDna,
+    swarmReport,
+    regime,
+    loading,
+  } = usePortfolioData()
 
-type RegimeResponse = {
-  current?: { regime?: string; confidence?: number }
-}
-
-type NotesResponse = {
-  notes?: Array<{
-    id: string
-    title: string
-    executive_summary: string
-    confidence_score?: number
-    generated_at: string
-    note_type?: string
-  }>
-}
-
-type PortfolioListItem = {
-  id?: string
-  portfolio_id?: string
-  portfolio_name?: string
-  name?: string
-  dna_score?: number
-  analyzed_at?: string
-  updated_at?: string
-  created_at?: string
-  user_name?: string
-  advisor_name?: string
-}
-
-type SwarmLatest = {
-  id?: string
-  headline?: string
-  title?: string
-  regime?: string
-  top_risk?: string
-  generated_at?: string
-}
-
-const DEFAULT_REGIME: RegimeResponse = {
-  current: { regime: 'unknown', confidence: 0 },
-}
-
-async function DashboardServerPage() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'https://neufin-web.vercel.app'
-  const appOrigin = appUrl.startsWith('http') ? appUrl : `https://${appUrl}`
-  const cookieHeader = (await cookies()).getAll().map((c) => `${c.name}=${c.value}`).join('; ')
-
-  async function safeFetchJson<T>(path: string): Promise<T | null> {
-    try {
-      const res = await fetch(`${appOrigin}${path}`, {
-        cache: 'no-store',
-        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
-      })
-      if (!res.ok) return null
-      return (await res.json()) as T
-    } catch (err) {
-      console.error('[dashboard] fetch failed:', path, err)
-      return null
-    }
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: 320, gap: 10, color: '#64748B', fontSize: 13,
+      }}>
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading your portfolio intelligence…
+      </div>
+    )
   }
 
-  const [regime, notes, portfolioListRaw, latestSwarm] = await Promise.all([
-    safeFetchJson<RegimeResponse>('/api/research/regime'),
-    safeFetchJson<NotesResponse | NotesResponse['notes']>('/api/research/notes?limit=5'),
-    safeFetchJson<PortfolioListItem[]>('/api/portfolio/list'),
-    safeFetchJson<SwarmLatest>('/api/swarm/report/latest'),
-  ])
-
-  const regimeData: RegimeResponse =
-    regime != null && typeof regime === 'object' ? (regime as RegimeResponse) : DEFAULT_REGIME
-
-  const researchNotes = Array.isArray(notes)
-    ? notes
-    : notes != null && typeof notes === 'object' && Array.isArray((notes as NotesResponse).notes)
-      ? (notes as NotesResponse).notes!
-      : []
-
-  const portfolioList = Array.isArray(portfolioListRaw) ? portfolioListRaw : []
-  const latestPortfolio = portfolioList[0] ?? null
-  const hasPortfolio = Boolean(latestPortfolio)
-  const lastAnalyzed = latestPortfolio?.analyzed_at || latestPortfolio?.updated_at || latestPortfolio?.created_at || null
-  const analyzedDaysAgo =
-    lastAnalyzed != null
-      ? Math.max(0, Math.floor((Date.now() - new Date(lastAnalyzed).getTime()) / (1000 * 60 * 60 * 24)))
-      : null
-  const userName =
-    latestPortfolio?.user_name ||
-    latestPortfolio?.advisor_name ||
-    (hasPortfolio ? 'Advisor' : 'there')
+  const lastAnalyzed =
+    latestPortfolio?.analyzed_at ??
+    latestPortfolio?.updated_at ??
+    latestPortfolio?.created_at ??
+    null
 
   return (
     <div>
+      {/* ── Greeting banner ───────────────────────────────────────────────── */}
       <div className="mb-6 rounded-xl border border-border/50 bg-surface px-5 py-4">
-        <p className="text-sm text-muted-foreground">
-          {hasPortfolio
-            ? `Welcome back, ${userName}. Your portfolio was last analyzed ${analyzedDaysAgo ?? 0} day${(analyzedDaysAgo ?? 0) === 1 ? '' : 's'} ago.`
-            : 'Welcome to NeuFin. Start with your portfolio →'}
-        </p>
+        {hasPortfolio ? (
+          <div>
+            <p className="text-sm font-medium text-foreground">
+              Portfolio Intelligence Dashboard
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {latestDna?.investor_type
+                ? `Archetype: ${latestDna.investor_type}`
+                : 'DNA analysis active'}
+              {lastAnalyzed && (
+                <>
+                  {' · '}Last analysed:{' '}
+                  {new Date(lastAnalyzed).toLocaleDateString('en-SG', {
+                    day: 'numeric', month: 'short', year: 'numeric',
+                  })}
+                </>
+              )}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Welcome to NeuFin. Start with your portfolio →{' '}
+            <Link href="/dashboard/portfolio" className="text-primary hover:underline">
+              Upload now
+            </Link>
+          </p>
+        )}
       </div>
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-border/50 bg-surface px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Portfolio Status</p>
-          {hasPortfolio ? (
-            <div className="mt-3">
-              <p className="text-sm font-medium text-foreground">
-                {latestPortfolio?.portfolio_name || latestPortfolio?.name || 'Latest Portfolio'}
+      {/* ── 3-card KPI grid ───────────────────────────────────────────────── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <DnaScoreCard
+          score={latestDna?.dna_score ?? latestPortfolio?.dna_score ?? null}
+          investorType={latestDna?.investor_type ?? null}
+          hasPortfolio={hasPortfolio}
+        />
+        <RegimeCard regime={regime} />
+        <PortfolioValueCard
+          totalValue={
+            latestDna?.total_value ??
+            latestPortfolio?.total_value ??
+            null
+          }
+          numPositions={portfolios.length}
+          hasPortfolio={hasPortfolio}
+        />
+      </div>
+
+      {/* ── DNA insights: strengths + recommendation ─────────────────────── */}
+      {hasPortfolio && latestDna && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 16,
+            marginBottom: 24,
+          }}
+        >
+          {/* Strengths */}
+          {(latestDna.strengths ?? []).length > 0 && (
+            <div className="rounded-xl border border-border/50 bg-surface px-5 py-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary">
+                Top Strengths
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                DNA score: {latestPortfolio?.dna_score ?? 'N/A'} · Last analyzed:{' '}
-                {lastAnalyzed ? new Date(lastAnalyzed).toLocaleString('en-SG', { dateStyle: 'medium' }) : 'Unknown'}
-              </p>
-              <Link href="/dashboard/portfolio" className="mt-3 inline-block text-xs text-primary hover:underline">
-                View Analysis →
-              </Link>
+              {latestDna.strengths.slice(0, 2).map((s, i) => (
+                <div
+                  key={i}
+                  style={{ borderLeft: '2px solid #22C55E', paddingLeft: 10, marginBottom: 8 }}
+                >
+                  <p className="text-xs text-foreground">
+                    {s.split('.')[0]}.
+                  </p>
+                </div>
+              ))}
             </div>
-          ) : (
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground">No portfolio found yet.</p>
-              <Link href="/dashboard/portfolio" className="mt-3 inline-block text-xs text-primary hover:underline">
-                Upload your first portfolio →
-              </Link>
+          )}
+
+          {/* Recommendation */}
+          {latestDna.recommendation && (
+            <div className="rounded-xl border border-border/50 bg-surface px-5 py-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary">
+                Recommended Action
+              </p>
+              <div style={{ borderLeft: '2px solid #F5A623', paddingLeft: 10 }}>
+                <p className="text-xs text-foreground">{latestDna.recommendation}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Weaknesses / risks */}
+          {(latestDna.weaknesses ?? []).length > 0 && (
+            <div className="rounded-xl border border-border/50 bg-surface px-5 py-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary">
+                Key Risks
+              </p>
+              {latestDna.weaknesses.slice(0, 2).map((w, i) => (
+                <div
+                  key={i}
+                  style={{ borderLeft: '2px solid #EF4444', paddingLeft: 10, marginBottom: 8 }}
+                >
+                  <p className="text-xs text-foreground">
+                    {w.split('.')[0]}.
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tax snapshot if data available */}
+          {latestDna.tax_analysis && (
+            (latestDna.tax_analysis.total_liability ?? 0) > 0 ||
+            (latestDna.tax_analysis.total_harvest_opp ?? 0) > 0
+          ) && (
+            <div className="rounded-xl border border-border/50 bg-surface px-5 py-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary">
+                Tax Snapshot
+              </p>
+              {(latestDna.tax_analysis?.total_liability ?? 0) > 0 && (
+                <div style={{ borderLeft: '2px solid #F5A623', paddingLeft: 10, marginBottom: 8 }}>
+                  <p className="text-xs text-muted-foreground">CGT Exposure</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    ${(latestDna.tax_analysis!.total_liability!).toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {(latestDna.tax_analysis?.total_harvest_opp ?? 0) > 0 && (
+                <div style={{ borderLeft: '2px solid #22C55E', paddingLeft: 10 }}>
+                  <p className="text-xs text-muted-foreground">Harvest Opportunity</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    ${(latestDna.tax_analysis!.total_harvest_opp!).toLocaleString()}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
+      )}
 
-        <div className="rounded-xl border border-border/50 bg-surface px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Latest Swarm IC</p>
-          {latestSwarm?.id ? (
-            <div className="mt-3">
-              <p className="text-sm font-medium text-foreground">
-                {latestSwarm.headline || latestSwarm.title || 'Latest IC Briefing'}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Regime: {latestSwarm.regime || 'N/A'} · Top risk: {latestSwarm.top_risk || 'N/A'}
-              </p>
-              <Link href="/swarm" className="mt-3 inline-block text-xs text-primary hover:underline">
-                View full IC briefing →
-              </Link>
-            </div>
-          ) : (
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground">No swarm briefings yet.</p>
-              <Link href="/swarm" className="mt-3 inline-block text-xs text-primary hover:underline">
-                Run Swarm IC →
-              </Link>
-            </div>
-          )}
+      {/* ── Swarm IC briefing preview ────────────────────────────────────── */}
+      {swarmReport && (
+        <SwarmBriefingPreview swarmReport={swarmReport} />
+      )}
+
+      {/* ── If no swarm yet but has portfolio: show prompt ───────────────── */}
+      {hasPortfolio && !swarmReport && (
+        <div className="mb-6 rounded-xl border border-border/50 bg-surface px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-2">
+            Swarm IC Analysis
+          </p>
+          <p className="text-xs text-muted-foreground mb-3">
+            Run the 7-agent swarm on your portfolio for regime-adjusted alpha signals,
+            tax strategy, and an IC-grade memo.
+          </p>
+          <Link
+            href="/swarm"
+            className="inline-block rounded-md bg-primary/15 border border-primary/30 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/25"
+          >
+            Run Swarm IC →
+          </Link>
         </div>
-      </div>
+      )}
 
-      <DashboardCockpitClient regimeData={regimeData} researchNotes={researchNotes} />
+      {/* ── Research feed ────────────────────────────────────────────────── */}
+      <ResearchFeedClient limit={5} />
+
+      {/* ── No portfolio: prominent upload CTA ──────────────────────────── */}
+      {!hasPortfolio && (
+        <div className="mt-6 rounded-xl border border-dashed border-border/50 bg-surface px-5 py-12 text-center">
+          <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
+          <p className="text-sm font-medium text-foreground">Start your first analysis</p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Upload a CSV with your holdings to generate an IC-grade portfolio report
+          </p>
+          <Link
+            href="/dashboard/portfolio"
+            className="mt-5 inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Upload Portfolio →
+          </Link>
+        </div>
+      )}
+
+      {/* ── Feedback banner ──────────────────────────────────────────────── */}
       <div className="mt-6 flex items-center justify-between rounded-xl border border-border/50 bg-surface px-5 py-4">
         <div>
           <p className="text-sm font-medium text-foreground">
