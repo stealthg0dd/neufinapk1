@@ -111,7 +111,14 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
     const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo, skipBrowserRedirect: false },
+      options: {
+        redirectTo,
+        skipBrowserRedirect: false,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
     })
     if (err) {
       setError(err.message)
