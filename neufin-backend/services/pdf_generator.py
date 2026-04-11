@@ -159,9 +159,10 @@ def _empty_swarm_norm() -> dict[str, Any]:
         },
         "market_regime": {},
         "quant_analysis": {},
-        "tax_report": {},
+        "tax_recommendation": {},
         "risk_sentinel": {},
-        "alpha_scout": {},
+        "alpha_signal": {},
+        "macro_advice": {},
         "agent_trace": [],
         "regime": None,
     }
@@ -215,10 +216,10 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
             "sharpe_ratio",
             "market_regime",
             "quant_analysis",
-            "tax_report",
+            "tax_recommendation",
             "risk_sentinel",
-            "alpha_scout",
-            "strategist_intel",
+            "alpha_signal",
+            "macro_advice",
         ):
             if inv.get(k) is None and row.get(k) is not None:
                 inv[k] = row[k]
@@ -235,10 +236,10 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
             "sharpe_ratio": row.get("sharpe_ratio"),
             "market_regime": row.get("market_regime"),
             "quant_analysis": row.get("quant_analysis"),
-            "tax_report": row.get("tax_report"),
+            "tax_recommendation": row.get("tax_recommendation"),
             "risk_sentinel": row.get("risk_sentinel"),
-            "alpha_scout": row.get("alpha_scout"),
-            "strategist_intel": row.get("strategist_intel"),
+            "alpha_signal": row.get("alpha_signal"),
+            "macro_advice": row.get("macro_advice"),
         }
     atr = row.get("agent_trace")
     if isinstance(atr, str):
@@ -258,9 +259,10 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
         "quant_analysis": (
             inv.get("quant_analysis") or row.get("quant_analysis") or {}
         ),
-        "tax_report": (inv.get("tax_report") or row.get("tax_report") or {}),
+        "tax_recommendation": (inv.get("tax_recommendation") or row.get("tax_recommendation") or {}),
         "risk_sentinel": (inv.get("risk_sentinel") or row.get("risk_sentinel") or {}),
-        "alpha_scout": (inv.get("alpha_scout") or row.get("alpha_scout") or {}),
+        "alpha_signal": (inv.get("alpha_signal") or row.get("alpha_signal") or {}),
+        "macro_advice": (inv.get("macro_advice") or row.get("macro_advice") or {}),
         "agent_trace": agent_trace_list,
         "regime": inv.get("regime") or row.get("regime"),
     }
@@ -582,13 +584,13 @@ def _build_pdf_sync(
     quant = swarm_norm.get("quant_analysis") or thesis.get("quant_analysis") or {}
     if not isinstance(quant, dict):
         quant = {}
-    tax_r = swarm_norm.get("tax_report") or thesis.get("tax_report") or {}
+    tax_r = swarm_norm.get("tax_recommendation") or thesis.get("tax_recommendation") or {}
     if not isinstance(tax_r, dict):
         tax_r = {}
     sentinel = swarm_norm.get("risk_sentinel") or thesis.get("risk_sentinel") or {}
     if not isinstance(sentinel, dict):
         sentinel = {}
-    alpha_raw = swarm_norm.get("alpha_scout") or thesis.get("alpha_scout") or {}
+    alpha_raw = swarm_norm.get("alpha_signal") or thesis.get("alpha_signal") or {}
     if not isinstance(alpha_raw, dict):
         alpha_raw = {}
 
@@ -1507,7 +1509,7 @@ def _build_pdf_sync(
     # PAGE 10 Recommendations
     elems.append(Paragraph("RECOMMENDATIONS & NEXT STEPS", styles["h_section"]))
     elems.append(Spacer(1, 8))
-    act_plan = thesis.get("action_plan") or []
+    act_plan = thesis.get("action_plan") or thesis.get("recommendation_summary") or []
     if not isinstance(act_plan, list):
         act_plan = []
     prio = [["#", "Action", "Rationale", "Expected Impact", "Timeline"]]

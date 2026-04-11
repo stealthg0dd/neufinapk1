@@ -101,24 +101,26 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
 
 def _synthesis_payload(dna: dict | None, metrics: dict, swarm_row: dict | None) -> dict:
     """Client-facing summary from DNA + metrics + swarm (no LLM)."""
-    dna = dna or {}
-    if isinstance(swarm_row, dict):
-        s = swarm_row
-    else:
-        s = {}
-    action_plan = s.get("action_plan")
-    if not isinstance(action_plan, list):
-        action_plan = []
+    s = swarm_row if isinstance(swarm_row, dict) else {}
     return {
-        "dna_score": dna.get("dna_score") or metrics.get("dna_score"),
-        "investor_type": dna.get("investor_type"),
-        "strengths": list(dna.get("strengths") or []),
-        "weaknesses": list(dna.get("weaknesses") or []),
-        "recommendation": dna.get("recommendation"),
-        "risk_assessment": s.get("risk_sentinel"),
-        "market_outlook": s.get("regime"),
-        "action_items": action_plan,
-        "swarm_headline": s.get("headline"),
+        "dna_score": (dna or {}).get("dna_score", 0),
+        "investor_type": (dna or {}).get("investor_type", ""),
+        "strengths": list((dna or {}).get("strengths") or []),
+        "weaknesses": list((dna or {}).get("weaknesses") or []),
+        "recommendation": (dna or {}).get("recommendation", ""),
+        "headline": s.get("headline", ""),
+        "briefing": s.get("briefing", ""),
+        "regime": s.get("regime") or s.get("market_regime", ""),
+        "investment_thesis": s.get("investment_thesis", ""),
+        "quant_analysis": s.get("quant_analysis", ""),
+        "risk_sentinel": s.get("risk_sentinel", ""),
+        "alpha_signal": s.get("alpha_signal", ""),
+        "recommendation_summary": s.get("recommendation_summary", ""),
+        "tax_recommendation": s.get("tax_recommendation", ""),
+        "macro_advice": s.get("macro_advice", ""),
+        "top_risks": s.get("top_risks") or [],
+        "agent_trace": s.get("agent_trace") or [],
+        "metrics": metrics,
     }
 
 
@@ -251,11 +253,13 @@ async def generate_report(
             swarm_result = (
                 supabase.table("swarm_reports")
                 .select(
-                    "id,user_id,created_at,headline,regime,risk_sentinel,"
-                    "investment_thesis,market_regime,quant_analysis,"
-                    "alpha_scout,action_plan,agent_trace"
+                    "id,user_id,created_at,headline,briefing,regime,"
+                    "risk_sentinel,investment_thesis,market_regime,"
+                    "quant_analysis,alpha_signal,recommendation_summary,"
+                    "tax_recommendation,macro_advice,top_risks,"
+                    "agent_trace,dna_score,weighted_beta,sharpe_ratio"
                 )
-                .eq("user_id", user.id)
+                .eq("user_id", str(user.id))
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute()
@@ -264,8 +268,8 @@ async def generate_report(
 
             profile_result = (
                 supabase.table("user_profiles")
-                .select("display_name, email, avatar_url")
-                .eq("id", user.id)
+                .select("full_name, email, avatar_url, subscription_tier")
+                .eq("id", str(user.id))
                 .limit(1)
                 .execute()
             )
@@ -313,7 +317,7 @@ async def generate_report(
         run_id = uuid.uuid4().hex[:8]
         brand = body.color_scheme.model_dump() if body.color_scheme else None
         advisor_config = {
-            "firm_name": body.firm_name or profile.get("display_name") or "",
+            "firm_name": body.firm_name or profile.get("full_name") or "",
             "logo_url": body.advisor_logo_url or profile.get("avatar_url"),
             "logo_base64": body.logo_base64,
             "brand_colors": brand,
