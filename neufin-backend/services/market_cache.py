@@ -486,6 +486,52 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
 SWARM_JOB_TTL = 86_400  # 24 hours
 _SWARM_JOB_MEMORY: dict[str, dict] = {}
 
+# ── File-based job store — shared across all Gunicorn workers via /tmp ──────────
+# When Redis is unavailable, worker A creates a job and writes it to /tmp.
+# Worker B polls for status and reads the same file from /tmp.
+# This solves the cross-worker 404 that occurs with _SWARM_JOB_MEMORY (per-process).
+import asyncio as _asyncio
+from pathlib import Path as _Path
+
+_JOB_STORE_PATH = _Path("/tmp/neufin_swarm_jobs")
+try:
+    _JOB_STORE_PATH.mkdir(exist_ok=True)
+except Exception:
+    pass  # /tmp may not be writable in some local dev environments
+
+_FILE_LOCK = _asyncio.Lock()
+
+
+async def _file_job_get(job_id: str) -> dict | None:
+    """Read job state from shared /tmp file store."""
+    path = _JOB_STORE_PATH / f"{job_id}.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except Exception:
+            return None
+    return None
+
+
+async def _file_job_set(job_id: str, data: dict) -> None:
+    """Write job state to shared /tmp file store (with async lock)."""
+    path = _JOB_STORE_PATH / f"{job_id}.json"
+    try:
+        async with _FILE_LOCK:
+            path.write_text(json.dumps(data, default=str))
+    except Exception as exc:
+        logger.warning("swarm.file_job_set_failed", job_id=job_id, error=str(exc))
+
+
+async def _file_job_delete(job_id: str) -> None:
+    """Remove a job file from /tmp store."""
+    path = _JOB_STORE_PATH / f"{job_id}.json"
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+
 
 async def get_redis():
     """Async wrapper around the module Redis singleton getter."""
@@ -509,8 +555,7 @@ async def create_swarm_job(user_id: str | None, session_id: str) -> str:
         "created_at": now,
         "updated_at": now,
     }
-    # Always mirror in-process so same-worker polls succeed even if Redis is flaky
-    # or another replica has not yet observed the key.
+    # Mirror in-process for same-worker fast path
     _SWARM_JOB_MEMORY[job_id] = job
     redis = await get_redis()
     if redis:
@@ -523,33 +568,46 @@ async def create_swarm_job(user_id: str | None, session_id: str) -> str:
                 SWARM_JOB_TTL,
                 json.dumps(job),
             )
+            return job_id
         except Exception as e:
             logger.warning("swarm.job_redis_set_failed", job_id=job_id, error=str(e))
-    else:
-        logger.warning("swarm.job_store_fallback_memory", job_id=job_id)
+    # File-based fallback — shared across all Gunicorn workers via /tmp
+    await _file_job_set(job_id, job)
+    logger.warning("swarm.job_store_fallback_file", job_id=job_id)
     return job_id
 
 
 async def update_swarm_job(job_id: str, **kwargs) -> None:
     """Patch fields on a swarm job. Call after each agent completes."""
-    redis = await get_redis()
     import asyncio
 
+    redis = await get_redis()
+    job = None
+
+    # Try Redis first
     if redis:
-        raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
-        if raw:
-            job = json.loads(raw)
-        else:
-            job = _SWARM_JOB_MEMORY.get(job_id)
-            if not job:
-                return
-    else:
+        try:
+            raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+            if raw:
+                job = json.loads(raw)
+        except Exception as e:
+            logger.warning("swarm.job_redis_get_failed", job_id=job_id, error=str(e))
+
+    # Redis miss → try file store (cross-worker case), then in-process
+    if job is None:
+        job = await _file_job_get(job_id)
+    if job is None:
         job = _SWARM_JOB_MEMORY.get(job_id)
-        if not job:
-            return
+    if job is None:
+        return
+
     job.update(kwargs)
     job["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+
+    # Write back to in-process mirror
     _SWARM_JOB_MEMORY[job_id] = job
+
+    # Write back to Redis if available
     if redis:
         try:
             await asyncio.to_thread(
@@ -558,15 +616,21 @@ async def update_swarm_job(job_id: str, **kwargs) -> None:
                 SWARM_JOB_TTL,
                 json.dumps(job),
             )
+            return
         except Exception as e:
             logger.warning("swarm.job_redis_update_failed", job_id=job_id, error=str(e))
 
+    # File fallback
+    await _file_job_set(job_id, job)
+
 
 async def get_swarm_job(job_id: str) -> dict | None:
-    """Fetch swarm job state."""
-    redis = await get_redis()
+    """Fetch swarm job state. Checks Redis → file store → in-process memory."""
     import asyncio
 
+    redis = await get_redis()
+
+    # 1. Redis (fastest, shared across workers when available)
     if redis:
         try:
             raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
@@ -574,4 +638,11 @@ async def get_swarm_job(job_id: str) -> dict | None:
                 return json.loads(raw)
         except Exception as e:
             logger.warning("swarm.job_redis_get_failed", job_id=job_id, error=str(e))
+
+    # 2. File store (shared across workers via /tmp — survives Redis unavailability)
+    job = await _file_job_get(job_id)
+    if job is not None:
+        return job
+
+    # 3. In-process memory (same-worker fast path, not cross-worker)
     return _SWARM_JOB_MEMORY.get(job_id)

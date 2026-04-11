@@ -111,46 +111,90 @@ async def _persist_swarm_result(
     Now async and awaited directly in the analyze endpoint so the record is
     guaranteed to exist before the response (and any redirect to /report/{id}) fires.
     user_id is None for anonymous/guest users — saved as NULL in Supabase.
+
+    COLUMN MAPPING (actual swarm_reports schema):
+      alpha_signal        ← was incorrectly saved as "alpha_scout"
+      recommendation_summary ← synthesizer recommendation text
+      macro_advice        ← macro strategist narrative
+      tax_recommendation  ← tax text (TEXT column)
+      tax_report          ← tax structured data (TEXT column)
+      investment_thesis   ← full thesis text
+      risk_sentinel       ← risk sentinel object
+      market_regime       ← regime object
+      quant_analysis      ← quant object
     """
     import asyncio
 
+    thesis = result.get("investment_thesis", {}) if isinstance(result.get("investment_thesis"), dict) else {}
+
+    # Build the row using ONLY real schema column names
+    row: dict = {
+        "id": report_id,
+        "user_id": user_id,  # NULL for anonymous — allowed by schema
+        "dna_score": thesis.get("dna_score") or thesis.get("health_score"),
+        "headline": thesis.get("headline"),
+        "briefing": thesis.get("briefing"),
+        "top_risks": thesis.get("top_risks"),
+        "macro_advice": thesis.get("macro_advice"),
+        "tax_recommendation": thesis.get("tax_recommendation"),
+        "stress_results": thesis.get("stress_results"),
+        "risk_factors": thesis.get("risk_factors"),
+        "score_breakdown": thesis.get("score_breakdown"),
+        "weighted_beta": thesis.get("weighted_beta"),
+        "sharpe_ratio": thesis.get("sharpe_ratio"),
+        "regime": thesis.get("regime"),
+        "agent_trace": result.get("agent_trace", []),
+        # ── Rich nested agent outputs (real column names) ───────────────────
+        # FIX: alpha_scout → alpha_signal (the actual DB column name)
+        "alpha_signal": (
+            thesis.get("alpha_signal")
+            or thesis.get("alpha_scout")   # fallback for old synthesizer key
+        ),
+        # Recommendation summary from synthesizer
+        "recommendation_summary": (
+            thesis.get("recommendation_summary")
+            or thesis.get("action_plan")
+        ),
+        # Market context columns
+        "investment_thesis": thesis.get("investment_thesis_body") or thesis.get("briefing"),
+        "market_regime": thesis.get("market_regime"),
+        "quant_analysis": thesis.get("quant_analysis"),
+        # tax_report is TEXT in schema — store as JSON string if it's a dict
+        "tax_report": (
+            json.dumps(thesis.get("tax_report"))
+            if isinstance(thesis.get("tax_report"), dict)
+            else thesis.get("tax_report")
+        ),
+        "risk_sentinel": thesis.get("risk_sentinel"),
+        # Additional structured columns
+        "alpha_outlook": thesis.get("alpha_outlook"),
+        "technical_outlook": thesis.get("technical_outlook"),
+        "market_context": thesis.get("market_context"),
+        "key_risks": thesis.get("key_risks"),
+        "risk_score": thesis.get("risk_score"),
+        "sentiment_score": thesis.get("sentiment_score"),
+        "portfolio_optimization": thesis.get("portfolio_optimization"),
+    }
+
+    # Strip None values to avoid overwriting existing data with nulls
+    row = {k: v for k, v in row.items() if v is not None}
+
     try:
-        thesis = result.get("investment_thesis", {})
-        row = {
-            "id": report_id,
-            "user_id": user_id,  # NULL for anonymous — allowed by schema
-            "dna_score": thesis.get("dna_score") or thesis.get("health_score"),
-            "headline": thesis.get("headline"),
-            "briefing": thesis.get("briefing"),
-            "top_risks": thesis.get("top_risks"),
-            "macro_advice": thesis.get("macro_advice"),
-            "tax_recommendation": thesis.get("tax_recommendation"),
-            "stress_results": thesis.get("stress_results"),
-            "risk_factors": thesis.get("risk_factors"),
-            "score_breakdown": thesis.get("score_breakdown"),
-            "weighted_beta": thesis.get("weighted_beta"),
-            "sharpe_ratio": thesis.get("sharpe_ratio"),
-            "regime": thesis.get("regime"),
-            "agent_trace": result.get("agent_trace", []),
-            # ── Rich nested agent outputs ─────────────────────────────────────
-            # These fields are populated by the synthesizer and stored as JSONB
-            # so that /api/swarm/report/latest can return fully structured data.
-            "market_regime": thesis.get("market_regime"),
-            "quant_analysis": thesis.get("quant_analysis"),
-            "tax_report": thesis.get("tax_report"),
-            "risk_sentinel": thesis.get("risk_sentinel"),
-            "alpha_scout": thesis.get("alpha_scout"),
-            "strategist_intel": thesis.get("strategist_intel"),
-        }
-        # Run the synchronous Supabase call in a thread so we don't block the event loop
         await asyncio.to_thread(
             lambda: supabase.table("swarm_reports")
             .upsert(row, on_conflict="id")
             .execute()
         )
-        logger.info("swarm.persist_ok", report_id=report_id)
+        logger.info("swarm.persist_ok", report_id=report_id, columns=list(row.keys()))
     except Exception as e:
-        logger.warning("swarm.persist_failed", report_id=report_id, error=str(e))
+        logger.error(
+            "swarm.persist_failed_detail",
+            error=str(e),
+            columns_attempted=list(row.keys()),
+            report_id=report_id,
+            exc_info=True,
+        )
+        # Return report_id anyway — don't let a persist failure crash the swarm
     return report_id
 
 
@@ -347,6 +391,31 @@ async def get_swarm_status(job_id: str):
     """Poll this every 3s to get live agent trace and job status."""
     job = await get_swarm_job(job_id)
     if not job:
+        # Supabase fallback: job state lost (worker restart / TTL) but result may be persisted
+        import asyncio
+        try:
+            db = await asyncio.to_thread(
+                lambda: supabase.table("swarm_reports")
+                .select("id, headline, dna_score, created_at")
+                .eq("id", job_id)
+                .limit(1)
+                .execute()
+            )
+            if db.data:
+                row = db.data[0]
+                return {
+                    "job_id": job_id,
+                    "status": "complete",
+                    "agent_trace": [],
+                    "error": None,
+                    "created_at": row.get("created_at"),
+                    "updated_at": row.get("created_at"),
+                    "dna_score": row.get("dna_score"),
+                    "headline": row.get("headline"),
+                    "_source": "supabase_fallback",
+                }
+        except Exception as e:
+            logger.warning("swarm.status_db_fallback_failed", job_id=job_id, error=str(e))
         raise HTTPException(404, "Job not found or expired")
 
     result = job.get("result") or {}
@@ -370,12 +439,33 @@ async def get_swarm_status(job_id: str):
 @router.get("/result/{job_id}")
 async def get_swarm_result(job_id: str):
     """Fetch full result when status == complete."""
+    import asyncio
+
     job = await get_swarm_job(job_id)
-    if not job:
-        raise HTTPException(404, "Job not found or expired")
-    if job["status"] != "complete":
+
+    if job and job.get("status") == "complete" and job.get("result"):
+        return job["result"]
+
+    # Fallback 1: job exists but result not yet set (still running / lost in crash)
+    if job and job.get("status") not in ("complete", None):
         raise HTTPException(202, "Job not yet complete")
-    return job["result"]
+
+    # Fallback 2: query Supabase — result persisted before job state expired
+    try:
+        db = await asyncio.to_thread(
+            lambda: supabase.table("swarm_reports")
+            .select("*")
+            .eq("id", job_id)
+            .limit(1)
+            .execute()
+        )
+        if db.data:
+            logger.info("swarm.result_db_fallback_hit", job_id=job_id)
+            return db.data[0]
+    except Exception as e:
+        logger.warning("swarm.result_db_fallback_failed", job_id=job_id, error=str(e))
+
+    raise HTTPException(404, "Result not found or not yet complete")
 
 
 @router.post("/analyze-sync")
@@ -502,9 +592,17 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
         "mitigations": [],
     }
 
-    # alpha_scout / strategist_intel — stored directly after schema update
-    alpha_scout = row.get("alpha_scout") or {"opportunities": [], "watchlist": []}
-    strategist_intel = row.get("strategist_intel") or {}
+    # alpha_signal (new column name) / alpha_scout (old fallback) / strategist_intel
+    alpha_scout = (
+        row.get("alpha_signal")
+        or row.get("alpha_scout")
+        or {"opportunities": [], "watchlist": []}
+    )
+    # strategist_intel is not a real column — reconstruct from macro_advice/recommendation_summary
+    strategist_intel = row.get("strategist_intel") or {
+        "macro_narrative": row.get("macro_advice"),
+        "recommendation": row.get("recommendation_summary"),
+    }
 
     shaped = {
         "swarm_report_id": row["id"],
