@@ -452,12 +452,12 @@ async def generate_report(
             ) from e
 
         positions_raw = list(positions_result.data or [])
+        if not positions_raw:
+            positions_raw = _positions_from_dna_row(existing_dna)
         for p in positions_raw:
             p["price"] = float(
                 p.get("current_price") or p.get("last_price") or 0
             )
-        if not positions_raw:
-            positions_raw = _positions_from_dna_row(existing_dna)
         positions_raw = _normalize_positions(positions_raw)
 
         if not positions_raw:
