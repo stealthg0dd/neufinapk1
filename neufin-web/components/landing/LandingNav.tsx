@@ -10,6 +10,7 @@ const LINKS = [
   { href: '/about', label: 'About' },
   { href: '/research', label: 'Research' },
   { href: '/pricing', label: 'Pricing' },
+  { href: '/partners', label: 'Partners' },
   { href: '#api-platform', label: 'API' },
 ] as const
 

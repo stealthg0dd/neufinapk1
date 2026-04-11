@@ -37,6 +37,7 @@ const NAV_ITEMS = [
   { label: 'Swarm', href: '/swarm' },
   { label: 'Vault', href: '/vault' },
   { label: 'Reports', href: '/reports/success' },
+  { label: 'Partners', href: '/partners' },
 ] as const
 
 // ── AppHeader ──────────────────────────────────────────────────────────────────
