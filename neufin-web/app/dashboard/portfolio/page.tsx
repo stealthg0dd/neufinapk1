@@ -24,6 +24,71 @@ const STAGES = [
 /** Circumference for r=58 (140×140 SVG, stroke 12) */
 const RING_C = 2 * Math.PI * 58
 
+// ── 3-step analysis state machine ────────────────────────────────────────────
+type AnalysisStep = 'idle' | 'dna_complete' | 'swarm_complete' | 'report_ready'
+
+const ANALYSIS_STEPS = [
+  { id: 'dna',    label: 'Portfolio DNA',  desc: '~15 seconds' },
+  { id: 'swarm',  label: 'IC Analysis',    desc: '~90 seconds' },
+  { id: 'report', label: 'IC Report',      desc: '~30 seconds' },
+]
+
+function StepIndicator({ step }: { step: AnalysisStep }) {
+  const doneIds = {
+    idle:           [] as string[],
+    dna_complete:   ['dna'],
+    swarm_complete: ['dna', 'swarm'],
+    report_ready:   ['dna', 'swarm', 'report'],
+  }[step]
+
+  return (
+    <div style={{
+      display: 'flex', gap: 0, marginBottom: 20,
+      background: 'hsl(var(--surface))',
+      borderRadius: 8, border: '1px solid hsl(var(--border))',
+      padding: '14px 16px',
+    }}>
+      {ANALYSIS_STEPS.map((s, i) => {
+        const done = doneIds.includes(s.id)
+        const active = !done && i === doneIds.length
+        return (
+          <div key={s.id} style={{ flex: 1, textAlign: 'center', position: 'relative' }}>
+            {/* connector line */}
+            {i > 0 && (
+              <div style={{
+                position: 'absolute', top: 14, right: '50%', width: '100%',
+                height: 2, background: doneIds.includes(ANALYSIS_STEPS[i - 1].id)
+                  ? 'hsl(var(--primary))' : 'hsl(var(--border))',
+                zIndex: 0,
+              }} />
+            )}
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: done ? 'hsl(var(--primary))' : active ? 'hsl(var(--primary)/0.2)' : 'hsl(var(--surface-2))',
+              border: `2px solid ${done ? 'hsl(var(--primary))' : active ? 'hsl(var(--primary))' : 'hsl(var(--border))'}`,
+              color: done ? '#0B0F14' : active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 6px', fontSize: 11, fontWeight: 700,
+              position: 'relative', zIndex: 1,
+            }}>
+              {done ? '✓' : i + 1}
+            </div>
+            <div style={{
+              fontSize: 11, fontWeight: 600,
+              color: done || active ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+            }}>
+              {s.label}
+            </div>
+            <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>
+              {s.desc}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function PortfolioPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -36,6 +101,7 @@ export default function PortfolioPage() {
   const [displayScore, setDisplayScore] = useState(0)
   const [plan, setPlan] = useState<'free' | 'retail' | 'advisor' | 'enterprise'>('free')
   const [reportAt, setReportAt] = useState<string | null>(null)
+  const [step, setStep] = useState<AnalysisStep>('idle')
 
   const [swarmResult, setSwarmResult] = useState<Record<string, unknown> | null>(null)
   const [showThemeModal, setShowThemeModal] = useState(false)
@@ -115,6 +181,8 @@ export default function PortfolioPage() {
       setResult(data)
       localStorage.setItem('neufin-last-analysis', JSON.stringify(data))
       setProgress(100)
+      // Advance to step 2 — swarm IC analysis is now available
+      setStep('dna_complete')
     } finally {
       window.clearInterval(timer)
       setBusy(false)
@@ -155,7 +223,10 @@ export default function PortfolioPage() {
     try {
       const raw = localStorage.getItem('neufin-last-swarm-result')
       if (!raw) return
-      setSwarmResult(JSON.parse(raw) as Record<string, unknown>)
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      setSwarmResult(parsed)
+      // If we have both DNA and swarm results, advance the step indicator
+      setStep(prev => prev === 'idle' ? 'swarm_complete' : prev)
     } catch {
       setSwarmResult(null)
     }
@@ -226,6 +297,7 @@ export default function PortfolioPage() {
         // Supabase storage signed URL
         if (data.pdf_url) {
           window.open(data.pdf_url, '_blank')
+          setStep('report_ready')
           return
         }
 
@@ -241,6 +313,7 @@ export default function PortfolioPage() {
           a.click()
           document.body.removeChild(a)
           URL.revokeObjectURL(url)
+          setStep('report_ready')
           return
         }
 
@@ -305,6 +378,9 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-5">
+      {/* 3-step analysis progress indicator — always visible */}
+      <StepIndicator step={step} />
+
       {showThemeModal && (
         <ReportThemeModal
           onSelect={(theme) => {
@@ -636,6 +712,88 @@ export default function PortfolioPage() {
               </Link>
             )}
           </div>
+
+          {/* Context-aware IC Analysis CTA based on current step */}
+          {step === 'dna_complete' && (
+            <div
+              style={{
+                marginTop: 8, padding: '16px 20px',
+                background: 'hsl(var(--surface))',
+                border: '1px solid hsl(var(--primary)/0.3)',
+                borderRadius: 10,
+              }}
+            >
+              <p className="mb-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+                Step 2 unlocked — Run IC Analysis
+              </p>
+              <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 12 }}>
+                Your DNA score is ready. Run the 7-agent IC Analysis to unlock the full swarm briefing,
+                macro regime, alpha signals, and a Goldman-grade IC memo.
+              </p>
+              <Link
+                href="/swarm"
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
+                style={{
+                  background: 'hsl(var(--primary))',
+                  color: 'hsl(var(--primary-foreground))',
+                }}
+              >
+                Run IC Analysis — 7-Agent Swarm →
+              </Link>
+              <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
+                ~90 seconds · Required for the full 10-page IC report
+              </p>
+            </div>
+          )}
+          {step === 'swarm_complete' && (
+            <div
+              style={{
+                marginTop: 8, padding: '16px 20px',
+                background: 'hsl(var(--surface))',
+                border: '1px solid hsl(var(--primary)/0.3)',
+                borderRadius: 10,
+              }}
+            >
+              <p className="mb-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+                Step 3 unlocked — Generate IC Report PDF
+              </p>
+              <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 12 }}>
+                IC Analysis complete. Generate the full 10-page IC memo combining DNA + Swarm analysis.
+              </p>
+              <button
+                type="button"
+                onClick={handleDownloadReport}
+                disabled={downloadLoading || !portfolioId}
+                className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                style={{
+                  background: 'hsl(var(--primary))',
+                  color: 'hsl(var(--primary-foreground))',
+                }}
+              >
+                {downloadLoading ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Preparing report...
+                  </>
+                ) : (
+                  'Generate IC Report PDF →'
+                )}
+              </button>
+            </div>
+          )}
+          {step === 'report_ready' && (
+            <div
+              style={{
+                marginTop: 8, padding: '14px 20px',
+                background: 'rgba(34,197,94,0.06)',
+                border: '1px solid rgba(34,197,94,0.3)',
+                borderRadius: 10,
+                color: '#22C55E', fontSize: 13, fontWeight: 600,
+              }}
+            >
+              ✓ IC Report generated — check your downloads or the open tab.
+            </div>
+          )}
         </motion.div>
       )}
     </div>

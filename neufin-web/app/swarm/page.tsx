@@ -71,8 +71,27 @@ function TypewriterText({ text, speed = 8 }: { text: string; speed?: number }) {
 
 // Positions are loaded from localStorage (set by the upload flow) — no hardcoded values
 type SwarmPosition = { symbol: string; shares: number; price: number; value: number; weight: number }
-type JobStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed'
+type JobStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed' | 'result_unavailable'
 type SwarmResult = Record<string, any>
+
+/** Retry fetching the swarm result up to `retries` times with a 2s delay.
+ *  Needed because the backend persist is async — the result may be in Supabase
+ *  a few seconds after the job transitions to "complete" in the job store. */
+async function fetchResultWithRetry(id: string, retries = 3): Promise<SwarmResult> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await apiGet<SwarmResult>(`/api/swarm/result/${id}`)
+      if (result && !('error' in result && result.error)) return result
+    } catch (err) {
+      if (i < retries - 1) {
+        await new Promise<void>(r => setTimeout(r, 2000))
+      } else {
+        throw err
+      }
+    }
+  }
+  throw new Error('Result not available after retries')
+}
 
 function loadPortfolioFromStorage(): { positions: SwarmPosition[]; totalValue: number } | null {
   if (typeof window === 'undefined') return null
@@ -756,6 +775,7 @@ export default function SwarmPage() {
   const [jobStatus, setJobStatus] = useState<JobStatus>('idle')
   const [agentTrace, setAgentTrace] = useState<AgentTraceItem[]>([])
   const [result, setResult] = useState<SwarmResult | null>(null)
+  const [resultError, setResultError] = useState<string | null>(null)
   const [pollIntervalRef, setPollIntervalRef] = useState<ReturnType<typeof setInterval> | null>(null)
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
@@ -875,9 +895,19 @@ export default function SwarmPage() {
       if (status.status === 'complete') {
         if (pollIntervalRef) clearInterval(pollIntervalRef)
         setPollIntervalRef(null)
-        const fullResult = await apiGet<SwarmResult>(`/api/swarm/result/${id}`)
-        setResult(fullResult)
-        localStorage.setItem('neufin-swarm-job-id', id)
+        try {
+          const fullResult = await fetchResultWithRetry(id)
+          setResult(fullResult)
+          setResultError(null)
+          localStorage.setItem('neufin-swarm-job-id', id)
+        } catch (err) {
+          console.error('[swarm] Result fetch failed after retries:', err)
+          setJobStatus('result_unavailable')
+          setResultError(
+            'Analysis completed but result could not be loaded. ' +
+            'This is a temporary issue — try refreshing or click Retry.'
+          )
+        }
       } else if (status.status === 'failed') {
         if (pollIntervalRef) clearInterval(pollIntervalRef)
         setPollIntervalRef(null)
@@ -892,6 +922,7 @@ export default function SwarmPage() {
     setJobStatus('queued')
     setAgentTrace([])
     setResult(null)
+    setResultError(null)
     setStartedAtMs(Date.now())
 
     const portfolioId = typeof window !== 'undefined'
@@ -1041,6 +1072,30 @@ export default function SwarmPage() {
         {/* Agent trace terminal */}
         <div className="xl:col-span-5">
           <SwarmTerminal status={jobStatus} trace={agentTrace} onRetry={startSwarm} />
+          {/* Result unavailable error state — analysis done but result fetch failed */}
+          {jobStatus === 'result_unavailable' && resultError && (
+            <div style={{
+              marginTop: 12, padding: '12px 16px',
+              background: '#201A08', border: '1px solid #F5A623',
+              borderRadius: 8, color: '#F5A623', fontSize: 13,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ flex: 1 }}>{resultError}</span>
+              {jobId && (
+                <button
+                  onClick={() => { setJobStatus('complete'); void pollStatus(jobId) }}
+                  style={{
+                    padding: '4px 12px',
+                    background: '#F5A623', color: '#0B0F14',
+                    border: 'none', borderRadius: 4, fontSize: 12,
+                    cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* IC Briefing */}
