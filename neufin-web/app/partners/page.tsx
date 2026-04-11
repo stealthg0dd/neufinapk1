@@ -339,7 +339,7 @@ export default function PartnersPage() {
 
   // ─── render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: '#070D1A', color: '#E2E8F0', fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100vh' }}>
+    <div style={{ background: '#070D1A', color: '#E2E8F0', minHeight: '100vh' }}>
 
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
       <nav style={{
