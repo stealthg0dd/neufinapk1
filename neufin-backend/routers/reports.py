@@ -101,41 +101,54 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
 
 def _normalize_positions(positions: list) -> list:
     """
-    Ensures weight_pct sums to ~100 and value is populated.
-    Handles CSV uploads where weight_pct = share count (sum >> 100).
+    Ensures weight_pct sums to ~100. Handles CSVs where
+    weight_pct was populated with share counts.
+    Also ensures value is populated for each position.
     """
     if not positions:
         return positions
 
+    def _px(p: dict) -> float:
+        return float(p.get("price") or p.get("current_price") or 0)
+
+    # Compute total_value from position values
     total_value = sum(float(p.get("value") or 0) for p in positions)
+
+    # If no values, try shares * price
     if total_value <= 0:
         total_value = sum(
-            float(p.get("shares") or 0) * float(p.get("price") or 0)
+            float(p.get("shares") or 0) * _px(p)
             for p in positions
         )
 
+    # Check if weights look like percentages already
     weight_sum = sum(
         float(p.get("weight_pct") or p.get("weight") or 0)
         for p in positions
     )
 
-    # Weights look like share counts (or are missing entirely) — recompute from value
-    if weight_sum > 110 or weight_sum < 50:
-        if total_value > 0:
-            for p in positions:
-                pos_value = float(p.get("value") or 0)
-                if pos_value > 0:
-                    p["weight_pct"] = round(pos_value / total_value * 100, 2)
-                    p["weight"] = p["weight_pct"]
-                else:
-                    p["weight_pct"] = 0.0
-                    p["weight"] = 0.0
-        else:
-            # Equal-weight fallback when no value data is available
-            w = round(100 / len(positions), 2)
-            for p in positions:
-                p["weight_pct"] = w
-                p["weight"] = w
+    needs_normalization = weight_sum > 110 or weight_sum < 50
+
+    for p in positions:
+        # Always ensure value is set
+        if not p.get("value") or float(p.get("value") or 0) == 0:
+            shares = float(p.get("shares") or 0)
+            price = _px(p)
+            if shares > 0 and price > 0:
+                p["value"] = round(shares * price, 2)
+
+        # Normalize weight if needed
+        if needs_normalization and total_value > 0:
+            pos_value = float(p.get("value") or 0)
+            p["weight_pct"] = round(pos_value / total_value * 100, 4)
+            p["weight"] = p["weight_pct"]
+
+    # If equal weight needed (no value data at all)
+    if needs_normalization and total_value <= 0:
+        equal_w = round(100 / len(positions), 4)
+        for p in positions:
+            p["weight_pct"] = equal_w
+            p["weight"] = equal_w
 
     return positions
 
@@ -286,24 +299,23 @@ async def generate_report(
 
             positions_result = (
                 supabase.table("portfolio_positions")
-                .select("symbol, shares, value, weight, cost_basis, sector")
+                .select("symbol, shares, value, weight_pct, current_price")
                 .eq("portfolio_id", body.portfolio_id)
                 .execute()
             )
 
-            # FIX 2: match swarm by portfolio_id (session_id column) first,
-            # then fall back to most-recent for the user.
-            _swarm_select = (
+            # Try portfolio-specific swarm first (session_id = portfolio_id)
+            _swarm_cols = (
                 "id,user_id,created_at,headline,briefing,regime,"
                 "risk_sentinel,investment_thesis,market_regime,"
                 "quant_analysis,alpha_signal,recommendation_summary,"
-                "tax_recommendation,macro_advice,top_risks,"
-                "agent_trace,dna_score,weighted_beta,sharpe_ratio,"
-                "sentiment_score,key_risks,alpha_outlook,technical_outlook"
+                "tax_recommendation,macro_advice,top_risks,agent_trace,"
+                "dna_score,weighted_beta,sharpe_ratio,sentiment_score,"
+                "key_risks,alpha_outlook,technical_outlook,tax_report,session_id"
             )
             swarm_result = (
                 supabase.table("swarm_reports")
-                .select(_swarm_select)
+                .select(_swarm_cols)
                 .eq("user_id", str(user.id))
                 .eq("session_id", body.portfolio_id)
                 .order("created_at", desc=True)
@@ -312,21 +324,22 @@ async def generate_report(
             )
             swarm_row = swarm_result.data[0] if swarm_result.data else None
 
+            # Fallback: most recent swarm for this user (any portfolio)
             if not swarm_row:
-                swarm_fallback = (
+                fallback = (
                     supabase.table("swarm_reports")
-                    .select(_swarm_select)
+                    .select(_swarm_cols)
                     .eq("user_id", str(user.id))
                     .order("created_at", desc=True)
                     .limit(1)
                     .execute()
                 )
-                swarm_row = swarm_fallback.data[0] if swarm_fallback.data else None
+                swarm_row = fallback.data[0] if fallback.data else None
                 if swarm_row:
                     logger.warning(
                         "reports.swarm_portfolio_mismatch",
                         portfolio_id=body.portfolio_id,
-                        swarm_id=swarm_row.get("id"),
+                        swarm_session_id=swarm_row.get("session_id"),
                     )
 
             profile_result = (
@@ -356,9 +369,10 @@ async def generate_report(
                 status_code=500, detail=f"Data fetch failed: {e!s}"
             ) from e
 
-        positions_raw = _normalize_positions(list(positions_result.data or []))
+        positions_raw = list(positions_result.data or [])
         if not positions_raw:
-            positions_raw = _normalize_positions(_positions_from_dna_row(existing_dna))
+            positions_raw = _positions_from_dna_row(existing_dna)
+        positions_raw = _normalize_positions(positions_raw)
 
         if not positions_raw:
             raise HTTPException(
@@ -366,27 +380,47 @@ async def generate_report(
                 detail="No positions found for this portfolio.",
             )
 
-        # FIX 3: parse alpha_signal JSON string into structured list before PDF generation
+        # FIX 3: parse alpha_signal before PDF generator (structured list + clean text)
         if swarm_row:
             import json as _json
-            alpha_raw = swarm_row.get("alpha_signal") or ""
-            if isinstance(alpha_raw, str) and alpha_raw.strip().startswith("{"):
+
+            alpha_raw = swarm_row.get("alpha_signal")
+            parsed_opps: list = []
+
+            if isinstance(alpha_raw, str) and alpha_raw.strip():
                 try:
-                    parsed_alpha = _json.loads(alpha_raw)
-                    opps = (
-                        parsed_alpha.get("opportunities")
-                        or parsed_alpha.get("alpha_opportunities", {}).get("opportunities")
+                    parsed = _json.loads(alpha_raw)
+                    parsed_opps = (
+                        parsed.get("opportunities")
+                        or parsed.get("alpha_opportunities", {}).get("opportunities")
                         or []
                     )
-                    swarm_row["alpha_signal_parsed"] = opps if isinstance(opps, list) else []
-                    swarm_row["alpha_signal"] = "\n".join(
-                        f"{o.get('symbol', '')}: {str(o.get('reason', ''))[:120]}"
-                        for o in (swarm_row["alpha_signal_parsed"])[:3]
-                    )
                 except Exception:
-                    swarm_row["alpha_signal_parsed"] = []
+                    parsed_opps = []
+            elif isinstance(alpha_raw, dict):
+                parsed_opps = (
+                    alpha_raw.get("opportunities")
+                    or alpha_raw.get("alpha_opportunities", {}).get("opportunities")
+                    or []
+                )
             elif isinstance(alpha_raw, list):
-                swarm_row["alpha_signal_parsed"] = alpha_raw
+                parsed_opps = alpha_raw
+
+            if parsed_opps:
+                swarm_row["alpha_signal_parsed"] = parsed_opps
+                lines = []
+                for o in parsed_opps[:5]:
+                    if not isinstance(o, dict):
+                        continue
+                    sym = o.get("symbol", "")
+                    try:
+                        c0 = float(o.get("confidence", 0) or 0)
+                    except (TypeError, ValueError):
+                        c0 = 0.0
+                    conf_i = int(c0 * 100) if c0 <= 1 else int(c0)
+                    reason = str(o.get("reason", ""))[:200]
+                    lines.append(f"{sym}: Confidence {conf_i}% — {reason}")
+                swarm_row["alpha_signal"] = "\n\n".join(lines)
             else:
                 swarm_row["alpha_signal_parsed"] = []
 
