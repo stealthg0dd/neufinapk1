@@ -245,7 +245,7 @@ async def generate_report(
 
             positions_result = (
                 supabase.table("portfolio_positions")
-                .select("symbol, shares, price, value, weight, cost_basis, sector")
+                .select("symbol, shares, value, weight, cost_basis, sector")
                 .eq("portfolio_id", body.portfolio_id)
                 .execute()
             )
