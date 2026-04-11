@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { toast } from 'react-hot-toast'
@@ -12,6 +12,7 @@ import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
 import { supabase } from '@/lib/supabase'
 import PortfolioPie from '@/components/PortfolioPie'
 import ChartLab from '@/components/dashboard/ChartLab'
+import { ReportThemeModal, getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
 
 const STAGES = [
   { label: 'Reading your holdings...', pct: 25, sub: 'Parsing CSV rows and mapping tickers' },
@@ -37,6 +38,8 @@ export default function PortfolioPage() {
   const [reportAt, setReportAt] = useState<string | null>(null)
 
   const [swarmResult, setSwarmResult] = useState<Record<string, unknown> | null>(null)
+  const [showThemeModal, setShowThemeModal] = useState(false)
+  const [pendingTheme, setPendingTheme] = useState<ReportTheme | null>(null)
 
   const fileSize = useMemo(() => (file ? `${(file.size / 1024).toFixed(1)} KB` : ''), [file])
   const portfolioId = result?.portfolio_id ?? null
@@ -166,9 +169,16 @@ export default function PortfolioPage() {
     setReportAt(new Date().toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' }))
   }, [result])
 
-  const handleDownloadReport = async () => {
+  const handleDownloadReport = async (theme?: ReportTheme) => {
     if (!portfolioId) {
       toast.error('Portfolio ID missing. Re-run analysis and try again.')
+      return
+    }
+
+    // If no theme passed and no stored preference, show the theme picker first
+    const resolvedTheme = theme ?? getStoredReportTheme()
+    if (!resolvedTheme) {
+      setShowThemeModal(true)
       return
     }
     try {
@@ -188,7 +198,7 @@ export default function PortfolioPage() {
       if (canGeneratePdf) {
         const res = await apiFetch('/api/reports/generate', {
           method: 'POST',
-          body: JSON.stringify({ portfolio_id: portfolioId, inline_pdf: false }),
+          body: JSON.stringify({ portfolio_id: portfolioId, inline_pdf: false, theme: resolvedTheme }),
         })
 
         const data = await res.json() as {
@@ -295,6 +305,15 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-5">
+      {showThemeModal && (
+        <ReportThemeModal
+          onSelect={(theme) => {
+            setShowThemeModal(false)
+            void handleDownloadReport(theme)
+          }}
+          onClose={() => setShowThemeModal(false)}
+        />
+      )}
       {/* Upload zone */}
       <div
         onDrop={onDrop}

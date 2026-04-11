@@ -5,6 +5,11 @@ import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
+import {
+  ReportThemeModal,
+  getStoredReportTheme,
+  type ReportTheme,
+} from '@/components/dashboard/ReportThemeModal'
 
 type Props = {
   portfolioId: string | null | undefined
@@ -14,12 +19,21 @@ type Props = {
 
 export function GenerateIcReportButton({ portfolioId, className, children }: Props) {
   const [loading, setLoading] = useState(false)
+  const [showThemeModal, setShowThemeModal] = useState(false)
 
-  const run = async () => {
+  const run = async (theme?: ReportTheme) => {
     if (!portfolioId) {
       toast.error('No portfolio linked to this analysis. Run a portfolio analysis first.')
       return
     }
+
+    // Check for stored theme preference first
+    const resolvedTheme = theme ?? getStoredReportTheme()
+    if (!resolvedTheme) {
+      setShowThemeModal(true)
+      return
+    }
+
     try {
       setLoading(true)
       const statusRes = await apiGet<{
@@ -38,6 +52,7 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
           body: JSON.stringify({
             portfolio_id: portfolioId,
             advisor_name: 'NeuFin',
+            theme: resolvedTheme,
           }),
         })
         if (!res.ok) {
@@ -58,9 +73,8 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
           window.location.href = data.checkout_url
           return
         }
-        const pdfUrl = data.pdf_url || null
-        if (pdfUrl) {
-          window.open(pdfUrl, '_blank')
+        if (data.pdf_url) {
+          window.open(data.pdf_url, '_blank')
           toast.success('Report ready')
         } else if (data.pdf_base64) {
           const bytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0))
@@ -68,7 +82,7 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
           const url = URL.createObjectURL(blob)
           const a = document.createElement('a')
           a.href = url
-          a.download = data.filename || `neufin-report.pdf`
+          a.download = data.filename || 'neufin-report.pdf'
           document.body.appendChild(a)
           a.click()
           document.body.removeChild(a)
@@ -96,23 +110,34 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => void run()}
-      disabled={loading || !portfolioId}
-      className={
-        className ??
-        'text-xs text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50'
-      }
-    >
-      {loading ? (
-        <span className="inline-flex items-center gap-1">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Generating…
-        </span>
-      ) : (
-        children ?? 'Generate Report'
+    <>
+      {showThemeModal && (
+        <ReportThemeModal
+          onSelect={(theme) => {
+            setShowThemeModal(false)
+            void run(theme)
+          }}
+          onClose={() => setShowThemeModal(false)}
+        />
       )}
-    </button>
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={loading || !portfolioId}
+        className={
+          className ??
+          'text-xs text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50'
+        }
+      >
+        {loading ? (
+          <span className="inline-flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Generating…
+          </span>
+        ) : (
+          children ?? 'Generate Report'
+        )}
+      </button>
+    </>
   )
 }

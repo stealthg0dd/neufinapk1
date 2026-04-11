@@ -3,9 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
-import { apiFetch, apiGet } from '@/lib/api-client'
+import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
-import { apiPost } from '@/lib/api-client'
+import {
+  ReportThemeModal,
+  getStoredReportTheme,
+  type ReportTheme,
+} from '@/components/dashboard/ReportThemeModal'
 
 interface ReportRecord {
   id: string
@@ -22,6 +26,7 @@ export default function DashboardReportsPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pendingReport, setPendingReport] = useState<ReportRecord | null>(null)
 
   useEffect(() => {
     void loadReports()
@@ -51,7 +56,7 @@ export default function DashboardReportsPage() {
     }
   }
 
-  async function downloadReport(report: ReportRecord) {
+  async function downloadReport(report: ReportRecord, theme?: ReportTheme) {
     // Already have a URL — open directly
     if (report.pdf_url) {
       window.open(report.pdf_url, '_blank')
@@ -60,6 +65,13 @@ export default function DashboardReportsPage() {
 
     if (!report.portfolio_id) {
       alert('No portfolio linked to this report.')
+      return
+    }
+
+    // Check theme preference before generating
+    const resolvedTheme = theme ?? getStoredReportTheme()
+    if (!resolvedTheme) {
+      setPendingReport(report)
       return
     }
 
@@ -89,7 +101,7 @@ export default function DashboardReportsPage() {
 
       const res = await apiFetch('/api/reports/generate', {
         method: 'POST',
-        body: JSON.stringify({ portfolio_id: report.portfolio_id, inline_pdf: false }),
+        body: JSON.stringify({ portfolio_id: report.portfolio_id, inline_pdf: false, theme: resolvedTheme }),
       })
 
       const data = await res.json() as {
@@ -132,6 +144,16 @@ export default function DashboardReportsPage() {
 
   return (
     <div className="rounded-xl border border-border/50 bg-surface p-6">
+      {pendingReport && (
+        <ReportThemeModal
+          onSelect={(theme) => {
+            const r = pendingReport
+            setPendingReport(null)
+            void downloadReport(r, theme)
+          }}
+          onClose={() => setPendingReport(null)}
+        />
+      )}
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-foreground">IC Reports &amp; Memos</h1>
