@@ -157,7 +157,7 @@ export default function AdminPage() {
     try {
       const url = plan === "all" ? "/api/admin/users" : `/api/admin/users?plan=${plan}`
       const res = await apiFetch(url, { cache: "no-store" })
-      if (res.status === 403) { setError("Advisor role required to access admin panel."); return }
+      if (res.status === 403) { setError("Advisor or admin access required for this panel."); return }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setRows(await res.json())
     } catch (e) {
@@ -209,7 +209,7 @@ export default function AdminPage() {
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">User Admin</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Internal ops panel · advisor only</p>
+            <p className="text-sm text-gray-400 mt-0.5">Internal ops panel · advisor or admin</p>
           </div>
           <div className="text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 bg-amber-500/10">
             ⚠ Internal use only — not visible to regular users

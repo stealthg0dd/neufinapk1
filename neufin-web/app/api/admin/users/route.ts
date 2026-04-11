@@ -1,116 +1,66 @@
 /**
  * GET /api/admin/users
  *
- * Lists all NeuFin user profiles for the internal ops admin panel.
- * Server-side only — uses SUPABASE_SERVICE_ROLE_KEY (never sent to browser).
- *
- * Query params:
- *   ?plan=trial|active|expired   (optional filter)
- *
- * Returns: UserAdminRow[]
+ * Proxies to FastAPI (ops: advisor OR is_admin) and maps to UserAdminRow[]
+ * for backward compatibility with /dashboard/admin.
  */
 
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { NextRequest, NextResponse } from 'next/server'
 
-export const dynamic = "force-dynamic"
+export const dynamic = 'force-dynamic'
 
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-}
+const BACKEND = () => process.env.NEXT_PUBLIC_API_URL ?? ''
 
 export interface UserAdminRow {
-  id:                  string
-  email:               string
+  id: string
+  email: string
+  name?: string
+  firm_name?: string | null
   subscription_status: string
-  trial_started_at:    string | null
-  created_at:          string | null
-  last_sign_in_at:     string | null
-  dna_score_count:     number
-  reports_purchased:   number
-  role:                string | null
+  subscription_tier?: string | null
+  trial_started_at: string | null
+  created_at: string | null
+  last_sign_in_at: string | null
+  dna_score_count: number
+  reports_purchased: number
+  role: string | null
+}
+
+function mapRow(p: Record<string, unknown>): UserAdminRow {
+  return {
+    id: String(p.id),
+    email: String(p.email ?? ''),
+    name: String(p.name ?? ''),
+    firm_name: (p.firm_name as string) ?? null,
+    subscription_status: String(p.subscription_status ?? p.status ?? 'unknown'),
+    subscription_tier: (p.subscription_tier as string) ?? (p.plan as string) ?? null,
+    trial_started_at: (p.trial_started_at as string) ?? null,
+    created_at: (p.created_at as string) ?? null,
+    last_sign_in_at:
+      (p.last_sign_in_at as string) ?? (p.last_active_at as string) ?? null,
+    dna_score_count: Number(p.dna_score_count ?? p.analyses_used ?? 0),
+    reports_purchased: Number(p.reports_purchased ?? 0),
+    role: (p.role as string) ?? null,
+  }
 }
 
 export async function GET(req: NextRequest) {
-  // Verify advisor auth via Bearer token
-  const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? ""
-  if (!token) {
-    return NextResponse.json({ error: "unauthorized", message: "Missing token", trace_id: "", timestamp: new Date().toISOString() }, { status: 401 })
+  const base = BACKEND()
+  if (!base) {
+    return NextResponse.json({ error: 'server_misconfigured' }, { status: 503 })
   }
-
-  // Validate token + check advisor role
-  const { data: { user }, error: authErr } = await getSupabaseAdmin().auth.getUser(token)
-  if (authErr || !user) {
-    return NextResponse.json({ error: "unauthorized", message: "Invalid token", trace_id: "", timestamp: new Date().toISOString() }, { status: 401 })
+  const qs = req.nextUrl.search
+  const auth = req.headers.get('authorization') ?? ''
+  const res = await fetch(`${base.replace(/\/$/, '')}/api/admin/users${qs}`, {
+    method: 'GET',
+    headers: { authorization: auth },
+    cache: 'no-store',
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    return NextResponse.json(data, { status: res.status })
   }
-
-  const { data: profile } = await getSupabaseAdmin()
-    .from("user_profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (profile?.role !== "advisor") {
-    return NextResponse.json({ error: "forbidden", message: "Advisor role required", trace_id: "", timestamp: new Date().toISOString() }, { status: 403 })
-  }
-
-  const planFilter = req.nextUrl.searchParams.get("plan")
-
-  // Fetch user_profiles (limit 200)
-  let query = getSupabaseAdmin()
-    .from("user_profiles")
-    .select("id, email, subscription_status, trial_started_at, created_at, last_sign_in_at, role")
-    .order("created_at", { ascending: false })
-    .limit(200)
-
-  if (planFilter) {
-    query = query.eq("subscription_status", planFilter)
-  }
-
-  const { data: profiles, error: profilesErr } = await query
-  if (profilesErr) {
-    return NextResponse.json({ error: "db_error", message: profilesErr.message, trace_id: "", timestamp: new Date().toISOString() }, { status: 500 })
-  }
-
-  // Enrich with DNA score counts and report counts
-  const userIds = (profiles ?? []).map((p: {id: string}) => p.id)
-
-  const [dnaCounts, reportCounts] = await Promise.all([
-    getSupabaseAdmin()
-      .from("dna_scores")
-      .select("user_id")
-      .in("user_id", userIds),
-    getSupabaseAdmin()
-      .from("advisor_reports")
-      .select("advisor_id")
-      .eq("is_paid", true)
-      .in("advisor_id", userIds),
-  ])
-
-  const dnaMap: Record<string, number> = {}
-  for (const row of dnaCounts.data ?? []) {
-    dnaMap[(row as {user_id: string}).user_id] = (dnaMap[(row as {user_id: string}).user_id] ?? 0) + 1
-  }
-
-  const reportMap: Record<string, number> = {}
-  for (const row of reportCounts.data ?? []) {
-    reportMap[(row as {advisor_id: string}).advisor_id] = (reportMap[(row as {advisor_id: string}).advisor_id] ?? 0) + 1
-  }
-
-  const rows: UserAdminRow[] = (profiles ?? []).map((p: Record<string, string|null>) => ({
-    id:                  p.id as string,
-    email:               p.email ?? "",
-    subscription_status: p.subscription_status ?? "unknown",
-    trial_started_at:    p.trial_started_at ?? null,
-    created_at:          p.created_at ?? null,
-    last_sign_in_at:     p.last_sign_in_at ?? null,
-    dna_score_count:     dnaMap[p.id as string] ?? 0,
-    reports_purchased:   reportMap[p.id as string] ?? 0,
-    role:                p.role ?? null,
-  }))
-
+  const items = Array.isArray(data) ? data : (data.items ?? [])
+  const rows: UserAdminRow[] = (items as Record<string, unknown>[]).map(mapRow)
   return NextResponse.json(rows)
 }

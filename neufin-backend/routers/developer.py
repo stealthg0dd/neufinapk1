@@ -178,6 +178,7 @@ async def create_api_key(
 
     raw_key = f"nf_{secrets.token_urlsafe(32)}"
     key_hash = _hash_key(raw_key)
+    key_prefix = raw_key[:14] if len(raw_key) >= 14 else raw_key
 
     try:
         result = (
@@ -186,6 +187,7 @@ async def create_api_key(
                 {
                     "user_id": user.id,
                     "key_hash": key_hash,
+                    "key_prefix": key_prefix,
                     "name": body.name,
                     "is_active": True,
                     "rate_limit_per_day": 10000,

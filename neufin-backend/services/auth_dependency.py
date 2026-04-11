@@ -266,3 +266,26 @@ async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
             detail="Admin access required.",
         )
     return user
+
+
+async def get_ops_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
+    """
+    Internal ops: advisors OR is_admin (for legacy /dashboard/admin + shared list APIs).
+    """
+    try:
+        result = (
+            supabase.table("user_profiles")
+            .select("is_admin, role")
+            .eq("id", user.id)
+            .limit(1)
+            .execute()
+        )
+        row = result.data[0] if result.data else {}
+    except Exception:
+        row = {}
+    if row.get("is_admin") is True or row.get("role") == "advisor":
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Advisor or admin access required.",
+    )

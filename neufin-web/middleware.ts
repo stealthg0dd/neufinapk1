@@ -29,7 +29,7 @@ function log(level: 'debug' | 'info' | 'warn' | 'error', message: string, data?:
 
 // ── Public path prefixes — skip auth check entirely ───────────────────────
 const PUBLIC_PREFIXES = [
-  '/',
+  // Note: do not use '/' here — every pathname starts with '/' and would skip auth.
   '/auth',          // /auth  +  /auth/callback
   '/login',
   '/signup',
@@ -60,6 +60,9 @@ const PUBLIC_PREFIXES = [
   '/robots',
   '/llms',
 ]
+
+// ── Admin portal — require valid session AND is_admin on user_profiles ─────
+const ADMIN_ONLY_PREFIXES = ['/admin']
 
 // ── Advisor-only paths — require valid session AND advisor role ────────────
 const ADVISOR_ONLY_PREFIXES = [
@@ -111,6 +114,37 @@ async function hasValidSupabaseSession(token: string): Promise<boolean> {
     return true
   } catch (error) {
     log('error', 'middleware.supabase_session_error', error)
+    return false
+  }
+}
+
+async function hasAdminRole(token: string): Promise<boolean> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY) return false
+  try {
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    })
+    if (!userRes.ok) return false
+    const userJson = await userRes.json() as { id?: string }
+    const userId = userJson.id
+    if (!userId) return false
+
+    const profileRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=is_admin&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        cache: 'no-store',
+      },
+    )
+    if (!profileRes.ok) return false
+    const profiles = await profileRes.json() as { is_admin?: boolean }[]
+    return profiles[0]?.is_admin === true
+  } catch (error) {
+    log('error', 'middleware.admin_check_error', error)
     return false
   }
 }
@@ -220,6 +254,15 @@ export async function middleware(request: NextRequest) {
   if (!isValid) {
     log('info', 'middleware.redirect_invalid_cookie', { pathname })
     return redirectToAuth(request, pathname, true)
+  }
+
+  // ── Internal admin portal (/admin/*): is_admin only ───────────────────────
+  if (ADMIN_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
+    const isAdmin = await hasAdminRole(token)
+    if (!isAdmin) {
+      log('info', 'middleware.redirect_non_admin', { pathname })
+      return redirectToDashboard(request)
+    }
   }
 
   // ── Advisor-only paths: additional role check ─────────────────────────────
