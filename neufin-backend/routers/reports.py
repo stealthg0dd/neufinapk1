@@ -245,7 +245,7 @@ async def generate_report(
 
             positions_result = (
                 supabase.table("portfolio_positions")
-                .select("symbol, shares, cost_basis")
+                .select("symbol, shares, price, value, weight, cost_basis, sector")
                 .eq("portfolio_id", body.portfolio_id)
                 .execute()
             )
@@ -336,6 +336,9 @@ async def generate_report(
                 portfolio.get("total_value") or metrics.get("total_value") or 0
             ),
             "metrics": metrics,
+            # Raw positions with cost_basis — used by _build_report_context to
+            # synthesize tax estimates when DNA tax_analysis is not available.
+            "positions_with_basis": positions_raw,
         }
 
         pdf_bytes = await generate_advisor_report(

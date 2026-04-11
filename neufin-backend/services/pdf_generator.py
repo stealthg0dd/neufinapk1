@@ -596,7 +596,13 @@ def _build_report_context(
         thesis_obj = {}
 
     # ── Portfolio basics ──────────────────────────────────────────────────────
-    positions: list[dict] = m.get("positions") or []
+    # positions_with_basis is passed from routers/reports.py and has cost_basis.
+    # Prefer it over metrics.positions which may lack cost_basis.
+    positions: list[dict] = (
+        p.get("positions_with_basis")
+        or m.get("positions")
+        or []
+    )
     total_value = float(p.get("total_value") or m.get("total_value") or 0)
 
     # ── DNA (always present after analysis) ───────────────────────────────────
@@ -631,6 +637,33 @@ def _build_report_context(
     total_tax_liability = float(tax_analysis.get("total_liability") or 0)
     total_harvest_opp = float(tax_analysis.get("total_harvest_opp") or 0)
     tax_narrative = str(tax_analysis.get("narrative") or "")
+
+    # Synthesize tax estimates from positions if no DNA tax data is present.
+    # portfolio_positions has cost_basis — use it to compute unrealized gains.
+    if not tax_positions and positions:
+        for pos in positions:
+            cost_basis = float(pos.get("cost_basis") or 0)
+            shares = float(pos.get("shares") or 0)
+            price = float(pos.get("price") or 0)
+            value = float(
+                pos.get("value")
+                or (price * shares if price and shares else 0)
+            )
+            if cost_basis > 0 and value > 0:
+                gain = value - cost_basis
+                tax_positions.append({
+                    "symbol": pos.get("symbol"),
+                    "unrealised_gain": gain,
+                    "tax_liability": max(0.0, gain * 0.20),
+                    "harvest_credit": max(0.0, -gain * 0.20),
+                })
+        if tax_positions:
+            total_tax_liability = sum(
+                float(tp.get("tax_liability") or 0) for tp in tax_positions
+            )
+            total_harvest_opp = sum(
+                float(tp.get("harvest_credit") or 0) for tp in tax_positions
+            )
 
     # ── Regime ────────────────────────────────────────────────────────────────
     mkt_regime = s.get("market_regime") or {}
@@ -975,7 +1008,10 @@ def _page_executive_memo(ctx: dict, s: dict, cw: float, bc: "ICBrand") -> list:
     if ctx.get("strengths"):
         items.append(Paragraph("KEY SUPPORTING FACTORS", s["h3"]))
         for strength in ctx["strengths"][:3]:
-            sentence = (strength.split(".")[0] + ".") if "." in strength else strength[:120]
+            # Truncate to first sentence, then cap at 100 chars to prevent overflow
+            sentence = (strength.split(".")[0] + ".") if "." in strength else strength
+            if len(sentence) > 100:
+                sentence = sentence[:97] + "..."
             items.append(Paragraph(
                 f'<font color="{_html_hex(bc.SUCCESS)}">▶</font>  {_xml(sentence)}',
                 s["body"],
@@ -1070,7 +1106,12 @@ def _build_pdf_sync(
     metrics = portfolio_data.get("metrics") or {}
     if not isinstance(metrics, dict):
         metrics = {}
-    positions = metrics.get("positions") or []
+    # Prefer positions_with_basis (has cost_basis) over metrics.positions
+    positions = (
+        portfolio_data.get("positions_with_basis")
+        or metrics.get("positions")
+        or []
+    )
     if not isinstance(positions, list):
         positions = []
 
@@ -1331,7 +1372,7 @@ def _build_pdf_sync(
         MARGIN,
         MARGIN + 20,
         A4_W - 2 * MARGIN,
-        A4_H - 2 * MARGIN - 38,
+        A4_H - 2 * MARGIN - 60,  # increased buffer to prevent header/footer overflow
         id="normal",
     )
 
@@ -1400,8 +1441,10 @@ def _build_pdf_sync(
     )
 
     elems.append(Spacer(1, 1))
-    elems.append(PageBreak())
+    # NextPageTemplate MUST come before PageBreak so the switch takes effect
+    # on the very next page — otherwise page 2 still renders on the Cover template.
     elems.append(NextPageTemplate("Body"))
+    elems.append(PageBreak())
 
     # PAGE 2 Executive memo (IC-grade: verdict, thesis, rec, risk, confidence)
     cw = A4_W - 2 * MARGIN
@@ -1437,7 +1480,7 @@ def _build_pdf_sync(
             for i in range(len(labels_pie))
         ]
         left = Table(
-            alloc_rows,
+            alloc_rows if alloc_rows else [["—", "No position data", "—"]],
             colWidths=[55, 130, 45],
             style=TableStyle(
                 [
@@ -1545,37 +1588,108 @@ def _build_pdf_sync(
     elems.append(Spacer(1, 10))
     elems.append(Paragraph("<b>Strengths</b>", styles["h_section"]))
     for s in strengths:
-        elems.append(Paragraph(f"✓ {_xml(s)}", styles["body"]))
+        # First sentence only, capped at 150 chars to prevent column overflow
+        sentence = (s.split(".")[0] + ".") if "." in s else s
+        sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+        elems.append(Paragraph(f"✓ {_xml(sentence)}", styles["body"]))
     elems.append(Spacer(1, 6))
     elems.append(Paragraph("<b>Weaknesses</b>", styles["h_section"]))
     for w in weaknesses:
-        elems.append(Paragraph(f"⚠ {_xml(w)}", styles["body"]))
+        sentence = (w.split(".")[0] + ".") if "." in w else w
+        sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
+        elems.append(Paragraph(f"⚠ {_xml(sentence)}", styles["body"]))
     elems.append(Spacer(1, 8))
-    bias_box = Table(
-        [
-            [Paragraph("<b>DETECTED BIASES</b>", styles["h_section"])],
-            [
-                Paragraph(
-                    _xml(
-                        sentinel.get(
-                            "primary_risks",
-                            ["Recency / concentration — review top holdings"],
-                        )[0]
-                        if sentinel.get("primary_risks")
-                        else "No specific behavioral bias flags — see DNA weaknesses."
-                    ),
-                    styles["body"],
-                )
-            ],
-        ],
-        colWidths=[A4_W - 2 * MARGIN],
-        style=TableStyle(
-            [
-                ("BOX", (0, 0), (-1, -1), 1, bc.AMBER),
-                ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ]
+
+    # ── DETECTED BIASES — derived from weaknesses text, never a contradiction ──
+    _BIAS_KEYWORDS = {
+        "anchor": (
+            "Anchoring Bias",
+            "Holding losing positions too long due to original price anchoring",
         ),
+        "recency": (
+            "Recency Bias",
+            "Overweighting recent performance in allocation decisions",
+        ),
+        "loss aversion": (
+            "Loss Aversion",
+            "Reluctance to realize losses despite rational case for exit",
+        ),
+        "overconfidence": (
+            "Overconfidence Bias",
+            "Concentrated positions indicating excess confidence",
+        ),
+        "herding": (
+            "Herding Bias",
+            "Following consensus positions without independent analysis",
+        ),
+        "home bias": (
+            "Home Bias",
+            "Geographic or sector concentration beyond diversification rationale",
+        ),
+        "concentration": (
+            "Concentration Risk",
+            "Position sizing inconsistent with diversification mandate",
+        ),
+    }
+    weaknesses_text_lower = " ".join(weaknesses).lower()
+    detected_biases = [
+        {"name": bias_name, "description": bias_desc}
+        for keyword, (bias_name, bias_desc) in _BIAS_KEYWORDS.items()
+        if keyword in weaknesses_text_lower
+    ]
+
+    if detected_biases:
+        bias_header = [
+            Paragraph("<b>DETECTED BIASES</b>", styles["h_section"]),
+            Paragraph(
+                f"<font size='8' color='#94A3B8'>"
+                f"{len(detected_biases)} bias pattern(s) identified from DNA assessment"
+                f"</font>",
+                styles["body"],
+            ),
+        ]
+        bias_rows = [["Bias", "Description", "Evidence"]]
+        for b in detected_biases:
+            bias_rows.append([
+                Paragraph(f"<b>{_xml(b['name'])}</b>", styles["body"]),
+                Paragraph(_xml(b["description"]), styles["body"]),
+                Paragraph(
+                    "<font size='7' color='#F5A623'>Detected in behavioral DNA assessment</font>",
+                    styles["body"],
+                ),
+            ])
+        bias_tbl = Table(
+            bias_rows,
+            colWidths=[120, 220, 130],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), bc.AMBER),
+                ("TEXTCOLOR", (0, 0), (-1, 0), bc.WHITE),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [bc.PRIMARY, bc.SURFACE]),
+                ("GRID", (0, 0), (-1, -1), 0.25, bc.MUTED),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]),
+        )
+        bias_box_items = [*bias_header, bias_tbl]
+    else:
+        bias_box_items = [
+            Paragraph("<b>DETECTED BIASES</b>", styles["h_section"]),
+            Paragraph("No behavioral bias flags detected.", styles["body"]),
+        ]
+
+    bias_box = Table(
+        [[item] for item in bias_box_items],
+        colWidths=[A4_W - 2 * MARGIN],
+        style=TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1, bc.AMBER),
+            ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]),
     )
     elems.append(bias_box)
     elems.append(PageBreak())
@@ -1616,22 +1730,24 @@ def _build_pdf_sync(
     elems.append(Spacer(1, 10))
 
     # Portfolio-derived macro signals (always available — no swarm needed)
+    # weights in portfolio_positions are stored as percentages (e.g. 14.1 = 14.1%)
+    # — do NOT divide by 100 or _fpct will display "0.14%" instead of "14.10%"
     _def_w = sum(
-        float(pos.get("weight") or 0) / 100
+        float(pos.get("weight") or 0)
         for pos in positions
         if pos.get("symbol") in ("GLD", "TLT", "BND", "JNJ", "PG", "VZ", "XLP", "XLU")
     )
     _tech_w = sum(
-        float(pos.get("weight") or 0) / 100
+        float(pos.get("weight") or 0)
         for pos in positions
         if pos.get("symbol") in ("AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "QQQ")
     )
     _gld_w = next(
-        (float(pos.get("weight") or 0) / 100 for pos in positions if pos.get("symbol") == "GLD"),
+        (float(pos.get("weight") or 0) for pos in positions if pos.get("symbol") == "GLD"),
         0,
     )
     _fi_w = next(
-        (float(pos.get("weight") or 0) / 100 for pos in positions
+        (float(pos.get("weight") or 0) for pos in positions
          if pos.get("symbol") in ("TLT", "BND", "AGG", "GOVT", "IEF")),
         0,
     )
