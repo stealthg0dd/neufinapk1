@@ -69,11 +69,13 @@ function DeleteModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel:
 // ── Branding section ──────────────────────────────────────────────────────────
 interface BrandingConfig {
   white_label_enabled: boolean
-  firm_name: string
-  firm_logo_url: string
-  advisor_name: string
+  firm_name: string | null
+  advisor_name: string | null
   advisor_email: string
+  logo_base64?: string | null
+  firm_logo_url?: string
   brand_primary_color: string
+  brand_color?: string | null
 }
 
 function BrandingSection() {
@@ -98,12 +100,17 @@ function BrandingSection() {
     apiGet<BrandingConfig>('/api/profile/white-label')
       .then((data) => {
         setConfig(data)
-        setFirmName(data.firm_name)
-        setAdvisorName(data.advisor_name)
-        setAdvisorEmail(data.advisor_email)
-        setBrandColor(data.brand_primary_color || '#1EB8CC')
+        setFirmName(data.firm_name ?? '')
+        setAdvisorName(data.advisor_name ?? '')
+        setAdvisorEmail(data.advisor_email ?? '')
+        const bc = data.brand_color || data.brand_primary_color || '#1EB8CC'
+        setBrandColor(bc)
         setWlEnabled(data.white_label_enabled)
-        setLogoPreview(data.firm_logo_url || null)
+        setLogoPreview(
+          data.logo_base64
+            ? `data:image/png;base64,${data.logo_base64}`
+            : (data.firm_logo_url || null),
+        )
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -129,9 +136,16 @@ function BrandingSection() {
         form.append('file', logoFile)
         const res = await apiFetch('/api/profile/logo', { method: 'POST', body: form })
         if (res.ok) {
-          const data = await res.json() as { logo_url?: string }
-          if (data.logo_url) {
-            setConfig((c) => c ? { ...c, firm_logo_url: data.logo_url! } : c)
+          const data = await res.json() as { logo_url?: string; logo_base64?: string }
+          if (data.logo_base64) {
+            const src = `data:image/png;base64,${data.logo_base64}`
+            setConfig((c) =>
+              c ? { ...c, logo_base64: data.logo_base64, firm_logo_url: data.logo_url || c.firm_logo_url } : c,
+            )
+            setLogoPreview(src)
+            setLogoFile(null)
+          } else if (data.logo_url) {
+            setConfig((c) => (c ? { ...c, firm_logo_url: data.logo_url! } : c))
             setLogoPreview(data.logo_url!)
             setLogoFile(null)
           }
@@ -149,7 +163,19 @@ function BrandingSection() {
         }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setConfig((c) => c ? { ...c, firm_name: firmName, advisor_name: advisorName, advisor_email: advisorEmail, brand_primary_color: brandColor, white_label_enabled: wlEnabled } : c)
+      setConfig((c) =>
+        c
+          ? {
+              ...c,
+              firm_name: firmName,
+              advisor_name: advisorName,
+              advisor_email: advisorEmail,
+              brand_primary_color: brandColor,
+              brand_color: brandColor,
+              white_label_enabled: wlEnabled,
+            }
+          : c,
+      )
       setMsg('Branding saved.')
       setEditing(false)
     } catch (e) {

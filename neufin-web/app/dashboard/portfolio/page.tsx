@@ -107,14 +107,16 @@ export default function PortfolioPage() {
   const [showThemeModal, setShowThemeModal] = useState(false)
   const [pendingTheme, setPendingTheme] = useState<ReportTheme | null>(null)
 
-  // White-label config
+  // White-label config (served from advisors table via /api/profile/white-label)
   const [wlConfig, setWlConfig] = useState<{
     white_label_enabled: boolean
-    firm_name: string
-    firm_logo_url: string
-    advisor_name: string
-    advisor_email: string
-    brand_primary_color: string
+    firm_name: string | null
+    advisor_name: string | null
+    logo_base64?: string | null
+    firm_logo_url?: string
+    advisor_email?: string
+    brand_color?: string | null
+    brand_primary_color?: string | null
   } | null>(null)
   const [useWhiteLabel, setUseWhiteLabel] = useState(false)
 
@@ -240,15 +242,16 @@ export default function PortfolioPage() {
   useEffect(() => {
     apiGet<{
       white_label_enabled: boolean
-      firm_name: string
-      firm_logo_url: string
-      advisor_name: string
-      advisor_email: string
-      brand_primary_color: string
+      firm_name: string | null
+      advisor_name: string | null
+      logo_base64?: string | null
+      firm_logo_url?: string
+      advisor_email?: string
+      brand_color?: string | null
+      brand_primary_color?: string | null
     }>('/api/profile/white-label')
       .then((data) => {
         setWlConfig(data)
-        // Auto-enable toggle if the user has white-label configured
         if (data.white_label_enabled) setUseWhiteLabel(true)
       })
       .catch(() => { /* non-critical */ })
@@ -308,13 +311,15 @@ export default function PortfolioPage() {
           inline_pdf: false,
           theme: resolvedTheme,
         }
-        if (useWhiteLabel && wlConfig) {
-          reportBody.firm_name       = wlConfig.firm_name
-          reportBody.advisor_name    = wlConfig.advisor_name
-          reportBody.advisor_email   = wlConfig.advisor_email
+        if (useWhiteLabel && wlConfig?.white_label_enabled) {
+          reportBody.firm_name = wlConfig.firm_name ?? undefined
+          reportBody.advisor_name = wlConfig.advisor_name ?? undefined
+          reportBody.advisor_email = wlConfig.advisor_email
+          reportBody.logo_base64 = wlConfig.logo_base64 || undefined
           reportBody.advisor_logo_url = wlConfig.firm_logo_url || undefined
-          reportBody.white_label     = true
-          reportBody.color_scheme    = { primary: wlConfig.brand_primary_color }
+          reportBody.white_label = true
+          const primary = wlConfig.brand_color || wlConfig.brand_primary_color
+          if (primary) reportBody.color_scheme = { primary }
         }
         const res = await apiFetch('/api/reports/generate', {
           method: 'POST',
@@ -741,10 +746,14 @@ export default function PortfolioPage() {
                 White-label this report with{' '}
                 <strong>{wlConfig.firm_name || 'your firm'}</strong> branding
               </label>
-              {wlConfig.firm_logo_url && (
+              {(wlConfig.logo_base64 || wlConfig.firm_logo_url) && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={wlConfig.firm_logo_url}
+                  src={
+                    wlConfig.logo_base64
+                      ? `data:image/png;base64,${wlConfig.logo_base64}`
+                      : (wlConfig.firm_logo_url as string)
+                  }
                   alt="Firm logo"
                   style={{ height: 24, marginLeft: 'auto', objectFit: 'contain' }}
                 />
