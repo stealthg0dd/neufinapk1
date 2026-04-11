@@ -25,7 +25,7 @@ export interface UserState {
   /** True when there's no authenticated session */
   isGuest: boolean
   /** Subscription tier string */
-  subscriptionTier: 'free' | 'pro'
+  subscriptionTier: 'free' | 'retail' | 'advisor' | 'enterprise' | 'pro'
   /** Advisor/firm name if set */
   advisorName: string | null
   /** Raw auth state passthrough */
@@ -68,7 +68,15 @@ export function useUser(): UserState {
       .finally(() => setSubLoading(false))
   }, [token])
 
-  const isPro   = subscription?.is_pro ?? false
+  // is_pro is true for any full-access state:
+  // - Backend now sets is_pro=true for trial + advisor + enterprise
+  // - Guard here for any stale cached response that still uses the old logic
+  const isPro = (
+    subscription?.is_pro === true ||
+    subscription?.subscription_status === 'trial' ||
+    subscription?.subscription_tier === 'advisor' ||
+    subscription?.subscription_tier === 'enterprise'
+  )
   const isGuest = !user
 
   return {

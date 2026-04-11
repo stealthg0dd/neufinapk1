@@ -496,7 +496,9 @@ export interface VaultRecord {
 }
 
 export interface SubscriptionInfo {
-  subscription_tier: 'free' | 'pro'
+  subscription_tier: 'free' | 'retail' | 'advisor' | 'enterprise' | 'pro'
+  subscription_status: 'free' | 'trial' | 'active' | 'expired'
+  trial_started_at: string
   is_pro: boolean
   advisor_name: string | null
   firm_name: string | null
@@ -538,7 +540,7 @@ export async function getSubscription(
   const res = await fetch(`${API}/api/vault/subscription`, {
     headers: authHeaders(token),
   })
-  if (!res.ok) return { subscription_tier: 'free', is_pro: false, advisor_name: null, firm_name: null }
+  if (!res.ok) return { subscription_tier: 'free', subscription_status: 'free', trial_started_at: '', is_pro: false, advisor_name: null, firm_name: null }
   return res.json()
 }
 

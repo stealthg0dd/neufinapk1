@@ -791,17 +791,64 @@ export default function SwarmPage() {
   const { isPro, loading: authLoading, user } = useUser()
   const { capture } = useNeufinAnalytics()
   const isTrialBypass = useMemo(() => {
+    // 1. Check subscription cache first (populated by mount effect below)
+    try {
+      const cached = localStorage.getItem('neufin:subscription-status:cache')
+      if (cached) {
+        const parsed = JSON.parse(cached) as { ts?: number; data?: { status?: string; plan?: string } }
+        const d = parsed?.data
+        if (
+          d?.status === 'trial' ||
+          d?.plan === 'advisor' ||
+          d?.plan === 'enterprise'
+        ) {
+          return true
+        }
+      }
+    } catch {}
+
+    // 2. Fallback: user object not available yet
+    if (!user) return false
+
+    // 3. created_at heuristic — broad fallback for accounts < 14 days old
     const createdAt = user?.created_at
-    if (!createdAt) return false
-    const createdTs = new Date(createdAt).getTime()
-    if (!Number.isFinite(createdTs)) return false
-    const ageDays = (Date.now() - createdTs) / (1000 * 60 * 60 * 24)
-    return ageDays < 14
-  }, [user?.created_at])
+    if (createdAt) {
+      const created = new Date(createdAt)
+      const daysSince = (Date.now() - created.getTime()) / 86_400_000
+      if (Number.isFinite(daysSince) && daysSince < 14) return true
+    }
+
+    return false
+  }, [user])
   const isUnlocked = isPro || unlockedLocally || isTrialBypass
 
   useEffect(() => {
     debugAuth('swarm:mount')
+  }, [])
+
+  // Refresh subscription cache on mount so isTrialBypass has fresh data
+  useEffect(() => {
+    apiGet<{
+      plan?: string
+      status?: string
+      days_remaining?: number
+    }>('/api/subscription/status')
+      .then((data) => {
+        if (data && typeof data === 'object') {
+          localStorage.setItem(
+            'neufin:subscription-status:cache',
+            JSON.stringify({
+              ts: Date.now(),
+              data: {
+                plan: data.plan,
+                status: data.status,
+                days_remaining: data.days_remaining,
+              },
+            })
+          )
+        }
+      })
+      .catch(() => {/* non-blocking */})
   }, [])
 
   // Load portfolio from localStorage (written by upload/analyze flow)
