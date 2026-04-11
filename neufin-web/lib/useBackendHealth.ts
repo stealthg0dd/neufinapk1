@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || ''
+const API = ''  // always use relative paths — Next.js proxy handles Railway forwarding server-side
 
 export interface BackendHealth {
   isOnline:   boolean

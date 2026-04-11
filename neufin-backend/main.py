@@ -565,7 +565,7 @@ except ImportError:
     )
 
 # ── CORS — origins from settings ──────────────────────────────────────────────
-_origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
+_origin_regex = r"https://(www\.)?neufin\.ai|https://[a-zA-Z0-9\-]+\.vercel\.app"
 
 # ── Middleware ordering ────────────────────────────────────────────────────────
 #

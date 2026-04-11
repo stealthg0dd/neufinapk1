@@ -180,7 +180,10 @@ export default function PortfolioPage() {
       const data = (await res.json()) as DNAAnalysisResponse
       setResult(data)
       try {
-        localStorage.setItem('neufin-last-analysis', JSON.stringify(data))
+        const serialised = JSON.stringify(data)
+        localStorage.setItem('neufin-last-analysis', serialised)
+        // Also write to the key the swarm page reads from
+        localStorage.setItem('dnaResult', serialised)
       } catch {
         // Ignore circular reference errors from React-decorated objects
       }
@@ -683,7 +686,9 @@ export default function PortfolioPage() {
               type="button"
               onClick={() => {
                 try {
-                  localStorage.setItem('neufin-last-analysis', JSON.stringify(result))
+                  const serialised = JSON.stringify(result)
+                  localStorage.setItem('neufin-last-analysis', serialised)
+                  localStorage.setItem('dnaResult', serialised)
                 } catch {
                   // Ignore circular reference errors from React-decorated objects
                 }

@@ -353,7 +353,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
   const corrColor  = avgCorr > 0.80 ? '#ef4444' : avgCorr > 0.65 ? '#FFB900' : '#00FF00'
 
   const cmData   = data.corr_matrix_data as { symbols: string[]; values: number[][] } | undefined
-  const hasCm    = cmData && cmData.symbols.length > 0
+  const hasCm    = cmData && Array.isArray(cmData.symbols) && cmData.symbols.length > 0
 
   return (
     <IntelCard title="Quant Analysis" icon={<BarChart2 size={12} />} accent="#c084fc">
