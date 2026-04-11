@@ -99,6 +99,47 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
     return []
 
 
+def _normalize_positions(positions: list) -> list:
+    """
+    Ensures weight_pct sums to ~100 and value is populated.
+    Handles CSV uploads where weight_pct = share count (sum >> 100).
+    """
+    if not positions:
+        return positions
+
+    total_value = sum(float(p.get("value") or 0) for p in positions)
+    if total_value <= 0:
+        total_value = sum(
+            float(p.get("shares") or 0) * float(p.get("price") or 0)
+            for p in positions
+        )
+
+    weight_sum = sum(
+        float(p.get("weight_pct") or p.get("weight") or 0)
+        for p in positions
+    )
+
+    # Weights look like share counts (or are missing entirely) — recompute from value
+    if weight_sum > 110 or weight_sum < 50:
+        if total_value > 0:
+            for p in positions:
+                pos_value = float(p.get("value") or 0)
+                if pos_value > 0:
+                    p["weight_pct"] = round(pos_value / total_value * 100, 2)
+                    p["weight"] = p["weight_pct"]
+                else:
+                    p["weight_pct"] = 0.0
+                    p["weight"] = 0.0
+        else:
+            # Equal-weight fallback when no value data is available
+            w = round(100 / len(positions), 2)
+            for p in positions:
+                p["weight_pct"] = w
+                p["weight"] = w
+
+    return positions
+
+
 def _synthesis_payload(dna: dict | None, metrics: dict, swarm_row: dict | None) -> dict:
     """Client-facing summary from DNA + metrics + swarm (no LLM)."""
     s = swarm_row if isinstance(swarm_row, dict) else {}
@@ -250,21 +291,43 @@ async def generate_report(
                 .execute()
             )
 
+            # FIX 2: match swarm by portfolio_id (session_id column) first,
+            # then fall back to most-recent for the user.
+            _swarm_select = (
+                "id,user_id,created_at,headline,briefing,regime,"
+                "risk_sentinel,investment_thesis,market_regime,"
+                "quant_analysis,alpha_signal,recommendation_summary,"
+                "tax_recommendation,macro_advice,top_risks,"
+                "agent_trace,dna_score,weighted_beta,sharpe_ratio,"
+                "sentiment_score,key_risks,alpha_outlook,technical_outlook"
+            )
             swarm_result = (
                 supabase.table("swarm_reports")
-                .select(
-                    "id,user_id,created_at,headline,briefing,regime,"
-                    "risk_sentinel,investment_thesis,market_regime,"
-                    "quant_analysis,alpha_signal,recommendation_summary,"
-                    "tax_recommendation,macro_advice,top_risks,"
-                    "agent_trace,dna_score,weighted_beta,sharpe_ratio"
-                )
+                .select(_swarm_select)
                 .eq("user_id", str(user.id))
+                .eq("session_id", body.portfolio_id)
                 .order("created_at", desc=True)
                 .limit(1)
                 .execute()
             )
             swarm_row = swarm_result.data[0] if swarm_result.data else None
+
+            if not swarm_row:
+                swarm_fallback = (
+                    supabase.table("swarm_reports")
+                    .select(_swarm_select)
+                    .eq("user_id", str(user.id))
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                swarm_row = swarm_fallback.data[0] if swarm_fallback.data else None
+                if swarm_row:
+                    logger.warning(
+                        "reports.swarm_portfolio_mismatch",
+                        portfolio_id=body.portfolio_id,
+                        swarm_id=swarm_row.get("id"),
+                    )
 
             profile_result = (
                 supabase.table("user_profiles")
@@ -289,15 +352,39 @@ async def generate_report(
                 status_code=500, detail=f"Data fetch failed: {e!s}"
             ) from e
 
-        positions_raw = list(positions_result.data or [])
+        positions_raw = _normalize_positions(list(positions_result.data or []))
         if not positions_raw:
-            positions_raw = _positions_from_dna_row(existing_dna)
+            positions_raw = _normalize_positions(_positions_from_dna_row(existing_dna))
 
         if not positions_raw:
             raise HTTPException(
                 status_code=404,
                 detail="No positions found for this portfolio.",
             )
+
+        # FIX 3: parse alpha_signal JSON string into structured list before PDF generation
+        if swarm_row:
+            import json as _json
+            alpha_raw = swarm_row.get("alpha_signal") or ""
+            if isinstance(alpha_raw, str) and alpha_raw.strip().startswith("{"):
+                try:
+                    parsed_alpha = _json.loads(alpha_raw)
+                    opps = (
+                        parsed_alpha.get("opportunities")
+                        or parsed_alpha.get("alpha_opportunities", {}).get("opportunities")
+                        or []
+                    )
+                    swarm_row["alpha_signal_parsed"] = opps if isinstance(opps, list) else []
+                    swarm_row["alpha_signal"] = "\n".join(
+                        f"{o.get('symbol', '')}: {str(o.get('reason', ''))[:120]}"
+                        for o in (swarm_row["alpha_signal_parsed"])[:3]
+                    )
+                except Exception:
+                    swarm_row["alpha_signal_parsed"] = []
+            elif isinstance(alpha_raw, list):
+                swarm_row["alpha_signal_parsed"] = alpha_raw
+            else:
+                swarm_row["alpha_signal_parsed"] = []
 
         try:
             metrics = calculate_portfolio_metrics(positions_raw)
@@ -330,12 +417,18 @@ async def generate_report(
             "report_run_id": run_id,
         }
 
+        # FIX 5: single source of truth for total_value across all PDF sections
+        total_value_final = float(
+            portfolio.get("total_value")
+            or metrics.get("total_value")
+            or sum(float(p.get("value") or 0) for p in positions_raw)
+            or 0
+        )
+
         portfolio_payload = {
             "name": portfolio.get("name") or "Portfolio Analysis",
-            "total_value": float(
-                portfolio.get("total_value") or metrics.get("total_value") or 0
-            ),
-            "metrics": metrics,
+            "total_value": total_value_final,
+            "metrics": {**metrics, "total_value": total_value_final},
             # Raw positions with cost_basis — used by _build_report_context to
             # synthesize tax estimates when DNA tax_analysis is not available.
             "positions_with_basis": positions_raw,

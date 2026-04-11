@@ -162,6 +162,7 @@ def _empty_swarm_norm() -> dict[str, Any]:
         "tax_recommendation": {},
         "risk_sentinel": {},
         "alpha_signal": {},
+        "alpha_signal_parsed": [],
         "macro_advice": {},
         "agent_trace": [],
         "regime": None,
@@ -262,6 +263,7 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
         "tax_recommendation": (inv.get("tax_recommendation") or row.get("tax_recommendation") or {}),
         "risk_sentinel": (inv.get("risk_sentinel") or row.get("risk_sentinel") or {}),
         "alpha_signal": (inv.get("alpha_signal") or row.get("alpha_signal") or {}),
+        "alpha_signal_parsed": row.get("alpha_signal_parsed") or [],
         "macro_advice": (inv.get("macro_advice") or row.get("macro_advice") or {}),
         "agent_trace": agent_trace_list,
         "regime": inv.get("regime") or row.get("regime"),
@@ -816,8 +818,28 @@ def _build_report_context(
         or s.get("alpha_outlook")
         or ""
     )
+    # Use structured parsed opps when available (set by reports.py FIX 3)
+    alpha_signal_parsed: list = s.get("alpha_signal_parsed") or []
     alpha_opps: list[dict] = []
-    if alpha_signal_text:
+    if alpha_signal_parsed:
+        for opp in alpha_signal_parsed[:5]:
+            if not isinstance(opp, dict):
+                continue
+            symbol = str(opp.get("symbol") or "")
+            reason = str(opp.get("reason") or "")
+            raw_conf = opp.get("confidence", 0.65)
+            try:
+                cf = float(raw_conf)
+                conf_str = f"{int(cf * 100) if cf <= 1 else int(cf)}%"
+            except (TypeError, ValueError):
+                conf_str = str(raw_conf)
+            alpha_opps.append({
+                "title": f"Alpha Scout: {symbol}" if symbol else "Alpha Scout Signal",
+                "description": reason,
+                "confidence": conf_str,
+                "regime": regime_label or "All regimes",
+            })
+    elif alpha_signal_text and not isinstance(alpha_signal_text, dict):
         alpha_opps.append({
             "title": "Alpha Scout Signal",
             "description": str(alpha_signal_text)[:200],
@@ -1008,12 +1030,8 @@ def _page_executive_memo(ctx: dict, s: dict, cw: float, bc: "ICBrand") -> list:
     if ctx.get("strengths"):
         items.append(Paragraph("KEY SUPPORTING FACTORS", s["h3"]))
         for strength in ctx["strengths"][:3]:
-            # Truncate to first sentence, then cap at 100 chars to prevent overflow
-            sentence = (strength.split(".")[0] + ".") if "." in strength else strength
-            if len(sentence) > 100:
-                sentence = sentence[:97] + "..."
             items.append(Paragraph(
-                f'<font color="{_html_hex(bc.SUCCESS)}">▶</font>  {_xml(sentence)}',
+                f'<font color="{_html_hex(bc.SUCCESS)}">▶</font>  {_xml(strength)}',
                 s["body"],
             ))
         items.append(Spacer(1, 10))
@@ -1047,10 +1065,9 @@ def _page_executive_memo(ctx: dict, s: dict, cw: float, bc: "ICBrand") -> list:
     if ctx.get("weaknesses"):
         items.append(Paragraph("PRIMARY RISK TO THESIS", s["h3"]))
         risk = ctx["weaknesses"][0]
-        risk_sentence = (risk.split(".")[0] + ".") if "." in risk else risk[:120]
         risk_t = Table(
             [[Paragraph(
-                f'<font color="{_html_hex(bc.AMBER)}">⚠  </font>{_xml(risk_sentence)}',
+                f'<font color="{_html_hex(bc.AMBER)}">⚠  </font>{_xml(risk)}',
                 s["body"],
             )]],
             colWidths=[cw],
@@ -1588,16 +1605,15 @@ def _build_pdf_sync(
     elems.append(Spacer(1, 10))
     elems.append(Paragraph("<b>Strengths</b>", styles["h_section"]))
     for s in strengths:
-        # First sentence only, capped at 150 chars to prevent column overflow
-        sentence = (s.split(".")[0] + ".") if "." in s else s
-        sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-        elems.append(Paragraph(f"✓ {_xml(sentence)}", styles["body"]))
+        elems.append(Paragraph(f"✓ {_xml(s)}", styles["body"]))
     elems.append(Spacer(1, 6))
     elems.append(Paragraph("<b>Weaknesses</b>", styles["h_section"]))
     for w in weaknesses:
-        sentence = (w.split(".")[0] + ".") if "." in w else w
-        sentence = sentence[:150] + ("..." if len(sentence) > 150 else "")
-        elems.append(Paragraph(f"⚠ {_xml(sentence)}", styles["body"]))
+        elems.append(Paragraph(
+            f"⚠ {_xml(w)}",
+            ParagraphStyle("weak_body", parent=styles["body"], fontSize=9, leading=13, leftIndent=12),
+        ))
+        elems.append(Spacer(1, 4))
     elems.append(Spacer(1, 8))
 
     # ── DETECTED BIASES — derived from weaknesses text, never a contradiction ──
