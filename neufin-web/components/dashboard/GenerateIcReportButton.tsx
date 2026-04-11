@@ -5,11 +5,7 @@ import toast from 'react-hot-toast'
 import { Loader2 } from 'lucide-react'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
-import {
-  ReportThemeModal,
-  getStoredReportTheme,
-  type ReportTheme,
-} from '@/components/dashboard/ReportThemeModal'
+import { getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
 
 type Props = {
   portfolioId: string | null | undefined
@@ -27,12 +23,7 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
       return
     }
 
-    // Check for stored theme preference first
     const resolvedTheme = theme ?? getStoredReportTheme()
-    if (!resolvedTheme) {
-      setShowThemeModal(true)
-      return
-    }
 
     try {
       setLoading(true)
@@ -111,15 +102,6 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
 
   return (
     <>
-      {showThemeModal && (
-        <ReportThemeModal
-          onSelect={(theme) => {
-            setShowThemeModal(false)
-            void run(theme)
-          }}
-          onClose={() => setShowThemeModal(false)}
-        />
-      )}
       <button
         type="button"
         onClick={() => void run()}

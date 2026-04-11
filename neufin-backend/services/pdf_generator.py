@@ -2,8 +2,8 @@
 NeuFin Portfolio Intelligence Report — v2
 
 Bank-grade IC PDF, 11 pages, two themes.
-  dark  — fintech dark (#0B0F14 background), default
-  white — classic institutional (#FFFFFF), print-friendly
+  light — classic institutional (#FFFFFF background), default
+  dark  — fintech dark (#0B0F14 background)
 
 Orchestration
 ─────────────
@@ -101,7 +101,8 @@ CHART_COLORS = [
 
 def _palette(theme: str) -> dict:
     """Return the full color palette for the given theme."""
-    dark = (theme != "white")
+    use_light = theme in ("white", "light")
+    dark = not use_light
     return {
         "theme":    theme,
         "bg":       DARK_BG       if dark else WHITE_BG,
@@ -147,17 +148,17 @@ def _styles(p: dict) -> dict:
     T = p["teal"]
 
     return {
-        "h1":     ps("h1",  fontName="Helvetica-Bold",    fontSize=15, textColor=W, leading=19),
-        "h2":     ps("h2",  fontName="Helvetica-Bold",    fontSize=12, textColor=W, leading=16),
-        "h3":     ps("h3",  fontName="Helvetica-Bold",    fontSize=10, textColor=T, leading=13, spaceAfter=3),
-        "body":   ps("bd",  fontName="Helvetica",         fontSize=9,  textColor=B, leading=13),
-        "body_b": ps("bdb", fontName="Helvetica-Bold",    fontSize=9,  textColor=B, leading=13),
-        "body_sm":ps("bsm", fontName="Helvetica",         fontSize=8,  textColor=B, leading=11),
-        "muted":  ps("mt",  fontName="Helvetica-Oblique", fontSize=8,  textColor=M, leading=11),
+        "h1":     ps("h1",  fontName="Helvetica-Bold",    fontSize=18, textColor=W, leading=22),
+        "h2":     ps("h2",  fontName="Helvetica-Bold",    fontSize=14, textColor=W, leading=18),
+        "h3":     ps("h3",  fontName="Helvetica-Bold",    fontSize=12, textColor=T, leading=15, spaceAfter=3),
+        "body":   ps("bd",  fontName="Helvetica",         fontSize=11, textColor=B, leading=15),
+        "body_b": ps("bdb", fontName="Helvetica-Bold",    fontSize=11, textColor=B, leading=15),
+        "body_sm":ps("bsm", fontName="Helvetica",         fontSize=9,  textColor=B, leading=12),
+        "muted":  ps("mt",  fontName="Helvetica-Oblique", fontSize=9,  textColor=M, leading=12),
         "muted8": ps("m8",  fontName="Helvetica",         fontSize=8,  textColor=M, leading=10),
-        "label":  ps("lb",  fontName="Helvetica-Bold",    fontSize=7,  textColor=M, leading=10),
-        "center": ps("cn",  fontName="Helvetica",         fontSize=9,  textColor=B, leading=13, alignment=TA_CENTER),
-        "center_b":ps("cnb",fontName="Helvetica-Bold",    fontSize=9,  textColor=W, leading=13, alignment=TA_CENTER),
+        "label":  ps("lb",  fontName="Helvetica-Bold",    fontSize=8,  textColor=M, leading=10),
+        "center": ps("cn",  fontName="Helvetica",         fontSize=11, textColor=B, leading=15, alignment=TA_CENTER),
+        "center_b":ps("cnb",fontName="Helvetica-Bold",    fontSize=11, textColor=W, leading=15, alignment=TA_CENTER),
         "amber_warn": ps("aw", fontName="Helvetica-Bold", fontSize=9,  textColor=ACCENT_AMBER, leading=13),
         "red_warn":   ps("rw", fontName="Helvetica-Bold", fontSize=9,  textColor=ACCENT_RED,   leading=13),
         "green_ok":   ps("go", fontName="Helvetica-Bold", fontSize=9,  textColor=ACCENT_GREEN, leading=13),
@@ -202,7 +203,7 @@ def _quality_check(ctx: dict) -> list[str]:
     dna_score = int(ctx.get("dna_score") or 0)
     if dna_score == 0:
         warnings.append(
-            "⚠  DNA score is 0 — behavioral assessment may be incomplete. "
+            "⚠  DNA score is 0 - behavioral assessment may be incomplete. "
             "Re-run DNA analysis for full archetype classification."
         )
 
@@ -595,6 +596,13 @@ def _build_report_context(
         d.get("weighted_beta") or thesis_obj.get("weighted_beta")
         or s.get("weighted_beta") or m.get("weighted_beta") or 0
     )
+    if weighted_beta > 5:
+        logger.info(
+            "pdf.weighted_beta_capped",
+            raw_beta=weighted_beta,
+            capped=min(weighted_beta, 3.0),
+        )
+        weighted_beta = min(weighted_beta, 3.0)
     avg_corr = float(d.get("avg_correlation") or m.get("avg_correlation") or 0)
     hhi_raw  = float(
         (d.get("score_breakdown") or {}).get("hhi_concentration")
@@ -747,8 +755,8 @@ def _build_report_context(
         recs.append({
             "priority": "HIGH",
             "action": f"Harvest losses in {', '.join(harvest_syms[:3])} (${total_harvest_opp:,.0f} opportunity)",
-            "rationale": f"Tax efficiency — est. ${total_harvest_opp * 5:,.0f} 5-year after-tax benefit",
-            "timeline": "Immediate — before year-end",
+            "rationale": f"Tax efficiency - est. ${total_harvest_opp * 5:,.0f} 5-year after-tax benefit",
+            "timeline": "Immediate - before year-end",
         })
     recs.append({
         "priority": "MEDIUM",
@@ -845,7 +853,7 @@ def _build_report_context(
                 f"Priority: {', '.join(harvest_syms[:3])}."
             ),
             "confidence": "95%",
-            "regime": "All regimes — time-sensitive",
+            "regime": "All regimes - time-sensitive",
         })
     if not alpha_opps:
         alpha_opps.append({
@@ -947,7 +955,7 @@ def _generate_emergency_pdf(
     message: str, advisor_config: dict, pal: dict | None = None
 ) -> bytes:
     if pal is None:
-        pal = _palette("dark")
+        pal = _palette("light")
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             rightMargin=MARGIN, leftMargin=MARGIN,
@@ -969,6 +977,94 @@ def _generate_emergency_pdf(
     ]
     doc.build(story)
     return buffer.getvalue()
+
+
+def build_swarm_ic_export_pdf(swarm_row: dict) -> bytes:
+    """
+    Compact NeuFin-branded PDF export of a Swarm IC row (professional light theme).
+    Intended for trial / paid users; gating lives on the HTTP route.
+    """
+    norm = _normalize_swarm(swarm_row)
+    thesis = norm.get("investment_thesis") or {}
+    if not isinstance(thesis, dict):
+        thesis = {}
+
+    pal = _palette("light")
+    st = _styles(pal)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        rightMargin=MARGIN,
+        leftMargin=MARGIN,
+        topMargin=MARGIN,
+        bottomMargin=MARGIN,
+    )
+    story: list = []
+    story.append(Paragraph("<b>NEUFIN</b> &nbsp;|&nbsp; Swarm IC Analysis", st["h1"]))
+    story.append(Paragraph(_xml("Confidential research export"), st["muted"]))
+    story.append(Spacer(1, 14))
+
+    hl = str(swarm_row.get("headline") or norm.get("headline") or "")
+    if hl:
+        story.append(Paragraph(_xml(hl), st["h2"]))
+        story.append(Spacer(1, 8))
+
+    br = str(swarm_row.get("briefing") or "")
+    if br:
+        story.append(Paragraph("<b>IC briefing</b>", st["h3"]))
+        story.append(Paragraph(_xml(br), st["body"]))
+        story.append(Spacer(1, 10))
+
+    inv_txt = str(thesis.get("briefing") or thesis.get("body") or "")
+    if inv_txt:
+        story.append(Paragraph("<b>Investment thesis</b>", st["h3"]))
+        story.append(Paragraph(_xml(inv_txt), st["body"]))
+        story.append(Spacer(1, 10))
+
+    qraw = norm.get("quant_analysis") or thesis.get("quant_analysis")
+    if isinstance(qraw, dict):
+        qa = json.dumps(qraw, default=str)[:8000]
+    elif qraw:
+        qa = str(qraw)[:8000]
+    else:
+        qa = ""
+    if qa:
+        story.append(PageBreak())
+        story.append(Paragraph("<b>Quantitative analysis</b>", st["h3"]))
+        story.append(Paragraph(_xml(qa), st["body_sm"]))
+        story.append(Spacer(1, 8))
+
+    rec = str(norm.get("recommendation_summary") or swarm_row.get("recommendation_summary") or "")
+    if rec:
+        story.append(Paragraph("<b>Recommendations</b>", st["h3"]))
+        story.append(Paragraph(_xml(rec), st["body"]))
+        story.append(Spacer(1, 8))
+
+    alpha = norm.get("alpha_signal") or swarm_row.get("alpha_signal")
+    if alpha and not isinstance(alpha, dict):
+        story.append(Paragraph("<b>Alpha & opportunities</b>", st["h3"]))
+        story.append(Paragraph(_xml(str(alpha)[:6000]), st["body"]))
+        story.append(Spacer(1, 8))
+
+    macro = str(norm.get("macro_advice") or swarm_row.get("macro_advice") or "")
+    if macro:
+        story.append(Paragraph("<b>Macro view</b>", st["h3"]))
+        story.append(Paragraph(_xml(macro), st["body"]))
+
+    story.append(Spacer(1, 16))
+    story.append(
+        Paragraph(
+            _xml(
+                "Generated by NeuFin Swarm IC. Not investment advice. "
+                "Market data from licensed vendors; AI synthesis via Anthropic Claude."
+            ),
+            st["muted8"],
+        )
+    )
+
+    doc.build(story)
+    return buf.getvalue()
 
 
 # ─── PAGE CALLBACKS (canvas-level) ────────────────────────────────────────────
@@ -1342,7 +1438,7 @@ def _page_portfolio_snapshot(
             ),
         )
     else:
-        chart_img = _donut_chart_image(labels_p, vals_p, pal, width=210, height=170)
+        chart_img = _donut_chart_image(labels_p, vals_p, pal, width=248, height=200)
         if chart_img is None:
             # Fallback: horizontal bar chart as a Table
             bar_rows = []
@@ -2435,7 +2531,7 @@ def _build_pdf_sync(
     advisor_config: dict,
     logo_bytes: bytes | None,
     swarm_data_present: bool,
-    theme: str = "dark",
+    theme: str = "light",
 ) -> bytes:
     pal = _palette(theme)
     st  = _styles(pal)
@@ -2556,7 +2652,7 @@ async def generate_advisor_report(
     dna_data: dict,
     swarm_data: Any | None,
     advisor_config: dict,
-    theme: str = "dark",
+    theme: str = "light",
 ) -> bytes:
     """
     Async orchestrator: fetch logo → normalize swarm → synchronous PDF build.
@@ -2566,7 +2662,7 @@ async def generate_advisor_report(
         dna_data:        dict with keys: dna_score, investor_type, strengths, weaknesses, …
         swarm_data:      raw swarm_reports row or None
         advisor_config:  dict with keys: advisor_name, firm_name, logo_url, …
-        theme:           "dark" (default fintech look) or "white" (institutional)
+        theme:           "light" (default, institutional) or "white" (alias) or "dark"
 
     Returns:
         Raw PDF bytes.
@@ -2670,14 +2766,16 @@ if __name__ == "__main__":
     }
 
     async def _run():
-        for theme in ("dark", "white"):
+        out_dir = Path(tempfile.gettempdir())
+        for theme, fname in (
+            ("light", out_dir / "report_light.pdf"),
+            ("dark", out_dir / "report_dark.pdf"),
+        ):
             try:
                 data = await generate_advisor_report(
                     _PORTFOLIO, _DNA, None, _ADVISOR, theme=theme
                 )
-                fname = str(Path(tempfile.gettempdir()) / f"neufin_test_{theme}.pdf")
-                with open(fname, "wb") as f:
-                    f.write(data)
+                fname.write_bytes(data)
                 print(f"OK {theme:5s} theme  {len(data):>8,} bytes  ->  {fname}")
             except Exception as exc:
                 print(f"ERR {theme}: {exc}")

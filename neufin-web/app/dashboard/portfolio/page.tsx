@@ -12,7 +12,7 @@ import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
 import { supabase } from '@/lib/supabase'
 import PortfolioPie from '@/components/PortfolioPie'
 import ChartLab from '@/components/dashboard/ChartLab'
-import { ReportThemeModal, getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
+import { getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
 
 const STAGES = [
   { label: 'Reading your holdings...', pct: 25, sub: 'Parsing CSV rows and mapping tickers' },
@@ -104,8 +104,6 @@ export default function PortfolioPage() {
   const [step, setStep] = useState<AnalysisStep>('idle')
 
   const [swarmResult, setSwarmResult] = useState<Record<string, unknown> | null>(null)
-  const [showThemeModal, setShowThemeModal] = useState(false)
-  const [pendingTheme, setPendingTheme] = useState<ReportTheme | null>(null)
 
   // White-label config (served from advisors table via /api/profile/white-label)
   const [wlConfig, setWlConfig] = useState<{
@@ -285,12 +283,7 @@ export default function PortfolioPage() {
       return
     }
 
-    // If no theme passed and no stored preference, show the theme picker first
     const resolvedTheme = theme ?? getStoredReportTheme()
-    if (!resolvedTheme) {
-      setShowThemeModal(true)
-      return
-    }
     try {
       setDownloadLoading(true)
       const statusRes = await apiGet<{
@@ -435,15 +428,6 @@ export default function PortfolioPage() {
       {/* 3-step analysis progress indicator — always visible */}
       <StepIndicator step={step} />
 
-      {showThemeModal && (
-        <ReportThemeModal
-          onSelect={(theme) => {
-            setShowThemeModal(false)
-            void handleDownloadReport(theme)
-          }}
-          onClose={() => setShowThemeModal(false)}
-        />
-      )}
       {/* Upload zone */}
       <div
         onDrop={onDrop}

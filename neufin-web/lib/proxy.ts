@@ -10,8 +10,40 @@ try {
 } catch {
   console.error(
     `[proxy] RAILWAY_API_URL is not a valid URL: "${RAILWAY_BASE}". ` +
-    `Falling back to hardcoded Railway URL.`
+    'Falling back to hardcoded Railway URL.'
   )
+}
+
+/** Extract Supabase JWT for upstream Railway calls (header first, then cookie). */
+export function bearerTokenFromRequest(req: NextRequest): string | null {
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim() || null
+  }
+
+  const cookie = req.cookies.get('neufin-auth')?.value
+  if (!cookie) return null
+
+  try {
+    const parsed = JSON.parse(cookie)
+    const candidate: string | null = parsed?.access_token || parsed?.token || null
+    if (!candidate) return null
+    try {
+      const parts = candidate.split('.')
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+      ) as { exp?: number }
+      if (payload.exp && Date.now() / 1000 > payload.exp) {
+        console.warn('[proxy] neufin-auth cookie token is expired — no auth forwarded')
+        return null
+      }
+    } catch {
+      // Can't decode JWT — use it anyway and let Railway decide
+    }
+    return candidate
+  } catch {
+    return cookie
+  }
 }
 
 export async function proxyToRailway(
@@ -22,55 +54,12 @@ export async function proxyToRailway(
   const url = `${RAILWAY_BASE}${backendPath}`
   const m = method || req.method
 
-  // Auth token extraction — Authorization header takes priority over cookie.
-  // The Authorization header always carries the fresh Supabase session token
-  // (api-client.ts calls getSession() which auto-refreshes).
-  // The neufin-auth cookie can contain stale/expired JWTs from previous sessions,
-  // causing Railway to return 401 even when the browser has a valid token.
-  let bearerToken: string | null = null
-
-  // 1. Authorization header wins (always freshest token)
-  const authHeader = req.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ')) {
-    bearerToken = authHeader.slice(7).trim() || null
-  }
-
-  // 2. Fall back to cookie only if no Authorization header present
-  if (!bearerToken) {
-    const cookie = req.cookies.get('neufin-auth')?.value
-    if (cookie) {
-      try {
-        const parsed = JSON.parse(cookie)
-        const candidate: string | null = parsed?.access_token || parsed?.token || null
-        if (candidate) {
-          // Skip obviously-expired tokens so we fail fast with a clear error
-          // rather than forwarding a bad token and getting a confusing 401/500.
-          try {
-            const parts = candidate.split('.')
-            const payload = JSON.parse(
-              atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
-            ) as { exp?: number }
-            if (payload.exp && Date.now() / 1000 > payload.exp) {
-              console.warn('[proxy] neufin-auth cookie token is expired — no auth forwarded')
-            } else {
-              bearerToken = candidate
-            }
-          } catch {
-            // Can't decode JWT — use it anyway and let Railway decide
-            bearerToken = candidate
-          }
-        }
-      } catch {
-        // Cookie is a raw string, not JSON
-        bearerToken = cookie
-      }
-    }
-  }
+  const bearerToken = bearerTokenFromRequest(req)
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
-  if (bearerToken) headers['Authorization'] = `Bearer ${bearerToken}`
+  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`
 
   let body: string | undefined
   if (m !== 'GET' && m !== 'HEAD') {
@@ -92,6 +81,38 @@ export async function proxyToRailway(
     return NextResponse.json(data, { status: upstream.status })
   } catch (err) {
     console.error(`[proxy] ${m} ${url} failed:`, err)
+    return NextResponse.json(
+      { error: 'Upstream service unavailable', detail: String(err) },
+      { status: 502 }
+    )
+  }
+}
+
+/** POST to Railway and return binary (e.g. PDF); forwards auth only, no JSON body. */
+export async function proxyBinaryPost(
+  req: NextRequest,
+  backendPath: string,
+): Promise<NextResponse> {
+  const url = `${RAILWAY_BASE}${backendPath}`
+  const bearerToken = bearerTokenFromRequest(req)
+  const headers: Record<string, string> = {}
+  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`
+
+  try {
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers,
+      signal: AbortSignal.timeout(120000),
+    })
+    const buf = await upstream.arrayBuffer()
+    const out = new Headers()
+    const ct = upstream.headers.get('content-type')
+    if (ct) out.set('content-type', ct)
+    const cd = upstream.headers.get('content-disposition')
+    if (cd) out.set('content-disposition', cd)
+    return new NextResponse(buf, { status: upstream.status, headers: out })
+  } catch (err) {
+    console.error(`[proxy] POST ${url} failed:`, err)
     return NextResponse.json(
       { error: 'Upstream service unavailable', detail: String(err) },
       { status: 502 }

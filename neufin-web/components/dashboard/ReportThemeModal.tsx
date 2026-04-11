@@ -6,10 +6,10 @@ export type ReportTheme = 'dark' | 'light'
 
 const STORAGE_KEY = 'neufin-report-theme'
 
-export function getStoredReportTheme(): ReportTheme | null {
-  if (typeof window === 'undefined') return null
+export function getStoredReportTheme(): ReportTheme {
+  if (typeof window === 'undefined') return 'light'
   const v = localStorage.getItem(STORAGE_KEY)
-  return v === 'dark' || v === 'light' ? v : null
+  return v === 'dark' || v === 'light' ? v : 'light'
 }
 
 export function storeReportTheme(theme: ReportTheme) {

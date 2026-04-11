@@ -1,4 +1,6 @@
+import csv
 import datetime
+import io
 
 import requests
 import structlog
@@ -118,7 +120,84 @@ def _candle(symbol: str, period_days: int) -> dict | None:
         except Exception:
             logger.warning("AlphaVantage OHLC fetch failed", exc_info=True)
 
+    # ── 3. Stooq (daily CSV, no API key) ───────────────────────────────────────
+    stooq = _candle_stooq(symbol, period_days)
+    if stooq and stooq.get("c"):
+        return stooq
+
     return None
+
+
+def _candle_stooq(symbol: str, period_days: int) -> dict | None:
+    """Fallback OHLCV from Stooq daily endpoint (US listings as ``sym.us``)."""
+    raw = symbol.strip().upper().replace(".", "-")
+    key = f"{raw.lower()}.us"
+    url = f"https://stooq.com/q/d/l/?s={key}&i=d"
+    try:
+        r = requests.get(url, timeout=15.0)
+        if r.status_code != 200 or not r.text.strip():
+            return None
+        if r.text.lstrip().lower().startswith("no data"):
+            return None
+        reader = csv.DictReader(io.StringIO(r.text))
+        rows = list(reader)
+        if not rows:
+            return None
+        cutoff = datetime.datetime.utcnow().date() - datetime.timedelta(days=period_days)
+        t_list: list[int] = []
+        o_list: list[float] = []
+        h_list: list[float] = []
+        l_list: list[float] = []
+        c_list: list[float] = []
+        v_list: list[int] = []
+        for row in rows:
+            ds = row.get("Date") or row.get("date")
+            if not ds:
+                continue
+            try:
+                d_only = datetime.date.fromisoformat(str(ds)[:10])
+            except ValueError:
+                continue
+            if d_only < cutoff:
+                continue
+            try:
+                o_ = float(row.get("Open") or row.get("open") or 0)
+                h_ = float(row.get("High") or row.get("high") or 0)
+                l_ = float(row.get("Low") or row.get("low") or 0)
+                c_ = float(row.get("Close") or row.get("close") or 0)
+            except (TypeError, ValueError):
+                continue
+            if c_ <= 0:
+                continue
+            vol_raw = row.get("Volume") or row.get("volume") or "0"
+            try:
+                v_ = int(float(vol_raw))
+            except (TypeError, ValueError):
+                v_ = 0
+            ts = int(
+                datetime.datetime(
+                    d_only.year, d_only.month, d_only.day, tzinfo=datetime.UTC
+                ).timestamp()
+            )
+            t_list.append(ts)
+            o_list.append(o_)
+            h_list.append(h_)
+            l_list.append(l_)
+            c_list.append(c_)
+            v_list.append(v_)
+        if not c_list:
+            return None
+        return {
+            "t": t_list,
+            "o": o_list,
+            "h": h_list,
+            "l": l_list,
+            "c": c_list,
+            "v": v_list,
+        }
+    except Exception:
+        logger.warning("stooq.candle_failed", symbol=symbol, exc_info=True)
+        return None
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
@@ -496,7 +575,7 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
             candle["l"],
             candle["c"],
             candle.get("v", [0] * len(candle["c"])),
-            strict=False,
+            strict=True,
         )
     ]
     return {"symbol": symbol.upper(), "period": period, "data": data}

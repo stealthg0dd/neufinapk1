@@ -72,7 +72,7 @@ class ReportRequest(BaseModel):
     advisor_logo_url: str | None = None
     advisor_email: str = "info@neufin.ai"
     white_label: bool = False
-    theme: str = "dark"  # "dark" (default) | "light" (white background, print-friendly)
+    theme: str = "light"  # "light" (default, institutional) | "dark" (fintech)
     inline_pdf: bool = False
 
 
@@ -424,10 +424,7 @@ async def generate_report(
             try:
                 adv_result = (
                     supabase.table("advisors")
-                    .select(
-                        "advisor_name, firm_name, logo_base64, "
-                        "white_label, brand_color"
-                    )
+                    .select("advisor_name, firm_name, logo_base64, white_label")
                     .eq("id", str(user.id))
                     .limit(1)
                     .execute()
@@ -505,7 +502,7 @@ async def generate_report(
             "brand_colors": (
                 body.color_scheme.model_dump()
                 if body.color_scheme
-                else {"primary": adv.get("brand_color", "#1EB8CC")}
+                else {"primary": profile.get("brand_primary_color") or "#1EB8CC"}
             ),
             "white_label": (
                 body.white_label or bool(adv.get("white_label")) or False

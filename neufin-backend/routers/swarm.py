@@ -13,6 +13,7 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 # ── Prompt injection patterns ─────────────────────────────────────────────────
@@ -50,6 +51,7 @@ def _sanitize_message(message: str) -> str | None:
 
 
 from database import supabase  # noqa: E402
+from routers.reports import can_download_report_free  # noqa: E402
 from services.agent_swarm import chat_with_swarm, run_swarm  # noqa: E402
 from services.ai_router import get_ai_analysis  # noqa: E402
 from services.auth_dependency import (  # noqa: E402
@@ -63,6 +65,7 @@ from services.market_cache import (  # noqa: E402
     get_swarm_job,
     update_swarm_job,
 )
+from services.pdf_generator import build_swarm_ic_export_pdf  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
@@ -862,3 +865,54 @@ Return ONLY valid JSON (no markdown fences):
             "recommended_action": action,
         },
     }
+
+
+@router.post("/export-pdf")
+async def export_swarm_analysis_pdf(user: JWTUser = Depends(get_current_user)):
+    """
+    Export the user's latest Swarm IC row as a compact NeuFin PDF (light theme).
+    Gated like advisor reports: active trial or paid advisor/enterprise tier.
+    """
+    uid = str(user.id)
+    if not await can_download_report_free(uid):
+        raise HTTPException(
+            status_code=403,
+            detail="Swarm PDF export requires an active trial or Advisor subscription.",
+        )
+
+    try:
+        res = (
+            supabase.table("swarm_reports")
+            .select(
+                "headline,briefing,investment_thesis,regime,quant_analysis,"
+                "alpha_signal,recommendation_summary,macro_advice,risk_sentinel"
+            )
+            .eq("user_id", uid)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("swarm.export_pdf_query_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Could not load Swarm analysis.") from exc
+
+    if not res.data:
+        raise HTTPException(
+            status_code=404,
+            detail="No Swarm IC analysis found. Run Swarm from the portfolio or IC page first.",
+        )
+
+    row = res.data[0]
+    try:
+        pdf_bytes = build_swarm_ic_export_pdf(row)
+    except Exception as exc:
+        logger.error("swarm.export_pdf_build_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not build PDF.") from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="neufin-swarm-ic-export.pdf"',
+        },
+    )

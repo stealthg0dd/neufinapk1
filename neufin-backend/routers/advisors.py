@@ -53,7 +53,8 @@ async def get_advisor_by_share_token(share_token: str):
         result = (
             supabase.table("user_profiles")
             .select(
-                "id, advisor_name, firm_name, calendar_link, logo_base64, brand_color, white_label, subscription_tier"
+                "id, advisor_name, firm_name, calendar_link, logo_base64, "
+                "brand_primary_color, white_label, subscription_tier"
             )
             .eq("id", user_id)
             .single()
@@ -62,10 +63,11 @@ async def get_advisor_by_share_token(share_token: str):
     except Exception:
         raise HTTPException(404, "Advisor profile not found.") from None
 
-    data = result.data
+    data = dict(result.data or {})
     if not data or not data.get("advisor_name"):
         raise HTTPException(404, "Advisor profile not found.")
 
+    data["brand_color"] = data.get("brand_primary_color") or "#1A56DB"
     return data
 
 
@@ -76,7 +78,8 @@ async def get_advisor_profile(advisor_id: str):
         result = (
             supabase.table("user_profiles")
             .select(
-                "id, advisor_name, firm_name, calendar_link, logo_base64, brand_color, white_label, subscription_tier"
+                "id, advisor_name, firm_name, calendar_link, logo_base64, "
+                "brand_primary_color, white_label, subscription_tier"
             )
             .eq("id", advisor_id)
             .single()
@@ -88,7 +91,9 @@ async def get_advisor_profile(advisor_id: str):
     if not result.data:
         raise HTTPException(404, "Advisor not found.")
 
-    return result.data
+    out = dict(result.data)
+    out["brand_color"] = out.get("brand_primary_color") or "#1A56DB"
+    return out
 
 
 @router.put("/me")
@@ -104,7 +109,6 @@ async def upsert_advisor_profile(
         "firm_name": body.firm_name,
         "calendar_link": body.calendar_link or "",
         "logo_base64": body.logo_base64,
-        "brand_color": body.brand_color,
         "white_label": body.white_label,
     }
     profile_row = {
@@ -113,7 +117,6 @@ async def upsert_advisor_profile(
         "firm_name": body.firm_name,
         "calendar_link": body.calendar_link,
         "logo_base64": body.logo_base64,
-        "brand_color": body.brand_color,
         "white_label": body.white_label,
         "white_label_enabled": body.white_label,
         "brand_primary_color": body.brand_color,

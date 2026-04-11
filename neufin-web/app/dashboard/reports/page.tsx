@@ -5,11 +5,7 @@ import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
-import {
-  ReportThemeModal,
-  getStoredReportTheme,
-  type ReportTheme,
-} from '@/components/dashboard/ReportThemeModal'
+import { getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
 
 interface ReportRecord {
   id: string
@@ -26,8 +22,6 @@ export default function DashboardReportsPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pendingReport, setPendingReport] = useState<ReportRecord | null>(null)
-
   useEffect(() => {
     void loadReports()
   }, [])
@@ -68,12 +62,7 @@ export default function DashboardReportsPage() {
       return
     }
 
-    // Check theme preference before generating
     const resolvedTheme = theme ?? getStoredReportTheme()
-    if (!resolvedTheme) {
-      setPendingReport(report)
-      return
-    }
 
     setGenerating(report.id)
     try {
@@ -144,16 +133,6 @@ export default function DashboardReportsPage() {
 
   return (
     <div className="rounded-xl border border-border/50 bg-surface p-6">
-      {pendingReport && (
-        <ReportThemeModal
-          onSelect={(theme) => {
-            const r = pendingReport
-            setPendingReport(null)
-            void downloadReport(r, theme)
-          }}
-          onClose={() => setPendingReport(null)}
-        />
-      )}
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-foreground">IC Reports &amp; Memos</h1>

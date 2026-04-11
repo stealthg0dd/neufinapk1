@@ -28,7 +28,12 @@ MAX_LOGO_BYTES = 5 * 1024 * 1024
 
 
 def _advisors_merge(user_id: str, patch: dict) -> None:
-    """Read-modify-write merge into advisors so partial updates do not null columns."""
+    """Read-modify-write merge into advisors so partial updates do not null columns.
+
+    Brand color is stored on ``user_profiles.brand_primary_color`` only; many
+    production DBs do not yet have ``advisors.brand_color`` (PostgREST PGRST204).
+    """
+    patch = {k: v for k, v in patch.items() if k != "brand_color"}
     try:
         ex = supabase.table("advisors").select("*").eq("id", user_id).limit(1).execute()
         base = dict(ex.data[0]) if ex.data else {}
@@ -40,14 +45,15 @@ def _advisors_merge(user_id: str, patch: dict) -> None:
         "firm_name": base.get("firm_name") or "",
         "advisor_name": base.get("advisor_name") or "",
         "white_label": bool(base.get("white_label")),
-        "brand_color": base.get("brand_color") or "#1EB8CC",
         "logo_base64": base.get("logo_base64"),
     }
+    merged.pop("brand_color", None)
     for k, v in patch.items():
         if k == "white_label" or v is not None:
             merged[k] = v
     if "logo_base64" not in patch and merged.get("logo_base64") is None:
         merged.pop("logo_base64", None)
+    merged.pop("brand_color", None)
     supabase.table("advisors").upsert(merged, on_conflict="id").execute()
 
 
@@ -90,6 +96,8 @@ async def complete_onboarding(
         profile_updates["advisor_email"] = body.advisor_email
     if body.firm_name is not None:
         profile_updates["firm_name"] = body.firm_name
+    if body.brand_color is not None:
+        profile_updates["brand_primary_color"] = body.brand_color or "#1EB8CC"
 
     try:
         supabase.table("user_profiles").update(profile_updates).eq("id", uid).execute()
@@ -102,7 +110,6 @@ async def complete_onboarding(
             "firm_name": body.firm_name or "",
             "advisor_name": body.advisor_name or "",
             "white_label": bool(body.white_label),
-            "brand_color": body.brand_color or "#1EB8CC",
         }
         if body.logo_base64:
             patch["logo_base64"] = body.logo_base64
@@ -131,10 +138,11 @@ async def get_white_label(user: JWTUser = Depends(get_current_user)):
     uid = str(user.id)
     advisor_email = ""
     firm_logo_url = ""
+    rowp: dict = {}
     try:
         pr = (
             supabase.table("user_profiles")
-            .select("advisor_email,firm_logo_url")
+            .select("advisor_email,firm_logo_url,brand_primary_color")
             .eq("id", uid)
             .limit(1)
             .execute()
@@ -146,10 +154,12 @@ async def get_white_label(user: JWTUser = Depends(get_current_user)):
     except Exception as exc:
         logger.debug("profile.user_profile_read_failed", error=str(exc))
 
+    profile_brand = rowp.get("brand_primary_color") or "#1EB8CC"
+
     try:
         result = (
             supabase.table("advisors")
-            .select("firm_name,advisor_name,logo_base64,white_label,brand_color")
+            .select("firm_name,advisor_name,logo_base64,white_label")
             .eq("id", uid)
             .limit(1)
             .execute()
@@ -161,10 +171,10 @@ async def get_white_label(user: JWTUser = Depends(get_current_user)):
             "firm_name": None,
             "advisor_name": None,
             "logo_base64": None,
-            "brand_color": "#1EB8CC",
+            "brand_color": profile_brand,
             "firm_logo_url": firm_logo_url,
             "advisor_email": advisor_email,
-            "brand_primary_color": "#1EB8CC",
+            "brand_primary_color": profile_brand,
         }
 
     if not result.data:
@@ -173,23 +183,22 @@ async def get_white_label(user: JWTUser = Depends(get_current_user)):
             "firm_name": None,
             "advisor_name": None,
             "logo_base64": None,
-            "brand_color": "#1EB8CC",
+            "brand_color": profile_brand,
             "firm_logo_url": firm_logo_url,
             "advisor_email": advisor_email,
-            "brand_primary_color": "#1EB8CC",
+            "brand_primary_color": profile_brand,
         }
 
     row = result.data[0]
-    bc = row.get("brand_color") or "#1EB8CC"
     return {
         "white_label_enabled": bool(row.get("white_label")),
         "firm_name": row.get("firm_name"),
         "advisor_name": row.get("advisor_name"),
         "logo_base64": row.get("logo_base64"),
-        "brand_color": bc,
+        "brand_color": profile_brand,
         "firm_logo_url": firm_logo_url,
         "advisor_email": advisor_email,
-        "brand_primary_color": bc,
+        "brand_primary_color": profile_brand,
     }
 
 
@@ -220,9 +229,6 @@ async def update_branding(
         adv_patch["advisor_name"] = body.advisor_name
     if body.white_label_enabled is not None:
         adv_patch["white_label"] = body.white_label_enabled
-    if body.brand_primary_color is not None:
-        adv_patch["brand_color"] = body.brand_primary_color
-
     if not prof and not adv_patch:
         raise HTTPException(status_code=400, detail="No fields supplied to update.")
 

@@ -785,6 +785,7 @@ export default function SwarmPage() {
   const [failedTickers,   setFailedTickers]   = useState<string[]>([])
   const [positions,       setPositions]       = useState<SwarmPosition[]>([])
   const [totalValue,      setTotalValue]      = useState(0)
+  const [exportingPdf,    setExportingPdf]    = useState(false)
   const thesis = (result?.investment_thesis ?? result) as Record<string, any> | null
   const isRunning = jobStatus === 'queued' || jobStatus === 'running'
 
@@ -1003,6 +1004,41 @@ export default function SwarmPage() {
     }
   }
 
+  async function exportSwarmPdf() {
+    if (!user) {
+      setToast('Sign in to export PDF')
+      return
+    }
+    setExportingPdf(true)
+    try {
+      const res = await apiFetch('/api/swarm/export-pdf', { method: 'POST' })
+      if (!res.ok) {
+        let msg = `Export failed (${res.status})`
+        try {
+          const j = (await res.json()) as { detail?: string }
+          if (j?.detail) msg = String(j.detail)
+        } catch {
+          /* non-JSON body */
+        }
+        setToast(msg)
+        return
+      }
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = 'neufin-swarm-ic-export.pdf'
+      a.click()
+      URL.revokeObjectURL(href)
+      setToast('PDF downloaded')
+    } catch (e) {
+      console.error('[swarm] PDF export:', e)
+      setToast('Export failed')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   useEffect(() => {
     if (jobStatus !== 'complete' || !result) return
     const swarmDurationMs = perfTimer.end('swarm') ?? 0
@@ -1074,6 +1110,21 @@ export default function SwarmPage() {
               ])}
             />
           </Suspense>
+          {user && (
+            <button
+              type="button"
+              onClick={() => void exportSwarmPdf()}
+              disabled={exportingPdf}
+              className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest border transition-all disabled:opacity-40"
+              style={{
+                background: 'transparent',
+                color:       '#94a3b8',
+                borderColor: '#334155',
+              }}
+            >
+              {exportingPdf ? 'Exporting...' : 'Export PDF'}
+            </button>
+          )}
           {thesis && (
             <button
               onClick={() => setChatOpen(o => !o)}
