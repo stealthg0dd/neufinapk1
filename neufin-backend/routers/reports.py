@@ -252,7 +252,7 @@ async def generate_report(
                 supabase.table("swarm_reports")
                 .select(
                     "id,user_id,created_at,headline,regime,risk_sentinel,"
-                    "investment_thesis,market_regime,quant_analysis,tax_report,"
+                    "investment_thesis,market_regime,quant_analysis,"
                     "alpha_scout,action_plan,agent_trace"
                 )
                 .eq("user_id", user.id)
