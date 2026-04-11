@@ -328,7 +328,7 @@ export interface AdvisorProfile {
 
 export interface WhiteLabelReportRequest {
   portfolio_id: string
-  advisor_id: string
+  advisor_id?: string   // optional — backend defaults to authenticated user
   advisor_name?: string
   logo_base64?: string | null
   color_scheme?: { primary: string; secondary: string; accent: string } | null
@@ -468,18 +468,19 @@ export async function getAdvisorReports(
 
 export async function generateWhiteLabelReport(
   body: WhiteLabelReportRequest,
-  token?: string | null
 ): Promise<{ report_id: string | null; pdf_url: string | null; pdf_size_bytes: number; pages: number }> {
-  const res = await fetch('/api/reports/generate', {
+  // Use apiFetch so getSession() auto-refreshes the token before every request.
+  // The old raw fetch() with a passed-in token could silently send an expired JWT.
+  const { apiFetch: _apiFetch } = await import('./api-client')
+  const res = await _apiFetch('/api/reports/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || 'White-label PDF generation failed')
+    throw new Error((err as { detail?: string }).detail || 'White-label PDF generation failed')
   }
-  return res.json()
+  return res.json() as Promise<{ report_id: string | null; pdf_url: string | null; pdf_size_bytes: number; pages: number }>
 }
 
 // ── Vault ──────────────────────────────────────────────────────────────────────

@@ -37,7 +37,6 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
           method: 'POST',
           body: JSON.stringify({
             portfolio_id: portfolioId,
-            advisor_id: 'self',
             advisor_name: 'NeuFin',
           }),
         })
@@ -51,19 +50,29 @@ export function GenerateIcReportButton({ portfolioId, className, children }: Pro
         }
         const data = (await res.json()) as {
           pdf_url?: string
-          url?: string
-          download_url?: string
-          report_url?: string
+          pdf_base64?: string
+          filename?: string
           checkout_url?: string
         }
         if (data.checkout_url) {
           window.location.href = data.checkout_url
           return
         }
-        const pdfUrl =
-          data.pdf_url || data.url || data.download_url || data.report_url || null
+        const pdfUrl = data.pdf_url || null
         if (pdfUrl) {
           window.open(pdfUrl, '_blank')
+          toast.success('Report ready')
+        } else if (data.pdf_base64) {
+          const bytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0))
+          const blob = new Blob([bytes], { type: 'application/pdf' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = data.filename || `neufin-report.pdf`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
           toast.success('Report ready')
         } else {
           toast.error('Report URL unavailable. Try again.')

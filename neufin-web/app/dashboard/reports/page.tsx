@@ -1,46 +1,133 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { cookies } from 'next/headers'
-import { GenerateIcReportButton } from '@/components/dashboard/GenerateIcReportButton'
+import { Loader2 } from 'lucide-react'
+import { apiFetch, apiGet } from '@/lib/api-client'
+import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
+import { apiPost } from '@/lib/api-client'
 
-type VaultReport = {
+interface ReportRecord {
   id: string
-  portfolio_id?: string | null
-  portfolio_name?: string
-  created_at?: string
-  pdf_url?: string | null
+  portfolio_id: string | null
+  portfolio_name?: string | null
+  pdf_url: string | null
+  is_paid: boolean
+  created_at: string
   dna_score?: number | null
-  is_paid?: boolean
 }
 
-function resolveAppUrl() {
-  const app = process.env.NEXT_PUBLIC_APP_URL?.trim()
-  if (app) return app.startsWith('http') ? app : `https://${app}`
-  const vercel = process.env.VERCEL_URL?.trim()
-  if (vercel) return `https://${vercel}`
-  return 'https://neufin-web.vercel.app'
-}
+export default function DashboardReportsPage() {
+  const [reports, setReports] = useState<ReportRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-export default async function DashboardReportsPage() {
-  const cookieHeader = (await cookies()).getAll().map((c) => `${c.name}=${c.value}`).join('; ')
-  const appUrl = resolveAppUrl().replace(/\/$/, '')
-  let reports: VaultReport[] = []
-  try {
-    const res = await fetch(`${appUrl}/api/vault/history`, {
-      cache: 'no-store',
-      headers: cookieHeader ? { cookie: cookieHeader } : undefined,
-    })
-    if (res.ok) {
-      const json = (await res.json()) as VaultReport[] | { history?: VaultReport[]; reports?: VaultReport[] }
-      reports = Array.isArray(json)
-        ? json
-        : Array.isArray(json.history)
-          ? json.history
-          : Array.isArray(json.reports)
-            ? json.reports
-            : []
+  useEffect(() => {
+    void loadReports()
+  }, [])
+
+  async function loadReports() {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await apiGet<ReportRecord[] | { reports?: ReportRecord[]; history?: ReportRecord[] }>(
+        '/api/vault/history'
+      )
+      setReports(
+        Array.isArray(data)
+          ? data
+          : Array.isArray((data as { history?: ReportRecord[] }).history)
+            ? (data as { history: ReportRecord[] }).history
+            : Array.isArray((data as { reports?: ReportRecord[] }).reports)
+              ? (data as { reports: ReportRecord[] }).reports
+              : []
+      )
+    } catch (err) {
+      console.error('[reports] Failed to load:', err)
+      setError('Failed to load reports. Check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
-  } catch {
-    reports = []
+  }
+
+  async function downloadReport(report: ReportRecord) {
+    // Already have a URL — open directly
+    if (report.pdf_url) {
+      window.open(report.pdf_url, '_blank')
+      return
+    }
+
+    if (!report.portfolio_id) {
+      alert('No portfolio linked to this report.')
+      return
+    }
+
+    setGenerating(report.id)
+    try {
+      // Check subscription gate first
+      const statusRes = await apiGet<{ plan: string; status?: string }>('/api/subscription/status')
+      const canGenerate =
+        statusRes.plan === 'advisor' ||
+        statusRes.plan === 'enterprise' ||
+        statusRes.status === 'trial'
+
+      if (!canGenerate) {
+        const origin = window.location.origin
+        const { checkout_url } = await apiPost<{ checkout_url: string }>(
+          '/api/reports/checkout',
+          {
+            plan: 'single',
+            portfolio_id: report.portfolio_id,
+            success_url: stripeSuccessUrlReports(origin),
+            cancel_url: `${origin}/dashboard/reports`,
+          }
+        )
+        window.location.href = checkout_url
+        return
+      }
+
+      const res = await apiFetch('/api/reports/generate', {
+        method: 'POST',
+        body: JSON.stringify({ portfolio_id: report.portfolio_id, inline_pdf: false }),
+      })
+
+      const data = await res.json() as {
+        pdf_url?: string | null
+        pdf_base64?: string | null
+        filename?: string | null
+        checkout_url?: string | null
+      }
+
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url
+        return
+      }
+
+      if (data.pdf_url) {
+        window.open(data.pdf_url, '_blank')
+        void loadReports() // refresh list so the new URL appears
+        return
+      }
+
+      if (data.pdf_base64) {
+        const bytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0))
+        const blob = new Blob([bytes], { type: 'application/pdf' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename || `neufin-report-${report.id.slice(0, 8)}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+        return
+      }
+    } catch (err) {
+      console.error('[reports] download failed:', err)
+    } finally {
+      setGenerating(null)
+    }
   }
 
   return (
@@ -60,7 +147,18 @@ export default async function DashboardReportsPage() {
         </Link>
       </div>
 
-      {reports.length > 0 ? (
+      {error && (
+        <div className="mb-4 rounded-lg border border-risk/40 bg-risk/10 px-4 py-3 text-sm text-risk">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading reports…
+        </div>
+      ) : reports.length > 0 ? (
         <div className="space-y-3">
           {reports.map((r) => (
             <div
@@ -102,7 +200,21 @@ export default async function DashboardReportsPage() {
                     Download PDF
                   </a>
                 ) : (
-                  <GenerateIcReportButton portfolioId={r.portfolio_id} className="text-xs text-primary hover:underline" />
+                  <button
+                    type="button"
+                    disabled={generating === r.id || !r.portfolio_id}
+                    onClick={() => void downloadReport(r)}
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {generating === r.id ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Generating…
+                      </>
+                    ) : (
+                      'Generate Report'
+                    )}
+                  </button>
                 )}
               </div>
             </div>
@@ -121,4 +233,3 @@ export default async function DashboardReportsPage() {
     </div>
   )
 }
-

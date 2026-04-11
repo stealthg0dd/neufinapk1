@@ -188,24 +188,54 @@ export default function PortfolioPage() {
       if (canGeneratePdf) {
         const res = await apiFetch('/api/reports/generate', {
           method: 'POST',
-          body: JSON.stringify({ portfolio_id: portfolioId }),
+          body: JSON.stringify({ portfolio_id: portfolioId, inline_pdf: false }),
         })
-        if (!res.ok) {
-          throw new Error('Report generation failed')
-        }
-        const data = (await res.json()) as { pdf_url?: string; url?: string; download_url?: string; report_url?: string }
-        const pdfUrl = data?.pdf_url
-          || data?.url
-          || data?.download_url
-          || data?.report_url
-          || null
 
-        if (pdfUrl) {
-          window.open(pdfUrl, '_blank')
-        } else {
-          console.error('[report] No PDF URL in response:', data)
-          toast.error('Report URL unavailable. Try again.')
+        const data = await res.json() as {
+          pdf_url?: string | null
+          pdf_base64?: string | null
+          filename?: string | null
+          checkout_url?: string | null
+          error?: string
+          message?: string
         }
+
+        if (!res.ok) {
+          const errMsg = data?.message || data?.error || `HTTP ${res.status}`
+          toast.error(`Report failed: ${errMsg}`)
+          console.error('[report] error response:', data)
+          return
+        }
+
+        // Stripe checkout for paid users
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url
+          return
+        }
+
+        // Supabase storage signed URL
+        if (data.pdf_url) {
+          window.open(data.pdf_url, '_blank')
+          return
+        }
+
+        // Base64 fallback (storage upload failed)
+        if (data.pdf_base64) {
+          const bytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0))
+          const blob = new Blob([bytes], { type: 'application/pdf' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = data.filename || `neufin-report-${portfolioId.slice(0, 8)}.pdf`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          URL.revokeObjectURL(url)
+          return
+        }
+
+        console.error('[report] no delivery method in response:', data)
+        toast.error('Report URL unavailable. Try again.')
       } else {
         const origin = typeof window !== 'undefined' ? window.location.origin : ''
         const { checkout_url } = await apiPost<{ checkout_url: string }>(
@@ -219,7 +249,8 @@ export default function PortfolioPage() {
         )
         window.location.href = checkout_url
       }
-    } catch {
+    } catch (err) {
+      console.error('[report] error:', err)
       toast.error('Report unavailable. Try again.')
     } finally {
       setDownloadLoading(false)
