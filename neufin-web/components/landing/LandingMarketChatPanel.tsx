@@ -56,7 +56,12 @@ export default function LandingMarketChatPanel() {
   }, [])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Only auto-scroll when the user has sent at least one message,
+    // not on the initial assistant seed (which would scroll the landing page down).
+    const hasUserMessage = messages.some((m) => m.role === 'user')
+    if (hasUserMessage) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   const send = async (question: string) => {

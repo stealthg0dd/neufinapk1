@@ -4,6 +4,7 @@ import './globals.css'
 import RootProviders from '@/app/components/RootProviders'
 import AuthDebugBoot from '@/app/components/AuthDebugBoot'
 import { AuthDebugPanel } from '@/components/AuthDebugPanel'
+import { ScrollReset } from '@/components/ScrollReset'
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
@@ -159,6 +160,7 @@ gtag('config', 'G-Z2E03GFJP3');`,
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
         />
         <RootProviders>
+          <ScrollReset />
           {showAuthDebug ? <AuthDebugBoot /> : null}
           <main id="main-content">{children}</main>
           {showAuthDebug ? <AuthDebugPanel /> : null}
