@@ -71,7 +71,7 @@ class ReportRequest(BaseModel):
     advisor_logo_url: str | None = None
     advisor_email: str = "info@neufin.ai"
     white_label: bool = False
-    # When True, response is raw PDF bytes (media_type application/pdf) instead of JSON metadata.
+    theme: str = "dark"  # "dark" (default) | "light" (white background, print-friendly)
     inline_pdf: bool = False
 
 
@@ -343,6 +343,7 @@ async def generate_report(
             existing_dna or {},
             swarm_row,
             advisor_config,
+            theme=body.theme,
         )
 
         filename = f"report-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}.pdf"

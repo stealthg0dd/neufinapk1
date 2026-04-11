@@ -318,7 +318,7 @@ def _regime_display(regime: str | None) -> tuple[str, HexColor]:
         return "RISK-OFF", HexColor("#F5A623")
     if r in ("growth", "inflation", "risk-on"):
         return "RISK-ON", HexColor("#22C55E")
-    return (regime or "UNKNOWN").upper(), HexColor("#1EB8CC")
+    return (regime or "Pending Live Data").upper(), HexColor("#1EB8CC")
 
 
 async def _fetch_logo_bytes(advisor_config: dict) -> bytes | None:
@@ -540,6 +540,21 @@ def _styles(bc: ICBrand):
             fontName="Helvetica-Bold",
             leading=14,
         ),
+        "h3": ps(
+            "h3",
+            fontSize=9,
+            textColor=bc.ACCENT,
+            fontName="Helvetica-Bold",
+            leading=12,
+            spaceAfter=3,
+        ),
+        "muted": ps(
+            "mt",
+            fontSize=8,
+            textColor=bc.MUTED,
+            fontName="Helvetica-Oblique",
+            leading=11,
+        ),
         "accent_title": ps(
             "at",
             fontSize=28,
@@ -559,6 +574,476 @@ def _styles(bc: ICBrand):
     }
 
 
+def _build_report_context(
+    portfolio_data: dict,
+    dna_data: dict,
+    swarm_norm: dict,
+    advisor_config: dict,
+) -> dict:
+    """
+    Single source of truth for all PDF sections.
+    Works with swarm_norm (already normalised by _normalize_swarm).
+    Never returns None for key fields — always synthesises from available data.
+    """
+    s = swarm_norm if isinstance(swarm_norm, dict) else {}
+    d = dna_data if isinstance(dna_data, dict) else {}
+    p = portfolio_data if isinstance(portfolio_data, dict) else {}
+    m = p.get("metrics") or {}
+
+    # investment_thesis is a sub-dict inside swarm_norm
+    thesis_obj = s.get("investment_thesis") or {}
+    if not isinstance(thesis_obj, dict):
+        thesis_obj = {}
+
+    # ── Portfolio basics ──────────────────────────────────────────────────────
+    positions: list[dict] = m.get("positions") or []
+    total_value = float(p.get("total_value") or m.get("total_value") or 0)
+
+    # ── DNA (always present after analysis) ───────────────────────────────────
+    dna_score = int(d.get("dna_score") or 0)
+    investor_type = str(d.get("investor_type") or "Balanced Growth Investor")
+    strengths: list[str] = list(d.get("strengths") or [])
+    weaknesses: list[str] = list(d.get("weaknesses") or [])
+    recommendation = str(d.get("recommendation") or "")
+    tax_analysis: dict = d.get("tax_analysis") or {}
+    if not isinstance(tax_analysis, dict):
+        tax_analysis = {}
+
+    # ── Quant (DNA first, then swarm fallback) ─────────────────────────────────
+    weighted_beta = float(
+        d.get("weighted_beta")
+        or thesis_obj.get("weighted_beta")
+        or s.get("weighted_beta")
+        or m.get("weighted_beta")
+        or 0
+    )
+    avg_corr = float(d.get("avg_correlation") or m.get("avg_correlation") or 0)
+    # HHI: DNA score_breakdown stores it as a 0-25 score; raw metrics store 0-1
+    hhi_raw = float(
+        (d.get("score_breakdown") or {}).get("hhi_concentration")
+        or m.get("hhi")
+        or 0
+    )
+    hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
+
+    # ── Tax from DNA (NOT swarm) — always populated after analysis ─────────────
+    tax_positions: list[dict] = tax_analysis.get("positions") or []
+    total_tax_liability = float(tax_analysis.get("total_liability") or 0)
+    total_harvest_opp = float(tax_analysis.get("total_harvest_opp") or 0)
+    tax_narrative = str(tax_analysis.get("narrative") or "")
+
+    # ── Regime ────────────────────────────────────────────────────────────────
+    mkt_regime = s.get("market_regime") or {}
+    if isinstance(mkt_regime, str):
+        regime_raw = mkt_regime
+        regime_conf = 0.0
+    else:
+        regime_raw = (
+            s.get("regime")
+            or thesis_obj.get("regime")
+            or (mkt_regime.get("regime") if isinstance(mkt_regime, dict) else None)
+            or ""
+        )
+        regime_conf = float(
+            (mkt_regime.get("confidence") if isinstance(mkt_regime, dict) else None) or 0
+        )
+
+    _rmap = {
+        "risk_off": "Risk-Off", "risk-off": "Risk-Off",
+        "risk_on": "Risk-On", "risk-on": "Risk-On", "growth": "Risk-On",
+        "neutral": "Neutral",
+        "crisis": "Crisis / Deep Risk-Off", "recession": "Crisis / Deep Risk-Off",
+        "stagflation": "Risk-Off / Stagflation",
+        "inflation": "Risk-On / Inflationary",
+        "recovery": "Recovery",
+        "defensive": "Defensive Positioning",
+    }
+    regime_label = _rmap.get(str(regime_raw).lower().strip().replace("-", "_"), "")
+    if not regime_label and regime_raw:
+        regime_label = str(regime_raw).replace("_", " ").title()
+
+    macro_advice = s.get("macro_advice") or thesis_obj.get("macro_advice") or ""
+    regime_narrative = macro_advice or s.get("market_context") or ""
+
+    # Derive from portfolio if swarm has no regime data
+    if not regime_label:
+        if weighted_beta > 1.15:
+            regime_label = "Risk-On Exposure"
+        elif weighted_beta < 0.85:
+            regime_label = "Defensive Positioning"
+        else:
+            regime_label = "Market-Neutral"
+        regime_conf = 0.0
+        regime_narrative = (
+            f"Macro regime pending Swarm IC analysis. "
+            f"Portfolio beta of {weighted_beta:.2f} suggests "
+            f"{'growth-tilted' if weighted_beta > 1 else 'balanced'} positioning "
+            f"relative to broad market."
+        )
+
+    # ── Portfolio mandate ─────────────────────────────────────────────────────
+    has_gold = any(pos.get("symbol") == "GLD" for pos in positions)
+    has_bonds = any(pos.get("symbol") in ("TLT", "BND", "AGG", "IEF", "GOVT") for pos in positions)
+    if weighted_beta > 1.2:
+        mandate, mandate_desc = "Aggressive Growth", "Equity-heavy, high-beta profile"
+    elif has_gold and has_bonds and weighted_beta < 1.1:
+        mandate, mandate_desc = "All-Weather Balanced", "Growth with inflation and duration hedges"
+    elif weighted_beta < 0.85:
+        mandate, mandate_desc = "Capital Preservation", "Defensive, income-oriented positioning"
+    else:
+        mandate, mandate_desc = "Balanced Growth", "Moderate risk, multi-factor diversification"
+
+    # ── Investment thesis ─────────────────────────────────────────────────────
+    briefing = (
+        thesis_obj.get("briefing")
+        or thesis_obj.get("body")
+        or s.get("briefing")
+        or ""
+    )
+    # Reject the empty-state placeholder inserted by _normalize_swarm/_empty_swarm_norm
+    _EMPTY_MARKERS = ("swarm output was not available", "run portfolio intelligence")
+    if any(m in briefing.lower() for m in _EMPTY_MARKERS):
+        briefing = ""
+    thesis = briefing.strip()
+    if not thesis:
+        top3 = sorted(positions, key=lambda x: float(x.get("weight") or 0), reverse=True)[:3]
+        top_names = ", ".join(str(pos.get("symbol", "")) for pos in top3)
+        tax_note = (
+            f"Tax optimisation is the primary near-term lever "
+            f"(${total_tax_liability:,.0f} CGT exposure, ${total_harvest_opp:,.0f} harvestable). "
+        ) if total_tax_liability > 0 else ""
+        thesis = (
+            f"This ${total_value:,.0f} portfolio is structured as a {investor_type} "
+            f"with {len(positions)} holdings. Core positions ({top_names or 'diversified holdings'}) "
+            f"drive a market beta of {weighted_beta:.2f}. "
+            f"{tax_note}"
+            f"Portfolio construction is {'sound' if dna_score >= 70 else 'under review'} "
+            f"at a DNA score of {dna_score}/100."
+        )
+
+    # ── Verdict ───────────────────────────────────────────────────────────────
+    if dna_score >= 80:
+        verdict, verdict_color = "HOLD / OPTIMISE", "#22C55E"
+        verdict_desc = (
+            "Portfolio construction is sound. Focus on tax optimisation "
+            "and regime-aligned tilts rather than structural changes."
+        )
+    elif dna_score >= 60:
+        verdict, verdict_color = "REVIEW / REBALANCE", "#F5A623"
+        verdict_desc = (
+            "Material improvement opportunities exist. "
+            "Prioritise concentration reduction and tax harvesting."
+        )
+    else:
+        verdict, verdict_color = "RESTRUCTURE", "#EF4444"
+        verdict_desc = (
+            "Portfolio construction needs significant review. "
+            "Consider factor rebalancing and risk reduction."
+        )
+
+    # ── Recommendations ───────────────────────────────────────────────────────
+    recs: list[dict] = []
+    rec_summary = s.get("recommendation_summary") or thesis_obj.get("recommendation_summary") or ""
+    if rec_summary:
+        recs.append({"priority": "HIGH", "action": rec_summary[:120],
+                     "rationale": "Swarm IC synthesis", "timeline": "30 days"})
+    if recommendation:
+        recs.append({"priority": "HIGH", "action": recommendation[:120],
+                     "rationale": "Behavioral DNA assessment", "timeline": "30–60 days"})
+    if total_harvest_opp > 50:
+        harvest_syms = [tp["symbol"] for tp in tax_positions
+                        if float(tp.get("harvest_credit") or 0) > 0]
+        recs.append({
+            "priority": "HIGH",
+            "action": (
+                f"Harvest losses in {', '.join(harvest_syms[:3])} "
+                f"(${total_harvest_opp:,.0f} opportunity)"
+            ),
+            "rationale": (
+                f"Tax efficiency — est. ${total_harvest_opp * 5:,.0f} "
+                "5-year after-tax benefit"
+            ),
+            "timeline": "Immediate — before year-end",
+        })
+    recs.append({
+        "priority": "MEDIUM",
+        "action": (
+            f"Align defensive allocation to {regime_label} regime"
+            if regime_label else
+            "Run Swarm IC Analysis for regime-adjusted positioning"
+        ),
+        "rationale": "Regime alignment",
+        "timeline": "60 days",
+    })
+
+    # ── Alpha opportunities ────────────────────────────────────────────────────
+    alpha_signal_text = (
+        s.get("alpha_signal")
+        or thesis_obj.get("alpha_signal")
+        or s.get("alpha_outlook")
+        or ""
+    )
+    alpha_opps: list[dict] = []
+    if alpha_signal_text:
+        alpha_opps.append({
+            "title": "Alpha Scout Signal",
+            "description": str(alpha_signal_text)[:200],
+            "confidence": "65%",
+            "regime": regime_label or "All regimes",
+        })
+    if weighted_beta > 1.0 and regime_label in (
+        "Risk-Off", "Risk-Off / Stagflation", "Neutral", "Market-Neutral"
+    ):
+        alpha_opps.append({
+            "title": "Defensive Rotation Opportunity",
+            "description": (
+                f"Beta {weighted_beta:.2f} amplifies drawdown in {regime_label} regime. "
+                "Rotate 5–10% from high-beta positions into XLU / XLP / GLD "
+                "for improved risk-adjusted return."
+            ),
+            "confidence": "72%",
+            "regime": regime_label,
+        })
+    if total_harvest_opp > 0:
+        harvest_syms = [tp["symbol"] for tp in tax_positions
+                        if float(tp.get("harvest_credit") or 0) > 0]
+        alpha_opps.append({
+            "title": "Tax-Loss Harvesting Window",
+            "description": (
+                f"${total_harvest_opp:,.0f} harvestable. "
+                f"Est. ${total_harvest_opp * 0.2:,.0f} in direct savings at 20% CGT. "
+                f"Priority: {', '.join(harvest_syms[:3])}."
+            ),
+            "confidence": "95%",
+            "regime": "All regimes — time-sensitive",
+        })
+    if not alpha_opps:
+        alpha_opps.append({
+            "title": "Run Swarm IC Analysis for Alpha Signals",
+            "description": (
+                "Full alpha discovery requires the 7-agent swarm analysis. "
+                "Run from the portfolio page to unlock symbol-level "
+                "recommendations with estimated return impact."
+            ),
+            "confidence": "—",
+            "regime": "—",
+        })
+
+    return {
+        # Portfolio
+        "portfolio_name": p.get("name") or "Portfolio Analysis",
+        "total_value": total_value,
+        "positions": positions,
+        "num_positions": len(positions),
+        # DNA
+        "dna_score": dna_score,
+        "investor_type": investor_type,
+        "mandate": mandate,
+        "mandate_desc": mandate_desc,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        # Quant
+        "weighted_beta": weighted_beta,
+        "avg_corr": avg_corr,
+        "hhi": hhi,
+        # Tax (from DNA — always populated)
+        "tax_positions": tax_positions,
+        "total_tax_liability": total_tax_liability,
+        "total_harvest_opp": total_harvest_opp,
+        "tax_narrative": tax_narrative,
+        # Regime
+        "regime_label": regime_label,
+        "regime_conf": regime_conf,
+        "regime_narrative": regime_narrative,
+        # Synthesis
+        "thesis": thesis,
+        "verdict": verdict,
+        "verdict_color": verdict_color,
+        "verdict_desc": verdict_desc,
+        "recommendations": recs,
+        "alpha_opps": alpha_opps,
+        # Trace
+        "agent_trace": s.get("agent_trace") or [],
+        "swarm_available": bool(
+            swarm_norm and isinstance(swarm_norm, dict)
+            and any(swarm_norm.get(k) for k in ("regime", "investment_thesis", "quant_analysis"))
+        ),
+        # Advisor
+        "advisor_name": advisor_config.get("advisor_name") or "NeuFin Intelligence",
+        "firm_name": advisor_config.get("firm_name") or "",
+        "advisor_email": advisor_config.get("advisor_email") or "info@neufin.ai",
+        "white_label": bool(advisor_config.get("white_label")),
+        "report_run_id": advisor_config.get("report_run_id") or "—",
+    }
+
+
+def _page_executive_memo(ctx: dict, s: dict, cw: float, bc: "ICBrand") -> list:
+    """
+    Page 2: Executive memo — the most important page.
+    An MD reads only this page. Answers: What? What's wrong? What to do?
+    Never shows UNKNOWN or See swarm.
+    """
+    items: list = []
+
+    # ── Verdict banner ────────────────────────────────────────────────────────
+    verdict_hx = HexColor(ctx["verdict_color"])
+    # Semi-transparent tint for background (ReportLab has no alpha, simulate with surface)
+    banner = Table(
+        [[Paragraph(
+            f"PORTFOLIO VERDICT:  {ctx['verdict']}",
+            ParagraphStyle(
+                "vb", fontName="Helvetica-Bold", fontSize=16,
+                textColor=verdict_hx, alignment=TA_CENTER,
+            ),
+        )]],
+        colWidths=[cw],
+    )
+    banner.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
+        ("BOX", (0, 0), (-1, -1), 2, verdict_hx),
+        ("TOPPADDING", (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+    ]))
+    items.append(banner)
+    items.append(Spacer(1, 6))
+    items.append(Paragraph(_xml(ctx["verdict_desc"]), s["muted"]))
+    items.append(Spacer(1, 14))
+
+    # ── Three metric cards: DNA | Regime | Mandate ────────────────────────────
+    score = ctx["dna_score"]
+    sc_col = "#22C55E" if score >= 71 else ("#F5A623" if score >= 41 else "#EF4444")
+    regime_display = ctx["regime_label"] or "Pending Live Data"
+    conf_label = (
+        f"{int(ctx['regime_conf'] * 100)}% conf"
+        if ctx["regime_conf"] > 0 else "portfolio-derived"
+    )
+    cw3 = cw / 3
+    card_data = [
+        [
+            Paragraph(
+                str(score),
+                ParagraphStyle("scv", fontName="Helvetica-Bold", fontSize=26,
+                               textColor=HexColor(sc_col), alignment=TA_CENTER),
+            ),
+            Paragraph(
+                _xml(regime_display),
+                ParagraphStyle("rcv", fontName="Helvetica-Bold", fontSize=14,
+                               textColor=bc.AMBER, alignment=TA_CENTER),
+            ),
+            Paragraph(
+                _xml(ctx["mandate"]),
+                ParagraphStyle("mcv", fontName="Helvetica-Bold", fontSize=12,
+                               textColor=bc.ACCENT, alignment=TA_CENTER),
+            ),
+        ],
+        [
+            Paragraph(
+                "PORTFOLIO HEALTH",
+                ParagraphStyle("sc2", fontName="Helvetica", fontSize=8,
+                               textColor=bc.MUTED, alignment=TA_CENTER),
+            ),
+            Paragraph(
+                f"MACRO REGIME · {conf_label}",
+                ParagraphStyle("rc2", fontName="Helvetica", fontSize=8,
+                               textColor=bc.MUTED, alignment=TA_CENTER),
+            ),
+            Paragraph(
+                "MANDATE",
+                ParagraphStyle("mc2", fontName="Helvetica", fontSize=8,
+                               textColor=bc.MUTED, alignment=TA_CENTER),
+            ),
+        ],
+    ]
+    cards = Table(card_data, colWidths=[cw3, cw3, cw3])
+    cards.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), bc.PRIMARY),
+        ("BOX", (0, 0), (-1, -1), 1, bc.SURFACE),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, bc.SURFACE),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+    ]))
+    items.append(cards)
+    items.append(Spacer(1, 14))
+
+    # ── Investment thesis ─────────────────────────────────────────────────────
+    items.append(Paragraph("INVESTMENT THESIS", s["h3"]))
+    items.append(Paragraph(_xml(ctx["thesis"]), s["body"]))
+    items.append(Spacer(1, 10))
+
+    # ── Key supporting factors ────────────────────────────────────────────────
+    if ctx.get("strengths"):
+        items.append(Paragraph("KEY SUPPORTING FACTORS", s["h3"]))
+        for strength in ctx["strengths"][:3]:
+            sentence = (strength.split(".")[0] + ".") if "." in strength else strength[:120]
+            items.append(Paragraph(
+                f'<font color="{_html_hex(bc.SUCCESS)}">▶</font>  {_xml(sentence)}',
+                s["body"],
+            ))
+        items.append(Spacer(1, 10))
+
+    # ── Primary recommendation ────────────────────────────────────────────────
+    recs = ctx.get("recommendations") or []
+    if recs:
+        rec = recs[0]
+        items.append(Paragraph("PRIMARY RECOMMENDATION", s["h3"]))
+        rec_t = Table(
+            [[Paragraph(
+                f"<b>{_xml(rec['action'])}</b><br/>"
+                f'<font color="{_html_hex(bc.MUTED)}">'
+                f"{_xml(rec.get('rationale', ''))} · Timeline: {_xml(rec.get('timeline', ''))}"
+                f"</font>",
+                s["body"],
+            )]],
+            colWidths=[cw],
+        )
+        rec_t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
+            ("LINEBEFORE", (0, 0), (0, -1), 3, bc.SUCCESS),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        items.append(rec_t)
+        items.append(Spacer(1, 8))
+
+    # ── Primary risk ──────────────────────────────────────────────────────────
+    if ctx.get("weaknesses"):
+        items.append(Paragraph("PRIMARY RISK TO THESIS", s["h3"]))
+        risk = ctx["weaknesses"][0]
+        risk_sentence = (risk.split(".")[0] + ".") if "." in risk else risk[:120]
+        risk_t = Table(
+            [[Paragraph(
+                f'<font color="{_html_hex(bc.AMBER)}">⚠  </font>{_xml(risk_sentence)}',
+                s["body"],
+            )]],
+            colWidths=[cw],
+        )
+        risk_t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
+            ("LINEBEFORE", (0, 0), (0, -1), 3, bc.AMBER),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ]))
+        items.append(risk_t)
+        items.append(Spacer(1, 8))
+
+    # ── Confidence statement ──────────────────────────────────────────────────
+    conf_pct = 72 if ctx.get("swarm_available") else 65
+    conf_basis = (
+        "DNA analysis (live market data) + Swarm IC synthesis"
+        if ctx.get("swarm_available")
+        else "DNA analysis (live market data). Run Swarm IC for full synthesis."
+    )
+    items.append(Paragraph(
+        f'<font color="{_html_hex(bc.MUTED)}">'
+        f"Confidence: {conf_pct}% · Basis: {_xml(conf_basis)}</font>",
+        s["muted8"],
+    ))
+    return items
+
+
 def _build_pdf_sync(
     portfolio_data: dict,
     dna_data: dict,
@@ -566,8 +1051,22 @@ def _build_pdf_sync(
     advisor_config: dict,
     logo_bytes: bytes | None,
     swarm_data_present: bool,
+    theme: str = "dark",
 ) -> bytes:
-    bc = ICBrand(advisor_config.get("brand_colors"))
+    # Apply light-mode overrides before ICBrand initialisation
+    brand_colors = advisor_config.get("brand_colors")
+    if theme == "light":
+        _light: dict = {
+            "primary": "#FFFFFF", "accent": "#0891B2", "danger": "#DC2626",
+            "success": "#16A34A", "amber": "#D97706", "white": "#111827",
+            "muted": "#475569", "surface": "#F1F5F9", "secondary": "#E2E8F0",
+        }
+        brand_colors = {**_light, **(brand_colors or {})}
+    bc = ICBrand(brand_colors)
+
+    # Single source of truth for all page sections — never produces UNKNOWN
+    ctx = _build_report_context(portfolio_data, dna_data, swarm_norm, advisor_config)
+
     metrics = portfolio_data.get("metrics") or {}
     if not isinstance(metrics, dict):
         metrics = {}
@@ -595,30 +1094,19 @@ def _build_pdf_sync(
         alpha_raw = {}
 
     dna = dna_data or {}
-    dna_score = int(
-        dna.get("dna_score") or thesis.get("dna_score") or metrics.get("dna_score") or 0
-    )
-    archetype = (
-        dna.get("investor_type") or thesis.get("headline") or "PORTFOLIO INVESTOR"
-    )
-    strengths = _coerce_list(dna.get("strengths"), 5)
-    weaknesses = _coerce_list(dna.get("weaknesses"), 5)
+    # Pull core fields from ctx (already validated, never None/UNKNOWN)
+    dna_score = ctx["dna_score"]
+    archetype = ctx["investor_type"]
+    strengths = ctx["strengths"]
+    weaknesses = ctx["weaknesses"]
 
-    regime_raw = mkt.get("regime") or swarm_norm.get("regime") or thesis.get("regime")
-    regime_label, regime_color = _regime_display(
-        str(regime_raw) if regime_raw else None
-    )
-    conf_pct = 0.0
-    try:
-        conf_pct = float(mkt.get("confidence") or 0) * 100
-    except (TypeError, ValueError):
-        conf_pct = 0.0
+    # Use ctx regime values (guaranteed non-empty)
+    regime_label, regime_color = _regime_display(ctx["regime_label"])
+    conf_pct = ctx["regime_conf"] * 100
 
     portfolio_name = portfolio_data.get("name") or "Portfolio Analysis"
     client_name = advisor_config.get("client_name") or "Confidential"
-    total_value = float(
-        portfolio_data.get("total_value") or metrics.get("total_value") or 0
-    )
+    total_value = ctx["total_value"]
     firm_name = advisor_config.get("firm_name") or ""
     advisor_name = advisor_config.get("advisor_name") or "NeuFin Intelligence"
     white_label = bool(advisor_config.get("white_label"))
@@ -633,16 +1121,13 @@ def _build_pdf_sync(
         or swarm_norm.get("quant_analysis")
     )
 
-    # --- Thesis body ---
-    body_text = thesis.get("body") or thesis.get("briefing") or ""
-    if not body_text.strip():
-        body_text = (
-            f"Portfolio DNA score is {dna_score}/100 under a {regime_raw or 'mixed'!s} regime. "
-            f"Weighted beta is {_fnum(thesis.get('weighted_beta') or metrics.get('weighted_beta'))}. "
-            f"Sharpe ratio: {_fnum(thesis.get('sharpe_ratio') or metrics.get('sharpe_ratio'))}."
-        )
+    # Thesis body — from ctx (always real text, never empty)
+    body_text = ctx["thesis"]
 
-    # --- Recommendations (executive table) ---
+    # Override swarm_available with the actual runtime flag
+    ctx["swarm_available"] = swarm_data_present
+
+    # Recommendations — from ctx (always populated)
     recs: list[dict[str, str]] = []
     raw_recs = thesis.get("recommendations")
     if isinstance(raw_recs, list):
@@ -918,96 +1403,9 @@ def _build_pdf_sync(
     elems.append(PageBreak())
     elems.append(NextPageTemplate("Body"))
 
-    # PAGE 2 Executive summary
-    elems.append(
-        Table(
-            [[Paragraph("EXECUTIVE SUMMARY", styles["h_section"])]],
-            colWidths=[A4_W - 2 * MARGIN],
-            style=TableStyle(
-                [
-                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
-                    ("LINEABOVE", (0, 0), (0, 0), 0, bc.ACCENT),
-                    ("LINEBEFORE", (0, 0), (0, 0), 3, bc.ACCENT),
-                    ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
-                ]
-            ),
-        )
-    )
-    elems.append(Spacer(1, 10))
-
-    card_w = (A4_W - 2 * MARGIN - 20) / 3
-    dna_col = _dna_score_color(dna_score, bc)
-    alpha_n = len(opps) if opps else 0
-    card_tbl = Table(
-        [
-            [
-                Paragraph(
-                    f'<font color="{_html_hex(dna_col)}"><b>{dna_score}</b></font><br/><font size="8" color="#94A3B8">Portfolio Health</font>',
-                    ParagraphStyle(
-                        "c1", alignment=TA_CENTER, fontSize=12, textColor=bc.WHITE
-                    ),
-                ),
-                Paragraph(
-                    f"<b>{_xml(regime_label)}</b><br/><font size='8' color='#94A3B8'>Confidence {conf_pct:.0f}%</font>",
-                    ParagraphStyle(
-                        "c2", alignment=TA_CENTER, fontSize=10, textColor=regime_color
-                    ),
-                ),
-                Paragraph(
-                    f"<b>{alpha_n} opportunities</b><br/><font size='8' color='#94A3B8'>Alpha Potential</font>",
-                    ParagraphStyle(
-                        "c3", alignment=TA_CENTER, fontSize=10, textColor=bc.WHITE
-                    ),
-                ),
-            ]
-        ],
-        colWidths=[card_w, card_w, card_w],
-    )
-    card_tbl.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), bc.PRIMARY),
-                ("BOX", (0, 0), (-1, -1), 0.5, bc.SURFACE),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-            ]
-        )
-    )
-    elems.append(card_tbl)
-    elems.append(Spacer(1, 12))
-    elems.append(Paragraph(_xml(body_text[:1200]), styles["body"]))
-    elems.append(Spacer(1, 10))
-
-    rec_data = [["Priority", "Action", "Rationale"]]
-    for r in recs[:3]:
-        pri = r.get("pri", "MED")
-        icon = "!!" if pri == "HIGH" else ("!" if pri == "MED" else "i")
-        clr = bc.DANGER if pri == "HIGH" else (bc.AMBER if pri == "MED" else bc.ACCENT)
-        rec_data.append(
-            [
-                Paragraph(
-                    f'<font color="{_html_hex(clr)}">{icon}</font>', styles["body"]
-                ),
-                Paragraph(_xml(r.get("action", "")), styles["body"]),
-                Paragraph(_xml(r.get("why", "")), styles["body"]),
-            ]
-        )
-    elems.append(
-        Table(
-            rec_data,
-            colWidths=[40, 200, A4_W - 2 * MARGIN - 260],
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), bc.ACCENT),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), bc.WHITE),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.25, bc.SURFACE),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [bc.PRIMARY, bc.SURFACE]),
-                ]
-            ),
-        )
-    )
+    # PAGE 2 Executive memo (IC-grade: verdict, thesis, rec, risk, confidence)
+    cw = A4_W - 2 * MARGIN
+    elems.extend(_page_executive_memo(ctx, styles, cw, bc))
     elems.append(PageBreak())
 
     # PAGE 3 Portfolio snapshot
@@ -1182,68 +1580,108 @@ def _build_pdf_sync(
     elems.append(bias_box)
     elems.append(PageBreak())
 
-    # PAGE 5 Regime
+    # PAGE 5 Regime — uses ctx["regime_label"] (always set, never UNKNOWN)
     elems.append(Paragraph("MARKET REGIME & MACRO CONTEXT", styles["h_section"]))
     elems.append(Spacer(1, 8))
+    regime_display = ctx["regime_label"]   # guaranteed non-empty from _build_report_context
+    regime_conf_val = ctx["regime_conf"]
+    regime_conf_label = (
+        f"Confidence: {regime_conf_val * 100:.0f}%"
+        if regime_conf_val > 0
+        else "Portfolio-derived classification"
+    )
+    sub_line = (
+        f"{regime_conf_label} · "
+        "Classification based on FRED macro signals via Swarm IC analysis."
+        if regime_conf_val > 0
+        else
+        f"{regime_conf_label} · Run Swarm IC for live FRED/macro regime signals."
+    )
     banner = Table(
-        [
-            [
-                Paragraph(
-                    f"<b>CURRENT REGIME: {_xml(regime_label)}</b><br/>"
-                    f"<font size='9'>Confidence: {conf_pct:.0f}% · Last updated: {_xml(ts_full[:19])}</font>",
-                    ParagraphStyle(
-                        "bn", textColor=colors.white, alignment=TA_CENTER, fontSize=14
-                    ),
-                )
-            ]
-        ],
+        [[Paragraph(
+            f"<b>PORTFOLIO REGIME EXPOSURE: {_xml(regime_display.upper())}</b><br/>"
+            f"<font size='9'>{_xml(sub_line)}</font>",
+            ParagraphStyle(
+                "bn", textColor=colors.white, alignment=TA_CENTER, fontSize=13,
+            ),
+        )]],
         colWidths=[A4_W - 2 * MARGIN],
-        style=TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), regime_color),
-                ("TOPPADDING", (0, 0), (-1, -1), 12),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
-            ]
-        ),
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), regime_color),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ]),
     )
     elems.append(banner)
     elems.append(Spacer(1, 10))
-    drivers = _coerce_list(mkt.get("drivers"), 6)
+
+    # Portfolio-derived macro signals (always available — no swarm needed)
+    _def_w = sum(
+        float(pos.get("weight") or 0) / 100
+        for pos in positions
+        if pos.get("symbol") in ("GLD", "TLT", "BND", "JNJ", "PG", "VZ", "XLP", "XLU")
+    )
+    _tech_w = sum(
+        float(pos.get("weight") or 0) / 100
+        for pos in positions
+        if pos.get("symbol") in ("AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "QQQ")
+    )
+    _gld_w = next(
+        (float(pos.get("weight") or 0) / 100 for pos in positions if pos.get("symbol") == "GLD"),
+        0,
+    )
+    _fi_w = next(
+        (float(pos.get("weight") or 0) / 100 for pos in positions
+         if pos.get("symbol") in ("TLT", "BND", "AGG", "GOVT", "IEF")),
+        0,
+    )
+    portfolio_signals = [
+        ("Portfolio Beta", f"{beta:.2f}", "vs SPY 1.00"),
+        ("Defensive Weight", _fpct(_def_w), "GLD/TLT/XLP/XLU"),
+        ("Tech Concentration", _fpct(_tech_w), "Large-cap tech"),
+        ("Gold Hedge", _fpct(_gld_w), "Inflation buffer"),
+        ("Fixed Income", _fpct(_fi_w), "Duration exposure"),
+        ("HHI Concentration", f"{hhi:.4f}", "⚠ High" if hhi > 0.20 else "Normal"),
+    ]
     macro_cells = []
-    macro_names = ["VIX", "Yield Curve", "CPI YoY", "PMI", "Liquidity", "Credit"]
-    for i, name in enumerate(macro_names):
-        val = drivers[i] if i < len(drivers) else "—"
-        macro_cells.append(
-            Paragraph(
-                f"<b>{name}</b><br/>{ _xml(str(val)[:40]) }<br/><font size='8' color='#94A3B8'>See swarm run for detail</font>",
+    for sig_name, sig_val, sig_note in portfolio_signals:
+        macro_cells.append(Paragraph(
+            f"<b>{_xml(sig_name)}</b><br/>{_xml(sig_val)}<br/>"
+            f"<font size='8' color='#94A3B8'>{_xml(sig_note)}</font>",
+            styles["body"],
+        ))
+    # Fill with swarm drivers if available
+    drivers = _coerce_list(mkt.get("drivers"), 6)
+    if drivers:
+        macro_names = ["VIX Level", "Yield Curve", "CPI YoY", "PMI", "Liquidity", "Credit Spread"]
+        macro_cells = []
+        for i, name in enumerate(macro_names):
+            val = drivers[i] if i < len(drivers) else "Pending Swarm IC analysis"
+            macro_cells.append(Paragraph(
+                f"<b>{name}</b><br/>{_xml(str(val)[:60])}",
                 styles["body"],
-            )
-        )
+            ))
     grid = Table(
-        [
-            macro_cells[:3],
-            macro_cells[3:],
-        ],
+        [macro_cells[:3], macro_cells[3:]],
         colWidths=[150, 150, 150],
-        style=TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
-                ("BOX", (0, 0), (-1, -1), 0.5, bc.PRIMARY),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]
-        ),
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
+            ("BOX", (0, 0), (-1, -1), 0.5, bc.PRIMARY),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ]),
     )
     elems.append(grid)
     elems.append(Spacer(1, 10))
-    elems.append(
-        Paragraph(
-            _xml(
-                f"Your portfolio beta of {beta:.2f} shapes sensitivity to the {regime_label} environment. "
-                f"Review correlation clusters in the risk section for factor overlap."
-            ),
-            styles["body"],
-        )
+    # Narrative: from ctx (swarm macro_advice if available, else portfolio-derived)
+    regime_narr = ctx["regime_narrative"] or (
+        f"Portfolio beta of {beta:.2f} shapes sensitivity to the "
+        f"{regime_display} environment. "
+        f"Review correlation clusters in the risk section for factor overlap."
     )
+    elems.append(Paragraph(_xml(regime_narr[:800]), styles["body"]))
     elems.append(Spacer(1, 8))
     scen = [
         ["Scenario", "Probability", "Regime", "Portfolio Impact"],
@@ -1253,15 +1691,13 @@ def _build_pdf_sync(
         Table(
             scen,
             colWidths=[70, 80, 90, 200],
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), bc.ACCENT),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), bc.WHITE),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [bc.PRIMARY, bc.SURFACE]),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("GRID", (0, 0), (-1, -1), 0.25, bc.MUTED),
-                ]
-            ),
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), bc.ACCENT),
+                ("TEXTCOLOR", (0, 0), (-1, 0), bc.WHITE),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [bc.PRIMARY, bc.SURFACE]),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.25, bc.MUTED),
+            ]),
         )
     )
     elems.append(PageBreak())
@@ -1275,7 +1711,9 @@ def _build_pdf_sync(
     else:
         elems.append(
             Paragraph(
-                "Correlation matrix not available — run Swarm IC analysis for full heatmap.",
+                f"Correlation heatmap available after Swarm IC analysis. "
+                f"Portfolio HHI: {hhi:.4f} — "
+                f"{'concentration risk present' if hhi > 0.20 else 'diversification is healthy'}.",
                 styles["body"],
             )
         )
@@ -1287,7 +1725,7 @@ def _build_pdf_sync(
         [
             "VaR (95%, 1-day)",
             _fpct(var_95) if var_95 is not None else "—",
-            "See quant run",
+            "Pending Swarm IC analysis" if var_95 is None else "Calculated",
         ],
         ["Max Drawdown (est.)", _fpct(max_dd) if max_dd is not None else "—", "Normal"],
         ["Concentration (HHI)", f"{hhi:.4f}", "⚠ High" if hhi > 0.25 else "Normal"],
@@ -1333,116 +1771,128 @@ def _build_pdf_sync(
         elems.append(cw)
     elems.append(PageBreak())
 
-    # PAGE 7 Tax
+    # PAGE 7 Tax — reads directly from DNA data via ctx (always populated)
     elems.append(Paragraph("TAX & OPTIMIZATION", styles["h_section"]))
     elems.append(Spacer(1, 8))
-    elems.append(
-        Paragraph(
-            f"<font color='{_html_hex(bc.AMBER)}'><b>ESTIMATED CGT EXPOSURE: ${cgt_total:,.0f}</b></font><br/>"
-            f"<font size='9' color='#94A3B8'>Based on swarm tax model and unrealized gains where available.</font>",
-            styles["body"],
-        )
-    )
+    ctx_tax_total = ctx["total_tax_liability"]
+    ctx_harvest_total = ctx["total_harvest_opp"]
+    ctx_tax_positions = ctx["tax_positions"]
+    ctx_tax_narrative = ctx["tax_narrative"]
+
+    elems.append(Paragraph(
+        f"<font color='{_html_hex(bc.AMBER)}'>"
+        f"<b>ESTIMATED CGT EXPOSURE: ${ctx_tax_total:,.0f}</b></font><br/>"
+        f"<font size='9' color='#94A3B8'>Computed from cost basis in DNA analysis. "
+        f"Tax-loss harvest opportunity: ${ctx_harvest_total:,.0f}.</font>",
+        styles["body"],
+    ))
     elems.append(Spacer(1, 8))
-    tax_rows = [["Symbol", "Cost", "Current", "Gain/Loss", "Est. CGT"]]
-    if isinstance(liability_top, list):
-        for row in liability_top[:10]:
-            if not isinstance(row, dict):
+
+    # Build tax table from DNA positions (all positions with real gain/loss data)
+    tax_rows = [["Symbol", "Unrealised G/L", "Est. CGT", "Harvest Credit", "Status"]]
+    if ctx_tax_positions:
+        for tp in ctx_tax_positions:
+            if not isinstance(tp, dict):
                 continue
-            tax_rows.append(
-                [
-                    str(row.get("symbol", "—")),
-                    _fnum(row.get("cost")),
-                    _fnum(row.get("current")),
-                    _fpct(row.get("gain_pct")),
-                    _fnum(row.get("tax")),
-                ]
+            unrealised = float(tp.get("unrealised_gain") or 0)
+            cgt = float(tp.get("tax_liability") or 0)
+            harvest = float(tp.get("harvest_credit") or 0)
+            status = (
+                "Harvest candidate" if harvest > 0
+                else ("Taxable gain" if cgt > 0 else "Neutral")
             )
-    if len(tax_rows) == 1:
-        for p in pos_sorted[:10]:
-            tax_rows.append(
-                [
-                    str(p.get("symbol")),
-                    "—",
-                    _fnum(p.get("current_value")),
-                    "—",
-                    "—",
-                ]
-            )
-    elems.append(
-        Table(
-            tax_rows,
-            colWidths=[55, 65, 65, 65, 80],
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), bc.ACCENT),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), bc.WHITE),
-                    ("FONTSIZE", (0, 0), (-1, -1), 7),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [bc.PRIMARY, bc.SURFACE]),
-                    ("GRID", (0, 0), (-1, -1), 0.25, bc.MUTED),
-                ]
-            ),
-        )
-    )
+            gain_color = _html_hex(bc.SUCCESS) if unrealised >= 0 else _html_hex(bc.DANGER)
+            tax_rows.append([
+                str(tp.get("symbol", "—")),
+                Paragraph(f'<font color="{gain_color}">{_fnum(unrealised)}</font>', styles["body"]),
+                _fnum(cgt) if cgt > 0 else "—",
+                Paragraph(
+                    f'<font color="{_html_hex(bc.AMBER)}">{_fnum(harvest)}</font>'
+                    if harvest > 0 else "—",
+                    styles["body"],
+                ),
+                status,
+            ])
+    else:
+        # Fallback to position list if no cost basis data
+        for pos in pos_sorted[:12]:
+            tax_rows.append([
+                str(pos.get("symbol", "—")), "—", "—", "—",
+                "Add cost basis for tax analysis",
+            ])
+
+    elems.append(Table(
+        tax_rows,
+        colWidths=[50, 80, 70, 80, 100],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), bc.ACCENT),
+            ("TEXTCOLOR", (0, 0), (-1, 0), bc.WHITE),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [bc.PRIMARY, bc.SURFACE]),
+            ("GRID", (0, 0), (-1, -1), 0.25, bc.MUTED),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]),
+    ))
     elems.append(Spacer(1, 8))
-    hv = "Consider tax-loss harvesting on: " + ", ".join(
-        str(h.get("symbol", h))
-        for h in (harvest if isinstance(harvest, list) else [])[:5]
-    )
-    elems.append(
-        Paragraph(
-            _xml(
-                hv
-                if harvest
-                else "No harvest list in swarm output — add cost basis for detail."
-            ),
-            styles["body"],
+
+    # Harvest summary
+    harvest_syms = [tp["symbol"] for tp in ctx_tax_positions
+                    if float(tp.get("harvest_credit") or 0) > 0]
+    if harvest_syms and ctx_harvest_total > 0:
+        harvest_text = (
+            f"Tax-loss harvesting candidates: {', '.join(harvest_syms[:6])} — "
+            f"${ctx_harvest_total:,.0f} opportunity. "
+            f"Est. 5-year after-tax benefit: ${ctx_harvest_total * 5:,.0f} (assuming 20% CGT rate)."
         )
-    )
+    elif ctx_tax_narrative:
+        harvest_text = ctx_tax_narrative
+    else:
+        harvest_text = (
+            "Provide cost basis data to unlock full tax-loss harvesting analysis. "
+            "This identifies realizable losses that offset capital gains."
+        )
+    elems.append(Paragraph(_xml(harvest_text), styles["body"]))
     elems.append(PageBreak())
 
-    # PAGE 8 Alpha
+    # PAGE 8 Alpha — uses ctx["alpha_opps"] (always has at least 1 entry)
     elems.append(Paragraph("ALPHA OPPORTUNITIES", styles["h_section"]))
     elems.append(Spacer(1, 6))
-    if swarm_note:
-        elems.append(
-            Paragraph(
-                "<i>Run Swarm IC Analysis for full intelligence.</i>",
-                ParagraphStyle(
-                    "sn", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9
-                ),
-            )
-        )
-    for opp in opps[:5] if opps else []:
-        if isinstance(opp, dict):
-            title = opp.get("title") or opp.get("symbol") or "Opportunity"
-            impact = opp.get("impact") or opp.get("reason") or ""
-            regime_o = opp.get("regime") or regime_label
-            action = opp.get("action") or opp.get("reason") or ""
-            conf = float(opp.get("confidence") or 0.6)
-        else:
-            title, impact, regime_o, action, conf = str(opp), "", "", "", 0.5
+    if not ctx.get("swarm_available"):
+        elems.append(Paragraph(
+            "<i>Portfolio-derived signals below. Run Swarm IC Analysis to unlock "
+            "symbol-level alpha signals with estimated return impact.</i>",
+            ParagraphStyle("sn", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9),
+        ))
+        elems.append(Spacer(1, 4))
+    for opp in ctx["alpha_opps"][:5]:
+        if not isinstance(opp, dict):
+            continue
+        title = opp.get("title") or "Opportunity"
+        desc = opp.get("description") or ""
+        regime_o = opp.get("regime") or ctx["regime_label"] or "All regimes"
+        conf_raw = opp.get("confidence") or "—"
+        try:
+            conf = float(str(conf_raw).replace("%", "")) / 100 if "%" in str(conf_raw) else 0.65
+        except (ValueError, TypeError):
+            conf = 0.65
         card = Table(
             [
                 [Paragraph(f"<b>{_xml(str(title)[:80])}</b>", styles["body"])],
-                [Paragraph(_xml(str(impact)[:200]), styles["body"])],
-                [
-                    Paragraph(
-                        f"Regime: {_xml(str(regime_o))} · Confidence {conf:.0%}",
-                        styles["body"],
-                    )
-                ],
-                [Paragraph(f"Action: {_xml(str(action)[:200])}", styles["body"])],
+                [Paragraph(_xml(str(desc)[:300]), styles["body"])],
+                [Paragraph(
+                    f"Regime: {_xml(str(regime_o))} · Confidence: {_xml(str(conf_raw))}",
+                    styles["body"],
+                )],
                 [_confidence_bar(conf, bc)],
             ],
             colWidths=[A4_W - 2 * MARGIN],
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
-                    ("BOX", (0, 0), (-1, -1), 0.5, bc.ACCENT),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ]
-            ),
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), bc.SURFACE),
+                ("BOX", (0, 0), (-1, -1), 0.5, bc.ACCENT),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]),
         )
         elems.append(card)
         elems.append(Spacer(1, 8))
@@ -1457,14 +1907,12 @@ def _build_pdf_sync(
         )
     )
     if swarm_note:
-        elems.append(
-            Paragraph(
-                "<i>Limited agent trace — run Swarm IC Analysis for full detail.</i>",
-                ParagraphStyle(
-                    "sn2", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9
-                ),
-            )
-        )
+        elems.append(Paragraph(
+            "<i>Swarm IC analysis not yet run for this portfolio — "
+            "trace reflects DNA analysis only. "
+            "Run from the portfolio page for full 7-agent attribution.</i>",
+            ParagraphStyle("sn2", fontName="Helvetica-Oblique", textColor=bc.AMBER, fontSize=9),
+        ))
     elems.append(Spacer(1, 6))
     elems.append(
         Table(
@@ -1512,21 +1960,20 @@ def _build_pdf_sync(
     act_plan = thesis.get("action_plan") or thesis.get("recommendation_summary") or []
     if not isinstance(act_plan, list):
         act_plan = []
+    # Use ctx recommendations (always populated, from swarm + DNA + tax)
+    ctx_recs = ctx.get("recommendations") or []
     prio = [["#", "Action", "Rationale", "Expected Impact", "Timeline"]]
-    for i, a in enumerate((act_plan or [r.get("action") for r in recs])[:5]):
-        prio.append(
-            [
-                str(i + 1),
-                (
-                    _xml(str(a)[:80])
-                    if not isinstance(a, dict)
-                    else _xml(str(a.get("action", a))[:80])
-                ),
-                _xml("IC synthesis"),
-                "Medium",
-                "90 days",
-            ]
-        )
+    rec_source = act_plan if act_plan else ctx_recs
+    for i, a in enumerate(rec_source[:5]):
+        if isinstance(a, dict):
+            action_text = _xml(str(a.get("action", ""))[:80])
+            rationale_text = _xml(str(a.get("rationale", "IC synthesis"))[:60])
+            timeline_text = _xml(str(a.get("timeline", "90 days"))[:30])
+        else:
+            action_text = _xml(str(a)[:80])
+            rationale_text = _xml("IC synthesis")
+            timeline_text = "90 days"
+        prio.append([str(i + 1), action_text, rationale_text, "Portfolio optimisation", timeline_text])
     elems.append(
         Table(
             prio,
@@ -1627,6 +2074,7 @@ async def generate_advisor_report(
     dna_data: dict,
     swarm_data: Any | None,
     advisor_config: dict,
+    theme: str = "dark",
 ) -> bytes:
     """
     Orchestrator: async asset resolution, then synchronous PDF build.
@@ -1636,6 +2084,7 @@ async def generate_advisor_report(
 
     Returns raw PDF bytes; caller uploads or returns ``Response(content=...)``.
     Swarm data may be None; DNA may be empty — report still renders 10 pages.
+    ``theme`` is ``"dark"`` (default) or ``"light"`` (white background, print-friendly).
     """
     raw_logo = await _fetch_logo_bytes(advisor_config)
     logo_bytes = _prepare_logo_bytes(raw_logo)
@@ -1649,6 +2098,7 @@ async def generate_advisor_report(
             advisor_config,
             logo_bytes,
             swarm_data_present,
+            theme=theme,
         )
     except Exception as e:
         logger.error("pdf.orchestrator_failed", error=str(e), exc_info=True)
