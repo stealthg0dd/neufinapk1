@@ -21,7 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://neufin-web.vercel.app'),
+  metadataBase: new URL('https://www.neufin.ai'),
   icons: { icon: '/logo-icon.png', apple: '/logo-icon.png' },
   title: {
     default: 'NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence',
@@ -38,9 +38,9 @@ export const metadata: Metadata = {
     'Singapore fintech', 'UAE DFSA fintech', 'Estonia fintech EU',
   ],
   authors: [
-    { name: 'Varun Srivastava', url: 'https://neufin-web.vercel.app/about' },
-    { name: 'Ha Pham', url: 'https://neufin-web.vercel.app/about' },
-    { name: 'Ha Pham', url: 'https://neufin-web.vercel.app/about' },
+    { name: 'Varun Srivastava', url: 'https://www.neufin.ai/about' },
+    { name: 'Ha Pham', url: 'https://www.neufin.ai/about' },
+    { name: 'Ha Pham', url: 'https://www.neufin.ai/about' },
   ],
   creator: 'NeuFin — Neufin OÜ',
   publisher: 'Neufin OÜ',
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://neufin-web.vercel.app',
+    url: 'https://www.neufin.ai',
     siteName: 'NeuFin',
     title: 'NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence',
     description:
@@ -72,11 +72,11 @@ export const metadata: Metadata = {
     google: 'ADD_GOOGLE_SEARCH_CONSOLE_TOKEN_HERE',
   },
   alternates: {
-    canonical: 'https://neufin-web.vercel.app',
+    canonical: 'https://www.neufin.ai',
   },
   manifest: '/manifest.json',
   other: {
-    'llms-txt': 'https://neufin-web.vercel.app/llms.txt',
+    'llms-txt': 'https://www.neufin.ai/llms.txt',
   },
 }
 
