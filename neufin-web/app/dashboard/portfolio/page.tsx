@@ -188,7 +188,7 @@ export default function PortfolioPage() {
       if (canGeneratePdf) {
         const res = await apiFetch('/api/reports/generate', {
           method: 'POST',
-          body: JSON.stringify({ portfolio_id: portfolioId, advisor_id: 'self' }),
+          body: JSON.stringify({ portfolio_id: portfolioId }),
         })
         if (!res.ok) {
           throw new Error('Report generation failed')

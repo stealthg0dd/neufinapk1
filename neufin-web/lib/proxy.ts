@@ -22,20 +22,49 @@ export async function proxyToRailway(
   const url = `${RAILWAY_BASE}${backendPath}`
   const m = method || req.method
 
-  // Extract auth token — try cookie first, then Authorization header
-  const cookie = req.cookies.get('neufin-auth')?.value
-  const authHeader = req.headers.get('authorization')
+  // Auth token extraction — Authorization header takes priority over cookie.
+  // The Authorization header always carries the fresh Supabase session token
+  // (api-client.ts calls getSession() which auto-refreshes).
+  // The neufin-auth cookie can contain stale/expired JWTs from previous sessions,
+  // causing Railway to return 401 even when the browser has a valid token.
   let bearerToken: string | null = null
 
-  if (cookie) {
-    try {
-      const parsed = JSON.parse(cookie)
-      bearerToken = parsed?.access_token || parsed?.token || cookie
-    } catch {
-      bearerToken = cookie
+  // 1. Authorization header wins (always freshest token)
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    bearerToken = authHeader.slice(7).trim() || null
+  }
+
+  // 2. Fall back to cookie only if no Authorization header present
+  if (!bearerToken) {
+    const cookie = req.cookies.get('neufin-auth')?.value
+    if (cookie) {
+      try {
+        const parsed = JSON.parse(cookie)
+        const candidate: string | null = parsed?.access_token || parsed?.token || null
+        if (candidate) {
+          // Skip obviously-expired tokens so we fail fast with a clear error
+          // rather than forwarding a bad token and getting a confusing 401/500.
+          try {
+            const parts = candidate.split('.')
+            const payload = JSON.parse(
+              atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+            ) as { exp?: number }
+            if (payload.exp && Date.now() / 1000 > payload.exp) {
+              console.warn('[proxy] neufin-auth cookie token is expired — no auth forwarded')
+            } else {
+              bearerToken = candidate
+            }
+          } catch {
+            // Can't decode JWT — use it anyway and let Railway decide
+            bearerToken = candidate
+          }
+        }
+      } catch {
+        // Cookie is a raw string, not JSON
+        bearerToken = cookie
+      }
     }
-  } else if (authHeader) {
-    bearerToken = authHeader.replace('Bearer ', '')
   }
 
   const headers: Record<string, string> = {
