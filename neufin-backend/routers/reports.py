@@ -238,7 +238,11 @@ async def generate_report(
 
             swarm_result = (
                 supabase.table("swarm_reports")
-                .select("*")
+                .select(
+                    "id,user_id,created_at,headline,regime,risk_sentinel,"
+                    "investment_thesis,market_regime,quant_analysis,tax_report,"
+                    "alpha_scout,action_plan,agent_trace"
+                )
                 .eq("user_id", user.id)
                 .order("created_at", desc=True)
                 .limit(1)
@@ -257,7 +261,17 @@ async def generate_report(
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e)) from e
+            tb = traceback.format_exc()
+            logger.error(
+                "reports.db_fetch_failed",
+                error=str(e),
+                traceback=tb,
+                portfolio_id=getattr(body, "portfolio_id", "unknown"),
+                user_id=str(user.id) if user else "unknown",
+            )
+            raise HTTPException(
+                status_code=500, detail=f"Data fetch failed: {e!s}"
+            ) from e
 
         positions_raw = list(positions_result.data or [])
         if not positions_raw:
@@ -272,7 +286,17 @@ async def generate_report(
         try:
             metrics = calculate_portfolio_metrics(positions_raw)
         except Exception as e:
-            raise HTTPException(status_code=422, detail=str(e)) from e
+            tb = traceback.format_exc()
+            logger.error(
+                "reports.metrics_calc_failed",
+                error=str(e),
+                traceback=tb,
+                num_positions=len(positions_raw),
+                portfolio_id=getattr(body, "portfolio_id", "unknown"),
+            )
+            raise HTTPException(
+                status_code=422, detail=f"Metrics calculation failed: {e!s}"
+            ) from e
 
         run_id = uuid.uuid4().hex[:8]
         brand = body.color_scheme.model_dump() if body.color_scheme else None
@@ -357,7 +381,15 @@ async def generate_report(
             out["filename"] = filename
         return out
 
-    except HTTPException:
+    except HTTPException as http_exc:
+        if http_exc.status_code >= 500:
+            logger.error(
+                "reports.5xx_http_exception",
+                status_code=http_exc.status_code,
+                detail=str(http_exc.detail),
+                portfolio_id=getattr(body, "portfolio_id", "unknown"),
+                user_id=str(user.id) if user else "unknown",
+            )
         raise
     except Exception as e:
         tb = traceback.format_exc()
