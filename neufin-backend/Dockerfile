@@ -4,10 +4,16 @@ FROM python:3.11-slim AS builder
 WORKDIR /app
 
 # Build tools required by numpy, cryptography, and other C-extension packages.
+# Cairo/Pango dev headers are required by reportlab's graphics renderer and any
+# package that compiles cffi-based cairo bindings (e.g. cairocffi, WeasyPrint).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libssl-dev \
         libffi-dev \
+        libcairo2-dev \
+        libpango1.0-dev \
+        libpangocairo-1.0-0 \
+        pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -19,7 +25,15 @@ RUN pip install --no-cache-dir --upgrade pip \
 FROM python:3.11-slim AS production
 
 # curl is required for the built-in HEALTHCHECK command.
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# Cairo/Pango runtime libraries are required by reportlab's graphics renderer
+# (renderPM / svglib).  Without these .so files the worker dies with an OSError
+# at import time, producing a silent 500 with no Python traceback in the logs.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        libcairo2 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
