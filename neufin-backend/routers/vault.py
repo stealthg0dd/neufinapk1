@@ -316,27 +316,66 @@ async def claim_session_portfolios(
 # ── Subscription ───────────────────────────────────────────────────────────────
 
 
+def _compute_is_pro(tier: str, status: str, trial_started_at: object) -> bool:
+    """
+    Returns True when the user has full (Advisor-tier) access:
+      - Paid advisor/enterprise subscription that is currently active, OR
+      - An active 14-day trial (trial_started_at is within the last 14 days).
+    """
+    # Paid tiers
+    if tier in ("advisor", "enterprise") and status == "active":
+        return True
+
+    # Trial period
+    if status == "trial" and trial_started_at:
+        from datetime import datetime, timezone, timedelta
+        try:
+            ts = trial_started_at
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            trial_end = ts + timedelta(days=14)
+            if datetime.now(timezone.utc) < trial_end:
+                return True
+        except Exception:
+            pass
+
+    return False
+
+
 @router.get("/subscription")
 async def get_subscription(user: JWTUser = Depends(get_current_user)):
-    """Return the user's current subscription_tier from user_profiles."""
+    """Return the user's current subscription tier and access level."""
     uid = user.id
     try:
         result = (
             supabase.table("user_profiles")
-            .select("subscription_tier, advisor_name, firm_name")
+            .select(
+                "subscription_tier, subscription_status, trial_started_at, "
+                "advisor_name, firm_name"
+            )
             .eq("id", uid)
             .single()
             .execute()
         )
         data = result.data or {}
+        tier   = data.get("subscription_tier", "free") or "free"
+        status = data.get("subscription_status", "free") or "free"
+        trial_started_at = data.get("trial_started_at")
         return {
-            "subscription_tier": data.get("subscription_tier", "free"),
-            "is_pro": data.get("subscription_tier") == "pro",
-            "advisor_name": data.get("advisor_name"),
-            "firm_name": data.get("firm_name"),
+            "subscription_tier":   tier,
+            "subscription_status": status,
+            "trial_started_at":    str(trial_started_at or ""),
+            "is_pro":              _compute_is_pro(tier, status, trial_started_at),
+            "advisor_name":        data.get("advisor_name"),
+            "firm_name":           data.get("firm_name"),
         }
     except Exception:
-        return {"subscription_tier": "free", "is_pro": False}
+        return {
+            "subscription_tier":   "free",
+            "subscription_status": "free",
+            "trial_started_at":    "",
+            "is_pro":              False,
+        }
 
 
 # ── Stripe Customer Portal ─────────────────────────────────────────────────────
