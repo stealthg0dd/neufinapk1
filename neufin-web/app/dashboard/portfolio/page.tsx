@@ -179,7 +179,11 @@ export default function PortfolioPage() {
 
       const data = (await res.json()) as DNAAnalysisResponse
       setResult(data)
-      localStorage.setItem('neufin-last-analysis', JSON.stringify(data))
+      try {
+        localStorage.setItem('neufin-last-analysis', JSON.stringify(data))
+      } catch {
+        // Ignore circular reference errors from React-decorated objects
+      }
       setProgress(100)
       // Advance to step 2 — swarm IC analysis is now available
       setStep('dna_complete')
@@ -690,7 +694,7 @@ export default function PortfolioPage() {
             </button>
             <button
               type="button"
-              onClick={handleDownloadReport}
+              onClick={() => void handleDownloadReport()}
               disabled={downloadLoading || !portfolioId}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${
                 isAdvisorPlan
@@ -768,7 +772,7 @@ export default function PortfolioPage() {
               </p>
               <button
                 type="button"
-                onClick={handleDownloadReport}
+                onClick={() => void handleDownloadReport()}
                 disabled={downloadLoading || !portfolioId}
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
                 style={{

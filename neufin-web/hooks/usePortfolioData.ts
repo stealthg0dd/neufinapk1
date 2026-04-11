@@ -135,9 +135,21 @@ export function usePortfolioData() {
       // ── Full DNA from Supabase (has investor_type, strengths, weaknesses etc.) ──
       // /api/portfolio/list only returns dna_score as int; query dna_scores directly.
       try {
-        // Ensure the session is fresh before making a direct Supabase REST call.
-        // An expired JWT causes a 400 "exp claim timestamp check failed" error.
-        await supabase.auth.getSession()
+        // Force a fresh access token before making a direct Supabase REST call.
+        // getSession() returns the cached session; if the JWT is already expired
+        // the background refresh may not have completed yet, causing a 400
+        // "exp claim timestamp check failed" from the Supabase REST API.
+        // refreshSession() makes an explicit /auth/v1/token?grant_type=refresh_token
+        // network call and blocks until the new token is ready.
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          const expiresAt = session.expires_at ?? 0
+          const nowSecs = Math.floor(Date.now() / 1000)
+          // Refresh if token expired or expires within the next 60 seconds
+          if (expiresAt - nowSecs < 60) {
+            await supabase.auth.refreshSession()
+          }
+        }
         const { data: dnaRows, error: dnaErr } = await supabase
           .from('dna_scores')
           .select(
