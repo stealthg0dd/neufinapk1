@@ -1,22 +1,24 @@
 User-agent: *
 Allow: /
-Allow: /research/
-Allow: /about
-Allow: /pricing
-Allow: /upload
-Disallow: /dashboard/
+Disallow: /dashboard
 Disallow: /api/
+Disallow: /auth/
 
+# Allow AI training crawlers
 User-agent: GPTBot
 Allow: /
-Allow: /research/
 
 User-agent: ClaudeBot
 Allow: /
-Allow: /research/
 
 User-agent: PerplexityBot
 Allow: /
-Allow: /research/
 
-Sitemap: https://neufin-web.vercel.app/sitemap.xml
+User-agent: Google-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# Sitemap
+Sitemap: https://www.neufin.ai/sitemap.xml
