@@ -97,6 +97,7 @@ from routers import (  # noqa: E402
     market,
     payments,
     portfolio,
+    profile as profile_router,
     referrals,
     reports,
     research as research_router,
@@ -691,6 +692,7 @@ app.include_router(alerts.router)
 app.include_router(admin_router.router)
 app.include_router(revenue_router.router)
 app.include_router(research_router.router)
+app.include_router(profile_router.router)
 
 
 # ── Global OPTIONS handler ─────────────────────────────────────────────────────

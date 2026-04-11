@@ -1072,7 +1072,13 @@ def _make_cover_callback(
         )
         canvas.drawCentredString(A4_W / 2, MARGIN - 4, disc[:180])
 
-        if not ctx["white_label"]:
+        if ctx["white_label"]:
+            # White-labeled: show firm attribution instead of NeuFin branding
+            footer_text = f"Prepared by {firm_name} · Confidential" if firm_name else "Confidential"
+            canvas.setFont("Helvetica-Bold", 8)
+            canvas.setFillColor(pal["text_mut"])
+            canvas.drawCentredString(A4_W / 2, MARGIN + 12, footer_text)
+        else:
             canvas.setFont("Helvetica-Bold", 8)
             canvas.setFillColor(ACCENT_TEAL)
             canvas.drawCentredString(A4_W / 2, MARGIN + 12, "Powered by NeuFin Intelligence")

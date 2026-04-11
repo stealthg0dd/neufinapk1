@@ -331,7 +331,11 @@ async def generate_report(
 
             profile_result = (
                 supabase.table("user_profiles")
-                .select("full_name, email, avatar_url, subscription_tier")
+                .select(
+                    "full_name, email, avatar_url, subscription_tier,"
+                    "firm_name, firm_logo_url, advisor_name, advisor_email,"
+                    "white_label_enabled, brand_primary_color"
+                )
                 .eq("id", str(user.id))
                 .limit(1)
                 .execute()
@@ -403,17 +407,43 @@ async def generate_report(
 
         run_id = uuid.uuid4().hex[:8]
         brand = body.color_scheme.model_dump() if body.color_scheme else None
+
+        # White-label: request body fields take priority; fall back to saved profile config
+        profile_wl_enabled = bool(profile.get("white_label_enabled"))
+        effective_white_label = body.white_label or profile_wl_enabled
+        effective_firm_name = (
+            body.firm_name
+            or profile.get("firm_name")
+            or profile.get("full_name")
+            or ""
+        )
+        effective_advisor_name = (
+            body.advisor_name
+            if body.advisor_name != "NeuFin Intelligence"  # not the default
+            else (profile.get("advisor_name") or body.advisor_name)
+        )
+        effective_logo_url = (
+            body.advisor_logo_url
+            or profile.get("firm_logo_url")
+            or profile.get("avatar_url")
+        )
+        effective_email = (
+            body.advisor_email
+            if body.advisor_email != "info@neufin.ai"  # not the default
+            else (profile.get("advisor_email") or profile.get("email") or "info@neufin.ai")
+        )
+
         advisor_config = {
-            "firm_name": body.firm_name or profile.get("full_name") or "",
-            "logo_url": body.advisor_logo_url or profile.get("avatar_url"),
+            "firm_name": effective_firm_name,
+            "logo_url": effective_logo_url,
             "logo_base64": body.logo_base64,
-            "brand_colors": brand,
-            "advisor_name": body.advisor_name,
+            "brand_colors": brand or (
+                {"primary": profile.get("brand_primary_color")} if profile.get("brand_primary_color") else None
+            ),
+            "advisor_name": effective_advisor_name,
             "client_name": body.client_name,
-            "advisor_email": body.advisor_email
-            or profile.get("email")
-            or "info@neufin.ai",
-            "white_label": body.white_label,
+            "advisor_email": effective_email,
+            "white_label": effective_white_label,
             "report_run_id": run_id,
         }
 
