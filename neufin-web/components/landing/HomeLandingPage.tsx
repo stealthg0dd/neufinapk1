@@ -109,8 +109,8 @@ export default function HomeLandingPage({
 
             <p className="mb-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
               Upload your portfolio. Our swarm of 7 specialized AI agents analyzes market regime, behavioral biases, risk
-              clusters, and alpha opportunities — delivering an IC-grade investment brief in 60 seconds. No Bloomberg
-              subscription required.
+              clusters, and alpha opportunities — delivering an Investment Committee briefing in 60 seconds.
+              No expensive data terminals required.
             </p>
 
             <div className="mb-8 flex flex-wrap gap-6">
@@ -163,7 +163,7 @@ export default function HomeLandingPage({
             </div>
 
             <p className="mb-4 text-[11px] text-muted-foreground">
-              In beta with advisors across SG, UAE & UK · Enterprise-grade security · info@neufin.ai
+              In beta with advisors across Singapore, UAE & UK · Enterprise-grade security · info@neufin.ai
             </p>
 
             <div className="flex flex-wrap items-center gap-4">
@@ -197,12 +197,12 @@ export default function HomeLandingPage({
           <div className="mb-16 text-center">
             <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary">AGENTIC AI SYSTEM</p>
             <h2 className="text-4xl font-bold text-foreground">
-              7 AI agents working in parallel
+              Seven specialized agents.
               <br />
-              on every portfolio decision.
+              One Investment Committee briefing.
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-              Most platforms give you data. NeuFin gives you a team. Seven specialized AI agents run simultaneously the
+              Most platforms give you data. NeuFin gives you a complete Investment Committee. Seven specialized AI agents run simultaneously the
               moment you upload your portfolio — each one an expert in its domain.
             </p>
           </div>
@@ -211,71 +211,71 @@ export default function HomeLandingPage({
             const agents = [
               {
                 id: 'market_regime',
-                name: 'MARKET REGIME',
+                name: 'MACRO INTELLIGENCE',
                 emoji: '🌍',
-                tagline: 'Reads the macro environment',
+                tagline: 'Monitors the macro environment',
                 description:
-                  'Monitors VIX, PMI, yield curve, and inflation signals via FRED API to classify the current market regime across 5 categories.',
+                  'Monitors VIX, PMI, yield curve, and CPI signals via FRED to classify the current regime across 5 categories. Every portfolio decision is regime-aware.',
                 output: 'Current: Risk-Off · Confidence 82%',
                 color: 'risk',
               },
               {
                 id: 'strategist',
-                name: 'STRATEGIST',
+                name: 'PORTFOLIO STRATEGIST',
                 emoji: '🧠',
-                tagline: 'Turns macro into narrative',
+                tagline: 'Turns macro signals into positioning',
                 description:
-                  'Synthesizes Finnhub news + FRED signals into a coherent macro narrative and positioning thesis for your specific holdings.',
+                  'Synthesizes macro signals and news flow into a positioning thesis specific to your holdings. Tells you what to do, not just what is happening.',
                 output: 'Defensive rotation recommended',
                 color: 'warning',
               },
               {
                 id: 'quant',
-                name: 'QUANT',
+                name: 'QUANTITATIVE ANALYSIS',
                 emoji: '📊',
-                tagline: "Numbers don't lie",
+                tagline: 'Pure portfolio mathematics',
                 description:
-                  'Computes HHI concentration, weighted beta across 6 data providers, Sharpe ratio, and correlation cluster analysis.',
+                  'Computes HHI concentration, weighted beta, Sharpe ratio, and correlation clusters across six data providers. No model assumptions — pure portfolio mathematics.',
                 output: 'Sharpe 1.24 · Beta 0.82 · 3 clusters',
                 color: 'primary',
               },
               {
                 id: 'tax_arch',
-                name: 'TAX ARCHITECT',
+                name: 'TAX OPTIMISATION',
                 emoji: '🏛️',
                 tagline: 'Protects after-tax alpha',
                 description:
-                  'Calculates per-position CGT liability and after-tax alpha. Flags positions approaching long-term capital gains thresholds.',
+                  'Calculates per-position CGT liability and flags tax-loss harvesting opportunities before year-end. Protects after-tax alpha without manual spreadsheets.',
                 output: 'CGT exposure: $4,200',
                 color: 'warning',
               },
               {
                 id: 'risk_sentinel',
-                name: 'RISK SENTINEL',
+                name: 'INDEPENDENT RISK REVIEW',
                 emoji: '🛡️',
-                tagline: 'Independent risk layer',
+                tagline: 'A second opinion on every portfolio',
                 description:
-                  'Runs a completely independent risk assessment — not influenced by the other agents. Provides a second opinion on concentration and tail risk.',
+                  'Runs a fully independent risk assessment — not influenced by any other agent. A second opinion on concentration, tail risk, and drawdown exposure.',
                 output: 'Risk: HIGH · Tech cluster 67%',
                 color: 'risk',
               },
               {
                 id: 'alpha_scout',
-                name: 'ALPHA SCOUT',
+                name: 'ALPHA DISCOVERY',
                 emoji: '⚡',
-                tagline: "Finds what you're missing",
+                tagline: 'Finds what your portfolio is missing',
                 description:
-                  "Scans for alpha opportunities your current portfolio isn't capturing — sector rotations, momentum signals, and underweighted positions relative to regime.",
+                  'Scans for opportunities your portfolio is not capturing — sector rotations, momentum signals, and underweighted positions relative to live regime.',
                 output: '2 opportunities identified',
                 color: 'positive',
               },
               {
                 id: 'synthesizer',
-                name: 'SYNTHESIZER',
+                name: 'IC SYNTHESIS',
                 emoji: '✦',
-                tagline: 'Produces the IC briefing',
+                tagline: 'Produces the Investment Committee briefing',
                 description:
-                  'Aggregates all agent outputs into a single institutional-grade Investment Committee briefing — actionable, cited, and audit-ready.',
+                  'Aggregates all agent outputs into a single Investment Committee briefing — structured, cited, and ready for client or committee delivery.',
                 output: 'IC Briefing → PDF ready',
                 color: 'accent',
               },
@@ -385,7 +385,7 @@ export default function HomeLandingPage({
       {/* SECTION 2 — PROBLEM / SOLUTION */}
       <section className="py-20">
         <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="text-3xl font-bold text-foreground">Why advisors and PE teams choose to switch</h2>
+          <h2 className="text-3xl font-bold text-foreground">Why leading advisors are switching to NeuFin</h2>
         </div>
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
           <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
@@ -395,9 +395,9 @@ export default function HomeLandingPage({
             </h3>
             <ul className="space-y-3">
               {[
-                '3 hours building one quarterly client report — manually',
-                "No behavioral explanation when clients ask 'why is my portfolio down?'",
-                'Losing clients to robo-advisors who charge 0.25% vs your 1% AUM fee',
+                '3 hours building a single quarterly report — manually, every time',
+                'No clear explanation when clients ask why their portfolio is underperforming',
+                'Robo-advisors at 0.25% AUM competing directly against your 1% fee',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
@@ -413,9 +413,9 @@ export default function HomeLandingPage({
             </h3>
             <ul className="space-y-3">
               {[
-                "Portfolio DNA brief in 60 seconds — branded with your name, not NeuFin's",
-                "Behavioral bias detection: 'Your client shows Overconfidence — here's the dollar impact'",
-                'IC-grade output that justifies your advisory fee vs any robo-competitor',
+                "Investment Committee brief in 60 seconds — white-labeled with your firm's branding",
+                'Behavioral bias detection with quantified dollar impact per client portfolio',
+                'IC-grade analysis that demonstrates the value of human advisory beyond any algorithm',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
@@ -428,7 +428,7 @@ export default function HomeLandingPage({
       </section>
       <section className="py-20">
         <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="text-3xl font-bold text-foreground">Why B2B platforms choose NeuFin over building in-house</h2>
+          <h2 className="text-3xl font-bold text-foreground">Why wealth platforms choose NeuFin over building in-house</h2>
         </div>
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
           <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
@@ -438,9 +438,9 @@ export default function HomeLandingPage({
             </h3>
             <ul className="space-y-3">
               {[
-                '6–12 months to build a behavioral intelligence layer',
-                '3 engineers, $200K+ in development cost',
-                'Churn spikes 15–25% every market correction with no intervention tool',
+                '6 to 12 months to build a behavioral intelligence layer from scratch',
+                'Three engineers and over $200,000 in development cost before launch',
+                'Client churn spikes 15 to 25 percent in every market correction',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
@@ -456,9 +456,9 @@ export default function HomeLandingPage({
             </h3>
             <ul className="space-y-3">
               {[
-                'REST API integration in a weekend — not 6 months',
-                'DNA Score + behavioral bias flags per user portfolio',
-                'Churn risk detection before users panic-sell',
+                'REST API integration in a single weekend — not six months',
+                'Behavioral DNA score and bias flags per user portfolio, out of the box',
+                'Churn risk detection before clients panic-sell — automated and scalable',
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
                   <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
@@ -794,7 +794,7 @@ export default function HomeLandingPage({
       <section className="py-20">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <p className="text-xl font-semibold text-foreground md:text-2xl">
-            IC-grade portfolio intelligence in 60 seconds. No Bloomberg. No analyst. No waiting.
+            IC-grade portfolio intelligence in 60 seconds. No terminals. No analysts. No waiting.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
@@ -825,6 +825,11 @@ export default function HomeLandingPage({
                 <p>© 2026 Neufin OÜ. All rights reserved.</p>
                 <p>A unit of CTech Ventures</p>
                 <p>info@neufin.ai · www.neufin.ai</p>
+                <p className="mt-1">
+                  <a href="/terms-and-conditions" className="underline hover:text-muted-foreground/80">Terms &amp; Conditions</a>
+                  {' · '}
+                  <a href="/privacy" className="underline hover:text-muted-foreground/80">Privacy Policy</a>
+                </p>
               </div>
             </div>
 
