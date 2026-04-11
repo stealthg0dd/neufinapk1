@@ -143,8 +143,8 @@ async def get_white_label(user: JWTUser = Depends(get_current_user)):
             rowp = pr.data[0]
             advisor_email = rowp.get("advisor_email") or ""
             firm_logo_url = rowp.get("firm_logo_url") or ""
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("profile.user_profile_read_failed", error=str(exc))
 
     try:
         result = (

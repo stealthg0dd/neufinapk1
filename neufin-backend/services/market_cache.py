@@ -13,12 +13,15 @@ Tier-2 returns the serialised pandas Series immediately — no Alpha Vantage cal
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 import math
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 import structlog
@@ -487,19 +490,20 @@ SWARM_JOB_TTL = 86_400  # 24 hours
 _SWARM_JOB_MEMORY: dict[str, dict] = {}
 
 # ── File-based job store — shared across all Gunicorn workers via /tmp ──────────
-# When Redis is unavailable, worker A creates a job and writes it to /tmp.
-# Worker B polls for status and reads the same file from /tmp.
+# When Redis is unavailable, worker A creates a job and writes it to the OS temp dir.
+# Worker B polls for status and reads the same file — shared across Gunicorn workers.
 # This solves the cross-worker 404 that occurs with _SWARM_JOB_MEMORY (per-process).
-import asyncio as _asyncio
-from pathlib import Path as _Path
-
-_JOB_STORE_PATH = _Path("/tmp/neufin_swarm_jobs")
+_JOB_STORE_PATH = Path(tempfile.gettempdir()) / "neufin_swarm_jobs"
 try:
     _JOB_STORE_PATH.mkdir(exist_ok=True)
-except Exception:
-    pass  # /tmp may not be writable in some local dev environments
+except Exception as exc:
+    logger.debug(
+        "swarm.job_store_mkdir_skipped",
+        path=str(_JOB_STORE_PATH),
+        error=str(exc),
+    )
 
-_FILE_LOCK = _asyncio.Lock()
+_FILE_LOCK = asyncio.Lock()
 
 
 async def _file_job_get(job_id: str) -> dict | None:
@@ -529,14 +533,16 @@ async def _file_job_delete(job_id: str) -> None:
     try:
         if path.exists():
             path.unlink()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "swarm.file_job_delete_failed",
+            job_id=job_id,
+            error=str(exc),
+        )
 
 
 async def get_redis():
     """Async wrapper around the module Redis singleton getter."""
-    import asyncio
-
     return await asyncio.to_thread(_get_redis)
 
 

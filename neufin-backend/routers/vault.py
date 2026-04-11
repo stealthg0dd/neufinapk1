@@ -14,6 +14,8 @@ GET  /api/plans                  → all subscription plans (public, no auth)
 GET  /api/subscription/status    → current user's plan + monthly usage (auth required)
 """
 
+from datetime import UTC, datetime, timedelta
+
 import stripe
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -330,16 +332,17 @@ def _compute_is_pro(tier: str, status: str, trial_started_at: object) -> bool:
 
     # Trial period
     if status == "trial" and trial_started_at:
-        from datetime import datetime, timezone, timedelta
         try:
             ts = trial_started_at
             if isinstance(ts, str):
                 ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if getattr(ts, "tzinfo", None) is None:
+                ts = ts.replace(tzinfo=UTC)
             trial_end = ts + timedelta(days=14)
-            if datetime.now(timezone.utc) < trial_end:
+            if datetime.now(UTC) < trial_end:
                 return True
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("vault.trial_window_parse_failed", error=str(exc))
 
     return False
 

@@ -13,6 +13,7 @@
 
 import base64
 import datetime
+import json
 import traceback
 import uuid
 
@@ -101,54 +102,65 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
 
 def _normalize_positions(positions: list) -> list:
     """
-    Ensures weight_pct sums to ~100. Handles CSVs where
-    weight_pct was populated with share counts.
-    Also ensures value is populated for each position.
+    Ensures weight_pct and weight sum to ~100.
+
+    The portfolio_positions table has BOTH weight AND weight_pct.
+    After a CSV upload, weight_pct may contain share counts if the
+    upload pipeline misidentified the column — this normalizes it.
+
+    Uses value column (confirmed in schema) as source of truth.
     """
     if not positions:
         return positions
 
-    def _px(p: dict) -> float:
-        return float(p.get("price") or p.get("current_price") or 0)
-
-    # Compute total_value from position values
+    # Use value column (confirmed in schema) for normalization
     total_value = sum(float(p.get("value") or 0) for p in positions)
 
-    # If no values, try shares * price
+    # Fallback: shares * price
     if total_value <= 0:
         total_value = sum(
-            float(p.get("shares") or 0) * _px(p)
+            float(p.get("shares") or 0)
+            * float(
+                p.get("price")
+                or p.get("current_price")
+                or p.get("last_price")
+                or 0
+            )
             for p in positions
         )
 
-    # Check if weights look like percentages already
+    # Check current weight sum
     weight_sum = sum(
         float(p.get("weight_pct") or p.get("weight") or 0)
         for p in positions
     )
 
-    needs_normalization = weight_sum > 110 or weight_sum < 50
+    # Normalize if weights look like share counts (sum >> 100)
+    # or weights are all zero
+    needs_norm = weight_sum > 110 or weight_sum < 1
 
-    for p in positions:
-        # Always ensure value is set
-        if not p.get("value") or float(p.get("value") or 0) == 0:
-            shares = float(p.get("shares") or 0)
-            price = _px(p)
-            if shares > 0 and price > 0:
-                p["value"] = round(shares * price, 2)
-
-        # Normalize weight if needed
-        if needs_normalization and total_value > 0:
-            pos_value = float(p.get("value") or 0)
-            p["weight_pct"] = round(pos_value / total_value * 100, 4)
-            p["weight"] = p["weight_pct"]
-
-    # If equal weight needed (no value data at all)
-    if needs_normalization and total_value <= 0:
-        equal_w = round(100 / len(positions), 4)
+    if needs_norm and total_value > 0:
         for p in positions:
-            p["weight_pct"] = equal_w
-            p["weight"] = equal_w
+            pos_val = float(p.get("value") or 0)
+            w = round(pos_val / total_value * 100, 4) if pos_val > 0 else 0.0
+            p["weight_pct"] = w
+            p["weight"] = w
+        logger.info(
+            "reports.weights_normalized",
+            original_sum=weight_sum,
+            new_sum=sum(p["weight_pct"] for p in positions),
+            total_value=total_value,
+        )
+    elif needs_norm:
+        # No value data — equal weight
+        eq = round(100 / len(positions), 4)
+        for p in positions:
+            p["weight_pct"] = eq
+            p["weight"] = eq
+        logger.warning(
+            "reports.weights_equal_fallback",
+            num_positions=len(positions),
+        )
 
     return positions
 
@@ -196,8 +208,11 @@ def _upload_to_storage(pdf_bytes: bytes, filename: str) -> str | None:
             url = signed.get("signedURL") or signed.get("signedUrl")
             if url:
                 return url
-        except Exception:  # noqa: S110 — fall through to public URL
-            pass
+        except Exception as exc:
+            logger.debug(
+                "reports.storage_signed_url_failed",
+                error=str(exc),
+            )
     except Exception as e:
         logger.warning("reports.storage_upload_failed", error=str(e))
         return None
@@ -272,6 +287,7 @@ async def generate_report(
                 raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
         try:
+            adv: dict = {}
             portfolio_result = (
                 supabase.table("portfolios")
                 .select("id, user_id, name, total_value")
@@ -299,13 +315,16 @@ async def generate_report(
 
             positions_result = (
                 supabase.table("portfolio_positions")
-                .select("symbol, shares, value, weight_pct, current_price")
+                .select(
+                    "symbol, shares, current_price, last_price, value, "
+                    "weight_pct, weight, cost_basis, sector, industry, "
+                    "asset_class, currency"
+                )
                 .eq("portfolio_id", body.portfolio_id)
                 .execute()
             )
 
-            # Try portfolio-specific swarm first (session_id = portfolio_id)
-            _swarm_cols = (
+            _swarm_select = (
                 "id,user_id,created_at,headline,briefing,regime,"
                 "risk_sentinel,investment_thesis,market_regime,"
                 "quant_analysis,alpha_signal,recommendation_summary,"
@@ -313,9 +332,11 @@ async def generate_report(
                 "dna_score,weighted_beta,sharpe_ratio,sentiment_score,"
                 "key_risks,alpha_outlook,technical_outlook,tax_report,session_id"
             )
+
+            # Primary: match swarm to this specific portfolio
             swarm_result = (
                 supabase.table("swarm_reports")
-                .select(_swarm_cols)
+                .select(_swarm_select)
                 .eq("user_id", str(user.id))
                 .eq("session_id", body.portfolio_id)
                 .order("created_at", desc=True)
@@ -324,23 +345,68 @@ async def generate_report(
             )
             swarm_row = swarm_result.data[0] if swarm_result.data else None
 
-            # Fallback: most recent swarm for this user (any portfolio)
+            # Fallback: most recent swarm for this user
             if not swarm_row:
-                fallback = (
+                fallback_result = (
                     supabase.table("swarm_reports")
-                    .select(_swarm_cols)
+                    .select(_swarm_select)
                     .eq("user_id", str(user.id))
                     .order("created_at", desc=True)
                     .limit(1)
                     .execute()
                 )
-                swarm_row = fallback.data[0] if fallback.data else None
+                swarm_row = (
+                    fallback_result.data[0] if fallback_result.data else None
+                )
                 if swarm_row:
                     logger.warning(
                         "reports.swarm_portfolio_mismatch",
-                        portfolio_id=body.portfolio_id,
-                        swarm_session_id=swarm_row.get("session_id"),
+                        requested_portfolio=body.portfolio_id,
+                        swarm_session=swarm_row.get("session_id"),
                     )
+
+            if swarm_row:
+                raw_alpha = swarm_row.get("alpha_signal")
+                parsed_opps: list = []
+                try:
+                    if isinstance(raw_alpha, str) and raw_alpha.strip():
+                        parsed = json.loads(raw_alpha)
+                        parsed_opps = (
+                            parsed.get("opportunities")
+                            or parsed.get("alpha_opportunities", {}).get(
+                                "opportunities"
+                            )
+                            or []
+                        )
+                    elif isinstance(raw_alpha, dict):
+                        parsed_opps = (
+                            raw_alpha.get("opportunities")
+                            or raw_alpha.get("alpha_opportunities", {}).get(
+                                "opportunities"
+                            )
+                            or []
+                        )
+                    elif isinstance(raw_alpha, list):
+                        parsed_opps = raw_alpha
+                except Exception as e:
+                    logger.warning("reports.alpha_parse_failed", error=str(e))
+
+                swarm_row["alpha_signal_parsed"] = parsed_opps
+
+                if parsed_opps:
+                    lines: list[str] = []
+                    for o in parsed_opps[:5]:
+                        if not isinstance(o, dict):
+                            continue
+                        try:
+                            c0 = float(o.get("confidence", 0) or 0)
+                        except (TypeError, ValueError):
+                            c0 = 0.0
+                        conf_i = int(c0 * 100) if c0 <= 1.0 else int(c0)
+                        sym = o.get("symbol", "")
+                        reason = str(o.get("reason", ""))[:250]
+                        lines.append(f"{sym}: {conf_i}% confidence — {reason}")
+                    swarm_row["alpha_signal"] = "\n\n".join(lines)
 
             profile_result = (
                 supabase.table("user_profiles")
@@ -355,33 +421,21 @@ async def generate_report(
             )
             profile = (profile_result.data or [None])[0] or {}
 
-            # Merge advisors row (white-label source of truth)
             try:
-                adv_r = (
+                adv_result = (
                     supabase.table("advisors")
-                    .select("firm_name,advisor_name,logo_base64,white_label,brand_color")
+                    .select(
+                        "advisor_name, firm_name, logo_base64, "
+                        "white_label, brand_color"
+                    )
                     .eq("id", str(user.id))
                     .limit(1)
                     .execute()
                 )
-                if adv_r.data:
-                    ar = adv_r.data[0]
-                    if ar.get("firm_name"):
-                        profile["firm_name"] = profile.get("firm_name") or ar["firm_name"]
-                    if ar.get("advisor_name"):
-                        profile["advisor_name"] = profile.get("advisor_name") or ar["advisor_name"]
-                    if ar.get("logo_base64"):
-                        profile["advisor_logo_base64"] = ar["logo_base64"]
-                    if ar.get("brand_color"):
-                        profile["brand_primary_color"] = (
-                            profile.get("brand_primary_color") or ar["brand_color"]
-                        )
-                    if ar.get("white_label") is not None:
-                        profile["white_label_enabled"] = bool(ar.get("white_label")) or bool(
-                            profile.get("white_label_enabled")
-                        )
-            except Exception:
-                pass
+                adv = adv_result.data[0] if adv_result.data else {}
+            except Exception as exc:
+                logger.warning("reports.advisors_read_failed", error=str(exc))
+                adv = {}
         except HTTPException:
             raise
         except Exception as e:
@@ -398,6 +452,10 @@ async def generate_report(
             ) from e
 
         positions_raw = list(positions_result.data or [])
+        for p in positions_raw:
+            p["price"] = float(
+                p.get("current_price") or p.get("last_price") or 0
+            )
         if not positions_raw:
             positions_raw = _positions_from_dna_row(existing_dna)
         positions_raw = _normalize_positions(positions_raw)
@@ -407,50 +465,6 @@ async def generate_report(
                 status_code=404,
                 detail="No positions found for this portfolio.",
             )
-
-        # FIX 3: parse alpha_signal before PDF generator (structured list + clean text)
-        if swarm_row:
-            import json as _json
-
-            alpha_raw = swarm_row.get("alpha_signal")
-            parsed_opps: list = []
-
-            if isinstance(alpha_raw, str) and alpha_raw.strip():
-                try:
-                    parsed = _json.loads(alpha_raw)
-                    parsed_opps = (
-                        parsed.get("opportunities")
-                        or parsed.get("alpha_opportunities", {}).get("opportunities")
-                        or []
-                    )
-                except Exception:
-                    parsed_opps = []
-            elif isinstance(alpha_raw, dict):
-                parsed_opps = (
-                    alpha_raw.get("opportunities")
-                    or alpha_raw.get("alpha_opportunities", {}).get("opportunities")
-                    or []
-                )
-            elif isinstance(alpha_raw, list):
-                parsed_opps = alpha_raw
-
-            if parsed_opps:
-                swarm_row["alpha_signal_parsed"] = parsed_opps
-                lines = []
-                for o in parsed_opps[:5]:
-                    if not isinstance(o, dict):
-                        continue
-                    sym = o.get("symbol", "")
-                    try:
-                        c0 = float(o.get("confidence", 0) or 0)
-                    except (TypeError, ValueError):
-                        c0 = 0.0
-                    conf_i = int(c0 * 100) if c0 <= 1 else int(c0)
-                    reason = str(o.get("reason", ""))[:200]
-                    lines.append(f"{sym}: Confidence {conf_i}% — {reason}")
-                swarm_row["alpha_signal"] = "\n\n".join(lines)
-            else:
-                swarm_row["alpha_signal_parsed"] = []
 
         try:
             metrics = calculate_portfolio_metrics(positions_raw)
@@ -468,44 +482,40 @@ async def generate_report(
             ) from e
 
         run_id = uuid.uuid4().hex[:8]
-        brand = body.color_scheme.model_dump() if body.color_scheme else None
-
-        # White-label: request body fields take priority; fall back to saved profile config
-        profile_wl_enabled = bool(profile.get("white_label_enabled"))
-        effective_white_label = body.white_label or profile_wl_enabled
-        effective_firm_name = (
-            body.firm_name
-            or profile.get("firm_name")
-            or profile.get("full_name")
-            or ""
-        )
-        effective_advisor_name = (
-            body.advisor_name
-            if body.advisor_name != "NeuFin Intelligence"  # not the default
-            else (profile.get("advisor_name") or body.advisor_name)
-        )
-        effective_logo_url = (
-            body.advisor_logo_url
-            or profile.get("firm_logo_url")
-            or profile.get("avatar_url")
-        )
-        effective_email = (
-            body.advisor_email
-            if body.advisor_email != "info@neufin.ai"  # not the default
-            else (profile.get("advisor_email") or profile.get("email") or "info@neufin.ai")
-        )
 
         advisor_config = {
-            "firm_name": effective_firm_name,
-            "logo_url": effective_logo_url,
-            "logo_base64": body.logo_base64 or profile.get("advisor_logo_base64"),
-            "brand_colors": brand or (
-                {"primary": profile.get("brand_primary_color")} if profile.get("brand_primary_color") else None
+            "firm_name": (
+                body.firm_name
+                or adv.get("firm_name")
+                or profile.get("full_name")
+                or ""
             ),
-            "advisor_name": effective_advisor_name,
+            "advisor_name": (
+                body.advisor_name
+                or adv.get("advisor_name")
+                or profile.get("full_name")
+                or "NeuFin Intelligence"
+            ),
+            "logo_base64": (body.logo_base64 or adv.get("logo_base64")),
+            "logo_url": (
+                body.advisor_logo_url
+                or profile.get("firm_logo_url")
+                or profile.get("avatar_url")
+            ),
+            "brand_colors": (
+                body.color_scheme.model_dump()
+                if body.color_scheme
+                else {"primary": adv.get("brand_color", "#1EB8CC")}
+            ),
+            "white_label": (
+                body.white_label or bool(adv.get("white_label")) or False
+            ),
+            "advisor_email": (
+                body.advisor_email
+                or profile.get("email")
+                or "info@neufin.ai"
+            ),
             "client_name": body.client_name,
-            "advisor_email": effective_email,
-            "white_label": effective_white_label,
             "report_run_id": run_id,
         }
 

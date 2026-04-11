@@ -87,6 +87,7 @@ ACCENT_GREEN = HexColor("#22C55E")
 ACCENT_AMBER = HexColor("#F5A623")
 ACCENT_RED   = HexColor("#EF4444")
 ACCENT_PUR   = HexColor("#8B5CF6")
+ACCENT_SLATE = HexColor("#64748B")
 
 # Pie/donut chart ring colors (shared)
 CHART_COLORS = [
@@ -480,7 +481,7 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
             except json.JSONDecodeError:
                 nested = {}
         elif st:
-            nested = {"briefing": st[:8000]}
+            nested = {"briefing": st}
         else:
             nested = {}
     elif isinstance(raw_thesis, dict) and raw_thesis:
@@ -607,7 +608,12 @@ def _build_report_context(
         for pos in positions:
             cost_basis = float(pos.get("cost_basis") or 0)
             shares     = float(pos.get("shares") or 0)
-            price      = float(pos.get("price") or 0)
+            price      = float(
+                pos.get("price")
+                or pos.get("current_price")
+                or pos.get("last_price")
+                or 0
+            )
             value      = float(pos.get("value") or (price * shares if price and shares else 0))
             if cost_basis > 0 and value > 0:
                 gain = value - cost_basis
@@ -1303,8 +1309,8 @@ def _page_portfolio_snapshot(
     items.append(Spacer(1, 8))
 
     positions = list(ctx.get("positions") or [])
-    total_weight = sum(float(p.get("weight_pct") or p.get("weight") or 0) for p in positions)
-    weights_valid = 80 <= total_weight <= 120
+    total_weight = sum(float(p.get("weight_pct") or 0) for p in positions)
+    weights_valid = 80.0 <= total_weight <= 120.0
 
     # Build pie data (only when weights are trustworthy)
     labels_p: list[str] = []
@@ -1322,12 +1328,7 @@ def _page_portfolio_snapshot(
     chart_img: Any
     if not weights_valid and positions:
         chart_img = Paragraph(
-            _xml(
-                "Portfolio allocation chart requires valid weight data. "
-                "Re-upload a CSV with an explicit weight_pct column, or ensure "
-                "the value column reflects current market value so weights can "
-                "be derived."
-            ),
+            _xml("Allocation chart requires valid weight data."),
             ParagraphStyle(
                 "pie_placeholder_" + pal["theme"],
                 fontName="Helvetica",
@@ -1423,7 +1424,7 @@ def _page_portfolio_snapshot(
     # Holdings table (top 10) — skip misleading 0% rows when weights are invalid
     if not weights_valid and positions:
         items.append(Paragraph(
-            "PORTFOLIO WEIGHT DATA — NORMALIZATION IN PROGRESS",
+            "PORTFOLIO WEIGHT DATA",
             ParagraphStyle(
                 "warn_h_ps_" + pal["theme"],
                 fontName="Helvetica-Bold",
@@ -1431,19 +1432,34 @@ def _page_portfolio_snapshot(
                 textColor=ACCENT_AMBER,
             ),
         ))
+        syms = ", ".join(
+            str(p.get("symbol", "")) for p in positions[:15]
+        )
         items.append(Paragraph(
             _xml(
-                f"Position weights could not be verified (sum = {total_weight:.1f}%). "
-                f"Upload a CSV with explicit weight_pct column, or ensure "
-                f"value column reflects current market value. "
-                f"Holdings count: {len(positions)} · Total AUM: "
-                f"${float(ctx.get('total_value') or 0):,.0f}"
+                f"Position weights (sum: {total_weight:.1f}%) could not be "
+                f"normalized to 100%. This typically occurs when the uploaded "
+                f"CSV used share counts instead of percentage weights. "
+                f"Re-upload with an explicit weight_pct column to display "
+                f"the allocation table. Total AUM confirmed: "
+                f"${float(ctx.get('total_value') or 0):,.0f} across "
+                f"{len(positions)} positions."
             ),
             ParagraphStyle(
                 "warn_b_ps_" + pal["theme"],
                 fontName="Helvetica",
                 fontSize=9,
                 textColor=pal["text_bod"],
+                spaceAfter=8,
+            ),
+        ))
+        items.append(Paragraph(
+            _xml(f"Holdings: {syms}"),
+            ParagraphStyle(
+                "warn_s_ps_" + pal["theme"],
+                fontName="Helvetica-Oblique",
+                fontSize=8,
+                textColor=pal["text_mut"],
             ),
         ))
     else:
@@ -1661,7 +1677,7 @@ def _page_macro_regime(
     drivers = _coerce_list(mkt.get("drivers"), 6)
     if drivers:
         macro_names = ["VIX Level", "Yield Curve", "CPI YoY", "PMI", "Liquidity", "Credit Spread"]
-        cells = [Paragraph(f"<b>{nm}</b><br/>{_xml(str(drivers[i] if i < len(drivers) else '—')[:150])}", st["body"])
+        cells = [Paragraph(f"<b>{nm}</b><br/>{_xml(str(drivers[i] if i < len(drivers) else '—')[:200])}", st["body"])
                  for i, nm in enumerate(macro_names)]
     else:
         cells = [Paragraph(f"<b>{_xml(n)}</b><br/>{_xml(v)}<br/>"
@@ -1900,26 +1916,26 @@ def _page_stress_testing(
         except (TypeError, ValueError):
             return 0.0
 
-    has_artifact = False
-    if isinstance(stress_results, dict):
-        for _k, scenario_data in stress_results.items():
-            ret = _scenario_ret_pct(scenario_data)
-            if abs(ret) > 200:
-                has_artifact = True
-                break
-    elif isinstance(stress_results, list):
-        for scenario_data in stress_results:
-            ret = _scenario_ret_pct(scenario_data)
-            if abs(ret) > 200:
-                has_artifact = True
-                break
+    stress_artifact = True
+    if isinstance(stress_results, dict) and stress_results:
+        stress_artifact = any(
+            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
+            for v in stress_results.values()
+        )
+    elif isinstance(stress_results, list) and stress_results:
+        stress_artifact = any(
+            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
+            for v in stress_results
+        )
+    elif stress_results:
+        stress_artifact = False
 
     def _beta_impact(mult: float) -> str:
         return f"{(beta * mult) * 100:+.1f}% (β-estimated)"
 
-    if has_artifact:
+    if stress_artifact:
         items.append(Paragraph(
-            "STRESS TEST — QUALITATIVE ASSESSMENT APPLIED",
+            "STRESS TEST — QUALITATIVE IC ASSESSMENT",
             ParagraphStyle(
                 "stress_warn_h_" + pal["theme"],
                 fontName="Helvetica-Bold",
@@ -1930,53 +1946,55 @@ def _page_stress_testing(
         items.append(Paragraph(
             _xml(
                 "Quantitative stress figures reflect a portfolio weight "
-                "normalization artifact (weight_pct inputs exceeded 100-point "
-                "scale). IC qualitative assessment applied below based on "
-                "known position-level beta and sector characteristics."
+                "normalization artifact. IC qualitative assessment applied "
+                "based on individual position betas and sector exposures."
             ),
             ParagraphStyle(
                 "stress_warn_b_" + pal["theme"],
                 fontName="Helvetica",
-                fontSize=9,
-                textColor=pal["text_bod"],
+                fontSize=8,
+                textColor=pal["text_mut"],
                 spaceAfter=8,
             ),
         ))
 
         positions = list(ctx.get("positions") or [])
-        tech_syms = ("AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL")
-        tech_weight = sum(
-            float(p.get("weight_pct") or p.get("weight") or 0)
-            for p in positions
-            if str(p.get("symbol") or "").upper() in tech_syms
+        tech_cluster = (
+            "AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "TSLA"
         )
-        tlt_weight = sum(
+        bond_cluster = ("TLT", "IEF", "BND", "AGG", "SHY", "GOVT")
+        tech_w = sum(
             float(p.get("weight_pct") or p.get("weight") or 0)
             for p in positions
-            if str(p.get("symbol") or "").upper() in ("TLT", "IEF", "BND", "AGG")
+            if str(p.get("symbol") or "").upper() in tech_cluster
+        )
+        bond_w = sum(
+            float(p.get("weight_pct") or p.get("weight") or 0)
+            for p in positions
+            if str(p.get("symbol") or "").upper() in bond_cluster
         )
 
         qualitative_data = [
-            ["Scenario", "Historical", "Est. Portfolio Impact", "Primary Risk"],
+            ["Scenario", "Historical", "Est. Impact", "Primary Risk"],
             [
                 "2022 Rate Shock",
                 "S&P -25.4%",
-                f"Est. -{min(30, max(8, tech_weight * 0.55 + tlt_weight * 0.7)):.0f}% to "
-                f"-{min(40, max(12, tech_weight * 0.7 + tlt_weight * 0.9)):.0f}%",
-                f"Tech {tech_weight:.0f}% + TLT duration drag",
+                f"Est. -{min(35, max(8, tech_w * 0.5 + bond_w * 0.7)):.0f}% to "
+                f"-{min(45, max(14, tech_w * 0.65 + bond_w * 0.9)):.0f}%",
+                f"Tech {tech_w:.0f}% + duration",
             ],
             [
                 "2020 COVID Crash",
                 "S&P -33.9%",
-                "Est. -20% to -30%",
-                "All correlations converge to 1.0 in liquidity event",
+                "Est. -20% to -32%",
+                "All correlations -> 1.0 in liquidity crisis",
             ],
             [
                 "2024 AI Rotation",
                 "S&P -8.5%",
-                f"Est. -{max(4, tech_weight * 0.35):.0f}% to "
-                f"-{max(7, tech_weight * 0.5):.0f}%",
-                f"Tech cluster {tech_weight:.0f}% amplifies rotation",
+                f"Est. -{max(4, tech_w * 0.3):.0f}% to "
+                f"-{max(8, tech_w * 0.45):.0f}%",
+                "Tech cluster amplifies rotation",
             ],
         ]
         stress_table = Table(
@@ -2041,9 +2059,9 @@ def _page_stress_testing(
         for i, (label, default_prob, default_reg, default_impact) in enumerate(scenario_defaults):
             if (not has_row_artifact) and i < len(stress_raw) and isinstance(stress_raw[i], dict):
                 row = stress_raw[i]
-                impact = str(row.get("portfolio_impact") or row.get("portfolio_return_pct") or default_impact)[:150]
+                impact = str(row.get("portfolio_impact") or row.get("portfolio_return_pct") or default_impact)[:200]
                 prob = _fpct(row.get("probability")) if row.get("probability") else default_prob
-                reg = str(row.get("regime") or default_reg)[:150]
+                reg = str(row.get("regime") or default_reg)[:200]
             else:
                 impact, prob, reg = default_impact, default_prob, default_reg
             scen_rows.append([label, prob, reg, impact])
@@ -2094,18 +2112,30 @@ def _page_alpha_opportunities(
         items.append(Spacer(1, 6))
 
     # ── Alpha opportunities — use pre-parsed list; NEVER render raw JSON string
-    alpha_opps: list[dict] = list(swarm_norm.get("alpha_signal_parsed") or [])
+    alpha_opps: list[dict] = list(
+        swarm_norm.get("alpha_signal_parsed")
+        or thesis.get("alpha_signal_parsed")
+        or []
+    )
 
     if not alpha_opps:
         raw = swarm_norm.get("alpha_signal") or thesis.get("alpha_signal")
         if isinstance(raw, str) and "{" in raw:
             try:
                 p = json.loads(raw)
-                alpha_opps = list(p.get("opportunities") or [])
+                alpha_opps = list(
+                    p.get("opportunities")
+                    or (p.get("alpha_opportunities") or {}).get("opportunities")
+                    or []
+                )
             except Exception:
                 alpha_opps = []
         elif isinstance(raw, dict):
-            alpha_opps = list(raw.get("opportunities") or [])
+            alpha_opps = list(
+                raw.get("opportunities")
+                or (raw.get("alpha_opportunities") or {}).get("opportunities")
+                or []
+            )
 
     th = pal["theme"]
     if alpha_opps:
@@ -2120,7 +2150,12 @@ def _page_alpha_opportunities(
                 cf = 0.0
             conf_pct = int(cf * 100) if cf <= 1.0 else int(cf)
             reason = str(opp.get("reason") or "")
-            conf_col = ACCENT_GREEN if conf_pct >= 75 else ACCENT_AMBER
+            if conf_pct >= 75:
+                conf_col = ACCENT_GREEN
+            elif conf_pct >= 60:
+                conf_col = ACCENT_AMBER
+            else:
+                conf_col = ACCENT_SLATE
 
             card_data = [[
                 Paragraph(
@@ -2133,11 +2168,11 @@ def _page_alpha_opportunities(
                     ),
                 ),
                 Paragraph(
-                    f"Confidence: {conf_pct}%",
+                    f"<b>{conf_pct}%</b> confidence",
                     ParagraphStyle(
                         f"alpha_conf_{th}",
-                        fontName="Helvetica",
-                        fontSize=11,
+                        fontName="Helvetica-Bold",
+                        fontSize=10,
                         textColor=conf_col,
                         alignment=TA_RIGHT,
                     ),
@@ -2231,8 +2266,8 @@ def _page_directives(
         if isinstance(a, dict):
             pri_str  = str(a.get("priority", "MED"))
             action   = str(a.get("action") or "")
-            rational = str(a.get("rationale") or "IC synthesis")[:150]
-            timeline = str(a.get("timeline") or "90 days")[:150]
+            rational = str(a.get("rationale") or "IC synthesis")[:200]
+            timeline = str(a.get("timeline") or "90 days")[:200]
         else:
             pri_str  = "MED"
             action   = str(a)
@@ -2331,7 +2366,7 @@ def _page_agent_attribution(
     ]
     agent_rows: list = [["Agent", "Key Input", "Key Output", "Trace Snippet"]]
     for i, (agent, kin, kout) in enumerate(agent_defs):
-        snippet = str(trace_raw[i])[:150] if i < len(trace_raw) else "—"
+        snippet = str(trace_raw[i])[:200] if i < len(trace_raw) else "—"
         agent_rows.append([
             Paragraph(f"<b>{agent}</b>", st["body"]),
             Paragraph(_xml(kin), st["body_sm"]),
