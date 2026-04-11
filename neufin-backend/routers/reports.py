@@ -62,7 +62,7 @@ class ColorScheme(BaseModel):
 
 class ReportRequest(BaseModel):
     portfolio_id: str
-    advisor_id: str
+    advisor_id: str | None = None  # "self" or omitted → resolved to user.id in handler
     advisor_name: str = "NeuFin Intelligence"
     logo_base64: str | None = None
     color_scheme: ColorScheme | None = None
@@ -177,6 +177,18 @@ async def generate_report(
     Set ``inline_pdf: true`` to receive ``Response(content=pdf_bytes, media_type="application/pdf")``
     instead of JSON (optional ``X-Report-Id``, ``X-PDF-URL`` headers when available).
     """
+    # Resolve advisor_id — "self" and None both map to the authenticated user.
+    effective_advisor_id = (
+        body.advisor_id
+        if body.advisor_id and body.advisor_id not in ("self", "")
+        else str(user.id)
+    )
+    logger.info(
+        "report_generate_called",
+        portfolio_id=body.portfolio_id,
+        user_id=str(user.id),
+        effective_advisor_id=effective_advisor_id,
+    )
     try:
         # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
         if not await can_download_report_free(user.id):
@@ -338,7 +350,7 @@ async def generate_report(
                 .insert(
                     {
                         "portfolio_id": body.portfolio_id,
-                        "advisor_id": user.id,
+                        "advisor_id": effective_advisor_id,
                         "pdf_url": pdf_url,
                         "is_paid": False,
                     }
