@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * PaywallOverlay.tsx — Bloomberg-style institutional gate.
+ * PaywallOverlay.tsx — Institutional gate overlay.
  *
  * Wraps any section with a blur + amber lock box when locked=true.
  * Design language matches the swarm terminal: #0D0D0D bg, #FFB900 amber,

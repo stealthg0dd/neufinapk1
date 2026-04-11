@@ -68,7 +68,7 @@ export default function AboutPage() {
             <span className="block">what broken finance costs.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-3xl text-base leading-relaxed text-muted-foreground">
-            We founded NeuFin because institutional-grade intelligence shouldn&apos;t require a Bloomberg subscription.
+            We founded NeuFin because institutional-grade intelligence shouldn&apos;t require expensive data terminals.
             Every investor deserves the same analytical edge as a hedge fund.
           </p>
           <p className="mt-6 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">

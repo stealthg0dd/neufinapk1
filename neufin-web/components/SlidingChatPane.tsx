@@ -1,13 +1,13 @@
 'use client'
 
 /**
- * SlidingChatPane.tsx — Bloomberg Terminal Managing Director Chat
+ * SlidingChatPane.tsx — Managing Director Chat Panel
  *
  * Full-height right-side drawer that slides in from the right.
  * Calls POST /api/swarm/chat with thesis_context + record_id for rich MD responses.
  * Streams the assistant reply character-by-character for a live terminal feel.
  *
- * Bloomberg style: #0D0D0D bg, #FFB900 amber, Fira Code monospace, NO rounded corners.
+ * Terminal style: #0D0D0D bg, #FFB900 amber, Fira Code monospace, NO rounded corners.
  */
 
 import React, { useState, useEffect, useRef, KeyboardEvent } from 'react'

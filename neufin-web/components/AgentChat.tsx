@@ -1,13 +1,13 @@
 'use client'
 
 /**
- * AgentChat.tsx — Bloomberg-style Managing Director Q&A panel.
+ * AgentChat.tsx — Managing Director Q&A panel.
  *
  * Calls POST /api/swarm/chat with the user's question + portfolio positions.
  * Displays the routed agent name, thinking steps, answer, key numbers,
  * and recommended action.
  *
- * Design: strict Bloomberg terminal — #0D0D0D bg, #FFB900 amber, Fira Code.
+ * Design: terminal style — #0D0D0D bg, #FFB900 amber, Fira Code.
  */
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
@@ -54,7 +54,7 @@ interface AgentChatProps {
   totalValue: number
   apiBase:    string
   onClose:    () => void
-  /** Hide Bloomberg header when embedded in Copilot rail */
+  /** Hide terminal header when embedded in Copilot rail */
   embedded?: boolean
   /** One-shot quick fill — use a new `id` each click so the same label can re-apply */
   quickFill?: { id: number; text: string } | null

@@ -734,7 +734,7 @@ export default function PortfolioPage() {
               </p>
               <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 12 }}>
                 Your DNA score is ready. Run the 7-agent IC Analysis to unlock the full swarm briefing,
-                macro regime, alpha signals, and a Goldman-grade IC memo.
+                macro regime, alpha signals, and an IC-grade investment memo.
               </p>
               <Link
                 href="/swarm"
