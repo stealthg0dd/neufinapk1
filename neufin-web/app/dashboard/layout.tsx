@@ -1,4 +1,5 @@
 import { DashboardShell } from '@/components/dashboard/DashboardShell'
+import { OnboardingGate } from '@/components/OnboardingGate'
 import { getResearchRegime } from '@/lib/api'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -8,5 +9,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   } catch {
     regime = null
   }
-  return <DashboardShell regime={regime}>{children}</DashboardShell>
+  return (
+    <DashboardShell regime={regime}>
+      <OnboardingGate />
+      {children}
+    </DashboardShell>
+  )
 }

@@ -33,6 +33,7 @@ const PUBLIC_PREFIXES = [
   '/auth',          // /auth  +  /auth/callback
   '/login',
   '/signup',
+  '/onboarding',    // new-user onboarding flow (auth checked client-side)
   '/pricing',
   '/contact-sales',
   '/upload',

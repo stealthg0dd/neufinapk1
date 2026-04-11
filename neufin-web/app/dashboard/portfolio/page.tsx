@@ -107,6 +107,17 @@ export default function PortfolioPage() {
   const [showThemeModal, setShowThemeModal] = useState(false)
   const [pendingTheme, setPendingTheme] = useState<ReportTheme | null>(null)
 
+  // White-label config
+  const [wlConfig, setWlConfig] = useState<{
+    white_label_enabled: boolean
+    firm_name: string
+    firm_logo_url: string
+    advisor_name: string
+    advisor_email: string
+    brand_primary_color: string
+  } | null>(null)
+  const [useWhiteLabel, setUseWhiteLabel] = useState(false)
+
   const fileSize = useMemo(() => (file ? `${(file.size / 1024).toFixed(1)} KB` : ''), [file])
   const portfolioId = result?.portfolio_id ?? null
   const riskLevel = useMemo(() => {
@@ -225,6 +236,24 @@ export default function PortfolioPage() {
       .catch(() => setPlan('free'))
   }, [result])
 
+  // Load white-label config once on mount
+  useEffect(() => {
+    apiGet<{
+      white_label_enabled: boolean
+      firm_name: string
+      firm_logo_url: string
+      advisor_name: string
+      advisor_email: string
+      brand_primary_color: string
+    }>('/api/profile/white-label')
+      .then((data) => {
+        setWlConfig(data)
+        // Auto-enable toggle if the user has white-label configured
+        if (data.white_label_enabled) setUseWhiteLabel(true)
+      })
+      .catch(() => { /* non-critical */ })
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     try {
@@ -274,9 +303,22 @@ export default function PortfolioPage() {
         statusRes.status === 'trial'
 
       if (canGeneratePdf) {
+        const reportBody: Record<string, unknown> = {
+          portfolio_id: portfolioId,
+          inline_pdf: false,
+          theme: resolvedTheme,
+        }
+        if (useWhiteLabel && wlConfig) {
+          reportBody.firm_name       = wlConfig.firm_name
+          reportBody.advisor_name    = wlConfig.advisor_name
+          reportBody.advisor_email   = wlConfig.advisor_email
+          reportBody.advisor_logo_url = wlConfig.firm_logo_url || undefined
+          reportBody.white_label     = true
+          reportBody.color_scheme    = { primary: wlConfig.brand_primary_color }
+        }
         const res = await apiFetch('/api/reports/generate', {
           method: 'POST',
-          body: JSON.stringify({ portfolio_id: portfolioId, inline_pdf: false, theme: resolvedTheme }),
+          body: JSON.stringify(reportBody),
         })
 
         const data = await res.json() as {
@@ -681,7 +723,36 @@ export default function PortfolioPage() {
             </section>
           ) : null}
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          {/* White-label toggle — only shown when branding is configured */}
+          {wlConfig?.white_label_enabled && (
+            <div className="mt-5 flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{ background: '#161D2E', border: '1px solid #2A3550' }}
+            >
+              <input
+                type="checkbox"
+                id="wl-toggle"
+                checked={useWhiteLabel}
+                onChange={(e) => setUseWhiteLabel(e.target.checked)}
+                className="w-4 h-4 accent-teal-400 cursor-pointer"
+              />
+              <label htmlFor="wl-toggle" className="text-sm cursor-pointer select-none"
+                style={{ color: '#F0F4FF' }}
+              >
+                White-label this report with{' '}
+                <strong>{wlConfig.firm_name || 'your firm'}</strong> branding
+              </label>
+              {wlConfig.firm_logo_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={wlConfig.firm_logo_url}
+                  alt="Firm logo"
+                  style={{ height: 24, marginLeft: 'auto', objectFit: 'contain' }}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => {
