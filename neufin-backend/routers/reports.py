@@ -354,6 +354,34 @@ async def generate_report(
                 .execute()
             )
             profile = (profile_result.data or [None])[0] or {}
+
+            # Merge advisors row (white-label source of truth)
+            try:
+                adv_r = (
+                    supabase.table("advisors")
+                    .select("firm_name,advisor_name,logo_base64,white_label,brand_color")
+                    .eq("id", str(user.id))
+                    .limit(1)
+                    .execute()
+                )
+                if adv_r.data:
+                    ar = adv_r.data[0]
+                    if ar.get("firm_name"):
+                        profile["firm_name"] = profile.get("firm_name") or ar["firm_name"]
+                    if ar.get("advisor_name"):
+                        profile["advisor_name"] = profile.get("advisor_name") or ar["advisor_name"]
+                    if ar.get("logo_base64"):
+                        profile["advisor_logo_base64"] = ar["logo_base64"]
+                    if ar.get("brand_color"):
+                        profile["brand_primary_color"] = (
+                            profile.get("brand_primary_color") or ar["brand_color"]
+                        )
+                    if ar.get("white_label") is not None:
+                        profile["white_label_enabled"] = bool(ar.get("white_label")) or bool(
+                            profile.get("white_label_enabled")
+                        )
+            except Exception:
+                pass
         except HTTPException:
             raise
         except Exception as e:
@@ -470,7 +498,7 @@ async def generate_report(
         advisor_config = {
             "firm_name": effective_firm_name,
             "logo_url": effective_logo_url,
-            "logo_base64": body.logo_base64,
+            "logo_base64": body.logo_base64 or profile.get("advisor_logo_base64"),
             "brand_colors": brand or (
                 {"primary": profile.get("brand_primary_color")} if profile.get("brand_primary_color") else None
             ),

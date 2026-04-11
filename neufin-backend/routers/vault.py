@@ -108,7 +108,8 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         result = (
             supabase.table("user_profiles")
             .select(
-                "subscription_tier, subscription_status, trial_started_at, advisor_name, firm_name"
+                "subscription_tier, subscription_status, trial_started_at,"
+                "advisor_name, firm_name, onboarding_completed"
             )
             .eq("id", uid)
             .single()
@@ -147,6 +148,7 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         },
         "advisor_name": data.get("advisor_name"),
         "firm_name": data.get("firm_name"),
+        "onboarding_completed": data.get("onboarding_completed", True),
     }
 
 

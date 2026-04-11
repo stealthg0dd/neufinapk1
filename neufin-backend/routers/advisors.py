@@ -95,10 +95,19 @@ async def get_advisor_profile(advisor_id: str):
 async def upsert_advisor_profile(
     body: AdvisorProfileRequest, user: JWTUser = Depends(get_subscribed_user)
 ):
-    """Upsert the authenticated user's advisor profile."""
+    """Upsert advisor branding on `advisors` and mirror key fields to `user_profiles`."""
     user_id = user.id
 
-    payload = {
+    advisor_row = {
+        "id": user_id,
+        "advisor_name": body.advisor_name,
+        "firm_name": body.firm_name,
+        "calendar_link": body.calendar_link or "",
+        "logo_base64": body.logo_base64,
+        "brand_color": body.brand_color,
+        "white_label": body.white_label,
+    }
+    profile_row = {
         "id": user_id,
         "advisor_name": body.advisor_name,
         "firm_name": body.firm_name,
@@ -106,12 +115,13 @@ async def upsert_advisor_profile(
         "logo_base64": body.logo_base64,
         "brand_color": body.brand_color,
         "white_label": body.white_label,
+        "white_label_enabled": body.white_label,
+        "brand_primary_color": body.brand_color,
     }
 
     try:
-        result = (
-            supabase.table("user_profiles").upsert(payload, on_conflict="id").execute()
-        )
-        return result.data[0] if result.data else payload
+        supabase.table("advisors").upsert(advisor_row, on_conflict="id").execute()
+        result = supabase.table("user_profiles").upsert(profile_row, on_conflict="id").execute()
+        return result.data[0] if result.data else advisor_row
     except Exception as e:
         raise HTTPException(500, f"Could not save profile: {e}") from e
