@@ -145,9 +145,9 @@ function DnaResultCard({ result }: { result: DemoResult }) {
         background: '#0B1929', border: '1px solid #1E3A5F', borderRadius: 8,
         padding: '12px 16px', marginBottom: 20, fontSize: 12, color: '#64748B', lineHeight: 1.5,
       }}>
-        ⚡ This is approximately <strong style={{ color: '#94A3B8' }}>10% of the full IC analysis</strong>.
+        This is approximately <strong style={{ color: '#94A3B8' }}>10% of the full IC analysis</strong>.
         The complete output includes 7-agent swarm briefing, regime positioning, tax harvesting,
-        alpha signals, and a 10-page white-label IC memo.
+        alpha signals, and a 10-page white-labeled IC memo.
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -377,13 +377,13 @@ export default function PartnersPage() {
 
         <h1 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: 800, lineHeight: 1.1, marginBottom: 24, letterSpacing: -1 }}>
           Your platform.<br />
-          <span style={{ color: '#0EA5E9' }}>Goldman-grade portfolio intelligence.</span><br />
+          <span style={{ color: '#0EA5E9' }}>Institutional-grade portfolio intelligence.</span><br />
           One API call.
         </h1>
 
         <p style={{ fontSize: 18, color: '#94A3B8', maxWidth: 620, margin: '0 auto 40px', lineHeight: 1.7 }}>
-          NeuFin's 7-agent swarm delivers IC-grade analysis for every client portfolio.
-          White-labeled. Embeds in 12 lines of code.
+          NeuFin's 7-agent swarm delivers Investment Committee-grade analysis for every client portfolio.
+          Fully white-labeled. Embeds in 12 lines of code.
         </p>
 
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -418,7 +418,7 @@ export default function PartnersPage() {
             { value: '15s', label: 'DNA analysis latency' },
             { value: '7', label: 'AI agents per analysis' },
             { value: '10-page', label: 'IC memo output' },
-            { value: '99.9%', label: 'uptime SLA' },
+            { value: 'Enterprise', label: 'grade reliability' },
           ].map(({ value, label }) => (
             <div key={label} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: '#0EA5E9' }}>{value}</div>
@@ -557,23 +557,23 @@ export default function PartnersPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
           {[
             {
-              icon: '🧬',
+              icon: null,
               title: 'Behavioral DNA Engine',
-              desc: '47 behavioral bias detectors. HHI, beta, correlation clustering. Investor archetype in 15 seconds.',
+              desc: '47 behavioral bias detectors, HHI, beta, and correlation clustering. Investor archetype and risk profile in 15 seconds.',
               tags: ['Disposition Effect', 'Recency Bias', 'Home Bias', 'Loss Aversion'],
               color: '#8B5CF6',
             },
             {
-              icon: '📊',
+              icon: null,
               title: 'IC-Grade Memos',
-              desc: '7-agent swarm analysis. Full investment committee brief. White-labeled PDF in 90 seconds.',
+              desc: 'Full 7-agent swarm analysis. Client-ready Investment Committee briefing. White-labeled 10-page PDF delivered in 90 seconds.',
               tags: ['10-page PDF', 'White-label', 'Regime Analysis', 'Alpha Signals'],
               color: '#0EA5E9',
             },
             {
-              icon: '🔔',
+              icon: null,
               title: 'Real-Time Alerts',
-              desc: 'Regime change notifications. Portfolio drift alerts. Webhook delivery to your platform.',
+              desc: 'Regime-change notifications, portfolio-drift alerts, and webhook delivery directly into your platform.',
               tags: ['Webhooks', 'Regime Shifts', 'Drift Alerts', 'Daily Digest'],
               color: '#22C55E',
             },
@@ -589,7 +589,7 @@ export default function PartnersPage() {
                 position: 'absolute', top: 0, left: 0, right: 0, height: 3,
                 background: col.color, borderRadius: '16px 16px 0 0',
               }} />
-              <div style={{ fontSize: 40, marginBottom: 16 }}>{col.icon}</div>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>{col.icon ?? null}</div>
               <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: '#F0F4FF' }}>
                 {col.title}
               </h3>
@@ -675,7 +675,7 @@ export default function PartnersPage() {
                   label: 'Additional annual revenue',
                   value: `$${Math.round(additionalRevenue).toLocaleString()}`,
                   color: '#22C55E',
-                  note: 'At 1% AUM fee on new clients',
+                  note: 'Calculated at 1% AUM fee on additional capacity unlocked by NeuFin automation.',
                 },
               ].map(({ label, value, color, note }) => (
                 <div key={label} style={{
@@ -715,7 +715,7 @@ export default function PartnersPage() {
               highlight: false,
               features: [
                 '100 analyses per month',
-                'Basic DNA + regime',
+                'Basic DNA and regime analysis',
                 'Sandbox API access',
                 'Community support',
               ],
@@ -750,8 +750,8 @@ export default function PartnersPage() {
                 'Dedicated API endpoints',
                 'Multi-client advisor dashboard',
                 'Custom report templates',
-                'SLA guarantee (99.9% uptime)',
-                'Compliance documentation',
+                'Enterprise-grade reliability',
+                'Full compliance documentation',
               ],
               cta: 'Contact Sales',
               ctaHref: 'mailto:partnerships@neufin.ai',
@@ -876,10 +876,10 @@ export default function PartnersPage() {
       {/* ── Footer CTA ────────────────────────────────────────────────────────── */}
       <section style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px', textAlign: 'center' }}>
         <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 16 }}>
-          Ready to add IC-grade intelligence to your platform?
+          Ready to add Investment Committee-grade intelligence to your platform?
         </h2>
         <p style={{ fontSize: 16, color: '#94A3B8', marginBottom: 32 }}>
-          90-day free trial. No credit card. Cancel anytime.
+          Start with a 90-day free trial. No credit card required.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/auth" style={{
