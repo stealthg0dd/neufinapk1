@@ -20,7 +20,8 @@ import base64
 import datetime
 import io
 import json
-import uuid
+import tempfile
+from pathlib import Path
 from typing import Any
 from xml.sax.saxutils import escape
 
@@ -28,9 +29,8 @@ import httpx
 import structlog
 from reportlab.graphics import renderPM
 from reportlab.graphics.shapes import Drawing, Rect, String
-from reportlab.lib import colors
 from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
@@ -188,14 +188,14 @@ def _quality_check(ctx: dict) -> list[str]:
 
     if not ctx.get("swarm_available"):
         warnings.append(
-            "ℹ  Swarm IC analysis not run for this portfolio. "
+            "Note: Swarm IC analysis not run for this portfolio. "
             "Regime classification, quant signals, and alpha opportunities "
-            "are portfolio-derived estimates — run Swarm IC for full intelligence."
+            "are portfolio-derived estimates; run Swarm IC for full intelligence."
         )
 
     if not ctx.get("tax_positions"):
         warnings.append(
-            "ℹ  Cost basis not provided. Tax section shows estimates only. "
+            "Note: Cost basis not provided. Tax section shows estimates only. "
             "Upload cost basis data to unlock precise CGT and harvesting analysis."
         )
 
@@ -312,10 +312,14 @@ def _donut_chart_image(
     if not HAS_MPL:
         return None
     try:
-        filtered = [(l, v) for l, v in zip(labels, values) if float(v) > 0.01]
+        filtered = [
+            (lbl, v)
+            for lbl, v in zip(labels, values, strict=True)
+            if float(v) > 0.01
+        ]
         if not filtered:
             return None
-        fl, fv = zip(*filtered)
+        _fl, fv = zip(*filtered, strict=True)
         n = len(fv)
 
         fig, ax = plt.subplots(figsize=(width / 72, height / 72))
@@ -737,7 +741,7 @@ def _build_report_context(
                      "rationale": "Swarm IC synthesis", "timeline": "30 days"})
     if recommendation:
         recs.append({"priority": "HIGH", "action": recommendation,
-                     "rationale": "Behavioral DNA assessment", "timeline": "30–60 days"})
+                     "rationale": "Behavioral DNA assessment", "timeline": "30-60 days"})
     if total_harvest_opp > 50:
         harvest_syms = [tp["symbol"] for tp in tax_positions if float(tp.get("harvest_credit") or 0) > 0]
         recs.append({
@@ -825,7 +829,7 @@ def _build_report_context(
             "title": "Defensive Rotation Opportunity",
             "description": (
                 f"Beta {weighted_beta:.2f} amplifies drawdown in {regime_label} regime. "
-                "Rotate 5–10% from high-beta positions into XLU / XLP / GLD "
+                "Rotate 5-10% from high-beta positions into XLU / XLP / GLD "
                 "for improved risk-adjusted return."
             ),
             "confidence": "72%",
@@ -1342,7 +1346,9 @@ def _page_portfolio_snapshot(
         if chart_img is None:
             # Fallback: horizontal bar chart as a Table
             bar_rows = []
-            for i, (lbl, val) in enumerate(zip(labels_p[:8], vals_p[:8])):
+            for i, (lbl, val) in enumerate(
+                zip(labels_p[:8], vals_p[:8], strict=True)
+            ):
                 bar_w = max(10, min(110, float(val) * 1.1))
                 bar_rows.append([
                     Paragraph(_xml(str(lbl)), st["body"]),
@@ -1402,7 +1408,7 @@ def _page_portfolio_snapshot(
     if labels_p:
         legend_rows = []
         row_chunk = []
-        for i, (lbl, val) in enumerate(zip(labels_p, vals_p)):
+        for i, (lbl, val) in enumerate(zip(labels_p, vals_p, strict=True)):
             dot = Table([[""]], colWidths=[8], rowHeights=[8],
                         style=TableStyle([("BACKGROUND",(0,0),(-1,-1),
                                            HexColor(CHART_COLORS[i % len(CHART_COLORS)]))]))
@@ -1710,7 +1716,6 @@ def _page_risk_correlation(
     items.append(Paragraph("RISK & CORRELATION ANALYSIS", st["h1"]))
     items.append(Spacer(1, 8))
 
-    swarm_norm = extra.get("swarm_norm") or {}
     quant     = extra.get("quant") or {}
     sentinel  = extra.get("sentinel") or {}
     metrics   = extra.get("metrics") or {}
@@ -1931,7 +1936,7 @@ def _page_stress_testing(
         stress_artifact = False
 
     def _beta_impact(mult: float) -> str:
-        return f"{(beta * mult) * 100:+.1f}% (β-estimated)"
+        return f"{(beta * mult) * 100:+.1f}% (beta-estimated)"
 
     if stress_artifact:
         items.append(Paragraph(
@@ -2025,7 +2030,7 @@ def _page_stress_testing(
 
         if not stress_raw:
             items.append(_amber_banner_table(
-                "ℹ  Stress-test output from Swarm IC is not available. "
+                "Note: Stress-test output from Swarm IC is not available. "
                 "Qualitative scenarios below are estimated from portfolio beta and current regime.",
                 pal, st, cw,
             ))
@@ -2045,7 +2050,7 @@ def _page_stress_testing(
         )
         if has_row_artifact:
             items.append(_amber_banner_table(
-                "ℹ  Stress rows contained extreme values; using β-estimated scenarios instead.",
+                "Note: Stress rows contained extreme values; using beta-estimated scenarios instead.",
                 pal, st, cw,
             ))
             items.append(Spacer(1, 8))
@@ -2083,7 +2088,7 @@ def _page_stress_testing(
         ["Event Risk", "+25% VIX spike", f"Est. {_beta_impact(-0.08)}", "Monitor correlation spikes"],
         ["Rate Shock", "+100bps yield shock", f"Est. {_beta_impact(-0.05)}", "Review duration exposure"],
         ["FX Volatility", "USD +5%", "Varies by FX exposure", "Check international holdings"],
-        ["Liquidity Crunch", "Bid-ask spreads × 3", "Position exits may be costly", "Maintain cash buffer"],
+        ["Liquidity Crunch", "Bid-ask spreads x 3", "Position exits may be costly", "Maintain cash buffer"],
     ]
     risk_hdr = [["Scenario", "Trigger", "Impact Estimate", "Action"]]
     items.append(Paragraph("ADDITIONAL RISK SCENARIOS", st["h3"]))
@@ -2632,10 +2637,10 @@ if __name__ == "__main__":
         ],
         "weaknesses": [
             "High correlation between AAPL and MSFT creates hidden concentration risk "
-            "in large-cap tech — both are sensitive to rate moves and valuation re-rating.",
-            "Gold allocation at 15% is below the 10–15% typical inflation hedge threshold; "
+            "in large-cap tech - both are sensitive to rate moves and valuation re-rating.",
+            "Gold allocation at 15% is below the 10-15% typical inflation hedge threshold; "
             "consider increasing if CPI remains elevated.",
-            "TLT duration risk is elevated — prolonged rate volatility could pressure NAV.",
+            "TLT duration risk is elevated - prolonged rate volatility could pressure NAV.",
         ],
         "recommendation": (
             "Trim AAPL by 5% and redeploy into XLP (consumer staples) to reduce "
@@ -2651,7 +2656,7 @@ if __name__ == "__main__":
             ],
             "total_liability": 3000,
             "total_harvest_opp": 900,
-            "narrative": "GLD and TLT are in loss position — harvesting both saves ~$900 CGT.",
+            "narrative": "GLD and TLT are in loss position - harvesting both saves ~$900 CGT.",
         },
     }
 
@@ -2670,11 +2675,11 @@ if __name__ == "__main__":
                 data = await generate_advisor_report(
                     _PORTFOLIO, _DNA, None, _ADVISOR, theme=theme
                 )
-                fname = f"/tmp/neufin_test_{theme}.pdf"
+                fname = str(Path(tempfile.gettempdir()) / f"neufin_test_{theme}.pdf")
                 with open(fname, "wb") as f:
                     f.write(data)
-                print(f"✓ {theme:5s} theme  {len(data):>8,} bytes  →  {fname}")
+                print(f"OK {theme:5s} theme  {len(data):>8,} bytes  ->  {fname}")
             except Exception as exc:
-                print(f"✗ {theme}: {exc}")
+                print(f"ERR {theme}: {exc}")
 
     asyncio.run(_run())
