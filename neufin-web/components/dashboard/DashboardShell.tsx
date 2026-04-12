@@ -47,7 +47,7 @@ export function DashboardShell({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <CommandBar regimeData={regime} onToggleCopilot={() => setMarketDeskOpen((o) => !o)} />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto bg-[#F6F8FB] px-7 py-6">
             <Suspense fallback={null}>
               <CheckoutSessionSuccessFeedback />
             </Suspense>

@@ -14,6 +14,11 @@ type SubscriptionStatus = {
   trial_ends_at?: string
 }
 
+type BannerState =
+  | null
+  | { kind: 'expired'; message: string }
+  | { kind: 'active'; days: number }
+
 const CACHE_KEY = 'neufin:subscription-status:cache'
 const CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -62,7 +67,7 @@ export function TrialStatusBanner() {
     }
   }, [])
 
-  const banner = useMemo(() => {
+  const banner: BannerState = useMemo(() => {
     if (!subscription) return null
     const plan = (subscription.plan ?? subscription.subscription_tier ?? 'free').toString().toLowerCase()
     if (plan === 'advisor' || plan === 'enterprise') return null
@@ -72,38 +77,39 @@ export function TrialStatusBanner() {
 
     if (status === 'expired' || (daysRemaining !== null && daysRemaining <= 0)) {
       return {
-        className: 'border-red-500/30 bg-red-500/10 text-red-100',
-        text: 'Trial ended · Your data is saved · Upgrade to run new analysis →',
+        kind: 'expired' as const,
+        message: 'Trial ended — your data is saved.',
       }
     }
 
-    if (daysRemaining !== null && daysRemaining < 3) {
-      return {
-        className: 'border-amber-500/35 bg-amber-500/12 text-amber-100',
-        text: `14-day free trial · ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining · Upgrade before trial ends →`,
-      }
-    }
-
-    const remainingText = daysRemaining !== null ? `${daysRemaining} days remaining` : 'active'
     return {
-      className: 'border-cyan-500/25 bg-emerald-500/10 text-emerald-100',
-      text: `14-day free trial · ${remainingText} · All features included`,
+      kind: 'active' as const,
+      days: daysRemaining ?? 14,
     }
   }, [subscription])
 
   if (pathname === '/dashboard/billing' || !banner) return null
 
-  return (
-    <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${banner.className}`}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-medium">{banner.text}</p>
-        <Link
-          href="/dashboard/billing"
-          className="shrink-0 rounded-md border border-current/30 px-3 py-1 text-xs font-medium hover:bg-white/10"
-        >
+  if (banner.kind === 'expired') {
+    return (
+      <div className="mb-4 flex h-10 max-h-10 items-center justify-between gap-3 border-b border-red-200 bg-red-50 px-4 text-[12px] text-red-800">
+        <p className="truncate font-medium">{banner.message}</p>
+        <Link href="/dashboard/billing" className="shrink-0 font-semibold text-red-900 underline underline-offset-2 hover:text-red-950">
           Upgrade
         </Link>
       </div>
+    )
+  }
+
+  return (
+    <div className="mb-4 flex h-10 max-h-10 items-center justify-between gap-3 border-b border-[#BFDBFE] bg-[#EFF6FF] px-4 text-[12px] text-[#1D4ED8]">
+      <p className="min-w-0 truncate">
+        <span className="font-medium">Trial active</span>
+        <span className="text-[#1D4ED8]/90"> — {banner.days} days remaining · </span>
+        <Link href="/dashboard/billing" className="font-semibold underline underline-offset-2 hover:text-blue-900">
+          Upgrade
+        </Link>
+      </p>
     </div>
   )
 }
