@@ -92,7 +92,7 @@ export function TrialStatusBanner() {
 
   if (banner.kind === 'expired') {
     return (
-      <div className="mb-4 flex h-10 max-h-10 items-center justify-between gap-3 border-b border-red-200 bg-red-50 px-4 text-[12px] text-red-800">
+      <div className="mb-4 flex max-h-10 min-h-10 items-center justify-between gap-3 border-b border-red-200 bg-red-50 px-4 text-sm text-red-800">
         <p className="truncate font-medium">{banner.message}</p>
         <Link href="/dashboard/billing" className="shrink-0 font-semibold text-red-900 underline underline-offset-2 hover:text-red-950">
           Upgrade
@@ -102,12 +102,12 @@ export function TrialStatusBanner() {
   }
 
   return (
-    <div className="mb-4 flex h-10 max-h-10 items-center justify-between gap-3 border-b border-[#BFDBFE] bg-[#EFF6FF] px-4 text-[12px] text-[#1D4ED8]">
+    <div className="mb-4 flex max-h-10 min-h-10 items-center justify-between gap-3 border-b border-primary/25 bg-[#E0F7FA] px-4 text-[13px] text-[#0F172A]">
       <p className="min-w-0 truncate">
         <span className="font-medium">Trial active</span>
-        <span className="text-[#1D4ED8]/90"> — {banner.days} days remaining · </span>
-        <Link href="/dashboard/billing" className="font-semibold underline underline-offset-2 hover:text-blue-900">
-          Upgrade
+        <span className="text-[var(--muted)]"> — {banner.days} days remaining · </span>
+        <Link href="/dashboard/billing" className="font-semibold text-primary underline underline-offset-2 hover:text-primary-dark">
+          Upgrade to Advisor
         </Link>
       </p>
     </div>

@@ -1,13 +1,13 @@
-name: Web CI
+name: CI Web
 
 on:
-  push:
-    branches: [main]
+  pull_request:
+    branches: [develop, main]
     paths:
       - 'neufin-web/**'
       - '.github/workflows/ci-web.yml'
-  pull_request:
-    branches: [main]
+  push:
+    branches: [develop, main]
     paths:
       - 'neufin-web/**'
       - '.github/workflows/ci-web.yml'
@@ -16,50 +16,37 @@ concurrency:
   group: ci-web-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NODE_VERSION: '20'
-
 jobs:
-  # ── Build (includes TypeScript type check via Next.js) ────────────────────
-  build:
-    name: Build & Type Check
+  web-checks:
+    name: Web CI
     runs-on: ubuntu-latest
-    env:
-      # Placeholders satisfy Next.js build-time env validation in CI
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
-      NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL || 'https://api.example.com' }}
-      NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.POSTHOG_KEY || '' }}
+    defaults:
+      run:
+        working-directory: neufin-web
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          node-version: '20'
+          cache: 'npm'
           cache-dependency-path: neufin-web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci --prefix neufin-web
+      - name: Install
+        run: npm ci
 
-      - name: Next.js build (type check included)
-        run: npm run build --prefix neufin-web
+      - name: Lint
+        run: npm run lint --if-present
+        continue-on-error: true  # non-blocking until ESLint is fixed
 
-      - name: Notify Slack on build failure
-        if: failure()
-        run: |
-          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}"
-          [ -z "$WEBHOOK" ] && exit 0
-          curl -s -X POST "$WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"❌ *Web CI — Build failed*\",
-              \"attachments\": [{
-                \"color\": \"danger\",
-                \"fields\": [
-                  {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
-                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\", \"short\": true},
-                  {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
-                ]
-              }]
-            }" || true
+      - name: Build
+        env:
+          # Use placeholder values — build must pass without real keys
+          NEXT_PUBLIC_API_URL: https://placeholder.invalid
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+          # Skip Sentry in CI
+          SENTRY_DSN: ""
+        run: npm run build

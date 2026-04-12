@@ -24,7 +24,7 @@ const AGENTS: AgentEntry[] = [
 function StatusIcon({ status }: { status: AgentStatus }) {
   if (status === 'complete') return <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-positive" />
   if (status === 'running') return <Loader2 className="mt-0.5 h-3 w-3 shrink-0 animate-spin text-primary" />
-  return <Circle className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/30" />
+  return <Circle className="mt-0.5 h-3 w-3 shrink-0 text-slate-600" />
 }
 
 export default function SwarmHeroTerminal() {
@@ -96,12 +96,12 @@ export default function SwarmHeroTerminal() {
   }, [entries, typed, visible])
 
   return (
-    <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-2xl">
-      <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-2.5">
+    <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-700/80 bg-[#0B0F14] text-slate-200 shadow-2xl">
+      <div className="flex items-center gap-2 border-b border-slate-700/80 bg-[#121821] px-4 py-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-risk/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-positive/70" />
-        <span className="ml-2 font-mono text-[10px] text-muted-foreground/50">NEUFIN SWARM TERMINAL</span>
+        <span className="ml-2 font-mono text-[10px] text-slate-500">NEUFIN SWARM TERMINAL</span>
         <span className="ml-auto inline-flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-positive" style={{ animation: 'pulse-dot 1.2s ease-in-out infinite' }} />
           <span className="font-mono text-[10px] text-positive">LIVE</span>
@@ -116,23 +116,23 @@ export default function SwarmHeroTerminal() {
           return (
             <div
               key={a.name}
-              className={`flex items-start gap-2 border-b border-border/20 py-1.5 last:border-0 ${
+              className={`flex items-start gap-2 border-b border-slate-800/80 py-1.5 last:border-0 ${
                 isVisible ? 'opacity-100' : 'opacity-0'
               } transition-opacity`}
             >
               <StatusIcon status={status} />
               <span className="w-28 shrink-0 text-[10px] font-bold uppercase text-primary">{a.name}</span>
-              <span className="text-[11px] leading-snug text-muted-foreground">{shown}</span>
+              <span className="text-[11px] leading-snug text-slate-400">{shown}</span>
             </div>
           )
         })}
 
         {showResult ? (
-          <div className="mt-3 rounded-lg border border-primary/20 bg-primary/10 p-3">
+          <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3">
             <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-primary">IC BRIEFING GENERATED</p>
-            <p className="text-sm font-semibold text-foreground">
+            <p className="text-sm font-semibold text-slate-100">
               DNA Score <span className="font-mono tabular-nums text-primary">78</span> · Investor Type{' '}
-              <span className="text-foreground">Defensive Allocator</span>
+              <span className="text-slate-100">Defensive Allocator</span>
             </p>
             <p className="mt-1 text-[11px] text-warning">Overconfidence bias detected in 3 positions</p>
           </div>
