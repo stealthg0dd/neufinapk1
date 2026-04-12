@@ -76,7 +76,7 @@ function AgentTraceDots({ active, completedCount }: { active: boolean; completed
                 transition: 'background 0.3s',
               }}
             />
-            <span style={{ color: done ? '#E2E8F0' : running ? '#F5A623' : '#475569', fontSize: 12 }}>
+            <span style={{ color: done ? '#0F172A' : running ? '#F5A623' : '#475569', fontSize: 12 }}>
               {name}
               {done && <span style={{ color: '#22C55E', marginLeft: 6, fontSize: 11 }}>✓</span>}
               {running && <span style={{ color: '#F5A623', marginLeft: 6, fontSize: 11, animation: 'pulse 1s infinite' }}>●</span>}
@@ -97,7 +97,7 @@ function DnaResultCard({ result }: { result: DemoResult }) {
 
   return (
     <div style={{
-      background: '#0D1520', border: '1px solid #1E2D45', borderRadius: 12,
+      background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 12,
       padding: '24px 28px', marginTop: 20,
     }}>
       {/* Score */}
@@ -112,10 +112,10 @@ function DnaResultCard({ result }: { result: DemoResult }) {
           <span style={{ fontSize: 10, color: '#64748B' }}>/100</span>
         </div>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#F0F4FF' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
             {label} Portfolio Health
           </div>
-          <div style={{ fontSize: 13, color: '#94A3B8', marginTop: 2 }}>
+          <div style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>
             {result.investor_type ?? 'Balanced Investor'}
           </div>
         </div>
@@ -123,7 +123,7 @@ function DnaResultCard({ result }: { result: DemoResult }) {
 
       {/* Metrics */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-        <div style={{ background: '#131C2E', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: '#F8FAFC', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
             Top Bias Detected
           </div>
@@ -131,7 +131,7 @@ function DnaResultCard({ result }: { result: DemoResult }) {
             {topBias.slice(0, 90)}{topBias.length > 90 ? '…' : ''}
           </div>
         </div>
-        <div style={{ background: '#131C2E', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: '#F8FAFC', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ fontSize: 10, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
             Top Recommendation
           </div>
@@ -142,10 +142,10 @@ function DnaResultCard({ result }: { result: DemoResult }) {
       </div>
 
       <div style={{
-        background: '#0B1929', border: '1px solid #1E3A5F', borderRadius: 8,
+        background: '#FFFFFF', border: '1px solid #1E3A5F', borderRadius: 8,
         padding: '12px 16px', marginBottom: 20, fontSize: 12, color: '#64748B', lineHeight: 1.5,
       }}>
-        This is approximately <strong style={{ color: '#94A3B8' }}>10% of the full IC analysis</strong>.
+        This is approximately <strong style={{ color: '#64748B' }}>10% of the full IC analysis</strong>.
         The complete output includes 7-agent swarm briefing, regime positioning, tax harvesting,
         alpha signals, and a 10-page white-labeled IC memo.
       </div>
@@ -166,7 +166,7 @@ function DnaResultCard({ result }: { result: DemoResult }) {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            background: 'transparent', color: '#94A3B8', padding: '10px 20px',
+            background: 'transparent', color: '#64748B', padding: '10px 20px',
             borderRadius: 8, fontWeight: 600, fontSize: 13, border: '1px solid #2A3550',
             textDecoration: 'none', display: 'inline-block',
           }}
@@ -339,11 +339,11 @@ export default function PartnersPage() {
 
   // ─── render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ background: '#070D1A', color: '#E2E8F0', minHeight: '100vh' }}>
+    <div style={{ background: '#F6F8FB', color: '#0F172A', minHeight: '100vh' }}>
 
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
       <nav style={{
-        borderBottom: '1px solid #1E2D45', background: 'rgba(7,13,26,0.9)',
+        borderBottom: '1px solid #E2E8F0', background: 'rgba(255,255,255,0.95)',
         backdropFilter: 'blur(12px)', position: 'sticky', top: 0, zIndex: 50,
       }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -351,11 +351,11 @@ export default function PartnersPage() {
             <Image src="/logo.png" alt="NeuFin" width={130} height={34} style={{ height: 34, width: 'auto' }} />
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 24, fontSize: 14 }}>
-            <a href="#sandbox" style={{ color: '#94A3B8', textDecoration: 'none' }}>Live Demo</a>
-            <a href="#pricing" style={{ color: '#94A3B8', textDecoration: 'none' }}>Pricing</a>
-            <a href="#integration" style={{ color: '#94A3B8', textDecoration: 'none' }}>Docs</a>
+            <a href="#sandbox" style={{ color: '#64748B', textDecoration: 'none' }}>Live Demo</a>
+            <a href="#pricing" style={{ color: '#64748B', textDecoration: 'none' }}>Pricing</a>
+            <a href="#integration" style={{ color: '#64748B', textDecoration: 'none' }}>Docs</a>
             <Link href="/auth" style={{
-              background: '#0EA5E9', color: '#fff', padding: '7px 18px',
+              background: '#1EB8CC', color: '#fff', padding: '7px 18px',
               borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: 'none',
             }}>
               Get Access
@@ -369,7 +369,7 @@ export default function PartnersPage() {
         <div style={{
           display: 'inline-block', background: 'rgba(14,165,233,0.1)',
           border: '1px solid rgba(14,165,233,0.3)', borderRadius: 20,
-          padding: '4px 16px', fontSize: 12, color: '#38BDF8',
+          padding: '4px 16px', fontSize: 12, color: '#1EB8CC',
           fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 28,
         }}>
           Partner API Platform
@@ -381,7 +381,7 @@ export default function PartnersPage() {
           One API call.
         </h1>
 
-        <p style={{ fontSize: 18, color: '#94A3B8', maxWidth: 620, margin: '0 auto 40px', lineHeight: 1.7 }}>
+        <p style={{ fontSize: 18, color: '#64748B', maxWidth: 620, margin: '0 auto 40px', lineHeight: 1.7 }}>
           NeuFin's 7-agent swarm delivers Investment Committee-grade analysis for every client portfolio.
           Fully white-labeled. Embeds in 12 lines of code.
         </p>
@@ -400,7 +400,7 @@ export default function PartnersPage() {
           <a
             href="#pricing"
             style={{
-              background: 'transparent', color: '#94A3B8', padding: '14px 32px',
+              background: 'transparent', color: '#64748B', padding: '14px 32px',
               borderRadius: 10, fontWeight: 600, fontSize: 15, border: '1px solid #2A3550',
               textDecoration: 'none', display: 'inline-block',
             }}
@@ -412,7 +412,7 @@ export default function PartnersPage() {
         {/* Social proof bar */}
         <div style={{
           display: 'flex', justifyContent: 'center', gap: 40, marginTop: 56,
-          paddingTop: 40, borderTop: '1px solid #1E2D45', flexWrap: 'wrap',
+          paddingTop: 40, borderTop: '1px solid #E2E8F0', flexWrap: 'wrap',
         }}>
           {[
             { value: '15s', label: 'DNA analysis latency' },
@@ -429,7 +429,7 @@ export default function PartnersPage() {
       </section>
 
       {/* ── SECTION 2: Live Sandbox ───────────────────────────────────────────── */}
-      <section id="sandbox" style={{ background: '#0B1220', borderTop: '1px solid #1E2D45', borderBottom: '1px solid #1E2D45' }}>
+      <section id="sandbox" style={{ background: '#F8FAFC', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '64px 24px' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <div style={{
@@ -443,14 +443,14 @@ export default function PartnersPage() {
             <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 12 }}>
               See it work in 15 seconds
             </h2>
-            <p style={{ fontSize: 15, color: '#94A3B8', maxWidth: 540, margin: '0 auto' }}>
+            <p style={{ fontSize: 15, color: '#64748B', maxWidth: 540, margin: '0 auto' }}>
               Enter any US stock tickers below. We'll run a real behavioral DNA analysis
               against live market data — same engine used in production.
             </p>
           </div>
 
           <div style={{
-            background: '#0D1520', border: '1px solid #1E2D45', borderRadius: 12, padding: 28,
+            background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 12, padding: 28,
           }}>
             <label style={{ display: 'block', fontSize: 12, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
               Portfolio tickers (comma-separated)
@@ -461,8 +461,8 @@ export default function PartnersPage() {
               rows={2}
               disabled={demoStatus === 'analyzing'}
               style={{
-                width: '100%', background: '#131C2E', border: '1px solid #2A3550',
-                borderRadius: 8, padding: '10px 14px', color: '#E2E8F0',
+                width: '100%', background: '#F8FAFC', border: '1px solid #2A3550',
+                borderRadius: 8, padding: '10px 14px', color: '#0F172A',
                 fontSize: 14, fontFamily: 'monospace', resize: 'vertical',
                 boxSizing: 'border-box', outline: 'none',
                 opacity: demoStatus === 'analyzing' ? 0.5 : 1,
@@ -473,7 +473,7 @@ export default function PartnersPage() {
               disabled={demoStatus === 'analyzing'}
               style={{
                 marginTop: 16, background: demoStatus === 'analyzing' ? '#1E3A5F' : '#0EA5E9',
-                color: demoStatus === 'analyzing' ? '#38BDF8' : '#fff',
+                color: demoStatus === 'analyzing' ? '#1EB8CC' : '#fff',
                 padding: '12px 28px', borderRadius: 8, fontWeight: 700, fontSize: 14,
                 border: 'none', cursor: demoStatus === 'analyzing' ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', gap: 10,
@@ -481,7 +481,7 @@ export default function PartnersPage() {
             >
               {demoStatus === 'analyzing' ? (
                 <>
-                  <span style={{ width: 14, height: 14, border: '2px solid #38BDF8', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                  <span style={{ width: 14, height: 14, border: '2px solid #1EB8CC', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                   Analyzing portfolio...
                 </>
               ) : 'Analyze Portfolio'}
@@ -489,7 +489,7 @@ export default function PartnersPage() {
 
             {/* Agent trace */}
             {(demoStatus === 'analyzing' || demoStatus === 'done') && (
-              <div style={{ marginTop: 24, borderTop: '1px solid #1E2D45', paddingTop: 20 }}>
+              <div style={{ marginTop: 24, borderTop: '1px solid #E2E8F0', paddingTop: 20 }}>
                 <div style={{ fontSize: 11, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 }}>
                   Agent Trace
                 </div>
@@ -522,16 +522,16 @@ export default function PartnersPage() {
               API call equivalent
             </div>
             <div style={{
-              background: '#0D1520', border: '1px solid #1E2D45', borderRadius: 8,
-              padding: '14px 18px', fontFamily: 'monospace', fontSize: 12, color: '#94A3B8',
+              background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 8,
+              padding: '14px 18px', fontFamily: 'monospace', fontSize: 12, color: '#64748B',
               display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12,
             }}>
               <pre style={{ margin: 0, whiteSpace: 'pre-wrap', flex: 1 }}>{curlSnippet}</pre>
               <button
                 onClick={copyCurl}
                 style={{
-                  background: copied ? 'rgba(34,197,94,0.15)' : '#1E2D45',
-                  color: copied ? '#22C55E' : '#94A3B8',
+                  background: copied ? 'rgba(34,197,94,0.15)' : '#E2E8F0',
+                  color: copied ? '#22C55E' : '#64748B',
                   border: 'none', borderRadius: 6, padding: '6px 12px',
                   cursor: 'pointer', fontSize: 11, fontWeight: 600, flexShrink: 0, whiteSpace: 'nowrap',
                 }}
@@ -549,7 +549,7 @@ export default function PartnersPage() {
           <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 12 }}>
             What Partners Get
           </h2>
-          <p style={{ fontSize: 16, color: '#94A3B8', maxWidth: 500, margin: '0 auto' }}>
+          <p style={{ fontSize: 16, color: '#64748B', maxWidth: 500, margin: '0 auto' }}>
             Everything you need to add institutional-grade intelligence to your platform.
           </p>
         </div>
@@ -581,7 +581,7 @@ export default function PartnersPage() {
             <div
               key={col.title}
               style={{
-                background: '#0D1520', border: `1px solid ${col.color}22`,
+                background: '#FFFFFF', border: `1px solid ${col.color}22`,
                 borderRadius: 16, padding: 32, position: 'relative', overflow: 'hidden',
               }}
             >
@@ -590,10 +590,10 @@ export default function PartnersPage() {
                 background: col.color, borderRadius: '16px 16px 0 0',
               }} />
               <div style={{ fontSize: 40, marginBottom: 16 }}>{col.icon ?? null}</div>
-              <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: '#F0F4FF' }}>
+              <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12, color: '#0F172A' }}>
                 {col.title}
               </h3>
-              <p style={{ fontSize: 14, color: '#94A3B8', lineHeight: 1.7, marginBottom: 20 }}>
+              <p style={{ fontSize: 14, color: '#64748B', lineHeight: 1.7, marginBottom: 20 }}>
                 {col.desc}
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -613,11 +613,11 @@ export default function PartnersPage() {
       </section>
 
       {/* ── SECTION 4: ROI Calculator ──────────────────────────────────────────── */}
-      <section style={{ background: '#0B1220', borderTop: '1px solid #1E2D45', borderBottom: '1px solid #1E2D45' }}>
+      <section style={{ background: '#F8FAFC', borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '80px 24px' }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
             <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 12 }}>ROI Calculator</h2>
-            <p style={{ fontSize: 16, color: '#94A3B8' }}>
+            <p style={{ fontSize: 16, color: '#64748B' }}>
               See how much time and revenue NeuFin unlocks for your practice.
             </p>
           </div>
@@ -625,7 +625,7 @@ export default function PartnersPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 40 }}>
             {/* Inputs */}
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1, fontSize: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1, fontSize: 12 }}>
                 Your Practice
               </h3>
               {[
@@ -634,7 +634,7 @@ export default function PartnersPage() {
                 { label: 'Hours on reporting per client / quarter', value: hoursPerClient, setter: setHoursPerClient, min: 0.5, max: 40 },
               ].map(({ label, value, setter, min, max }) => (
                 <div key={label} style={{ marginBottom: 24 }}>
-                  <label style={{ fontSize: 13, color: '#94A3B8', display: 'block', marginBottom: 8 }}>
+                  <label style={{ fontSize: 13, color: '#64748B', display: 'block', marginBottom: 8 }}>
                     {label}
                   </label>
                   <input
@@ -644,8 +644,8 @@ export default function PartnersPage() {
                     max={max}
                     onChange={e => setter(Number(e.target.value) || 0)}
                     style={{
-                      width: '100%', background: '#0D1520', border: '1px solid #2A3550',
-                      borderRadius: 8, padding: '10px 14px', color: '#F0F4FF',
+                      width: '100%', background: '#FFFFFF', border: '1px solid #2A3550',
+                      borderRadius: 8, padding: '10px 14px', color: '#0F172A',
                       fontSize: 18, fontWeight: 700, boxSizing: 'border-box', outline: 'none',
                     }}
                   />
@@ -655,7 +655,7 @@ export default function PartnersPage() {
 
             {/* Outputs */}
             <div>
-              <h3 style={{ fontSize: 12, fontWeight: 700, marginBottom: 20, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 1 }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, marginBottom: 20, color: '#64748B', textTransform: 'uppercase', letterSpacing: 1 }}>
                 Your Annual Impact
               </h3>
               {[
@@ -679,13 +679,13 @@ export default function PartnersPage() {
                 },
               ].map(({ label, value, color, note }) => (
                 <div key={label} style={{
-                  background: '#0D1520', border: `1px solid ${color}22`,
+                  background: '#FFFFFF', border: `1px solid ${color}22`,
                   borderRadius: 12, padding: '20px 24px', marginBottom: 16,
                 }}>
                   <div style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1 }}>
                     {value}
                   </div>
-                  <div style={{ fontSize: 14, color: '#E2E8F0', marginTop: 6, fontWeight: 600 }}>
+                  <div style={{ fontSize: 14, color: '#334155', marginTop: 6, fontWeight: 600 }}>
                     {label}
                   </div>
                   <div style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>{note}</div>
@@ -700,7 +700,7 @@ export default function PartnersPage() {
       <section id="pricing" style={{ maxWidth: 1100, margin: '0 auto', padding: '80px 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: 52 }}>
           <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 12 }}>Partner Pricing</h2>
-          <p style={{ fontSize: 16, color: '#94A3B8' }}>
+          <p style={{ fontSize: 16, color: '#64748B' }}>
             From solo IFAs to enterprise robo-advisors. Cancel anytime.
           </p>
         </div>
@@ -761,7 +761,7 @@ export default function PartnersPage() {
               key={tier.name}
               style={{
                 background: tier.highlight ? '#0D1A2E' : '#0D1520',
-                border: `1px solid ${tier.highlight ? tier.color + '66' : '#1E2D45'}`,
+                border: `1px solid ${tier.highlight ? tier.color + '66' : '#E2E8F0'}`,
                 borderRadius: 16, padding: '32px 28px', position: 'relative',
                 boxShadow: tier.highlight ? `0 0 40px ${tier.color}18` : 'none',
               }}
@@ -782,13 +782,13 @@ export default function PartnersPage() {
                 {tier.name}
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-                <span style={{ fontSize: 40, fontWeight: 800, color: '#F0F4FF' }}>{tier.price}</span>
+                <span style={{ fontSize: 40, fontWeight: 800, color: '#0F172A' }}>{tier.price}</span>
                 <span style={{ fontSize: 14, color: '#64748B' }}>{tier.period}</span>
               </div>
-              <div style={{ borderTop: '1px solid #1E2D45', margin: '20px 0 20px' }} />
+              <div style={{ borderTop: '1px solid #E2E8F0', margin: '20px 0 20px' }} />
               <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {tier.features.map(f => (
-                  <li key={f} style={{ fontSize: 14, color: '#94A3B8', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <li key={f} style={{ fontSize: 14, color: '#64748B', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     <span style={{ color: tier.color, flexShrink: 0, marginTop: 1 }}>✓</span>
                     {f}
                   </li>
@@ -812,22 +812,22 @@ export default function PartnersPage() {
       </section>
 
       {/* ── SECTION 6: Integration Code ───────────────────────────────────────── */}
-      <section id="integration" style={{ background: '#0B1220', borderTop: '1px solid #1E2D45' }}>
+      <section id="integration" style={{ background: '#F8FAFC', borderTop: '1px solid #E2E8F0' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '80px 24px' }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
             <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 12 }}>
               Integrate in Minutes
             </h2>
-            <p style={{ fontSize: 16, color: '#94A3B8' }}>
+            <p style={{ fontSize: 16, color: '#64748B' }}>
               One endpoint. JSON in, IC-grade intelligence out.
             </p>
           </div>
 
           {/* Tab bar */}
           <div style={{
-            background: '#0D1520', border: '1px solid #1E2D45', borderRadius: 12, overflow: 'hidden',
+            background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden',
           }}>
-            <div style={{ borderBottom: '1px solid #1E2D45', display: 'flex', position: 'relative' }}>
+            <div style={{ borderBottom: '1px solid #E2E8F0', display: 'flex', position: 'relative' }}>
               {/* Traffic light dots */}
               <div style={{ display: 'flex', gap: 6, padding: '12px 16px', alignItems: 'center' }}>
                 <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F57' }} />
@@ -841,8 +841,8 @@ export default function PartnersPage() {
                     onClick={() => setCodeTab(tab)}
                     style={{
                       padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                      background: codeTab === tab ? '#1E2D45' : 'transparent',
-                      color: codeTab === tab ? '#F0F4FF' : '#64748B',
+                      background: codeTab === tab ? '#E0F7FA' : 'transparent',
+                      color: codeTab === tab ? '#0F172A' : '#64748B',
                       fontSize: 12, fontWeight: 600, textTransform: codeTab === tab ? 'none' : 'none',
                     }}
                   >
@@ -854,7 +854,7 @@ export default function PartnersPage() {
                   style={{
                     padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
                     background: codeCopied ? 'rgba(34,197,94,0.15)' : '#1E3A5F',
-                    color: codeCopied ? '#22C55E' : '#94A3B8',
+                    color: codeCopied ? '#22C55E' : '#64748B',
                     fontSize: 11, fontWeight: 600, marginLeft: 8,
                   }}
                 >
@@ -864,7 +864,7 @@ export default function PartnersPage() {
             </div>
             <pre style={{
               margin: 0, padding: '24px 28px', fontFamily: "'Fira Code', 'JetBrains Mono', monospace",
-              fontSize: 13, lineHeight: 1.8, color: '#94A3B8', overflowX: 'auto',
+              fontSize: 13, lineHeight: 1.8, color: '#64748B', overflowX: 'auto',
               whiteSpace: 'pre',
             }}>
               {CODE[codeTab]}
@@ -878,7 +878,7 @@ export default function PartnersPage() {
         <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 16 }}>
           Ready to add Investment Committee-grade intelligence to your platform?
         </h2>
-        <p style={{ fontSize: 16, color: '#94A3B8', marginBottom: 32 }}>
+        <p style={{ fontSize: 16, color: '#64748B', marginBottom: 32 }}>
           Start with a 90-day free trial. No credit card required.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -889,7 +889,7 @@ export default function PartnersPage() {
             Start Free Trial
           </Link>
           <a href="mailto:partnerships@neufin.ai" style={{
-            background: 'transparent', color: '#94A3B8', padding: '14px 36px',
+            background: 'transparent', color: '#64748B', padding: '14px 36px',
             borderRadius: 10, fontWeight: 600, fontSize: 15, border: '1px solid #2A3550',
             textDecoration: 'none',
           }}>
