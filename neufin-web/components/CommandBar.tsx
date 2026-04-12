@@ -108,12 +108,12 @@ export function CommandBar({
 
   return (
     <>
-      <header className="grid h-11 w-full shrink-0 grid-cols-1 items-center gap-2 border-b border-[hsl(var(--border)/0.4)] bg-command px-4 sm:grid-cols-[1fr_minmax(0,28rem)_1fr] sm:gap-0">
+      <header className="grid h-11 w-full shrink-0 grid-cols-1 items-center gap-2 border-b border-border bg-white px-4 sm:grid-cols-[1fr_minmax(0,28rem)_1fr] sm:gap-0">
         <div className="flex min-w-0 items-center gap-3">
           <Image src="/logo.png" alt="NeuFin" width={120} height={40} className="hidden h-8 w-auto md:block" />
-          <span className="hidden h-4 w-px shrink-0 bg-[hsl(var(--border))] sm:block" aria-hidden />
+          <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
           <span
-            className={`truncate text-[10px] font-mono font-medium tracking-wider ${regimeBadgeClasses(regime.variant)} rounded px-2 py-0.5`}
+            className={`truncate rounded px-2 py-0.5 font-mono text-sm font-medium tracking-wide ${regimeBadgeClasses(regime.variant)}`}
           >
             REGIME: {regime.display}
           </span>
@@ -124,33 +124,31 @@ export function CommandBar({
             type="button"
             onClick={onSearchClick}
             aria-label="Search portfolios and research"
-            className="w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--surface)/0.8)] px-3 py-1.5 text-left text-xs text-[hsl(var(--muted-foreground))] focus:bg-[hsl(var(--surface))] focus:outline-none focus:ring-1 focus:ring-[hsl(var(--primary)/0.5)]"
+            className="w-full rounded-md border border-border bg-surface-2/90 px-3 py-1.5 text-left text-sm text-muted2 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary/40"
           >
-            Search portfolios, assets, research... ⌘K
+            Search portfolios, assets, research… ⌘K
           </button>
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <span className="hidden text-[10px] font-mono text-[hsl(var(--muted-foreground)/0.6)] lg:inline">
-            {clock}
-          </span>
+          <span className="hidden font-mono text-sm text-muted2 lg:inline">{clock}</span>
           <button
             type="button"
-            className="relative rounded p-1 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+            className="relative rounded p-1 text-muted2 transition-colors hover:text-navy"
             aria-label="Notifications"
           >
             <Bell className="h-[14px] w-[14px]" />
             {hasAlertSignal ? (
-              <span className="absolute -right-0.5 -top-0.5 h-1 w-1 rounded-full bg-[hsl(var(--risk))]" />
+              <span className="absolute -right-0.5 -top-0.5 h-1 w-1 rounded-full bg-danger2" />
             ) : null}
           </button>
           <button
             type="button"
             onClick={() => onToggleCopilot?.()}
-            className="rounded-md border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.15)] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--accent))] transition-colors hover:bg-[hsl(var(--accent)/0.25)]"
+            className="rounded-md border border-primary/25 bg-primary-light px-2.5 py-1 text-sm font-medium text-primary-dark transition-colors hover:border-primary/40"
           >
             <span className="inline-flex items-center gap-1">
-              <Sparkles className="h-3 w-3" aria-hidden />
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
               Copilot
             </span>
           </button>
@@ -161,25 +159,25 @@ export function CommandBar({
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
           <button
             type="button"
-            className="absolute inset-0 bg-[hsl(var(--background)/0.85)] backdrop-blur-sm"
+            className="absolute inset-0 bg-navy/40 backdrop-blur-sm"
             aria-label="Close command palette"
             onClick={() => setPaletteOpen(false)}
           />
-          <div className="relative z-10 w-full max-w-lg rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--popover))] shadow-2xl">
-            <div className="flex items-center gap-3 border-b border-[hsl(var(--border))] px-4 py-3">
-              <span className="text-sm text-[hsl(var(--muted-foreground))]">⌘K</span>
+          <div className="relative z-10 w-full max-w-lg rounded-lg border border-border bg-white shadow-2xl">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+              <span className="text-sm text-muted2">⌘K</span>
               <input
                 autoFocus
                 placeholder="Search portfolios, assets, research..."
                 aria-label="Search portfolios and research"
-                className="flex-1 bg-transparent text-sm text-[hsl(var(--foreground))] outline-none placeholder:text-[hsl(var(--muted-foreground)/0.6)]"
+                className="flex-1 bg-transparent text-sm text-navy outline-none placeholder:text-muted2/70"
               />
-              <kbd className="rounded border border-[hsl(var(--border))] bg-[hsl(var(--surface))] px-1.5 py-0.5 text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
+              <kbd className="rounded border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-muted2">
                 ESC
               </kbd>
             </div>
-            <p className="px-4 py-3 text-xs text-[hsl(var(--muted-foreground))]">
-              Command palette — navigation and search integrations ship in the next release.
+            <p className="px-4 py-3 text-sm text-muted2">
+              Command palette: navigation and search integrations ship in the next release.
             </p>
           </div>
         </div>

@@ -9,9 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-geist)', 'system-ui', 'sans-serif'],
-        display: ['var(--font-instrument)', 'Georgia', 'serif'],
-        mono: ['var(--font-jetbrains)', 'ui-monospace', 'monospace'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       colors: {
         brand: {
@@ -75,14 +74,14 @@ const config: Config = {
         ring: '#1EB8CC',
       },
       fontSize: {
-        display: ['2.5rem', { lineHeight: '1.1', letterSpacing: '-0.025em' }],
-        'page-title': ['2rem', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
-        section: ['1.5rem', { lineHeight: '1.3' }],
-        'card-title': ['1.125rem', { lineHeight: '1.4' }],
+        /* Institutional scale — page title 32px, meta floor 14px */
+        'page-title': ['2rem', { lineHeight: '1.25', letterSpacing: '-0.02em' }],
+        section: ['1.5rem', { lineHeight: '1.35' }],
+        'card-title': ['1.125rem', { lineHeight: '1.45' }],
         body: ['1rem', { lineHeight: '1.65' }],
         'body-sm': ['0.9375rem', { lineHeight: '1.6' }],
-        caption: ['0.8125rem', { lineHeight: '1.5' }],
-        label: ['0.75rem', { lineHeight: '1', letterSpacing: '0.08em' }],
+        caption: ['0.875rem', { lineHeight: '1.5' }],
+        label: ['0.75rem', { lineHeight: '1', letterSpacing: '0.06em' }],
       },
       spacing: {
         'page-x': '24px',

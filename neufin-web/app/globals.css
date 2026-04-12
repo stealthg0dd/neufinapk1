@@ -61,7 +61,8 @@
   --text: var(--navy);
   --text-2: var(--slate);
   --canvas: var(--bg-app);
-  --amber: var(--primary);
+  /* Warning / highlight (distinct from brand primary) */
+  --amber: #f5a623;
   --blue: var(--primary);
   --emerald: #22c55e;
   --red: var(--danger);
@@ -395,7 +396,7 @@ span:not(.badge):not(.chip) {
 
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent;
   }
   .neufin-grid-bg {
     background-image:
@@ -510,7 +511,7 @@ span:not(.badge):not(.chip) {
     color: var(--text-secondary) !important;
   }
   .border-t-\[var\(--amber\)\] {
-    border-top-color: var(--primary) !important;
+    border-top-color: var(--amber) !important;
   }
   .border-t-\[var\(--canvas\)\] {
     border-top-color: var(--bg-app) !important;
@@ -519,6 +520,14 @@ span:not(.badge):not(.chip) {
     border-color: rgba(226, 232, 240, 0.6) !important;
   }
   .border-\[var\(--amber\)\]\/30 {
+    border-color: rgba(245, 166, 35, 0.35) !important;
+  }
+
+  /* Brand accent borders (use instead of misnamed --amber for teal) */
+  .border-t-\[var\(--primary\)\] {
+    border-top-color: var(--primary) !important;
+  }
+  .border-\[var\(--primary\)\]\/30 {
     border-color: rgba(30, 184, 204, 0.3) !important;
   }
 }
@@ -557,7 +566,7 @@ span:not(.badge):not(.chip) {
   background: var(--primary-light);
   border: 1px solid rgba(30, 184, 204, 0.35);
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--primary);
   margin-right: 10px;

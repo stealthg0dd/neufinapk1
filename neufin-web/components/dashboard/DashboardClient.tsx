@@ -312,7 +312,7 @@ export default function DashboardClient() {
       {/* Sidebar desktop */}
       <aside className="hidden md:flex w-[240px] shrink-0 border-r border-[var(--border)] flex-col bg-[var(--surface-1)]/50 backdrop-blur-xl">
         <div className="p-5 border-b border-[var(--border)]">
-          <Link href="/" className="font-display text-xl text-[var(--amber)]">
+          <Link href="/" className="font-sans text-xl text-primary">
             NeuFin
           </Link>
         </div>
@@ -326,7 +326,7 @@ export default function DashboardClient() {
                 className={clsx(
                   'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors border-l-2',
                   active
-                    ? 'border-[var(--amber)] bg-[var(--surface-2)] text-[var(--text-primary)]'
+                    ? 'border-primary bg-[var(--surface-2)] text-[var(--text-primary)]'
                     : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--surface-2)]/60',
                 )}
               >
@@ -338,7 +338,7 @@ export default function DashboardClient() {
         </nav>
         <div className="p-4 border-t border-[var(--border)] space-y-2">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[var(--surface-3)] flex items-center justify-center text-xs font-mono text-[var(--amber)]">
+            <div className="w-9 h-9 rounded-full bg-[var(--surface-3)] flex items-center justify-center text-xs font-mono text-primary">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
@@ -346,7 +346,7 @@ export default function DashboardClient() {
               <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Plan · Trial</span>
             </div>
           </div>
-          <Link href="/pricing" className="text-xs text-[var(--amber)] font-medium hover:underline block">
+          <Link href="/pricing" className="text-xs text-primary font-medium hover:underline block">
             Upgrade
           </Link>
           <button
@@ -379,13 +379,13 @@ export default function DashboardClient() {
             {/* Welcome hero */}
             <GlassCard className="p-8 text-center border-[var(--border-accent)]">
               <div className="mb-4 flex justify-center">
-                <Dna className="h-12 w-12 text-[var(--amber)]" aria-hidden />
+                <Dna className="h-12 w-12 text-primary" aria-hidden />
               </div>
-              <h2 className="font-display text-2xl text-[var(--text-primary)] mb-2">
+              <h2 className="font-sans text-2xl text-[var(--text-primary)] mb-2">
                 Welcome to NeuFin
               </h2>
               <p className="text-[var(--text-secondary)] mb-1">
-                You have <span className="text-[var(--amber)] font-semibold">14 days full access</span> — no credit card required.
+                You have <span className="text-primary font-semibold">14 days full access</span> — no credit card required.
               </p>
               <p className="text-sm text-[var(--text-muted)] mb-8">
                 Upload a portfolio CSV to generate your Investor DNA Score and unlock AI swarm analysis.
@@ -393,7 +393,7 @@ export default function DashboardClient() {
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
                   href="/upload"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity"
                 >
                   <FolderUp className="h-4 w-4 shrink-0" aria-hidden />
                   Upload Portfolio CSV
@@ -418,7 +418,7 @@ export default function DashboardClient() {
                 ] as const
               ).map(({ Icon, title, desc }) => (
                 <GlassCard key={title} className="p-5">
-                  <Icon className="mb-2 h-8 w-8 text-[var(--amber)]" aria-hidden />
+                  <Icon className="mb-2 h-8 w-8 text-primary" aria-hidden />
                   <p className="font-semibold text-[var(--text-primary)] text-sm mb-1">{title}</p>
                   <p className="text-xs text-[var(--text-secondary)]">{desc}</p>
                 </GlassCard>
@@ -542,7 +542,7 @@ export default function DashboardClient() {
                         <button
                           type="button"
                           onClick={() => toggleSort('symbol')}
-                          className="inline-flex items-center gap-1 hover:text-[var(--amber)] transition-colors"
+                          className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         >
                           Ticker
                           <motion.span layout>
@@ -555,7 +555,7 @@ export default function DashboardClient() {
                         <button
                           type="button"
                           onClick={() => toggleSort('weight')}
-                          className="inline-flex items-center gap-1 hover:text-[var(--amber)] transition-colors"
+                          className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         >
                           Weight %
                           <ArrowUpDown className="w-3 h-3 opacity-60" />
@@ -565,7 +565,7 @@ export default function DashboardClient() {
                         <button
                           type="button"
                           onClick={() => toggleSort('price')}
-                          className="inline-flex items-center gap-1 hover:text-[var(--amber)] transition-colors"
+                          className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         >
                           Price
                           <ArrowUpDown className="w-3 h-3 opacity-60" />
@@ -576,7 +576,7 @@ export default function DashboardClient() {
                         <button
                           type="button"
                           onClick={() => toggleSort('value')}
-                          className="inline-flex items-center gap-1 hover:text-[var(--amber)] transition-colors"
+                          className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         >
                           Total Return
                           <ArrowUpDown className="w-3 h-3 opacity-60" />
@@ -625,8 +625,8 @@ export default function DashboardClient() {
       <aside className="hidden lg:block w-[300px] shrink-0 border-l border-[var(--border)] p-4 bg-[var(--surface-1)]/40">
         <div className="flex items-center gap-2 mb-4">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--amber)] opacity-40" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--amber)]" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-40" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
           </span>
           <h2 className="text-sm font-semibold text-[var(--text-primary)]">AI Intelligence</h2>
         </div>
@@ -634,7 +634,7 @@ export default function DashboardClient() {
           {loadNotes
             ? [1, 2, 3].map((i) => <div key={i} className="h-20 rounded-xl shimmer" />)
             : (notes ?? []).map((n) => (
-                <GlassCard key={n.id} className="p-3 border-l-2 border-l-[var(--amber)]">
+                <GlassCard key={n.id} className="p-3 border-l-2 border-l-primary">
                   <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{n.title}</p>
                   <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1">{n.executive_summary}</p>
                   <p className="text-[10px] font-mono text-[var(--text-muted)] mt-2">
@@ -658,7 +658,7 @@ export default function DashboardClient() {
             type="button"
             disabled={aiBusy || !metrics}
             onClick={onAskAi}
-            className="w-full py-2 rounded-lg bg-[var(--amber)] text-[var(--canvas)] text-xs font-semibold disabled:opacity-50"
+            className="w-full py-2 rounded-lg bg-primary text-white text-xs font-semibold disabled:opacity-50"
           >
             {aiBusy ? 'Thinking…' : 'Ask AI'}
           </button>

@@ -91,11 +91,7 @@ export default function HomeLandingPage({
             <h1 className="mb-4 font-sans text-5xl font-bold leading-tight tracking-tight text-[var(--navy)] md:text-6xl">
               <span className="block">7 AI Agents.</span>
               <span className="block">One portfolio.</span>
-              <span
-                className="block bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"
-              >
-                Institutional clarity.
-              </span>
+              <span className="block text-primary">Institutional clarity.</span>
             </h1>
 
             <p className="mb-6 max-w-xl text-lg leading-relaxed text-[var(--slate)]">
@@ -170,7 +166,7 @@ export default function HomeLandingPage({
       <section id="swarm-demo" className="section relative scroll-mt-20 bg-[var(--bg-app)]">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16 text-center">
-            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary">AGENTIC AI SYSTEM</p>
+            <p className="mb-3 font-mono text-sm font-medium uppercase tracking-widest text-primary">AGENTIC AI SYSTEM</p>
             <h2 className="text-3xl font-bold text-[var(--navy)] md:text-4xl">
               Seven specialized agents.
               <br />
@@ -309,7 +305,7 @@ export default function HomeLandingPage({
                 <div className="mx-auto mt-8 max-w-4xl">
                   <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
                     <div className="w-full rounded-xl border border-border/60 border-dashed bg-surface/40 p-4 text-center md:w-[28%]">
-                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Your Portfolio CSV</p>
+                      <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Your Portfolio CSV</p>
                     </div>
 
                     <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
@@ -319,7 +315,7 @@ export default function HomeLandingPage({
                     <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
 
                     <div className="w-full rounded-xl border border-border/60 bg-surface p-4 text-center md:w-[44%]">
-                      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">7 Agents</p>
+                      <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">7 Agents</p>
                       <div className="mt-3 grid grid-cols-4 gap-2">
                         {(
                           [
@@ -340,7 +336,7 @@ export default function HomeLandingPage({
                           />
                         ))}
                       </div>
-                      <p className="mt-3 text-[11px] text-muted-foreground">in parallel</p>
+                      <p className="mt-3 text-sm text-muted-foreground">in parallel</p>
                     </div>
 
                     <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
@@ -350,7 +346,7 @@ export default function HomeLandingPage({
                     <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
 
                     <div className="w-full rounded-xl border border-primary/40 bg-primary/5 p-4 text-center md:w-[28%]">
-                      <p className="font-mono text-[10px] uppercase tracking-widest text-primary">IC-Grade Briefing</p>
+                      <p className="font-mono text-xs uppercase tracking-widest text-primary">IC-Grade Briefing</p>
                     </div>
                   </div>
 
@@ -469,7 +465,7 @@ export default function HomeLandingPage({
       <section className="border-y border-border/40 bg-surface/20 py-16">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
-            <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-primary">REGULATORY FRAMEWORK</p>
+            <p className="mb-2 font-mono text-sm font-medium uppercase tracking-widest text-primary">REGULATORY FRAMEWORK</p>
             <h2 className="text-2xl font-bold text-navy">Compliance Across Every Market We Operate</h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
               Neufin is built for global institutional deployment with jurisdiction-specific compliance frameworks.
@@ -479,49 +475,49 @@ export default function HomeLandingPage({
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                flag: '🇸🇬',
+                code: 'SG',
                 region: 'Singapore',
                 regulatory: 'MAS (Monetary Authority of Singapore)',
                 items: ['Capital Markets Services regime awareness'],
                 status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
               },
               {
-                flag: '🇲🇾',
+                code: 'MY',
                 region: 'Malaysia',
                 regulatory: 'Securities Commission Malaysia (SC)',
                 items: ['CMSA compliance framework'],
                 status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
               },
               {
-                flag: '🇹🇭',
+                code: 'TH',
                 region: 'Thailand',
                 regulatory: 'SEC Thailand oversight',
                 items: ['Investment Advisory Act alignment'],
                 status: { label: 'Launching 2026', tone: 'bg-warning/10 text-warning border-warning/30' },
               },
               {
-                flag: '🇻🇳',
+                code: 'VN',
                 region: 'Vietnam',
                 regulatory: 'SSC (State Securities Commission)',
                 items: ['Securities Law 2019 framework'],
                 status: { label: 'Launching 2026', tone: 'bg-warning/10 text-warning border-warning/30' },
               },
               {
-                flag: '🇦🇪',
+                code: 'AE',
                 region: 'UAE',
                 regulatory: 'ADGM / DFSA regulatory framework',
                 items: ['FinTech permission alignment'],
                 status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
               },
               {
-                flag: '🇪🇺',
+                code: 'EU',
                 region: 'European Union / Estonia HQ',
                 regulatory: 'GDPR compliance (full)',
                 items: ['MiFID II awareness', 'ESMA regulatory alignment', 'Neufin OÜ registered entity'],
                 status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
               },
               {
-                flag: '🇺🇸',
+                code: 'US',
                 region: 'United States',
                 regulatory: 'SEC Reg S-P, FINRA 4512 alignment',
                 items: ['SOC 2 Type II in preparation', 'CCPA aligned', 'Registered office: USA'],
@@ -531,22 +527,25 @@ export default function HomeLandingPage({
               <div key={c.region} className="rounded-xl border border-border bg-surface p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl leading-none" aria-hidden>
-                      {c.flag}
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 font-mono text-xs font-semibold text-muted2"
+                      aria-hidden
+                    >
+                      {c.code}
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-navy">{c.region}</p>
-                      <p className="mt-1 font-mono text-[11px] text-primary">{c.regulatory}</p>
+                      <p className="mt-1 font-mono text-sm text-primary">{c.regulatory}</p>
                     </div>
                   </div>
-                  <span className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] ${c.status.tone}`}>
+                  <span className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-xs ${c.status.tone}`}>
                     {c.status.label}
                   </span>
                 </div>
 
                 <ul className="mt-4 space-y-2">
                   {c.items.map((it) => (
-                    <li key={it} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <li key={it} className="flex items-start gap-2 text-sm text-muted-foreground">
                       <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive" />
                       <span>{it}</span>
                     </li>
@@ -560,7 +559,7 @@ export default function HomeLandingPage({
 
       {/* SECTION 3 — MARKET INTELLIGENCE */}
       <section className="border-y border-border/40 bg-surface/30 py-20">
-        <p className="mb-2 text-center font-mono text-[11px] uppercase tracking-widest text-primary">
+        <p className="mb-2 text-center font-mono text-sm font-medium uppercase tracking-widest text-primary">
           LIVE MARKET INTELLIGENCE
         </p>
         <p className="mb-10 text-center text-muted-foreground">
@@ -572,7 +571,7 @@ export default function HomeLandingPage({
               {regimeLabel ?? 'Awaiting regime signal'}
             </p>
             <div className="mt-4">
-              <div className="mb-1 flex justify-between font-mono text-[10px] text-muted-foreground">
+              <div className="mb-1 flex justify-between font-mono text-sm text-muted-foreground">
                 <span>Confidence</span>
                 <span>{confPct !== null ? `${confPct}%` : '—'}</span>
               </div>
@@ -583,7 +582,7 @@ export default function HomeLandingPage({
                 />
               </div>
             </div>
-            <p className="mt-3 font-mono text-[10px] text-muted-foreground/60">
+            <p className="mt-3 font-mono text-sm text-muted-foreground/70">
               Last updated:{' '}
               {regimeStartedAt
                 ? new Date(regimeStartedAt).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' })
@@ -611,7 +610,7 @@ export default function HomeLandingPage({
                         <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
                           {(note?.note_type ?? 'note').replace(/_/g, ' ')}
                         </span>
-                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{nconf}% conf</span>
+                        <span className="shrink-0 font-mono text-sm text-muted-foreground">{nconf}% conf</span>
                       </div>
                       <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-navy">
                         {note?.title ?? 'Untitled'}
@@ -620,14 +619,14 @@ export default function HomeLandingPage({
                         {note?.executive_summary ?? ''}
                       </p>
                       <div className="mt-2.5 flex items-center justify-between">
-                        <span className="font-mono text-[10px] text-muted-foreground/60">
+                        <span className="font-mono text-sm text-muted-foreground/70">
                           {genAt
                             ? new Date(genAt).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })
                             : '—'}
                         </span>
                         <Link
                           href={`/research/${note.id}`}
-                          className="cursor-pointer text-[11px] text-primary"
+                          className="cursor-pointer text-sm text-primary"
                         >
                           Read →
                         </Link>
@@ -681,7 +680,7 @@ export default function HomeLandingPage({
                 <Icon className="accent-blue mb-3 h-8 w-8" strokeWidth={1.5} />
                 <h3 className="text-section-title text-lg">{name}</h3>
                 <p className="text-body-sm mt-1 flex-1">{desc}</p>
-                <p className="text-muted-marketing mt-3 text-[11px]">Available on Growth and Institutional plans.</p>
+                <p className="text-muted-marketing mt-3 text-sm">Available on Growth and Institutional plans.</p>
                 <Link
                   href="/partners"
                   className="accent-blue mt-3 inline-flex text-sm font-semibold hover:underline"
@@ -710,7 +709,7 @@ export default function HomeLandingPage({
           <div className="grid items-stretch gap-6 md:grid-cols-3">
             <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
               <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Free</p>
-              <p className="mb-1 font-display text-5xl font-bold text-navy">$0</p>
+              <p className="mb-1 font-sans text-5xl font-bold text-navy">$0</p>
               <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
               <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
                 {['3 DNA analyses', 'Basic behavioral report', 'CSV upload'].map((f) => (
@@ -733,7 +732,7 @@ export default function HomeLandingPage({
                 Most Popular
               </span>
               <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Advisor</p>
-              <p className="mb-1 font-display text-5xl font-bold text-primary">$299</p>
+              <p className="mb-1 font-sans text-5xl font-bold text-primary">$299</p>
               <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
               <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
                 {[
@@ -759,7 +758,7 @@ export default function HomeLandingPage({
 
             <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
               <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Enterprise</p>
-              <p className="mb-1 font-display text-5xl font-bold text-navy">$999</p>
+              <p className="mb-1 font-sans text-5xl font-bold text-navy">$999</p>
               <p className="mb-2 text-sm text-[var(--slate)]">per month</p>
               <p className="mb-6 text-xs text-primary">Custom pricing available</p>
               <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">

@@ -9,26 +9,30 @@ test.describe('NEUFIN WEB — A1–A5 Health Check', () => {
     const domLoadedMs = Date.now() - t0
     expect(domLoadedMs).toBeLessThan(3000)
 
-    // Dark canvas background visible (not white). We allow either body/html background to carry it.
+    // Light institutional app shell (off-white / white, not pure black canvas).
     const bg = await page.evaluate(() => {
       const body = getComputedStyle(document.body).backgroundColor
       const html = getComputedStyle(document.documentElement).backgroundColor
       return { body, html }
     })
-    const isWhite = (c: string) => c === 'rgb(255, 255, 255)' || c === 'rgba(255, 255, 255, 1)'
-    expect(isWhite(bg.body) && isWhite(bg.html)).toBeFalsy()
+    const isNearBlack = (c: string) => {
+      const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+      if (!m) return false
+      const r = Number(m[1])
+      const g = Number(m[2])
+      const b = Number(m[3])
+      return r + g + b < 60
+    }
+    expect(isNearBlack(bg.body) && isNearBlack(bg.html)).toBeFalsy()
 
-    // Hero headline uses Instrument Serif via font-display utility.
-    await expect(page.locator('h1.font-display')).toBeVisible()
+    await expect(page.locator('h1.font-sans.text-5xl')).toBeVisible()
 
     // Animated demo should exist.
     await expect(page.getByText(/Live preview/i)).toBeVisible()
 
-    // CTA visible and amber-ish background.
-    const cta = page.getByRole('link', { name: /start free analysis/i })
+    const cta = page.getByRole('link', { name: /analyze my portfolio free/i })
     await expect(cta).toBeVisible()
     const ctaBg = await cta.evaluate((el) => getComputedStyle(el).backgroundColor)
-    // Amber target is around rgb(245,166,35); allow a wide range.
     expect(ctaBg).toMatch(/rgb\(/)
 
     // Mobile 375px — no horizontal scroll.

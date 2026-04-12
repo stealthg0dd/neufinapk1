@@ -1,23 +1,27 @@
 /**
- * NeuFin design tokens — mirror of CSS variables in app/globals.css
- * Use for programmatic access (charts, canvas, etc.)
+ * Programmatic design tokens — values mirror `app/globals.css` :root.
+ * Prefer CSS variables in components; use this for charts/canvas only.
  */
 export const designTokens = {
-  canvas: '#080B14',
-  surface1: '#0F1420',
-  surface2: '#161D2E',
-  surface3: '#1E2640',
-  border: 'rgba(255,255,255,0.07)',
-  borderAccent: 'rgba(245,162,35,0.3)',
-  textPrimary: '#F0F4FF',
-  textSecondary: '#8B95B0',
-  textMuted: '#4A5568',
+  bgApp: '#F6F8FB',
+  surface: '#FFFFFF',
+  surface2: '#F8FAFC',
+  surface3: '#F1F5F9',
+  border: '#E2E8F0',
+  borderAccent: 'rgba(30, 184, 204, 0.35)',
+  textPrimary: '#0F172A',
+  textSecondary: '#334155',
+  textMuted: '#64748B',
+  primary: '#1EB8CC',
+  primaryDark: '#158A99',
+  primaryLight: '#E0F7FA',
+  /** Semantic warning (not brand primary) */
   amber: '#F5A623',
-  emerald: '#00D97E',
-  red: '#FF4D6A',
-  blue: '#4D9FFF',
-  glassBg: 'rgba(15,20,32,0.7)',
-  glassBorder: 'rgba(255,255,255,0.08)',
+  emerald: '#22C55E',
+  red: '#EF4444',
+  blue: '#1EB8CC',
+  glassBg: 'rgba(255, 255, 255, 0.92)',
+  glassBorder: 'rgba(226, 232, 240, 0.95)',
 } as const
 
 export type DesignTokenKey = keyof typeof designTokens
