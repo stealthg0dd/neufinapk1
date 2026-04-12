@@ -67,32 +67,27 @@ export default function HomeLandingPage({
   const tone = regimeSlug ? regimeTone(regimeSlug) : { dot: 'bg-muted-foreground', text: 'text-muted-foreground' }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col">
       <LandingNav />
 
+      <div className="marketing-section flex flex-col">
       {/* SECTION 1 — HERO */}
-      <section className="relative min-h-screen overflow-hidden bg-background">
+      <section className="relative min-h-screen overflow-hidden marketing-section-white marketing-hero-subtle">
         <div
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 opacity-60"
           style={{
-            backgroundImage:
-              'linear-gradient(rgba(30,184,204,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(30,184,204,0.04) 1px, transparent 1px)',
-            backgroundSize: '50px 50px',
             animation: 'grid-move-50 25s linear infinite',
           }}
         />
         <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 px-6 pb-20 pt-28 sm:pt-32 md:pt-24 lg:grid-cols-2">
           <div>
-            <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              AGENTIC PORTFOLIO INTELLIGENCE
-            </span>
+            <span className="eyebrow-badge">Portfolio Intelligence</span>
 
-            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary/80">
+            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary/90">
               7 AI Agents. IC-Grade Intelligence. 60 Seconds.
             </p>
 
-            <h1 className="mb-4 font-sans text-5xl font-bold leading-[1.1] md:text-6xl">
+            <h1 className="text-page-title mb-4 font-sans md:text-6xl">
               <span className="block">7 AI Agents.</span>
               <span className="block">One portfolio.</span>
               <span
@@ -107,32 +102,11 @@ export default function HomeLandingPage({
               </span>
             </h1>
 
-            <p className="mb-6 max-w-lg text-lg leading-relaxed text-muted-foreground">
+            <p className="text-body mb-6 max-w-lg text-lg leading-relaxed">
               Upload your portfolio. Our swarm of 7 specialized AI agents analyzes market regime, behavioral biases, risk
               clusters, and alpha opportunities — delivering an Investment Committee briefing in 60 seconds.
               No expensive data terminals required.
             </p>
-
-            <div className="mb-8 flex flex-wrap gap-6">
-              <div className="flex flex-col">
-                <span className="font-mono text-2xl font-bold tabular-nums text-risk">60s</span>
-                <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  IC-grade portfolio brief, from CSV upload
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-mono text-2xl font-bold tabular-nums text-risk">47</span>
-                <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Behavioral biases tracked per portfolio
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-mono text-2xl font-bold tabular-nums text-positive">7</span>
-                <span className="mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  Specialized AI agents running in parallel
-                </span>
-              </div>
-            </div>
 
             <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
               {[
@@ -140,9 +114,9 @@ export default function HomeLandingPage({
                 { k: '47 Behavioral Biases Detected', v: 'including loss aversion, anchoring' },
                 { k: 'IC-Grade Output', v: 'investment committee briefings in 60 seconds' },
               ].map((p) => (
-                <div key={p.k} className="rounded-xl border border-border/60 bg-surface/60 p-3">
-                  <p className="text-sm font-semibold text-foreground">{p.k}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{p.v}</p>
+                <div key={p.k} className="mkt-card-sm">
+                  <p className="text-card-title text-sm">{p.k}</p>
+                  <p className="text-body-sm mt-1 text-[11px]">{p.v}</p>
                 </div>
               ))}
             </div>
@@ -186,7 +160,9 @@ export default function HomeLandingPage({
             </div>
           </div>
 
-          <SwarmHeroTerminal />
+          <div className="swarm-terminal-chrome w-full max-w-lg justify-self-center lg:justify-self-end">
+            <SwarmHeroTerminal />
+          </div>
         </div>
       </section>
 
@@ -212,7 +188,7 @@ export default function HomeLandingPage({
               {
                 id: 'market_regime',
                 name: 'MACRO INTELLIGENCE',
-                emoji: '🌍',
+                mono: 'MR',
                 tagline: 'Monitors the macro environment',
                 description:
                   'Monitors VIX, PMI, yield curve, and CPI signals via FRED to classify the current regime across 5 categories. Every portfolio decision is regime-aware.',
@@ -222,7 +198,7 @@ export default function HomeLandingPage({
               {
                 id: 'strategist',
                 name: 'PORTFOLIO STRATEGIST',
-                emoji: '🧠',
+                mono: 'PS',
                 tagline: 'Turns macro signals into positioning',
                 description:
                   'Synthesizes macro signals and news flow into a positioning thesis specific to your holdings. Tells you what to do, not just what is happening.',
@@ -232,7 +208,7 @@ export default function HomeLandingPage({
               {
                 id: 'quant',
                 name: 'QUANTITATIVE ANALYSIS',
-                emoji: '📊',
+                mono: 'QA',
                 tagline: 'Pure portfolio mathematics',
                 description:
                   'Computes HHI concentration, weighted beta, Sharpe ratio, and correlation clusters across six data providers. No model assumptions — pure portfolio mathematics.',
@@ -242,7 +218,7 @@ export default function HomeLandingPage({
               {
                 id: 'tax_arch',
                 name: 'TAX OPTIMISATION',
-                emoji: '🏛️',
+                mono: 'TO',
                 tagline: 'Protects after-tax alpha',
                 description:
                   'Calculates per-position CGT liability and flags tax-loss harvesting opportunities before year-end. Protects after-tax alpha without manual spreadsheets.',
@@ -252,7 +228,7 @@ export default function HomeLandingPage({
               {
                 id: 'risk_sentinel',
                 name: 'INDEPENDENT RISK REVIEW',
-                emoji: '🛡️',
+                mono: 'RR',
                 tagline: 'A second opinion on every portfolio',
                 description:
                   'Runs a fully independent risk assessment — not influenced by any other agent. A second opinion on concentration, tail risk, and drawdown exposure.',
@@ -262,7 +238,7 @@ export default function HomeLandingPage({
               {
                 id: 'alpha_scout',
                 name: 'ALPHA DISCOVERY',
-                emoji: '⚡',
+                mono: 'AD',
                 tagline: 'Finds what your portfolio is missing',
                 description:
                   'Scans for opportunities your portfolio is not capturing — sector rotations, momentum signals, and underweighted positions relative to live regime.',
@@ -272,7 +248,7 @@ export default function HomeLandingPage({
               {
                 id: 'synthesizer',
                 name: 'IC SYNTHESIS',
-                emoji: '✦',
+                mono: 'IC',
                 tagline: 'Produces the Investment Committee briefing',
                 description:
                   'Aggregates all agent outputs into a single Investment Committee briefing — structured, cited, and ready for client or committee delivery.',
@@ -282,8 +258,7 @@ export default function HomeLandingPage({
             ] as const
 
             const colorVar = (c: string) => (['risk', 'warning', 'primary', 'positive', 'accent'].includes(c) ? c : 'primary')
-            const borderHover = (c: string) => `hover:border-[hsl(var(--${colorVar(c)})/0.4)]`
-            const pillText = (c: string) => `text-[hsl(var(--${colorVar(c)}))]`
+            const borderHover = (c: string) => `hover:border-[hsl(var(--${colorVar(c)})/0.35)]`
 
             const firstRow = agents.slice(0, 4)
             const secondRow = agents.slice(4)
@@ -292,21 +267,19 @@ export default function HomeLandingPage({
               <div
                 key={a.id}
                 className={[
-                  'rounded-xl border border-border bg-surface p-5 transition-colors',
+                  'rounded-[10px] border border-[#E5E7EB] bg-white p-5 transition-colors shadow-sm',
                   borderHover(a.color),
                 ].join(' ')}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl leading-none" aria-hidden>
-                    {a.emoji}
+                <div className="flex items-center">
+                  <span className="agent-badge" aria-hidden>
+                    {a.mono}
                   </span>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{a.name}</span>
+                  <span className="text-card-title font-mono text-[10px] uppercase tracking-wider">{a.name}</span>
                 </div>
-                <p className="mt-2 text-sm font-semibold text-foreground">{a.tagline}</p>
-                <p className="mb-3 mt-1 text-[12px] leading-relaxed text-muted-foreground">{a.description}</p>
-                <span className={['inline-flex items-center rounded bg-surface-2 px-2 py-1 font-mono text-[10px]', pillText(a.color)].join(' ')}>
-                  → {a.output}
-                </span>
+                <p className="text-label mt-2">{a.tagline}</p>
+                <p className="text-body-sm mb-3 mt-1 leading-relaxed">{a.description}</p>
+                <span className="agent-status-pill font-mono">→ {a.output}</span>
               </div>
             )
 
@@ -361,7 +334,9 @@ export default function HomeLandingPage({
                     </div>
                   </div>
 
-                  <p className="mt-4 text-center text-sm text-muted-foreground">⚡ Average analysis time: 60 seconds</p>
+                  <p className="mt-4 text-center text-sm text-body-sm">
+                    Average analysis time: 60 seconds
+                  </p>
                 </div>
 
                 <div className="mt-12 text-center">
@@ -681,18 +656,22 @@ export default function HomeLandingPage({
             ].map(({ icon: Icon, name, desc }) => (
               <div
                 key={name}
-                className="flex flex-col rounded-xl border border-border bg-surface p-5 transition-colors hover:border-primary/30"
+                className="mkt-card-elevated flex flex-col transition-colors hover:border-[hsl(var(--primary)/0.35)]"
               >
-                <Icon className="mb-3 h-8 w-8 text-primary" strokeWidth={1.5} />
-                <h3 className="text-lg font-semibold text-foreground">{name}</h3>
-                <p className="mt-1 flex-1 text-sm text-muted-foreground">{desc}</p>
-                <span className="mt-4 inline-flex w-fit rounded-full border border-border bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  Coming Q3 2026
-                </span>
+                <Icon className="accent-blue mb-3 h-8 w-8" strokeWidth={1.5} />
+                <h3 className="text-section-title text-lg">{name}</h3>
+                <p className="text-body-sm mt-1 flex-1">{desc}</p>
+                <p className="text-muted-marketing mt-3 text-[11px]">Available on Growth and Institutional plans.</p>
+                <Link
+                  href="/partners"
+                  className="accent-blue mt-3 inline-flex text-sm font-semibold hover:underline"
+                >
+                  View API Documentation →
+                </Link>
               </div>
             ))}
           </div>
-          <pre className="mt-10 overflow-x-auto rounded-xl border border-border bg-surface-3 p-5 font-mono text-sm text-muted-foreground">
+          <pre className="mt-10 overflow-x-auto rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-5 font-mono text-sm text-[#475569]">
             {`{
   "dna_score": 78,
   "investor_type": "Growth-Oriented",
@@ -816,19 +795,32 @@ export default function HomeLandingPage({
                 <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">
                   REGISTERED ENTITIES
                 </p>
-                <p>Neufin OÜ — Registered in Estonia (EU) · HQ</p>
-                <p>Neufin Inc. — Registered Office, United States</p>
+                <p>NeuFin OÜ · Registered in Estonia (EU)</p>
+                <p>Neufin Inc. — Registered office, United States</p>
                 <p>Singapore · Malaysia · UAE · Thailand · Vietnam (Coming 2026)</p>
               </div>
               <div className="text-left md:text-right">
                 <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">LEGAL</p>
                 <p>© 2026 Neufin OÜ. All rights reserved.</p>
-                <p>A unit of CTech Ventures</p>
                 <p>info@neufin.ai · www.neufin.ai</p>
-                <p className="mt-1">
-                  <a href="/terms-and-conditions" className="underline hover:text-muted-foreground/80">Terms &amp; Conditions</a>
-                  {' · '}
-                  <a href="/privacy" className="underline hover:text-muted-foreground/80">Privacy Policy</a>
+                <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                  <a href="/terms-and-conditions" className="underline hover:text-muted-foreground/80">
+                    Terms of Service
+                  </a>
+                  <a href="/privacy" className="underline hover:text-muted-foreground/80">
+                    Privacy Policy
+                  </a>
+                  <a
+                    href="https://status.neufin.ai"
+                    className="underline hover:text-muted-foreground/80"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Status
+                  </a>
+                  <Link href="/partners" className="underline hover:text-muted-foreground/80">
+                    API Docs
+                  </Link>
                 </p>
               </div>
             </div>
@@ -842,6 +834,7 @@ export default function HomeLandingPage({
           </div>
         </div>
       </section>
+      </div>
     </div>
   )
 }

@@ -8,10 +8,10 @@
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 
 const AGENTS = [
-  { value: 'general', label: 'General', fullLabel: 'General Agent', emoji: '🤖', color: 'text-primary', accent: 'border-primary/50', ring: 'ring-primary/30' },
-  { value: 'quant', label: 'Quant', fullLabel: 'Quant Agent', emoji: '📊', color: 'text-warning', accent: 'border-warning/50', ring: 'ring-warning/30' },
-  { value: 'macro', label: 'Macro', fullLabel: 'Macro Strategist', emoji: '🌐', color: 'text-positive', accent: 'border-positive/50', ring: 'ring-positive/30' },
-  { value: 'technical', label: 'Technical', fullLabel: 'Technical Analyst', emoji: '📈', color: 'text-accent', accent: 'border-accent/50', ring: 'ring-accent/30' },
+  { value: 'general', label: 'General', fullLabel: 'General Agent', mono: 'GN', color: 'text-primary', accent: 'border-primary/50', ring: 'ring-primary/30' },
+  { value: 'quant', label: 'Quant', fullLabel: 'Quant Agent', mono: 'QT', color: 'text-warning', accent: 'border-warning/50', ring: 'ring-warning/30' },
+  { value: 'macro', label: 'Macro', fullLabel: 'Macro Strategist', mono: 'MC', color: 'text-positive', accent: 'border-positive/50', ring: 'ring-positive/30' },
+  { value: 'technical', label: 'Technical', fullLabel: 'Technical Analyst', mono: 'TA', color: 'text-accent', accent: 'border-accent/50', ring: 'ring-accent/30' },
 ] as const
 
 type AgentValue = (typeof AGENTS)[number]['value']
@@ -120,7 +120,7 @@ export default function LandingMarketChatPanel() {
         <div className="mt-8 flex min-h-[min(70vh,560px)] flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-xl">
           <div className="flex items-center justify-between gap-3 border-b border-border bg-surface-2 px-4 py-3">
             <div className="flex min-w-0 items-center gap-2.5">
-              <span className="text-lg">{currentAgent.emoji}</span>
+              <span className="agent-badge">{currentAgent.mono}</span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-foreground">Neufin market desk</p>
                 <p className={`truncate text-[10px] uppercase tracking-widest ${currentAgent.color}`}>
@@ -164,10 +164,10 @@ export default function LandingMarketChatPanel() {
             )}
 
             {messages.map((msg, idx) => (
-              <div key={idx} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={idx} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'items-start justify-start'}`}>
                 {msg.role === 'assistant' && !msg.loading && (
-                  <span className="mt-0.5 shrink-0 text-base leading-none">
-                    {AGENTS.find((a) => a.value === msg.agent)?.emoji ?? '🤖'}
+                  <span className="agent-badge mt-0.5 shrink-0">
+                    {AGENTS.find((a) => a.value === msg.agent)?.mono ?? 'GN'}
                   </span>
                 )}
                 <div className="max-w-[90%] sm:max-w-[85%]">

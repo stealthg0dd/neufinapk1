@@ -10,18 +10,16 @@ export default async function StockTickerMarquee() {
   const doubled = [...tickers, ...tickers]
 
   return (
-    <div className="border-y border-border/30 bg-surface/30 py-2.5 overflow-hidden">
-      <div className="flex gap-10 whitespace-nowrap will-change-transform animate-[scroll_35s_linear_infinite]">
+    <div className="stock-ticker-marquee overflow-hidden">
+      <div className="flex h-full items-center gap-10 whitespace-nowrap py-0 will-change-transform animate-[scroll_35s_linear_infinite]">
         {doubled.map((t, idx) => {
           const up = t.changePct >= 0
           return (
-            <div key={`${t.symbol}-${idx}`} className="flex items-center gap-2 font-mono text-[11px]">
-              <span className="text-muted-foreground/70">{t.symbol}</span>
-              <span className="text-foreground">${t.price.toFixed(2)}</span>
-              <span className={up ? 'text-positive' : 'text-risk'}>
-                {up ? '▲' : '▼'} {formatPct(t.changePct)}
-              </span>
-              <span className="text-muted-foreground/40">|</span>
+            <div key={`${t.symbol}-${idx}`} className="flex items-center gap-2 font-mono">
+              <span className="ticker-muted">{t.symbol}</span>
+              <span className="text-[#334155]">${t.price.toFixed(2)}</span>
+              <span className={up ? 'ticker-up' : 'ticker-down'}>{formatPct(t.changePct)}</span>
+              <span className="ticker-muted opacity-50">|</span>
             </div>
           )
         })}
