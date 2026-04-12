@@ -1,0 +1,1 @@
+{"error":"internal_error","message":"Data fetch failed: {'message': 'column portfolio_positions.cost_basis does not exist', 'code': '42703', 'hint': None, 'details': None}","trace_id":"4957e381-be93-4883-acd5-d05ce431c383","timestamp":"2026-04-11T01:19:50.275544Z"}
