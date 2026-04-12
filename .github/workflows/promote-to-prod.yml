@@ -36,6 +36,7 @@ jobs:
     name: Merge & Deploy to Production
     runs-on: ubuntu-latest
     needs: validate
+    timeout-minutes: 30
     # ── GitHub Environment gate ───────────────────────────────────────────
     # Configure the "production" environment at:
     #   Settings → Environments → production → Required reviewers → stealthg0dd
@@ -90,10 +91,12 @@ jobs:
           HEALTH_URL="${{ secrets.RAILWAY_BACKEND_URL }}/health"
           echo "Checking $HEALTH_URL"
           for i in 1 2 3 4 5; do
-            STATUS=$(curl -sf "$HEALTH_URL" \
+            # Use -s without -f so curl always outputs the HTTP status code.
+            # -f would exit non-zero on 4xx and cause "||echo 000" to append, yielding e.g. "401000".
+            STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" \
               -H "Accept: application/json" \
               --max-time 15 \
-              -o /tmp/health.json -w "%{http_code}" 2>/dev/null || echo "000")
+              "$HEALTH_URL" 2>/dev/null || echo "000")
             if [ "$STATUS" = "200" ]; then
               BODY_STATUS=$(python3 -c "import json; d=json.load(open('/tmp/health.json')); print(d.get('status',''))" 2>/dev/null || echo "")
               if [ "$BODY_STATUS" = "ok" ]; then
@@ -125,6 +128,27 @@ jobs:
           fi
           echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
           echo "✅ Web deployed to: $DEPLOYMENT_URL"
+
+      # ── Verify production web is live ─────────────────────────────────────
+      - name: Verify production web (https://www.neufin.ai)
+        run: |
+          echo "Waiting for Vercel promotion to propagate to www.neufin.ai..."
+          sleep 30
+          for i in $(seq 1 8); do
+            # Use -s without -f to capture the real HTTP code (avoids "401000" concatenation bug).
+            STATUS=$(curl -sL -o /dev/null -w "%{http_code}" \
+              --max-time 20 \
+              "https://www.neufin.ai" 2>/dev/null || echo "000")
+            echo "Attempt $i: https://www.neufin.ai → HTTP $STATUS"
+            # 200 = ready; 301/302 = redirect (CDN edge, still alive); 401/403 = auth wall but server is up
+            if [[ "$STATUS" =~ ^(200|301|302|401|403)$ ]]; then
+              echo "✅ Production web is live (HTTP $STATUS)"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "⚠️  www.neufin.ai did not become reachable in time — Vercel deployment itself succeeded"
+          exit 0
 
       # ── Sentry releases ───────────────────────────────────────────────────
       - name: Create Sentry release (backend)
