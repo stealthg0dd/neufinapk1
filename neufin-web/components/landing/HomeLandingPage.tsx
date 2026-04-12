@@ -84,26 +84,21 @@ export default function HomeLandingPage({
           <div>
             <span className="eyebrow-badge">Portfolio Intelligence</span>
 
-            <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary/90">
+            <p className="mb-3 font-mono text-sm uppercase tracking-widest text-primary">
               7 AI Agents. IC-Grade Intelligence. 60 Seconds.
             </p>
 
-            <h1 className="text-page-title mb-4 font-sans md:text-6xl">
+            <h1 className="mb-4 font-sans text-5xl font-bold leading-tight tracking-tight text-[var(--navy)] md:text-6xl">
               <span className="block">7 AI Agents.</span>
               <span className="block">One portfolio.</span>
               <span
-                className="block"
-                style={{
-                  background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)))',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}
+                className="block bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"
               >
                 Institutional clarity.
               </span>
             </h1>
 
-            <p className="text-body mb-6 max-w-lg text-lg leading-relaxed">
+            <p className="mb-6 max-w-xl text-lg leading-relaxed text-[var(--slate)]">
               Upload your portfolio. Our swarm of 7 specialized AI agents analyzes market regime, behavioral biases, risk
               clusters, and alpha opportunities — delivering an Investment Committee briefing in 60 seconds.
               No expensive data terminals required.
@@ -117,45 +112,48 @@ export default function HomeLandingPage({
               ].map((p) => (
                 <div key={p.k} className="mkt-card-sm">
                   <p className="text-card-title text-sm">{p.k}</p>
-                  <p className="text-body-sm mt-1 text-[11px]">{p.v}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-[var(--slate)]">{p.v}</p>
                 </div>
               ))}
             </div>
 
             <div className="mb-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/upload"
-                className="rounded-lg bg-primary px-6 py-3 text-center text-sm font-medium text-primary-foreground transition-all hover:scale-105 hover:bg-primary/90"
-              >
+              <Link href="/upload" className="btn-primary justify-center text-base">
                 Analyze My Portfolio Free →
               </Link>
-              <Link
-                href="#swarm-demo"
-                className="px-4 py-3 text-center text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
+              <Link href="#swarm-demo" className="btn-secondary justify-center text-base">
                 Watch Swarm Demo
               </Link>
             </div>
 
-            <p className="mb-4 text-[11px] text-muted-foreground">
+            <p className="mb-4 text-sm text-[var(--muted)]">
               In beta with advisors across Singapore, UAE & UK · Enterprise-grade security · info@neufin.ai
             </p>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <CheckCircle className="h-3 w-3 shrink-0 text-positive" />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--muted)]">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle className="h-4 w-4 shrink-0 text-positive" />
                 14-day free trial
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <CheckCircle className="h-3 w-3 shrink-0 text-positive" />
+              <span className="text-[var(--border)]" aria-hidden>
+                ·
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle className="h-4 w-4 shrink-0 text-positive" />
                 No credit card required
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Shield className="h-3 w-3 shrink-0 text-primary" />
+              <span className="text-[var(--border)]" aria-hidden>
+                ·
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Shield className="h-4 w-4 shrink-0 text-primary" />
                 Enterprise-grade security
               </span>
-              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Globe className="h-3 w-3 shrink-0 text-primary" />
+              <span className="text-[var(--border)]" aria-hidden>
+                ·
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Globe className="h-4 w-4 shrink-0 text-primary" />
                 MAS · GDPR · MiFID II aligned
               </span>
             </div>
@@ -169,16 +167,16 @@ export default function HomeLandingPage({
 
       <StockTickerMarquee />
 
-      <section id="swarm-demo" className="relative scroll-mt-20 py-24">
+      <section id="swarm-demo" className="section relative scroll-mt-20 bg-[var(--bg-app)]">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-16 text-center">
             <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-primary">AGENTIC AI SYSTEM</p>
-            <h2 className="text-4xl font-bold text-foreground">
+            <h2 className="text-3xl font-bold text-[var(--navy)] md:text-4xl">
               Seven specialized agents.
               <br />
               One Investment Committee briefing.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+            <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--slate)]">
               Most platforms give you data. NeuFin gives you a complete Investment Committee. Seven specialized AI agents run simultaneously the
               moment you upload your portfolio — each one an expert in its domain.
             </p>
@@ -259,7 +257,16 @@ export default function HomeLandingPage({
             ] as const
 
             const colorVar = (c: string) => (['risk', 'warning', 'primary', 'positive', 'accent'].includes(c) ? c : 'primary')
-            const borderHover = (c: string) => `hover:border-[hsl(var(--${colorVar(c)})/0.35)]`
+            const borderHover = (c: string) => {
+              const map: Record<string, string> = {
+                risk: 'hover:border-danger2/40',
+                warning: 'hover:border-warning2/40',
+                primary: 'hover:border-primary/40',
+                positive: 'hover:border-success2/40',
+                accent: 'hover:border-accent/40',
+              }
+              return map[colorVar(c)] ?? 'hover:border-primary/40'
+            }
 
             const firstRow = agents.slice(0, 4)
             const secondRow = agents.slice(4)
@@ -276,10 +283,12 @@ export default function HomeLandingPage({
                   <span className="agent-badge" aria-hidden>
                     {a.mono}
                   </span>
-                  <span className="text-card-title font-mono text-[10px] uppercase tracking-wider">{a.name}</span>
+                  <span className="font-mono text-base font-semibold uppercase tracking-wider text-[var(--navy)]">
+                    {a.name}
+                  </span>
                 </div>
-                <p className="text-label mt-2">{a.tagline}</p>
-                <p className="text-body-sm mb-3 mt-1 leading-relaxed">{a.description}</p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{a.tagline}</p>
+                <p className="mb-3 mt-1 text-sm leading-relaxed text-[var(--slate)]">{a.description}</p>
                 <span className="agent-status-pill font-mono">→ {a.output}</span>
               </div>
             )
@@ -312,11 +321,21 @@ export default function HomeLandingPage({
                     <div className="w-full rounded-xl border border-border/60 bg-surface p-4 text-center md:w-[44%]">
                       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">7 Agents</p>
                       <div className="mt-3 grid grid-cols-4 gap-2">
-                        {['primary', 'accent', 'warning', 'risk', 'positive', 'primary', 'accent'].map((c, i) => (
+                        {(
+                          [
+                            ['primary', '#1EB8CC'],
+                            ['accent', '#8b5cf6'],
+                            ['warning', '#F5A623'],
+                            ['risk', '#EF4444'],
+                            ['positive', '#22C55E'],
+                            ['primary', '#1EB8CC'],
+                            ['accent', '#8b5cf6'],
+                          ] as const
+                        ).map(([c, hex], i) => (
                           <span
                             key={`${c}-${i}`}
                             className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: `hsl(var(--${c}))` }}
+                            style={{ backgroundColor: hex }}
                             aria-hidden
                           />
                         ))}
@@ -341,7 +360,7 @@ export default function HomeLandingPage({
                 </div>
 
                 <div className="mt-12 text-center">
-                  <h3 className="text-2xl font-bold text-foreground">Ready to see your agents work?</h3>
+                  <h3 className="text-2xl font-bold text-navy">Ready to see your agents work?</h3>
                   <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                     <Link
                       href="/upload"
@@ -361,11 +380,11 @@ export default function HomeLandingPage({
       {/* SECTION 2 — PROBLEM / SOLUTION */}
       <section className="py-20">
         <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="text-3xl font-bold text-foreground">Why leading advisors are switching to NeuFin</h2>
+          <h2 className="mb-4 text-3xl font-bold text-[var(--navy)]">Why leading advisors are switching to NeuFin</h2>
         </div>
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
           <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
               <X className="h-4 w-4 text-risk" strokeWidth={2} />
               <span className="text-risk">What you're losing right now</span>
             </h3>
@@ -375,7 +394,7 @@ export default function HomeLandingPage({
                 'No clear explanation when clients ask why their portfolio is underperforming',
                 'Robo-advisors at 0.25% AUM competing directly against your 1% fee',
               ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
                   <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
                   {t}
                 </li>
@@ -383,7 +402,7 @@ export default function HomeLandingPage({
             </ul>
           </div>
           <div className="rounded-xl border border-positive/20 bg-positive/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[var(--navy)]">
               <Check className="h-4 w-4 text-positive" strokeWidth={2} />
               <span className="text-positive">What you get instead</span>
             </h3>
@@ -393,7 +412,7 @@ export default function HomeLandingPage({
                 'Behavioral bias detection with quantified dollar impact per client portfolio',
                 'IC-grade analysis that demonstrates the value of human advisory beyond any algorithm',
               ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
                   <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
                   {t}
                 </li>
@@ -404,11 +423,11 @@ export default function HomeLandingPage({
       </section>
       <section className="py-20">
         <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="text-3xl font-bold text-foreground">Why wealth platforms choose NeuFin over building in-house</h2>
+          <h2 className="mb-4 text-3xl font-bold text-navy">Why wealth platforms choose NeuFin over building in-house</h2>
         </div>
         <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
           <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
               <X className="h-4 w-4 text-risk" strokeWidth={2} />
               <span className="text-risk">What your engineering team quotes you</span>
             </h3>
@@ -418,7 +437,7 @@ export default function HomeLandingPage({
                 'Three engineers and over $200,000 in development cost before launch',
                 'Client churn spikes 15 to 25 percent in every market correction',
               ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
                   <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
                   {t}
                 </li>
@@ -426,7 +445,7 @@ export default function HomeLandingPage({
             </ul>
           </div>
           <div className="rounded-xl border border-positive/20 bg-positive/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
               <Check className="h-4 w-4 text-positive" strokeWidth={2} />
               <span className="text-positive">What you get with NeuFin API</span>
             </h3>
@@ -436,7 +455,7 @@ export default function HomeLandingPage({
                 'Behavioral DNA score and bias flags per user portfolio, out of the box',
                 'Churn risk detection before clients panic-sell — automated and scalable',
               ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
                   <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
                   {t}
                 </li>
@@ -451,7 +470,7 @@ export default function HomeLandingPage({
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
             <p className="mb-2 font-mono text-[11px] uppercase tracking-widest text-primary">REGULATORY FRAMEWORK</p>
-            <h2 className="text-2xl font-bold text-foreground">Compliance Across Every Market We Operate</h2>
+            <h2 className="text-2xl font-bold text-navy">Compliance Across Every Market We Operate</h2>
             <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
               Neufin is built for global institutional deployment with jurisdiction-specific compliance frameworks.
             </p>
@@ -516,7 +535,7 @@ export default function HomeLandingPage({
                       {c.flag}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{c.region}</p>
+                      <p className="text-sm font-semibold text-navy">{c.region}</p>
                       <p className="mt-1 font-mono text-[11px] text-primary">{c.regulatory}</p>
                     </div>
                   </div>
@@ -549,7 +568,7 @@ export default function HomeLandingPage({
         </p>
         <div className="mx-auto max-w-2xl px-6">
           <div className="rounded-xl border border-border bg-surface p-6">
-            <p className="font-mono text-4xl font-bold text-foreground">
+            <p className="font-mono text-4xl font-bold text-navy">
               {regimeLabel ?? 'Awaiting regime signal'}
             </p>
             <div className="mt-4">
@@ -594,7 +613,7 @@ export default function HomeLandingPage({
                         </span>
                         <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{nconf}% conf</span>
                       </div>
-                      <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-foreground">
+                      <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-navy">
                         {note?.title ?? 'Untitled'}
                       </h3>
                       <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -633,7 +652,7 @@ export default function HomeLandingPage({
       {/* SECTION 4 — API PLATFORM */}
       <section id="api-platform" className="scroll-mt-20 py-20">
         <div className="mx-auto max-w-5xl px-6">
-          <h2 className="text-center text-3xl font-bold text-foreground">Embed behavioral intelligence into your platform</h2>
+          <h2 className="text-center text-3xl font-bold text-navy">Embed behavioral intelligence into your platform</h2>
           <p className="mt-2 text-center text-muted-foreground">
             Three API endpoints. One weekend integration. No behavioral layer to build.
           </p>
@@ -685,15 +704,15 @@ export default function HomeLandingPage({
       </section>
 
       {/* SECTION 5 — PRICING */}
-      <section className="py-16">
+      <section className="bg-[var(--bg-app)] py-[72px]">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-10 text-center text-3xl font-bold text-foreground">Pricing</h2>
+          <h2 className="mb-10 text-center text-3xl font-bold text-navy">Pricing</h2>
           <div className="grid items-stretch gap-6 md:grid-cols-3">
-            <GlassCard className="flex flex-col p-6">
-              <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Free</p>
-              <p className="mb-1 font-display text-4xl text-foreground">$0</p>
-              <p className="mb-6 text-sm text-muted-foreground">per month</p>
-              <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
+            <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
+              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Free</p>
+              <p className="mb-1 font-display text-5xl font-bold text-navy">$0</p>
+              <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
+              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
                 {['3 DNA analyses', 'Basic behavioral report', 'CSV upload'].map((f) => (
                   <li key={f} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
@@ -703,20 +722,20 @@ export default function HomeLandingPage({
               </ul>
               <Link
                 href="/upload"
-                className="block w-full rounded-xl border border-[var(--glass-border)] py-3 text-center text-sm text-foreground transition-colors hover:border-[var(--border-accent)]"
+                className="block w-full rounded-lg border-[1.5px] border-[var(--border)] py-3 text-center text-sm font-semibold text-navy transition-colors hover:border-primary hover:text-primary"
               >
                 Start Free
               </Link>
             </GlassCard>
 
-            <GlassCard className="relative flex flex-col border-[var(--border-accent)] p-6 shadow-[0_0_60px_-20px_rgba(245,166,35,0.45)]">
-              <span className="absolute -top-3 right-4 rounded-full bg-[var(--amber)] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--canvas)]">
+            <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-white p-7 shadow-[var(--shadow-sm)]">
+              <span className="absolute -top-3 right-4 rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide text-white">
                 Most Popular
               </span>
-              <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Advisor</p>
-              <p className="mb-1 font-display text-4xl font-normal text-[var(--amber)]">$299</p>
-              <p className="mb-6 text-sm text-muted-foreground">per month</p>
-              <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
+              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Advisor</p>
+              <p className="mb-1 font-display text-5xl font-bold text-primary">$299</p>
+              <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
+              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
                 {[
                   'Unlimited portfolio analyses',
                   'Unlimited advisor client briefs (white-label PDF)',
@@ -732,18 +751,18 @@ export default function HomeLandingPage({
               </ul>
               <Link
                 href="/pricing"
-                className="block w-full rounded-xl bg-[var(--amber)] py-3 text-center text-sm font-semibold text-[var(--canvas)]"
+                className="block w-full rounded-lg bg-primary py-3 text-center text-sm font-semibold text-white"
               >
                 Start 14-Day Free Trial
               </Link>
             </GlassCard>
 
-            <GlassCard className="flex flex-col border-[var(--blue)]/35 p-6">
-              <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Enterprise</p>
-              <p className="mb-1 font-display text-4xl text-foreground">$999</p>
-              <p className="mb-2 text-sm text-muted-foreground">per month</p>
-              <p className="mb-6 text-xs text-[var(--blue)]">Custom pricing available</p>
-              <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
+            <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
+              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Enterprise</p>
+              <p className="mb-1 font-display text-5xl font-bold text-navy">$999</p>
+              <p className="mb-2 text-sm text-[var(--slate)]">per month</p>
+              <p className="mb-6 text-xs text-primary">Custom pricing available</p>
+              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
                 {[
                   'Everything in Advisor',
                   'Unlimited reports + white-label output',
@@ -759,7 +778,7 @@ export default function HomeLandingPage({
               </ul>
               <Link
                 href="/contact-sales"
-                className="block w-full rounded-xl border border-[var(--blue)]/40 py-3 text-center text-sm text-foreground"
+                className="block w-full rounded-lg border-[1.5px] border-[var(--border)] py-3 text-center text-sm font-semibold text-navy transition-colors hover:border-primary hover:text-primary"
               >
                 Contact Sales
               </Link>

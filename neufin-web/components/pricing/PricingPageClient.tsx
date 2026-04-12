@@ -37,11 +37,11 @@ function FAQItem({ q, a }: { q: string; a: string }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between gap-4 p-4 text-left text-sm font-medium text-[var(--text-primary)]"
+        className="flex w-full items-center justify-between gap-4 p-4 text-left text-sm font-medium text-navy"
       >
         {q}
         <motion.span animate={{ rotate: open ? 180 : 0 }}>
-          <ChevronDown className="w-4 h-4 text-[var(--text-muted)] shrink-0" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted)]" />
         </motion.span>
       </button>
       <motion.div
@@ -50,7 +50,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         className="overflow-hidden"
       >
-        <p className="px-4 pb-4 text-sm text-[var(--text-secondary)] leading-relaxed">{a}</p>
+        <p className="px-4 pb-4 text-sm leading-relaxed text-[var(--slate)]">{a}</p>
       </motion.div>
     </GlassCard>
   )
@@ -99,33 +99,33 @@ export default function PricingPageClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--canvas)] flex flex-col">
-      <nav className="border-b border-[var(--border)] backdrop-blur-xl sticky top-0 z-10 bg-[var(--canvas)]/90">
+    <div className="flex min-h-screen flex-col bg-[var(--bg-app)]">
+      <nav className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/95 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-display text-xl text-[var(--amber)]">
+          <Link href="/" className="font-display text-xl text-primary">
             NeuFin
           </Link>
           <div className="flex gap-2">
-            <Link href="/upload" className="btn-outline py-2 text-xs sm:text-sm px-3">
+            <Link href="/upload" className="btn-secondary px-3 py-2 text-sm">
               Analysis
             </Link>
-            <Link href="/login" className="btn-primary py-2 text-xs sm:text-sm px-3">
+            <Link href="/login" className="btn-primary px-3 py-2 text-sm">
               Sign in
             </Link>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 px-4 sm:px-6 py-16">
-        <div className="max-w-5xl mx-auto text-center mb-12">
-          <h1 className="font-display text-4xl md:text-5xl text-[var(--text-primary)] mb-4">Pricing</h1>
-          <p className="text-[var(--text-secondary)] max-w-xl mx-auto">
+      <main className="flex-1 px-4 py-16 sm:px-6">
+        <div className="mx-auto mb-12 max-w-5xl text-center">
+          <h1 className="mb-4 font-display text-4xl text-navy md:text-5xl">Pricing</h1>
+          <p className="mx-auto max-w-xl text-[var(--slate)]">
             Institutional workflows, without the terminal price tag.
           </p>
 
-          <div className="mt-8 inline-flex p-1 rounded-xl bg-[var(--surface-2)] border border-[var(--border)] relative">
+          <div className="relative mt-8 inline-flex rounded-xl border border-[var(--border)] bg-[var(--bg-card-2)] p-1">
             <motion.div
-              className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-[var(--amber)]/20 border border-[var(--border-accent)]"
+              className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-lg border border-primary/30 bg-primary/10"
               layout
               transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               style={{ left: annual ? 'calc(50% + 2px)' : 4 }}
@@ -133,8 +133,8 @@ export default function PricingPageClient() {
             <button
               type="button"
               onClick={() => setAnnual(false)}
-              className={`relative z-10 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                !annual ? 'text-[var(--amber)]' : 'text-[var(--text-secondary)]'
+              className={`relative z-10 rounded-lg px-5 py-2 text-sm font-medium transition-colors ${
+                !annual ? 'text-primary' : 'text-[var(--slate)]'
               }`}
             >
               Monthly
@@ -142,50 +142,51 @@ export default function PricingPageClient() {
             <button
               type="button"
               onClick={() => setAnnual(true)}
-              className={`relative z-10 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                annual ? 'text-[var(--amber)]' : 'text-[var(--text-secondary)]'
+              className={`relative z-10 rounded-lg px-5 py-2 text-sm font-medium transition-colors ${
+                annual ? 'text-primary' : 'text-[var(--slate)]'
               }`}
             >
               Annual
             </button>
           </div>
           {annual && (
-            <p className="mt-3 text-xs text-[var(--emerald)] font-medium">2 months free on paid tiers — billed annually</p>
+            <p className="mt-3 text-sm font-medium text-success2">2 months free on paid tiers — billed annually</p>
           )}
         </div>
 
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6 items-stretch">
+        <div className="mx-auto grid max-w-6xl items-stretch gap-6 md:grid-cols-3">
           {/* Free */}
-          <GlassCard className="p-6 flex flex-col">
-            <p className="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">Free</p>
-            <p className="font-display text-4xl text-[var(--text-primary)] mb-1">$0</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-6">per month</p>
-            <ul className="space-y-2 text-sm text-[var(--text-secondary)] flex-1 mb-6">
+          <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
+            <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Free</p>
+            <p className="mb-1 font-display text-5xl font-bold text-navy">$0</p>
+            <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
+            <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
               {['3 DNA analyses', 'Basic behavioral report', 'CSV upload'].map((f) => (
                 <li key={f} className="flex gap-2">
-                  <Check className="w-4 h-4 text-[var(--emerald)] shrink-0 mt-0.5" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success2" />
                   {f}
                 </li>
               ))}
             </ul>
-            <Link href="/upload" className="btn-outline w-full text-center text-sm py-3 block rounded-xl">
+            <Link
+              href="/upload"
+              className="block w-full rounded-lg border-2 border-[var(--border)] py-3 text-center text-sm font-semibold text-navy transition-colors hover:border-primary hover:text-primary"
+            >
               Start Free
             </Link>
           </GlassCard>
 
           {/* Advisor */}
-          <GlassCard className="p-6 flex flex-col relative border-[var(--border-accent)] shadow-[0_0_60px_-20px_rgba(245,166,35,0.45)]">
-            <span className="absolute -top-3 right-4 text-[10px] font-bold uppercase tracking-wider bg-[var(--amber)] text-[var(--canvas)] px-2 py-1 rounded-full">
+          <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-white p-7 shadow-[var(--shadow-sm)]">
+            <span className="absolute -top-3 right-4 rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide text-white">
               Most Popular
             </span>
-            <p className="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">Advisor</p>
-            <p className="font-display text-4xl text-[var(--amber)] mb-1 font-normal">
-              ${advDisplay}
-            </p>
-            <p className="text-sm text-[var(--text-secondary)] mb-6">
+            <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Advisor</p>
+            <p className="mb-1 font-display text-5xl font-bold text-primary">${advDisplay}</p>
+            <p className="mb-6 text-sm text-[var(--slate)]">
               per month{annual ? ', billed annually' : ''}
             </p>
-            <ul className="space-y-2 text-sm text-[var(--text-secondary)] flex-1 mb-6">
+            <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
               {[
                 'Unlimited analyses',
                 '10 advisor reports / mo',
@@ -193,7 +194,7 @@ export default function PricingPageClient() {
                 'API access',
               ].map((f) => (
                 <li key={f} className="flex gap-2">
-                  <Check className="w-4 h-4 text-[var(--emerald)] shrink-0 mt-0.5" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success2" />
                   {f}
                 </li>
               ))}
@@ -202,21 +203,21 @@ export default function PricingPageClient() {
               type="button"
               disabled={checkoutLoading}
               onClick={startAdvisorCheckout}
-              className="w-full py-3 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm disabled:opacity-50"
+              className="w-full rounded-lg bg-primary py-3 text-center text-sm font-semibold text-white disabled:opacity-50"
             >
               {checkoutLoading ? 'Redirecting…' : 'Start 14-Day Free Trial'}
             </button>
           </GlassCard>
 
           {/* Enterprise */}
-          <GlassCard className="p-6 flex flex-col border-[var(--blue)]/35">
-            <p className="text-xs uppercase tracking-wider text-[var(--text-muted)] mb-2">Enterprise</p>
-            <p className="font-display text-4xl text-[var(--text-primary)] mb-1">${entDisplay}</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-2">
+          <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
+            <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Enterprise</p>
+            <p className="mb-1 font-display text-5xl font-bold text-navy">${entDisplay}</p>
+            <p className="mb-2 text-sm text-[var(--slate)]">
               per month{annual ? ', billed annually' : ''}
             </p>
-            <p className="text-xs text-[var(--blue)] mb-6">Custom pricing available</p>
-            <ul className="space-y-2 text-sm text-[var(--text-secondary)] flex-1 mb-6">
+            <p className="mb-6 text-xs text-primary">Custom pricing available</p>
+            <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
               {[
                 'Everything in Advisor',
                 'Unlimited reports',
@@ -224,14 +225,14 @@ export default function PricingPageClient() {
                 'Dedicated support',
               ].map((f) => (
                 <li key={f} className="flex gap-2">
-                  <Check className="w-4 h-4 text-[var(--emerald)] shrink-0 mt-0.5" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success2" />
                   {f}
                 </li>
               ))}
             </ul>
             <Link
               href="/contact-sales"
-              className="btn-outline w-full text-center text-sm py-3 block rounded-xl border-[var(--blue)]/40"
+              className="block w-full rounded-lg border-2 border-[var(--border)] py-3 text-center text-sm font-semibold text-navy transition-colors hover:border-primary hover:text-primary"
             >
               Contact Sales
             </Link>
@@ -239,7 +240,7 @@ export default function PricingPageClient() {
         </div>
 
         <div className="max-w-2xl mx-auto mt-16 space-y-3">
-          <h2 className="font-display text-2xl text-center mb-6 text-[var(--text-primary)]">FAQ</h2>
+          <h2 className="mb-6 text-center font-display text-2xl text-navy">FAQ</h2>
           {faqs.map((f) => (
             <FAQItem key={f.q} {...f} />
           ))}
@@ -248,8 +249,8 @@ export default function PricingPageClient() {
 
       <section className="border-t border-[var(--border)] py-8 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-            <strong className="text-[var(--text-secondary)]">Regulatory Disclaimer:</strong> NeuFin provides financial
+          <p className="text-sm leading-relaxed text-[var(--muted)]">
+            <strong className="text-[var(--slate)]">Regulatory Disclaimer:</strong> NeuFin provides financial
             data and analysis tools for informational and educational purposes only. This is not financial advice.
             Past performance does not indicate future results. NeuFin aligns with MAS guidelines on fintech and data
             services.
@@ -257,7 +258,7 @@ export default function PricingPageClient() {
         </div>
       </section>
 
-      <footer className="border-t border-[var(--border)] py-6 text-center text-xs text-[var(--text-muted)]">
+      <footer className="border-t border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">
         <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
           <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="mb-3 h-6 w-auto opacity-80" />
           <span>NeuFin © {new Date().getFullYear()}</span>
