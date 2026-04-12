@@ -652,3 +652,65 @@ async def get_swarm_job(job_id: str) -> dict | None:
 
     # 3. In-process memory (same-worker fast path, not cross-worker)
     return _SWARM_JOB_MEMORY.get(job_id)
+
+
+async def count_active_swarm_jobs() -> int:
+    """
+    Count swarm async jobs in ``queued`` or ``running`` across memory, file store,
+    and Redis. Deduplicated by ``job_id``.
+    """
+    active_ids: set[str] = set()
+
+    def _consider(job_id: str, data: dict) -> None:
+        if not job_id or job_id in active_ids:
+            return
+        if data.get("status") in ("queued", "running"):
+            active_ids.add(job_id)
+
+    for jid, data in list(_SWARM_JOB_MEMORY.items()):
+        _consider(jid, data)
+
+    try:
+        for path in _JOB_STORE_PATH.glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except Exception as exc:
+                logger.debug("swarm.count_jobs_bad_json", path=str(path), error=str(exc))
+                continue
+            jid = str(data.get("job_id") or path.stem)
+            _consider(jid, data)
+    except Exception as exc:
+        logger.debug("swarm.count_jobs_files", error=str(exc))
+
+    redis = await get_redis()
+    if redis:
+        try:
+            cursor = 0
+            while True:
+                cursor, keys = await asyncio.to_thread(
+                    redis.scan, cursor, match="swarm:job:*", count=200
+                )
+                for k in keys:
+                    key = k.decode() if isinstance(k, bytes) else str(k)
+                    jid = key.split("swarm:job:", 1)[-1]
+                    if jid in active_ids:
+                        continue
+                    raw = await asyncio.to_thread(redis.get, k)
+                    if not raw:
+                        continue
+                    try:
+                        data = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
+                    except Exception as exc:
+                        logger.debug("swarm.count_jobs_bad_redis_json", error=str(exc))
+                        continue
+                    _consider(jid, data)
+                try:
+                    cur = int(cursor)  # redis-py returns int; be defensive
+                except (TypeError, ValueError):
+                    cur = 0
+                if cur == 0:
+                    break
+        except Exception as exc:
+            logger.debug("swarm.count_jobs_redis", error=str(exc))
+
+    return len(active_ids)

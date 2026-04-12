@@ -17,13 +17,27 @@ type AdminSystem = {
   supabase_connected: boolean
   redis: boolean | null
   last_swarm_report_at?: string | null
-  agent_success_rate_7d: number | null
-  error_rate_24h: number | null
-  active_swarm_jobs: number | null
-  latency_p50_ms: number | null
-  latency_p95_ms: number | null
-  latency_p99_ms: number | null
+  agent_success_rate_7d?: number | null
+  agent_success_sample_size_7d?: number | null
+  analytics_error_hint_rate_24h_pct?: number | null
+  analytics_events_sample_24h?: number | null
+  http_error_rate_24h_pct?: number | null
+  http_request_sample_count_24h?: number | null
+  active_swarm_jobs?: number | null
+  latency_p50_ms?: number | null
+  latency_p95_ms?: number | null
+  latency_p99_ms?: number | null
   note?: string
+}
+
+function fmtPct(v: number | null | undefined) {
+  if (v === null || v === undefined) return '—'
+  return `${v}%`
+}
+
+function fmtNum(v: number | null | undefined) {
+  if (v === null || v === undefined) return '—'
+  return String(v)
 }
 
 export default function AdminSystemPage() {
@@ -70,7 +84,7 @@ export default function AdminSystemPage() {
   }, [tick])
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
+    <div className="p-6 max-w-4xl space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-white">System</h1>
         <p className="text-sm text-zinc-500 mt-1">
@@ -106,11 +120,51 @@ export default function AdminSystemPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 text-sm text-zinc-400 space-y-2">
-        <p className="text-white font-medium text-base">Metrics placeholders</p>
-        <p>Agent success, 24h error rate, active swarm jobs, and latency percentiles are not yet wired to a metrics backend.</p>
-        {sys?.note && <p className="text-xs text-zinc-500">{sys.note}</p>}
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-300 uppercase tracking-wide mb-2">
+          API process metrics (24h)
+        </h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
+            <p className="text-xs text-zinc-500">HTTP samples</p>
+            <p className="text-xl text-white tabular-nums">{fmtNum(sys?.http_request_sample_count_24h)}</p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
+            <p className="text-xs text-zinc-500">HTTP 5xx rate</p>
+            <p className="text-xl text-white tabular-nums">{fmtPct(sys?.http_error_rate_24h_pct)}</p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
+            <p className="text-xs text-zinc-500">p50 / p95 / p99 latency</p>
+            <p className="text-lg text-white tabular-nums">
+              {fmtNum(sys?.latency_p50_ms)} / {fmtNum(sys?.latency_p95_ms)} / {fmtNum(sys?.latency_p99_ms)} ms
+            </p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
+            <p className="text-xs text-zinc-500">Swarm jobs (queued+running)</p>
+            <p className="text-xl text-white tabular-nums">{fmtNum(sys?.active_swarm_jobs)}</p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
+            <p className="text-xs text-zinc-500">Swarm success (7d, headline+trace)</p>
+            <p className="text-xl text-white tabular-nums">{fmtPct(sys?.agent_success_rate_7d)}</p>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              n={sys?.agent_success_sample_size_7d ?? '—'} reports
+            </p>
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
+            <p className="text-xs text-zinc-500">Analytics “error” hint (24h)</p>
+            <p className="text-xl text-white tabular-nums">{fmtPct(sys?.analytics_error_hint_rate_24h_pct)}</p>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              n={sys?.analytics_events_sample_24h ?? '—'} events
+            </p>
+          </div>
+        </div>
       </div>
+
+      {sys?.note && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 text-xs text-zinc-500 leading-relaxed">
+          {sys.note}
+        </div>
+      )}
     </div>
   )
 }

@@ -617,6 +617,20 @@ async def request_logging_middleware(request: Request, call_next):
     response = await call_next(request)
     duration_ms = round((time.monotonic() - t0) * 1000, 1)
 
+    # Lightweight latency / error samples for GET /api/admin/system (in-process).
+    try:
+        p = request.url.path
+        if p not in ("/health", "/api/admin/health", "/metrics", "/favicon.ico", "/openapi.json"):
+            from services.request_metrics import record_http_sample
+
+            record_http_sample(
+                duration_ms=duration_ms,
+                status_code=response.status_code,
+                path=p,
+            )
+    except Exception:
+        pass
+
     user_id = getattr(getattr(request.state, "user", None), "id", None)
     logger.info(
         "http.request",

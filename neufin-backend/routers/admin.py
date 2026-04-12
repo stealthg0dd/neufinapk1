@@ -17,6 +17,7 @@ Admin only (is_admin):
   GET  /api/admin/api-keys
   GET  /api/admin/reports
   GET  /api/admin/system
+  GET  /api/admin/partners/{partner_id}/usage
 """
 
 from __future__ import annotations
@@ -27,18 +28,21 @@ import hashlib
 import secrets
 from typing import Any
 
+import httpx
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.config import settings
 from database import supabase
+from services import market_cache
 from services.auth_dependency import (
     get_admin_user,
     get_ops_user,
     invalidate_subscription_cache,
 )
 from services.jwt_auth import JWTUser
+from services.request_metrics import http_stats_last_hours
 
 logger = structlog.get_logger(__name__)
 
@@ -427,8 +431,6 @@ async def resend_onboarding(
     user: JWTUser = Depends(get_ops_user),
 ):
     try:
-        import httpx
-
         headers = {
             "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
             "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
@@ -533,11 +535,48 @@ async def admin_reset_password_link(
 
 @router.delete("/api/admin/users/{user_id}")
 async def delete_user(user_id: str, _admin: JWTUser = Depends(get_admin_user)):
+    """
+    Delete the Supabase Auth user via the Admin REST API (SDK-neutral),
+    then best-effort remove ``user_profiles``.
+    """
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(500, "Supabase admin is not configured.")
+
+    url = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/admin/users/{user_id}"
+    headers = {
+        "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+    }
     try:
-        supabase.auth.admin.delete_user(user_id)
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            resp = await client.delete(url, headers=headers)
+        if resp.status_code not in (200, 204):
+            logger.error(
+                "admin.delete_user.auth_failed",
+                user_id=user_id,
+                status=resp.status_code,
+                body=resp.text[:400],
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Auth delete failed ({resp.status_code}): {resp.text[:200]}",
+            )
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.error("admin.delete_user.failed", user_id=user_id, error=str(exc))
+        logger.error("admin.delete_user.request_failed", user_id=user_id, error=str(exc))
         raise HTTPException(500, f"Failed to delete user: {exc}") from exc
+
+    try:
+        supabase.table("user_profiles").delete().eq("id", user_id).execute()
+    except Exception as exc:
+        logger.debug(
+            "admin.delete_user.profile_cleanup",
+            user_id=user_id,
+            error=str(exc),
+        )
+
+    logger.info("admin.delete_user.ok", user_id=user_id)
     return {"ok": True, "deleted": user_id}
 
 
@@ -637,6 +676,90 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
 
     out.sort(key=lambda x: x["api_calls_30d"], reverse=True)
     return {"partners": out}
+
+
+@router.get("/api/admin/partners/{partner_id}/usage")
+async def partner_usage_detail(
+    partner_id: str,
+    days: int = Query(30, ge=7, le=120),
+    _admin: JWTUser = Depends(get_admin_user),
+):
+    """Daily API calls per key + total for one partner (``user_id`` on ``api_keys``)."""
+    try:
+        keys_res = (
+            supabase.table("api_keys")
+            .select("id, key_prefix, name, is_active, created_at")
+            .eq("user_id", partner_id)
+            .execute()
+        )
+        keys = keys_res.data or []
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to list keys: {exc}") from exc
+
+    if not keys:
+        return {
+            "partner_id": partner_id,
+            "days": days,
+            "keys": [],
+            "daily_totals": [],
+        }
+
+    key_ids = [str(k["id"]) for k in keys if k.get("id")]
+    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=days)).date()
+
+    try:
+        usage_res = (
+            supabase.table("api_keys_daily_usage")
+            .select("key_id, date, calls")
+            .in_("key_id", key_ids)
+            .gte("date", since.isoformat())
+            .order("date", desc=False)
+            .execute()
+        )
+        usage_rows = usage_res.data or []
+    except Exception as exc:
+        logger.warning("admin.partner_usage.usage_failed", error=str(exc))
+        usage_rows = []
+
+    daily_totals: dict[str, int] = {}
+    per_key: dict[str, dict[str, int]] = {kid: {} for kid in key_ids}
+    for row in usage_rows:
+        kid = str(row.get("key_id") or "")
+        d = str(row.get("date") or "")
+        c = int(row.get("calls") or 0)
+        daily_totals[d] = daily_totals.get(d, 0) + c
+        if kid in per_key:
+            per_key[kid][d] = per_key[kid].get(d, 0) + c
+
+    daily_series = [
+        {"date": d, "calls": daily_totals[d]}
+        for d in sorted(daily_totals.keys())
+    ]
+
+    key_payload = []
+    for k in keys:
+        kid = str(k["id"])
+        prefix = k.get("key_prefix") or k.get("name") or kid[:8]
+        series = [
+            {"date": d, "calls": per_key.get(kid, {}).get(d, 0)}
+            for d in sorted(per_key.get(kid, {}).keys())
+        ]
+        key_payload.append(
+            {
+                "id": kid,
+                "key_masked": f"{str(prefix)[:12]}…",
+                "name": k.get("name"),
+                "is_active": k.get("is_active"),
+                "daily": series,
+            }
+        )
+
+    return {
+        "partner_id": partner_id,
+        "days": days,
+        "keys": key_payload,
+        "daily_totals": daily_series,
+    }
 
 
 @router.post("/api/admin/partners/{partner_id}/rotate-key")
@@ -934,6 +1057,71 @@ async def admin_reports_log(
 # ── System ───────────────────────────────────────────────────────────────────
 
 
+def _swarm_row_successful(row: dict) -> bool:
+    h = row.get("headline")
+    if not h or not str(h).strip():
+        return False
+    trace = row.get("agent_trace")
+    if isinstance(trace, list):
+        for step in trace:
+            if isinstance(step, dict):
+                st = str(step.get("status") or "").lower()
+                if st in ("error", "failed"):
+                    return False
+    return True
+
+
+def _swarm_agent_success_7d() -> dict[str, Any]:
+    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=7)).isoformat()
+    try:
+        r = (
+            supabase.table("swarm_reports")
+            .select("headline, agent_trace")
+            .gte("created_at", since)
+            .limit(2500)
+            .execute()
+        )
+        rows = [dict(x) for x in (r.data or [])]
+    except Exception as exc:
+        logger.debug("admin.system.swarm_success_query", error=str(exc))
+        return {"sample_size": 0, "success_rate_pct": None}
+    ok = sum(1 for row in rows if _swarm_row_successful(row))
+    n = len(rows)
+    return {
+        "sample_size": n,
+        "success_rate_pct": round(ok / n * 100.0, 1) if n else None,
+    }
+
+
+def _analytics_error_hint_24h() -> dict[str, Any]:
+    """Heuristic: fraction of recent analytics event names that look like failures."""
+    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=24)).isoformat()
+    try:
+        r = (
+            supabase.table("analytics_events")
+            .select("event")
+            .gte("created_at", since)
+            .limit(4000)
+            .execute()
+        )
+        events = [str((e or {}).get("event") or "") for e in (r.data or [])]
+    except Exception as exc:
+        logger.debug("admin.system.analytics_events", error=str(exc))
+        return {"sample_size": 0, "error_rate_pct": None}
+    n = len(events)
+    if not n:
+        return {"sample_size": 0, "error_rate_pct": None}
+    err = 0
+    for ev in events:
+        el = ev.lower()
+        if any(x in el for x in ("error", "fail", "exception", "denied")):
+            err += 1
+    return {
+        "sample_size": n,
+        "error_rate_pct": round(err / n * 100.0, 2),
+    }
+
+
 @router.get("/api/admin/system")
 async def admin_system(_admin: JWTUser = Depends(get_admin_user)):
     redis_ok: bool | None = None
@@ -971,18 +1159,36 @@ async def admin_system(_admin: JWTUser = Depends(get_admin_user)):
     except Exception as exc:
         logger.debug("admin.system.last_swarm", error=str(exc))
 
+    http_stats = http_stats_last_hours(24.0)
+    swarm_stats = _swarm_agent_success_7d()
+    analytics_stats = _analytics_error_hint_24h()
+
+    try:
+        active_jobs = await market_cache.count_active_swarm_jobs()
+    except Exception as exc:
+        logger.debug("admin.system.active_swarm_jobs", error=str(exc))
+        active_jobs = 0
+
     return {
         "backend": {"status": "ok", "environment": settings.ENVIRONMENT},
         "supabase_connected": supabase_ok,
         "redis": redis_ok,
         "last_swarm_report_at": last_swarm,
-        "agent_success_rate_7d": None,
-        "error_rate_24h": None,
-        "active_swarm_jobs": None,
-        "latency_p50_ms": None,
-        "latency_p95_ms": None,
-        "latency_p99_ms": None,
-        "note": "Agent success, errors, latency, and swarm job counts require metrics pipeline.",
+        "agent_success_rate_7d": swarm_stats["success_rate_pct"],
+        "agent_success_sample_size_7d": swarm_stats["sample_size"],
+        "analytics_error_hint_rate_24h_pct": analytics_stats["error_rate_pct"],
+        "analytics_events_sample_24h": analytics_stats["sample_size"],
+        "http_error_rate_24h_pct": http_stats["error_rate_pct"],
+        "http_request_sample_count_24h": http_stats["sample_count"],
+        "active_swarm_jobs": active_jobs,
+        "latency_p50_ms": http_stats["p50_ms"],
+        "latency_p95_ms": http_stats["p95_ms"],
+        "latency_p99_ms": http_stats["p99_ms"],
+        "note": (
+            "Latency and HTTP 5xx rate are from this API process only (in-memory ring buffer). "
+            "Agent success uses swarm_reports rows from the last 7 days (headline + agent_trace). "
+            "Analytics rate is a name-based heuristic on analytics_events."
+        ),
     }
 
 
