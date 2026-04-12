@@ -61,10 +61,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       className={[
-        'flex items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors',
+        'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
         active
-          ? 'bg-[#EFF6FF] font-semibold text-[#1D4ED8]'
-          : 'text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]',
+          ? 'bg-[#E0F7FA] font-semibold text-primary'
+          : 'text-[#334155] hover:bg-[#F8FAFC] hover:text-[#0F172A]',
       ].join(' ')}
     >
       <Icon className="h-[15px] w-[15px] shrink-0 opacity-90" strokeWidth={1.5} aria-hidden />
@@ -191,16 +191,16 @@ export default function DashboardSidebar({ user }: { user: User }) {
                 <Link
                   href="/developer"
                   className={[
-                    'flex items-center gap-2 rounded-md px-3 py-2 text-[13px] font-medium transition-colors',
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                     isActivePath(pathname, '/developer')
-                      ? 'bg-[#EFF6FF] font-semibold text-[#1D4ED8]'
-                      : 'text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]',
+                      ? 'bg-[#E0F7FA] font-semibold text-primary'
+                      : 'text-[#334155] hover:bg-[#F8FAFC] hover:text-[#0F172A]',
                   ].join(' ')}
                 >
                   <Code2 className="h-[15px] w-[15px] shrink-0" strokeWidth={1.5} aria-hidden />
                   <span className="flex items-center gap-2">
                     Developer
-                    <span className="rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-blue-700">
+                    <span className="rounded-full border border-primary/30 bg-primary-light px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-dark">
                       beta
                     </span>
                   </span>
@@ -212,13 +212,13 @@ export default function DashboardSidebar({ user }: { user: User }) {
       </nav>
 
       <div className="border-t border-[#F1F5F9] px-4 py-3">
-        <div className={`mb-3 rounded-md px-2.5 py-1.5 text-[11px] font-medium ${planBadgeClass}`}>{planBadgeText}</div>
+        <div className={`mb-3 rounded-md px-2.5 py-1.5 text-xs font-medium ${planBadgeClass}`}>{planBadgeText}</div>
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-100 font-mono text-xs font-semibold text-slate-700">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs leading-snug text-[#6B7280]">{user?.email ?? '—'}</p>
+            <p className="truncate text-[13px] leading-snug text-[#64748B]">{user?.email ?? '—'}</p>
           </div>
           <button
             type="button"

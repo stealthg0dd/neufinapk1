@@ -114,7 +114,7 @@ const softwareApplicationSchema = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#0B0F14',
+  themeColor: '#F6F8FB',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -128,7 +128,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} dark`}
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <head>
         <script
