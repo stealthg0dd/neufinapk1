@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import {
   LayoutDashboard,
   PieChart,
@@ -13,12 +14,14 @@ import {
   Bot,
   LogOut,
   Code2,
+  Shield,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { apiGet } from '@/lib/api-client'
 import type { User } from '@supabase/supabase-js'
+import { useUser } from '@/lib/store'
 
-type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
+type NavItem = { href: string; label: string; icon: LucideIcon }
 
 const NAV_OVERVIEW: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,16 +38,20 @@ const NAV_ACCOUNT: NavItem[] = [{ href: '/dashboard/billing', label: 'Billing', 
 
 function isActivePath(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === '/dashboard'
-  return pathname === href || pathname.startsWith(`${href}/`)
+  if (pathname === href) return true
+  return pathname.startsWith(`${href}/`)
 }
 
 type SubscriptionStatus = {
-  plan?: 'free' | 'retail' | 'advisor' | 'enterprise'
+  plan?: string
   subscription_tier?: string
-  status?: 'trial' | 'active' | 'expired'
+  status?: string
+  subscription_status?: string
   trial_days_remaining?: number
   days_remaining?: number
   trial_ends_at?: string
+  is_admin?: boolean
+  role?: string
 }
 
 function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
@@ -82,6 +89,7 @@ function NavSection({ label, items, pathname }: { label: string; items: NavItem[
 export default function DashboardSidebar({ user }: { user: User }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { isAdmin: isAdminFromHook } = useUser()
   const [subscription, setSubscription] = useState<SubscriptionStatus>({})
 
   const initials = useMemo(() => {
@@ -115,7 +123,19 @@ export default function DashboardSidebar({ user }: { user: User }) {
   const isActivePaid = plan === 'advisor' || plan === 'enterprise'
   const isExpired = !isActivePaid && daysRemaining !== null && daysRemaining <= 0
 
+  const isAdminNav =
+    isAdminFromHook ||
+    subscription.is_admin === true ||
+    (subscription.role ?? '').toLowerCase() === 'admin'
+
   const planBadgeText = (() => {
+    const tierLabel = (subscription.plan ?? subscription.subscription_tier ?? 'free').toString()
+    const statusLabel = isAdminNav
+      ? 'Admin'
+      : (subscription.status ?? subscription.subscription_status ?? 'active').toString()
+    if (isAdminNav) {
+      return `${tierLabel} · ${statusLabel}`
+    }
     if (isActivePaid) {
       const dayText = daysRemaining !== null ? `${daysRemaining} days remaining` : 'active'
       return `Advisor · ${dayText}`
@@ -126,7 +146,7 @@ export default function DashboardSidebar({ user }: { user: User }) {
       return `Free · Trial ends ${pretty}`
     }
     if (daysRemaining !== null) return `Free · ${daysRemaining} days remaining`
-    return 'Free plan'
+    return `${tierLabel} · ${statusLabel}`
   })()
 
   const planBadgeClass = (() => {
@@ -149,6 +169,18 @@ export default function DashboardSidebar({ user }: { user: User }) {
         <NavSection label="Overview" items={NAV_OVERVIEW} pathname={pathname} />
         <NavSection label="Insights" items={NAV_INSIGHTS} pathname={pathname} />
         <NavSection label="Account" items={NAV_ACCOUNT} pathname={pathname} />
+
+        {isAdminNav && (
+          <div className="mt-2">
+            <p className="text-label px-3 pb-1.5 pt-4">Admin</p>
+            <div className="flex flex-col gap-0.5 px-2">
+              <NavLink
+                item={{ href: '/dashboard/admin', label: 'Admin Panel', icon: Shield }}
+                pathname={pathname}
+              />
+            </div>
+          </div>
+        )}
 
         {isActivePaid && (
           <>

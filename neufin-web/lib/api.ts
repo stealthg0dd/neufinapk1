@@ -502,6 +502,9 @@ export interface SubscriptionInfo {
   is_pro: boolean
   advisor_name: string | null
   firm_name: string | null
+  /** NeuFin internal admin (user_profiles.is_admin) */
+  is_admin?: boolean
+  role?: string
 }
 
 /**
@@ -540,7 +543,17 @@ export async function getSubscription(
   const res = await fetch(`${API}/api/vault/subscription`, {
     headers: authHeaders(token),
   })
-  if (!res.ok) return { subscription_tier: 'free', subscription_status: 'free', trial_started_at: '', is_pro: false, advisor_name: null, firm_name: null }
+  if (!res.ok)
+    return {
+      subscription_tier: 'free',
+      subscription_status: 'free',
+      trial_started_at: '',
+      is_pro: false,
+      advisor_name: null,
+      firm_name: null,
+      is_admin: false,
+      role: 'user',
+    }
   return res.json()
 }
 

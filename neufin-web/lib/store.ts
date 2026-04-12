@@ -4,7 +4,7 @@
  * Abstracts both guests (localStorage) and authenticated users (Supabase session)
  * into a single interface so components never need to branch on auth state.
  *
- * const { score, isPro, isGuest, user, token } = useUser()
+ * const { score, isPro, isGuest, isAdmin, user, token } = useUser()
  */
 
 'use client'
@@ -28,6 +28,8 @@ export interface UserState {
   subscriptionTier: 'free' | 'retail' | 'advisor' | 'enterprise' | 'pro'
   /** Advisor/firm name if set */
   advisorName: string | null
+  /** Internal ops / dashboard admin access */
+  isAdmin: boolean
   /** Raw auth state passthrough */
   user: ReturnType<typeof useAuth>['user']
   token: ReturnType<typeof useAuth>['token']
@@ -79,6 +81,10 @@ export function useUser(): UserState {
   )
   const isGuest = !user
 
+  const isAdmin =
+    subscription?.is_admin === true ||
+    (subscription?.role ?? '').toLowerCase() === 'admin'
+
   return {
     score,
     investorType,
@@ -86,7 +92,8 @@ export function useUser(): UserState {
     isPro,
     isGuest,
     subscriptionTier: subscription?.subscription_tier ?? 'free',
-    advisorName:      subscription?.advisor_name ?? null,
+    advisorName: subscription?.advisor_name ?? null,
+    isAdmin,
     user,
     token,
     loading: authLoading || subLoading,

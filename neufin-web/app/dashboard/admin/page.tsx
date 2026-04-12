@@ -3,15 +3,17 @@
 /**
  * /dashboard/admin
  *
- * Internal ops admin panel — advisor role only.
+ * Internal ops admin panel — advisor or internal admin.
  * Displays all NeuFin user profiles with actions for trial extension
  * and onboarding email resend.
  *
- * Not linked from public navigation. Access via direct URL.
+ * Linked from the dashboard sidebar when is_admin / admin role.
  */
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useUser } from "@/lib/store"
 import { apiFetch } from "@/lib/api-client"
 import type { UserAdminRow } from "@/app/api/admin/users/route"
 
@@ -139,7 +141,9 @@ function ExtendTrialModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
+  const router = useRouter()
   const { user, getAccessToken } = useAuth()
+  const { isAdmin, loading: authSubscriptionLoading, subscriptionTier } = useUser()
   const [rows, setRows]         = useState<UserAdminRow[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -168,6 +172,16 @@ export default function AdminPage() {
   }, [getAccessToken])
 
   useEffect(() => { load(filter) }, [filter, load])
+
+  const canAccessPanel =
+    isAdmin || subscriptionTier === "advisor" || subscriptionTier === "enterprise"
+
+  useEffect(() => {
+    if (authSubscriptionLoading || !user) return
+    if (!canAccessPanel) {
+      router.replace("/dashboard")
+    }
+  }, [authSubscriptionLoading, user, canAccessPanel, router])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -201,6 +215,18 @@ export default function AdminPage() {
   const trial   = rows.filter((r) => r.subscription_status === "trial").length
   const expired = rows.filter((r) => r.subscription_status === "expired").length
 
+  if (authSubscriptionLoading || !user) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center text-sm text-slate-500">
+        Loading…
+      </div>
+    )
+  }
+
+  if (!canAccessPanel) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -212,7 +238,7 @@ export default function AdminPage() {
             <p className="text-sm text-gray-400 mt-0.5">Internal ops panel · advisor or admin</p>
           </div>
           <div className="text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 bg-amber-500/10">
-            ⚠ Internal use only — not visible to regular users
+            Internal use only — not visible to regular users
           </div>
         </div>
 

@@ -149,10 +149,10 @@ async function hasAdminRole(token: string): Promise<boolean> {
   }
 }
 
-async function hasAdvisorRole(token: string): Promise<boolean> {
+/** Advisor-only dashboard routes — allow advisor role, admin role, or is_admin flag. */
+async function hasAdvisorOrAdminAccess(token: string): Promise<boolean> {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return false
   try {
-    // Get user from token
     const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SUPABASE_ANON_KEY!, Authorization: `Bearer ${token}` },
       cache: 'no-store',
@@ -162,9 +162,8 @@ async function hasAdvisorRole(token: string): Promise<boolean> {
     const userId = userJson.id
     if (!userId) return false
 
-    // Check user_profiles.role via REST API with service key
     const profileRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=role&limit=1`,
+      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=role,is_admin&limit=1`,
       {
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -174,8 +173,12 @@ async function hasAdvisorRole(token: string): Promise<boolean> {
       },
     )
     if (!profileRes.ok) return false
-    const profiles = await profileRes.json() as { role?: string }[]
-    return profiles[0]?.role === 'advisor'
+    const profiles = await profileRes.json() as { role?: string; is_admin?: boolean }[]
+    const row = profiles[0]
+    if (!row) return false
+    const role = (row.role ?? '').toLowerCase()
+    if (row.is_admin === true) return true
+    return role === 'advisor' || role === 'admin'
   } catch (error) {
     log('error', 'middleware.advisor_check_error', error)
     return false
@@ -267,8 +270,8 @@ export async function middleware(request: NextRequest) {
 
   // ── Advisor-only paths: additional role check ─────────────────────────────
   if (ADVISOR_ONLY_PREFIXES.some((p) => pathname.startsWith(p))) {
-    const isAdvisor = await hasAdvisorRole(token)
-    if (!isAdvisor) {
+    const allowed = await hasAdvisorOrAdminAccess(token)
+    if (!allowed) {
       log('info', 'middleware.redirect_non_advisor', { pathname })
       return redirectToDashboard(request)
     }

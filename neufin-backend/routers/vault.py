@@ -111,7 +111,8 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
             supabase.table("user_profiles")
             .select(
                 "subscription_tier, subscription_status, trial_started_at,"
-                "advisor_name, firm_name, onboarding_completed"
+                "advisor_name, firm_name, onboarding_completed,"
+                "is_admin, role"
             )
             .eq("id", uid)
             .single()
@@ -151,6 +152,8 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         "advisor_name": data.get("advisor_name"),
         "firm_name": data.get("firm_name"),
         "onboarding_completed": data.get("onboarding_completed", True),
+        "is_admin": bool(data.get("is_admin") or False),
+        "role": data.get("role") or "user",
     }
 
 
@@ -356,7 +359,7 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
             supabase.table("user_profiles")
             .select(
                 "subscription_tier, subscription_status, trial_started_at, "
-                "advisor_name, firm_name"
+                "advisor_name, firm_name, is_admin, role"
             )
             .eq("id", uid)
             .single()
@@ -373,6 +376,8 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
             "is_pro":              _compute_is_pro(tier, status, trial_started_at),
             "advisor_name":        data.get("advisor_name"),
             "firm_name":           data.get("firm_name"),
+            "is_admin":            bool(data.get("is_admin") or False),
+            "role":                data.get("role") or "user",
         }
     except Exception:
         return {
@@ -380,6 +385,8 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
             "subscription_status": "free",
             "trial_started_at":    "",
             "is_pro":              False,
+            "is_admin":            False,
+            "role":                "user",
         }
 
 
