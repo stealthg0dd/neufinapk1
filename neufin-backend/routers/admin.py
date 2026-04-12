@@ -156,7 +156,9 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
     now = datetime.datetime.now(datetime.UTC)
     d30 = (now - datetime.timedelta(days=30)).isoformat()
     d60 = (now - datetime.timedelta(days=60)).isoformat()
-    month_start = datetime.datetime(now.year, now.month, 1, tzinfo=datetime.UTC).isoformat()
+    month_start = datetime.datetime(
+        now.year, now.month, 1, tzinfo=datetime.UTC
+    ).isoformat()
 
     total_users = _count_profiles_where([])
     trials = _count_profiles_where([("subscription_status", "trial")])
@@ -198,7 +200,9 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
         try:
             reports_month += _count_table_since(tbl, month_start)
         except Exception as exc:
-            logger.debug("admin.dashboard.reports_month_table", table=tbl, error=str(exc))
+            logger.debug(
+                "admin.dashboard.reports_month_table", table=tbl, error=str(exc)
+            )
             continue
 
     # Sparklines (14d new users + dna_scores as activity proxy)
@@ -231,7 +235,9 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
             },
             "analyses_this_month": {
                 "value": analyses_month,
-                "delta_pct": _delta_pct(float(d30_dna), float(max(analyses_prev_30, 1))),
+                "delta_pct": _delta_pct(
+                    float(d30_dna), float(max(analyses_prev_30, 1))
+                ),
                 "sparkline": spark_dna,
             },
             "reports_generated_this_month": {
@@ -488,9 +494,9 @@ async def suspend_user(
     _admin: JWTUser = Depends(get_admin_user),
 ):
     try:
-        supabase.table("user_profiles").update(
-            {"subscription_status": "suspended"}
-        ).eq("id", user_id).execute()
+        supabase.table("user_profiles").update({"subscription_status": "suspended"}).eq(
+            "id", user_id
+        ).execute()
     except Exception as exc:
         raise HTTPException(500, f"Failed to suspend: {exc}") from exc
     invalidate_subscription_cache(user_id)
@@ -564,7 +570,9 @@ async def delete_user(user_id: str, _admin: JWTUser = Depends(get_admin_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("admin.delete_user.request_failed", user_id=user_id, error=str(exc))
+        logger.error(
+            "admin.delete_user.request_failed", user_id=user_id, error=str(exc)
+        )
         raise HTTPException(500, f"Failed to delete user: {exc}") from exc
 
     try:
@@ -589,10 +597,14 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
     Users with API keys — B2B-style partner list with usage from api_keys_daily_usage.
     """
     try:
-        keys_res = supabase.table("api_keys").select(
-            "id, user_id, key_prefix, name, plan, is_active, last_used_at, "
-            "rate_limit_per_day, created_at, revoked_at"
-        ).execute()
+        keys_res = (
+            supabase.table("api_keys")
+            .select(
+                "id, user_id, key_prefix, name, plan, is_active, last_used_at, "
+                "rate_limit_per_day, created_at, revoked_at"
+            )
+            .execute()
+        )
         keys = keys_res.data or []
     except Exception as exc:
         raise HTTPException(500, f"Failed to list keys: {exc}") from exc
@@ -615,7 +627,9 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
         except Exception as exc:
             logger.warning("admin.partners.profiles_failed", error=str(exc))
 
-    since_30 = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=30)).date()
+    since_30 = (
+        datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=30)
+    ).date()
     usage_by_key: dict[str, int] = {}
     try:
         usage_res = (
@@ -732,8 +746,7 @@ async def partner_usage_detail(
             per_key[kid][d] = per_key[kid].get(d, 0) + c
 
     daily_series = [
-        {"date": d, "calls": daily_totals[d]}
-        for d in sorted(daily_totals.keys())
+        {"date": d, "calls": daily_totals[d]} for d in sorted(daily_totals.keys())
     ]
 
     key_payload = []
@@ -774,7 +787,10 @@ async def rotate_partner_key(
 
     try:
         supabase.table("api_keys").update(
-            {"is_active": False, "revoked_at": datetime.datetime.now(datetime.UTC).isoformat()}
+            {
+                "is_active": False,
+                "revoked_at": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
         ).eq("user_id", partner_id).eq("is_active", True).execute()
     except Exception as exc:
         logger.warning("admin.rotate_key.revoke_failed", error=str(exc))
@@ -964,17 +980,13 @@ async def admin_revenue(_admin: JWTUser = Depends(get_admin_user)):
         gte, lte = int(start.timestamp()), int(end.timestamp())
         month_cash = 0.0
         try:
-            pis = stripe.PaymentIntent.list(
-                created={"gte": gte, "lte": lte}, limit=100
-            )
+            pis = stripe.PaymentIntent.list(created={"gte": gte, "lte": lte}, limit=100)
             for pi in pis.auto_paging_iter():
                 if pi.get("status") == "succeeded":
                     month_cash += (pi.get("amount") or 0) / 100.0
         except Exception as exc:
             logger.debug("admin.revenue.pi_month", year=y, month=m, error=str(exc))
-        series_12m.append(
-            {"year": y, "month": m, "cash_usd": round(month_cash, 2)}
-        )
+        series_12m.append({"year": y, "month": m, "cash_usd": round(month_cash, 2)})
 
     top10 = sorted(top_customers.items(), key=lambda x: x[1], reverse=True)[:10]
 
@@ -1001,7 +1013,12 @@ async def admin_revenue(_admin: JWTUser = Depends(get_admin_user)):
             logger.debug("admin.revenue.trial_conversion", days=days, error=str(exc))
             denom, num = 0, 0
         rate = round(num / denom * 100.0, 1) if denom else None
-        return {"window_days": days, "trials_started": denom, "now_active": num, "rate_pct": rate}
+        return {
+            "window_days": days,
+            "trials_started": denom,
+            "now_active": num,
+            "rate_pct": rate,
+        }
 
     return {
         "configured": True,
@@ -1072,7 +1089,9 @@ def _swarm_row_successful(row: dict) -> bool:
 
 
 def _swarm_agent_success_7d() -> dict[str, Any]:
-    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=7)).isoformat()
+    since = (
+        datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=7)
+    ).isoformat()
     try:
         r = (
             supabase.table("swarm_reports")
@@ -1095,7 +1114,9 @@ def _swarm_agent_success_7d() -> dict[str, Any]:
 
 def _analytics_error_hint_24h() -> dict[str, Any]:
     """Heuristic: fraction of recent analytics event names that look like failures."""
-    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=24)).isoformat()
+    since = (
+        datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=24)
+    ).isoformat()
     try:
         r = (
             supabase.table("analytics_events")

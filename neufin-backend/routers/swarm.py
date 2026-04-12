@@ -128,7 +128,11 @@ async def _persist_swarm_result(
     """
     import asyncio
 
-    thesis = result.get("investment_thesis", {}) if isinstance(result.get("investment_thesis"), dict) else {}
+    thesis = (
+        result.get("investment_thesis", {})
+        if isinstance(result.get("investment_thesis"), dict)
+        else {}
+    )
 
     # Build the row using ONLY real schema column names
     row: dict = {
@@ -151,15 +155,15 @@ async def _persist_swarm_result(
         # FIX: alpha_scout → alpha_signal (the actual DB column name)
         "alpha_signal": (
             thesis.get("alpha_signal")
-            or thesis.get("alpha_scout")   # fallback for old synthesizer key
+            or thesis.get("alpha_scout")  # fallback for old synthesizer key
         ),
         # Recommendation summary from synthesizer
         "recommendation_summary": (
-            thesis.get("recommendation_summary")
-            or thesis.get("action_plan")
+            thesis.get("recommendation_summary") or thesis.get("action_plan")
         ),
         # Market context columns
-        "investment_thesis": thesis.get("investment_thesis_body") or thesis.get("briefing"),
+        "investment_thesis": thesis.get("investment_thesis_body")
+        or thesis.get("briefing"),
         "market_regime": thesis.get("market_regime"),
         "quant_analysis": thesis.get("quant_analysis"),
         # tax_report is TEXT in schema — store as JSON string if it's a dict
@@ -396,6 +400,7 @@ async def get_swarm_status(job_id: str):
     if not job:
         # Supabase fallback: job state lost (worker restart / TTL) but result may be persisted
         import asyncio
+
         try:
             db = await asyncio.to_thread(
                 lambda: supabase.table("swarm_reports")
@@ -418,7 +423,9 @@ async def get_swarm_status(job_id: str):
                     "_source": "supabase_fallback",
                 }
         except Exception as e:
-            logger.warning("swarm.status_db_fallback_failed", job_id=job_id, error=str(e))
+            logger.warning(
+                "swarm.status_db_fallback_failed", job_id=job_id, error=str(e)
+            )
         raise HTTPException(404, "Job not found or expired")
 
     result = job.get("result") or {}
@@ -894,7 +901,9 @@ async def export_swarm_analysis_pdf(user: JWTUser = Depends(get_current_user)):
         )
     except Exception as exc:
         logger.error("swarm.export_pdf_query_failed", error=str(exc))
-        raise HTTPException(status_code=500, detail="Could not load Swarm analysis.") from exc
+        raise HTTPException(
+            status_code=500, detail="Could not load Swarm analysis."
+        ) from exc
 
     if not res.data:
         raise HTTPException(

@@ -117,7 +117,9 @@ async def complete_onboarding(
             _advisors_merge(uid, patch)
         except Exception as exc:
             logger.error("profile.complete_onboarding_advisor_failed", error=str(exc))
-            raise HTTPException(status_code=500, detail="Could not save advisor branding") from exc
+            raise HTTPException(
+                status_code=500, detail="Could not save advisor branding"
+            ) from exc
 
     logger.info("profile.onboarding_complete", user_id=uid)
     return {"ok": True, "onboarding_completed": True}
@@ -241,7 +243,9 @@ async def update_branding(
         return {"ok": True}
     except Exception as exc:
         logger.error("profile.branding_error", error=str(exc))
-        raise HTTPException(status_code=500, detail="Could not save branding settings.") from exc
+        raise HTTPException(
+            status_code=500, detail="Could not save branding settings."
+        ) from exc
 
 
 @router.post("/logo")
@@ -275,10 +279,15 @@ async def upload_logo(
         supabase.storage.from_("firm-logos").upload(
             path=storage_path,
             file=io.BytesIO(contents),
-            file_options={"content-type": file.content_type or "image/png", "upsert": "true"},
+            file_options={
+                "content-type": file.content_type or "image/png",
+                "upsert": "true",
+            },
         )
         public_url = supabase.storage.from_("firm-logos").get_public_url(storage_path)
-        supabase.table("user_profiles").update({"firm_logo_url": public_url}).eq("id", uid).execute()
+        supabase.table("user_profiles").update({"firm_logo_url": public_url}).eq(
+            "id", uid
+        ).execute()
     except Exception as exc:
         logger.debug("profile.logo_storage_skipped", error=str(exc))
 

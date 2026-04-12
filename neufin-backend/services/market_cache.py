@@ -675,7 +675,9 @@ async def count_active_swarm_jobs() -> int:
             try:
                 data = json.loads(path.read_text())
             except Exception as exc:
-                logger.debug("swarm.count_jobs_bad_json", path=str(path), error=str(exc))
+                logger.debug(
+                    "swarm.count_jobs_bad_json", path=str(path), error=str(exc)
+                )
                 continue
             jid = str(data.get("job_id") or path.stem)
             _consider(jid, data)
@@ -699,7 +701,9 @@ async def count_active_swarm_jobs() -> int:
                     if not raw:
                         continue
                     try:
-                        data = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
+                        data = json.loads(
+                            raw.decode() if isinstance(raw, bytes) else raw
+                        )
                     except Exception as exc:
                         logger.debug("swarm.count_jobs_bad_redis_json", error=str(exc))
                         continue

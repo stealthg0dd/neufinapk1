@@ -620,7 +620,13 @@ async def request_logging_middleware(request: Request, call_next):
     # Lightweight latency / error samples for GET /api/admin/system (in-process).
     try:
         p = request.url.path
-        if p not in ("/health", "/api/admin/health", "/metrics", "/favicon.ico", "/openapi.json"):
+        if p not in (
+            "/health",
+            "/api/admin/health",
+            "/metrics",
+            "/favicon.ico",
+            "/openapi.json",
+        ):
             from services.request_metrics import record_http_sample
 
             record_http_sample(
@@ -628,8 +634,12 @@ async def request_logging_middleware(request: Request, call_next):
                 status_code=response.status_code,
                 path=p,
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "http.request_metrics_sample_failed",
+            error=str(exc),
+            path=request.url.path,
+        )
 
     user_id = getattr(getattr(request.state, "user", None), "id", None)
     logger.info(
