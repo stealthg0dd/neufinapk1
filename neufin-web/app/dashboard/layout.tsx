@@ -10,9 +10,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     regime = null
   }
   return (
-    <DashboardShell regime={regime}>
-      <OnboardingGate />
-      {children}
-    </DashboardShell>
+    <div className="min-h-screen bg-app">
+      <DashboardShell regime={regime}>
+        <OnboardingGate />
+        {children}
+      </DashboardShell>
+    </div>
   )
 }

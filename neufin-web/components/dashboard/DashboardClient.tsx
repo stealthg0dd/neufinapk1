@@ -24,6 +24,9 @@ import {
   Settings,
   ChevronDown,
   ArrowUpDown,
+  Dna,
+  Bot,
+  FolderUp,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { apiPost } from '@/lib/api-client'
@@ -375,7 +378,9 @@ export default function DashboardClient() {
           <div className="space-y-6">
             {/* Welcome hero */}
             <GlassCard className="p-8 text-center border-[var(--border-accent)]">
-              <div className="text-4xl mb-4">🧬</div>
+              <div className="mb-4 flex justify-center">
+                <Dna className="h-12 w-12 text-[var(--amber)]" aria-hidden />
+              </div>
               <h2 className="font-display text-2xl text-[var(--text-primary)] mb-2">
                 Welcome to NeuFin
               </h2>
@@ -390,28 +395,32 @@ export default function DashboardClient() {
                   href="/upload"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm hover:opacity-90 transition-opacity"
                 >
-                  <span>📂</span> Upload Portfolio CSV
+                  <FolderUp className="h-4 w-4 shrink-0" aria-hidden />
+                  Upload Portfolio CSV
                 </Link>
                 <Link
                   href="/swarm"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-[var(--glass-border)] text-[var(--text-primary)] font-semibold text-sm hover:border-[var(--border-accent)] transition-colors"
                 >
-                  <span>🤖</span> Try Swarm Analysis
+                  <Bot className="h-4 w-4 shrink-0" aria-hidden />
+                  Try Swarm Analysis
                 </Link>
               </div>
             </GlassCard>
 
             {/* What you get */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { icon: '🧬', title: 'DNA Score', desc: 'Behavioral bias detection across your portfolio' },
-                { icon: '🤖', title: 'AI Swarm', desc: 'Multi-model analysis: Claude, GPT-4, Gemini' },
-                { icon: '📄', title: 'PDF Report', desc: 'Professional advisor-ready report download' },
-              ].map((item) => (
-                <GlassCard key={item.title} className="p-5">
-                  <div className="text-2xl mb-2">{item.icon}</div>
-                  <p className="font-semibold text-[var(--text-primary)] text-sm mb-1">{item.title}</p>
-                  <p className="text-xs text-[var(--text-secondary)]">{item.desc}</p>
+              {(
+                [
+                  { Icon: Dna, title: 'DNA Score', desc: 'Behavioral bias detection across your portfolio' },
+                  { Icon: Bot, title: 'AI Swarm', desc: 'Multi-model analysis: Claude, GPT-4, Gemini' },
+                  { Icon: FileText, title: 'PDF Report', desc: 'Professional advisor-ready report download' },
+                ] as const
+              ).map(({ Icon, title, desc }) => (
+                <GlassCard key={title} className="p-5">
+                  <Icon className="mb-2 h-8 w-8 text-[var(--amber)]" aria-hidden />
+                  <p className="font-semibold text-[var(--text-primary)] text-sm mb-1">{title}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{desc}</p>
                 </GlassCard>
               ))}
             </div>
@@ -464,10 +473,10 @@ export default function DashboardClient() {
                 { label: 'Portfolio Beta', v: metrics?.weighted_beta ?? '—' },
                 { label: 'Max Drawdown', v: maxDd != null ? `${maxDd.toFixed(1)}%` : '—' },
               ].map((k) => (
-                <GlassCard key={k.label} className="p-4 md:p-5">
-                  <p className="text-xs text-[var(--text-secondary)] mb-2">{k.label}</p>
-                  <p className="font-mono text-2xl md:text-[28px] text-[var(--text-primary)] tabular-nums">{k.v}</p>
-                </GlassCard>
+                <div key={k.label} className="card-elevated rounded-2xl p-4 md:p-5">
+                  <p className="mb-2 text-xs text-slate-600">{k.label}</p>
+                  <p className="font-mono text-2xl text-slate-900 tabular-nums md:text-[28px]">{k.v}</p>
+                </div>
               ))}
             </div>
 

@@ -17,31 +17,24 @@ export function PortfolioValueCard({ totalValue, numPositions, hasPortfolio }: P
   const formatted = formatValue(totalValue)
 
   return (
-    <div style={{
-      background: '#161D2E', borderRadius: 12, border: '1px solid #2A3550',
-      padding: '20px 20px 16px', display: 'flex', flexDirection: 'column', gap: 4,
-    }}>
-      <div style={{ color: '#1EB8CC', fontSize: 10, fontWeight: 700, letterSpacing: '0.09em' }}>
-        PORTFOLIO VALUE
-      </div>
+    <div className="card-elevated flex flex-col gap-1">
+      <div className="text-label text-primary">PORTFOLIO VALUE</div>
 
       {hasPortfolio && formatted ? (
         <>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#F0F4FF', marginTop: 8, lineHeight: 1 }}>
-            {formatted}
-          </div>
-          <div style={{ color: '#64748B', fontSize: 11, marginTop: 4 }}>
+          <div className="text-metric mt-2 leading-none">{formatted}</div>
+          <p className="mt-1 text-body-sm text-slate-600">
             {numPositions != null && numPositions > 0
               ? `${numPositions} portfolio${numPositions > 1 ? 's' : ''} analysed`
               : 'Portfolio analysed'}
-          </div>
+          </p>
         </>
       ) : (
         <>
-          <div style={{ fontSize: 32, color: '#2A3550', marginTop: 8 }}>—</div>
-          <div style={{ color: '#64748B', fontSize: 11, marginTop: 4 }}>
+          <div className="mt-2 text-[32px] font-semibold text-slate-300">—</div>
+          <p className="mt-1 text-body-sm text-slate-600">
             {hasPortfolio ? 'Value loading' : 'No portfolio yet'}
-          </div>
+          </p>
         </>
       )}
     </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { Loader2, PieChart } from 'lucide-react'
 import { usePortfolioData } from '@/hooks/usePortfolioData'
 import { DnaScoreCard } from '@/components/dashboard/DnaScoreCard'
 import { RegimeCard } from '@/components/dashboard/RegimeCard'
@@ -118,7 +118,7 @@ export default function DashboardPage() {
               {latestDna.strengths.slice(0, 2).map((s, i) => (
                 <div
                   key={i}
-                  style={{ borderLeft: '2px solid #22C55E', paddingLeft: 10, marginBottom: 8 }}
+                  style={{ borderLeft: '2px solid #16A34A', paddingLeft: 10, marginBottom: 8 }}
                 >
                   <p className="text-xs text-foreground">
                     {s.split('.')[0]}.
@@ -149,7 +149,7 @@ export default function DashboardPage() {
               {latestDna.weaknesses.slice(0, 2).map((w, i) => (
                 <div
                   key={i}
-                  style={{ borderLeft: '2px solid #EF4444', paddingLeft: 10, marginBottom: 8 }}
+                  style={{ borderLeft: '2px solid #DC2626', paddingLeft: 10, marginBottom: 8 }}
                 >
                   <p className="text-xs text-foreground">
                     {w.split('.')[0]}.
@@ -219,7 +219,9 @@ export default function DashboardPage() {
       {/* ── No portfolio: prominent upload CTA ──────────────────────────── */}
       {!hasPortfolio && (
         <div className="mt-6 rounded-xl border border-dashed border-border/50 bg-surface px-5 py-12 text-center">
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
+          <div className="mb-3 flex justify-center">
+            <PieChart className="h-10 w-10 text-primary" aria-hidden />
+          </div>
           <p className="text-sm font-medium text-foreground">Start your first analysis</p>
           <p className="mt-1.5 text-xs text-muted-foreground">
             Upload a CSV with your holdings to generate an IC-grade portfolio report

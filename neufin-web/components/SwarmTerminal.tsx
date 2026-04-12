@@ -11,14 +11,14 @@ export interface AgentTraceItem {
 
 type JobStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed'
 
-const AGENT_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  market_regime: { icon: '🌍', color: '#EF4444', label: 'MARKET REGIME' },
-  strategist: { icon: '🧠', color: '#F5A623', label: 'STRATEGIST' },
-  quant: { icon: '📊', color: '#1EB8CC', label: 'QUANT' },
-  tax_architect: { icon: '🏛️', color: '#F5A623', label: 'TAX ARCHITECT' },
-  risk_sentinel: { icon: '🛡️', color: '#EF4444', label: 'RISK SENTINEL' },
-  alpha_scout: { icon: '⚡', color: '#22C55E', label: 'ALPHA SCOUT' },
-  synthesizer: { icon: '✦', color: '#7C3AED', label: 'SYNTHESIZER' },
+const AGENT_CONFIG: Record<string, { mono: string; color: string; label: string }> = {
+  market_regime: { mono: 'MR', color: '#DC2626', label: 'MARKET REGIME' },
+  strategist: { mono: 'PS', color: '#F5A623', label: 'STRATEGIST' },
+  quant: { mono: 'QA', color: '#1EB8CC', label: 'QUANT' },
+  tax_architect: { mono: 'TO', color: '#F5A623', label: 'TAX ARCHITECT' },
+  risk_sentinel: { mono: 'RR', color: '#DC2626', label: 'RISK SENTINEL' },
+  alpha_scout: { mono: 'AD', color: '#16A34A', label: 'ALPHA SCOUT' },
+  synthesizer: { mono: 'IC', color: '#7C3AED', label: 'SYNTHESIZER' },
 }
 
 const AGENT_ORDER = [
@@ -94,7 +94,7 @@ export default function SwarmTerminal({
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: cfg.color }}>{cfg.icon}</span>
+                  <span className="agent-badge">{cfg.mono}</span>
                   <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: cfg.color }}>
                     {cfg.label}
                   </span>

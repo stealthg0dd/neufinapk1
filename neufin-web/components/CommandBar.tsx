@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell } from 'lucide-react'
+import { Bell, Sparkles } from 'lucide-react'
 import { apiFetch } from '@/lib/api-client'
 import Image from 'next/image'
 
@@ -149,7 +149,10 @@ export function CommandBar({
             onClick={() => onToggleCopilot?.()}
             className="rounded-md border border-[hsl(var(--accent)/0.3)] bg-[hsl(var(--accent)/0.15)] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--accent))] transition-colors hover:bg-[hsl(var(--accent)/0.25)]"
           >
-            ✦ Copilot
+            <span className="inline-flex items-center gap-1">
+              <Sparkles className="h-3 w-3" aria-hidden />
+              Copilot
+            </span>
           </button>
         </div>
       </header>

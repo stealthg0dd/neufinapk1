@@ -59,8 +59,8 @@ export function TickerNumber({
         className={
           highlightSign && format === 'percent'
             ? value >= 0
-              ? 'text-[var(--emerald)]'
-              : 'text-[var(--red)]'
+              ? 'text-[#16A34A]'
+              : 'text-[#DC2626]'
             : 'text-[var(--text-primary)]'
         }
       >
@@ -76,7 +76,7 @@ export function TickerNumber({
             exit={{ opacity: 0, y: -2 }}
             className={clsx(
               'inline-flex items-center gap-0.5 text-sm',
-              positive ? 'text-[var(--emerald)]' : 'text-[var(--red)]',
+              positive ? 'text-[#16A34A]' : 'text-[#DC2626]',
             )}
           >
             {showArrow &&

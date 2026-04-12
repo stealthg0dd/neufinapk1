@@ -864,10 +864,10 @@ export default function PortfolioPage() {
             <div
               style={{
                 marginTop: 8, padding: '14px 20px',
-                background: 'rgba(34,197,94,0.06)',
-                border: '1px solid rgba(34,197,94,0.3)',
+                background: 'rgba(22,163,74,0.06)',
+                border: '1px solid rgba(22,163,74,0.28)',
                 borderRadius: 10,
-                color: '#22C55E', fontSize: 13, fontWeight: 600,
+                color: '#16A34A', fontSize: 13, fontWeight: 600,
               }}
             >
               ✓ IC Report generated — check your downloads or the open tab.

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { Dna, Trophy } from 'lucide-react'
 
 export interface LeaderboardEntry {
   dna_score: number
@@ -11,18 +12,18 @@ export interface LeaderboardEntry {
   created_at: string
 }
 
-const TYPE_CONFIG: Record<string, { emoji: string; color: string }> = {
-  'Diversified Strategist': { emoji: '⚖️',  color: '#3b82f6' },
-  'Conviction Growth':      { emoji: '🚀',  color: '#8b5cf6' },
-  'Momentum Trader':        { emoji: '⚡',  color: '#f59e0b' },
-  'Defensive Allocator':    { emoji: '🛡️', color: '#22c55e' },
-  'Speculative Investor':   { emoji: '🎯',  color: '#ef4444' },
+const TYPE_CONFIG: Record<string, { mono: string; color: string }> = {
+  'Diversified Strategist': { mono: 'DS', color: '#3b82f6' },
+  'Conviction Growth': { mono: 'CG', color: '#8b5cf6' },
+  'Momentum Trader': { mono: 'MT', color: '#f59e0b' },
+  'Defensive Allocator': { mono: 'DA', color: '#16a34a' },
+  'Speculative Investor': { mono: 'SI', color: '#dc2626' },
 }
 
 const PODIUM_CONFIG = [
-  { rank: 2, label: '🥈', medal: 'Silver', barH: 'h-20', order: 'order-1', offsetY: 'mt-8'  },
-  { rank: 1, label: '🥇', medal: 'Gold',   barH: 'h-32', order: 'order-2', offsetY: 'mt-0'  },
-  { rank: 3, label: '🥉', medal: 'Bronze', barH: 'h-14', order: 'order-3', offsetY: 'mt-12' },
+  { rank: 2, label: '2nd', medal: 'Silver', barH: 'h-20', order: 'order-1', offsetY: 'mt-8' },
+  { rank: 1, label: '1st', medal: 'Gold', barH: 'h-32', order: 'order-2', offsetY: 'mt-0' },
+  { rank: 3, label: '3rd', medal: 'Bronze', barH: 'h-14', order: 'order-3', offsetY: 'mt-12' },
 ] as const
 
 const PODIUM_COLORS = {
@@ -32,7 +33,7 @@ const PODIUM_COLORS = {
 } as const
 
 function scoreColor(score: number) {
-  return score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'
+  return score >= 70 ? '#16A34A' : score >= 40 ? '#f59e0b' : '#DC2626'
 }
 
 const fadeUp = {
@@ -55,9 +56,9 @@ function PodiumCard({
   config: typeof PODIUM_CONFIG[number]
   isMe: boolean
 }) {
-  const cfg    = TYPE_CONFIG[entry.investor_type] ?? { emoji: '🧬', color: '#6b7280' }
-  const pCfg   = PODIUM_COLORS[config.medal]
-  const sc     = scoreColor(entry.dna_score)
+  const cfg = TYPE_CONFIG[entry.investor_type] ?? { mono: 'NA', color: '#6b7280' }
+  const pCfg = PODIUM_COLORS[config.medal]
+  const sc = scoreColor(entry.dna_score)
 
   return (
     <motion.div
@@ -71,14 +72,14 @@ function PodiumCard({
         className={`w-full rounded-xl border p-4 text-center transition-all hover:scale-105 relative overflow-hidden
           ${pCfg.border} ${pCfg.bg}
           ${isMe ? 'ring-2 ring-blue-500/60' : ''}`}
-        style={{ boxShadow: `0 0 24px ${pCfg.glow}18` }}
+        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
       >
         {isMe && (
           <span className="absolute top-1.5 right-1.5 text-[9px] font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-1.5 py-0.5 leading-none">
             YOU
           </span>
         )}
-        <div className="text-2xl mb-1">{cfg.emoji}</div>
+        <span className="agent-badge mx-auto mb-1">{cfg.mono}</span>
         <div className="text-xl font-extrabold" style={{ color: sc }}>
           {entry.dna_score}
         </div>
@@ -93,7 +94,7 @@ function PodiumCard({
         className={`w-full ${config.barH} rounded-t-lg flex items-center justify-center`}
         style={{ background: `${pCfg.glow}22`, borderTop: `2px solid ${pCfg.glow}44` }}
       >
-        <span className="text-lg">{config.label}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-gray-200">{config.label}</span>
       </div>
     </motion.div>
   )
@@ -127,7 +128,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
         transition={{ duration: 0.4 }}
         className="card text-center py-16"
       >
-        <p className="text-5xl mb-4">🏆</p>
+        <Trophy className="mx-auto mb-4 h-14 w-14 text-amber-500/80" aria-hidden />
         <p className="text-gray-300 font-semibold mb-1">The leaderboard is empty</p>
         <p className="text-gray-500 text-sm mb-6">Be the first investor to claim the top spot.</p>
         <Link href="/upload" className="btn-primary inline-block">
@@ -151,7 +152,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
           className="card border-blue-800/40 bg-blue-950/20 flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🧬</span>
+            <Dna className="h-8 w-8 shrink-0 text-blue-400" aria-hidden />
             <div>
               <p className="text-sm font-semibold text-blue-300">Your current rank</p>
               <p className="text-xs text-gray-500">Based on your last analysis</p>
@@ -195,7 +196,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
           <ul className="divide-y divide-gray-800/50">
             {rest.map((entry, i) => {
               const rank   = i + 4
-              const cfg    = TYPE_CONFIG[entry.investor_type] ?? { emoji: '🧬', color: '#6b7280' }
+              const cfg = TYPE_CONFIG[entry.investor_type] ?? { mono: 'NA', color: '#6b7280' }
               const sc     = scoreColor(entry.dna_score)
               const isMe   = entry.share_token === myToken
 
@@ -216,7 +217,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                     </span>
 
                     {/* Type */}
-                    <span className="text-base shrink-0">{cfg.emoji}</span>
+                    <span className="agent-badge shrink-0 text-[9px]">{cfg.mono}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: cfg.color }}>
                         {entry.investor_type}

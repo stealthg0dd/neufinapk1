@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { LineChart } from 'lucide-react'
 import LeaderboardClient from './LeaderboardClient'
 import type { LeaderboardEntry } from './LeaderboardClient'
 
@@ -33,8 +34,12 @@ export default async function LeaderboardPage() {
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           <div className="flex items-center gap-3">
-            <Link href="/market" className="text-gray-400 hover:text-white text-sm transition-colors">
-              📊 Market DNA
+            <Link
+              href="/market"
+              className="inline-flex items-center gap-1.5 text-gray-400 transition-colors hover:text-white text-sm"
+            >
+              <LineChart className="h-4 w-4 shrink-0" aria-hidden />
+              Market DNA
             </Link>
             <Link href="/upload" className="btn-primary py-2 text-sm">
               Test Your Portfolio →
