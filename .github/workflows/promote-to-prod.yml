@@ -92,7 +92,8 @@ jobs:
           echo "Checking $HEALTH_URL"
           for i in 1 2 3 4 5; do
             # Use -s without -f so curl always outputs the HTTP status code.
-            # -f would exit non-zero on 4xx and cause "||echo 000" to append, yielding e.g. "401000".
+            # Without -f, curl exits 0 regardless of HTTP status; -f would make the
+            # "|| echo 000" fallback append "000" to the real code (e.g. "401000").
             STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" \
               -H "Accept: application/json" \
               --max-time 15 \
@@ -101,12 +102,14 @@ jobs:
               BODY_STATUS=$(python3 -c "import json; d=json.load(open('/tmp/health.json')); print(d.get('status',''))" 2>/dev/null || echo "")
               if [ "$BODY_STATUS" = "ok" ]; then
                 echo "✅ Backend health check passed"
-                break
+                exit 0
               fi
             fi
             echo "Attempt $i: HTTP $STATUS, retrying in 15s..."
             sleep 15
           done
+          echo "❌ Backend health check failed after 5 attempts"
+          exit 1
 
       # ── Deploy web to Vercel (production) ─────────────────────────────────
       - name: Install Vercel CLI
