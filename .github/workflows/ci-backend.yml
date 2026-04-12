@@ -2,12 +2,11 @@ name: Backend CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
     paths:
       - 'neufin-backend/**'
       - '.github/workflows/ci-backend.yml'
   pull_request:
-    branches: [main]
     paths:
       - 'neufin-backend/**'
       - '.github/workflows/ci-backend.yml'

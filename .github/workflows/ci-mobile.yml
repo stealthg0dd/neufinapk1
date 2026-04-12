@@ -2,12 +2,11 @@ name: Mobile CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
     paths:
       - 'neufin-mobile/**'
       - '.github/workflows/ci-mobile.yml'
   pull_request:
-    branches: [main]
     paths:
       - 'neufin-mobile/**'
       - '.github/workflows/ci-mobile.yml'

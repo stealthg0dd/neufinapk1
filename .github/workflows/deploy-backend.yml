@@ -1,19 +1,19 @@
-name: Deploy Backend
+name: Deploy Backend — Staging
 
 on:
-  # Runs after Backend CI completes successfully on main
+  # Runs after Backend CI completes successfully on develop
   workflow_run:
     workflows: ["Backend CI"]
     types: [completed]
-    branches: [main]
+    branches: [develop]
 
 jobs:
   deploy:
-    name: Deploy to Railway
+    name: Deploy to Railway (Staging)
     runs-on: ubuntu-latest
     # Only deploy when CI passed (not on failure or cancellation)
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    environment: production
+    environment: staging
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,9 +23,9 @@ jobs:
         run: npm install -g @railway/cli
 
       # ── Deploy ────────────────────────────────────────────────────────────
-      - name: Deploy neufin-backend to Railway
+      - name: Deploy neufin-backend to Railway (staging)
         working-directory: neufin-backend
-        run: railway up --service Neufin101 --detach
+        run: railway up --service Neufin101 --environment staging --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
@@ -36,7 +36,7 @@ jobs:
       # ── Health Check ──────────────────────────────────────────────────────
       - name: Health check /health
         run: |
-          HEALTH_URL="${{ secrets.RAILWAY_BACKEND_URL }}/health"
+          HEALTH_URL="${{ secrets.RAILWAY_STAGING_BACKEND_URL }}/health"
           echo "Checking $HEALTH_URL"
           for i in 1 2 3 4 5; do
             STATUS=$(curl -sf "$HEALTH_URL" \
@@ -58,65 +58,36 @@ jobs:
           echo "❌ Health check failed after 5 attempts"
           exit 1
 
-      # ── Sentry Release ────────────────────────────────────────────────────
-      - name: Create Sentry release
-        uses: getsentry/action-release@v1
-        continue-on-error: true
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_NEUFIN_BACKEND }}
-        with:
-          environment: production
-          version: ${{ github.event.workflow_run.head_sha }}
-
-      # ── Heartbeat ─────────────────────────────────────────────────────────
-      - name: POST heartbeat to router-system
-        run: |
-          curl -s -X POST "${{ secrets.AGENT_OS_URL }}/api/heartbeat/neufin-backend" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.AGENT_OS_API_KEY }}" \
-            -d "{
-              \"service\": \"neufin-backend\",
-              \"status\": \"deployed\",
-              \"sha\": \"${{ github.event.workflow_run.head_sha }}\",
-              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-            }" || echo "Heartbeat endpoint unavailable — continuing"
-
       # ── Slack Success ─────────────────────────────────────────────────────
-      - name: Notify Slack — deploy success
+      - name: Notify Slack — staging deploy success
         if: success()
         run: |
-          W1="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
-          W2="${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}"
-          [ -n "$W1" ] && curl -s -X POST "$W1" \
+          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}"
+          [ -z "$WEBHOOK" ] && exit 0
+          curl -s -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
-              \"text\": \"✅ *neufin-backend deployed to production*\",
+              \"text\": \"🚀 *neufin-backend deployed to staging*\",
               \"attachments\": [{
                 \"color\": \"good\",
                 \"fields\": [
+                  {\"title\": \"Branch\", \"value\": \"develop\", \"short\": true},
                   {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}|${{ github.event.workflow_run.head_sha }}>\", \"short\": true},
-                  {\"title\": \"Environment\", \"value\": \"production\", \"short\": true}
+                  {\"title\": \"Environment\", \"value\": \"staging\", \"short\": true}
                 ]
               }]
             }" || true
-          [ -n "$W2" ] && curl -s -X POST "$W2" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"✅ *neufin-backend* → production | commit: ${{ github.event.workflow_run.head_sha }}\"
-            }" || true
 
       # ── Slack Failure ─────────────────────────────────────────────────────
-      - name: Notify Slack — deploy failure
+      - name: Notify Slack — staging deploy failure
         if: failure()
         run: |
-          W1="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
-          W2="${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}"
-          [ -n "$W1" ] && curl -s -X POST "$W1" \
+          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}"
+          [ -z "$WEBHOOK" ] && exit 0
+          curl -s -X POST "$WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{
-              \"text\": \"❌ *neufin-backend deploy FAILED*\",
+              \"text\": \"❌ *neufin-backend staging deploy FAILED*\",
               \"attachments\": [{
                 \"color\": \"danger\",
                 \"fields\": [
@@ -124,9 +95,4 @@ jobs:
                   {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
                 ]
               }]
-            }" || true
-          [ -n "$W2" ] && curl -s -X POST "$W2" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"❌ *neufin-backend* deploy FAILED | <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\"
             }" || true
