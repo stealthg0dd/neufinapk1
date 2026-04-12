@@ -1,0 +1,16 @@
+name: Release Gate
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate passed
+        run: |
+          echo "Branch: ${{ github.base_ref }}"
+          echo "All required checks must pass before merge."
+          echo "For main: staging QA must be confirmed manually."

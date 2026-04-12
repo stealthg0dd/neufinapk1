@@ -1,13 +1,13 @@
-name: Backend CI
+name: CI Backend
 
 on:
-  push:
-    branches: [main]
+  pull_request:
+    branches: [develop, main]
     paths:
       - 'neufin-backend/**'
       - '.github/workflows/ci-backend.yml'
-  pull_request:
-    branches: [main]
+  push:
+    branches: [develop, main]
     paths:
       - 'neufin-backend/**'
       - '.github/workflows/ci-backend.yml'
@@ -16,111 +16,45 @@ concurrency:
   group: ci-backend-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PYTHON_VERSION: '3.11'
-
 jobs:
-  # ── Lint & Format Check ───────────────────────────────────────────────────
-  lint:
-    name: Lint & Format Check
+  backend-checks:
+    name: Backend CI
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: neufin-backend
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          python-version: '3.11'
 
-      - name: Install dev dependencies
-        run: pip install -r requirements-dev.txt
-
-      - name: Ruff lint
-        run: ruff check . --output-format=github
-
-      - name: Black format check
-        run: black --check .
-
-      - name: Notify Slack on lint failure
-        if: failure()
-        run: |
-          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}"
-          [ -z "$WEBHOOK" ] && exit 0
-          curl -s -X POST "$WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"❌ *Backend CI — Lint failed*\",
-              \"attachments\": [{
-                \"color\": \"danger\",
-                \"fields\": [
-                  {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
-                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\", \"short\": true},
-                  {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
-                ]
-              }]
-            }" || true
-
-  # ── Tests with Coverage ───────────────────────────────────────────────────
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    needs: lint
-    defaults:
-      run:
-        working-directory: neufin-backend
-    env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
-      APP_BASE_URL: http://localhost:8080
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - uses: actions/cache@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('neufin-backend/requirements*.txt') }}
 
-      - name: Install dependencies
+      - name: Install
         run: pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run tests with coverage
+      - name: Ruff
+        run: ruff check .
+
+      - name: Black
+        run: black --check .
+
+      - name: Pytest
+        env:
+          ENVIRONMENT: test
+          BYPASS_AUTH_IN_DEV: "false"
+          SUPABASE_URL: "https://test.supabase.co"
+          SUPABASE_SERVICE_ROLE_KEY: "test-key"
+          FERNET_MASTER_KEY: "test-fernet-key-32bytes-padded00"
         run: |
           pytest tests/ \
-            --cov=. \
-            --cov-report=xml \
-            --cov-report=term-missing \
+            --maxfail=3 \
+            --disable-warnings \
             --timeout=60 \
-            -v
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        if: always()
-        continue-on-error: true
-        with:
-          file: ./neufin-backend/coverage.xml
-          flags: backend
-          token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Notify Slack on test failure
-        if: failure()
-        run: |
-          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}"
-          [ -z "$WEBHOOK" ] && exit 0
-          curl -s -X POST "$WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"❌ *Backend CI — Tests failed*\",
-              \"attachments\": [{
-                \"color\": \"danger\",
-                \"fields\": [
-                  {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
-                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.sha }}>\", \"short\": true},
-                  {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
-                ]
-              }]
-            }" || true
+            -q

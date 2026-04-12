@@ -1,143 +1,54 @@
-name: Deploy Web
+# Vercel deploys natively from branch — this workflow
+# only validates post-deploy readiness and marks Sentry releases.
+
+name: Post-Deploy Web
 
 on:
-  # Runs after Web CI completes successfully on main
-  workflow_run:
-    workflows: ["Web CI"]
-    types: [completed]
-    branches: [main]
+  push:
+    branches: [main, develop]
+    paths:
+      - 'neufin-web/**'
 
 jobs:
-  deploy:
-    name: Deploy to Vercel
+  validate-deploy:
+    name: Post-deploy web validation
     runs-on: ubuntu-latest
-    # Only deploy when CI passed
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    environment: production
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel
-
-      # ── Deploy ────────────────────────────────────────────────────────────
-      # Deploy from repo root — Vercel project has rootDirectory="neufin-web"
-      # set in its settings, so running from root avoids the neufin-web/neufin-web
-      # path doubling that occurs when working-directory: neufin-web is used.
-      - name: Deploy to Vercel (production)
-        id: vercel-deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_NEUFIN_WEB }}
+      - name: Set target URL
+        id: env
         run: |
-          # Vercel CLI uses \r for progress lines; grep -oE extracts only the URL
-          # pattern so "Building..." suffixes don't corrupt the captured value.
-          RAW=$(vercel deploy --prod --yes --token "$VERCEL_TOKEN" 2>&1 | tee /tmp/vercel-output.txt)
-          DEPLOYMENT_URL=$(echo "$RAW" | grep -oE 'https://[a-zA-Z0-9._-]+\.vercel\.app' | tail -1)
-          if [ -z "$DEPLOYMENT_URL" ]; then
-            echo "Could not extract deployment URL from output:"
-            cat /tmp/vercel-output.txt
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "url=https://www.neufin.ai" >> $GITHUB_OUTPUT
+            echo "name=production" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://staging.neufin.ai" >> $GITHUB_OUTPUT
+            echo "name=staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for Vercel deploy
+        run: sleep 45
+
+      - name: Readiness check
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            ${{ steps.env.outputs.url }} || echo "000")
+          echo "Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Web readiness check failed"
             exit 1
           fi
-          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
-          echo "Deployed to: $DEPLOYMENT_URL"
+          echo "Web deploy confirmed at ${{ steps.env.outputs.url }}"
 
-      # ── Wait & Verify Ready ───────────────────────────────────────────────
-      # Poll the stable production alias — it's always ready once Vercel promotes.
-      - name: Wait for deployment to be ready
-        run: |
-          # Prefer the captured preview URL; fall back to the stable production alias.
-          PREVIEW_URL="${{ steps.vercel-deploy.outputs.deployment_url }}"
-          PROD_URL="https://neufin-web.vercel.app"
-          URL="${PREVIEW_URL:-$PROD_URL}"
-          echo "Polling $URL for readiness..."
-          for i in $(seq 1 12); do
-            # -L follows redirects; extract the final HTTP status code
-            STATUS=$(curl -sL -o /dev/null -w "%{http_code}" "$URL" --max-time 20 2>/dev/null || echo "000")
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "404" ]; then
-              # 200 = fully ready; 404 = app running (no content yet) — both confirm server is up
-              echo "✅ Deployment is ready (HTTP $STATUS)"
-              exit 0
-            fi
-            echo "Attempt $i: HTTP $STATUS — waiting 15s..."
-            sleep 15
-          done
-          echo "⚠️  Deployment readiness check timed out — deployment itself succeeded"
-          exit 0
-
-      # ── Sentry Release ────────────────────────────────────────────────────
       - name: Create Sentry release
+        if: github.ref_name == 'main'
         uses: getsentry/action-release@v1
-        continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT_NEUFIN_WEB }}
+          SENTRY_PROJECT: neufin-web
         with:
-          environment: production
-          version: ${{ github.event.workflow_run.head_sha }}
-
-      # ── Heartbeat ─────────────────────────────────────────────────────────
-      - name: POST heartbeat to router-system
-        run: |
-          curl -s -X POST "${{ secrets.AGENT_OS_URL }}/api/heartbeat/neufin-web" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.AGENT_OS_API_KEY }}" \
-            -d "{
-              \"service\": \"neufin-web\",
-              \"status\": \"deployed\",
-              \"sha\": \"${{ github.event.workflow_run.head_sha }}\",
-              \"url\": \"${{ steps.vercel-deploy.outputs.deployment_url }}\",
-              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-            }" || echo "Heartbeat endpoint unavailable — continuing"
-
-      # ── Slack Success ─────────────────────────────────────────────────────
-      - name: Notify Slack — deploy success
-        if: success()
-        run: |
-          W1="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
-          W2="${{ secrets.SLACK_WEBHOOK_CTECH_COMMAND }}"
-          [ -n "$W1" ] && curl -s -X POST "$W1" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"✅ *neufin-web deployed to production*\",
-              \"attachments\": [{
-                \"color\": \"good\",
-                \"fields\": [
-                  {\"title\": \"URL\", \"value\": \"${{ steps.vercel-deploy.outputs.deployment_url }}\", \"short\": false},
-                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}|${{ github.event.workflow_run.head_sha }}>\", \"short\": true},
-                  {\"title\": \"Environment\", \"value\": \"production\", \"short\": true}
-                ]
-              }]
-            }" || true
-          [ -n "$W2" ] && curl -s -X POST "$W2" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"✅ *neufin-web* → production | commit: ${{ github.event.workflow_run.head_sha }} | url: ${{ steps.vercel-deploy.outputs.deployment_url }}\"
-            }" || true
-
-      # ── Slack Failure ─────────────────────────────────────────────────────
-      - name: Notify Slack — deploy failure
-        if: failure()
-        run: |
-          WEBHOOK="${{ secrets.SLACK_WEBHOOK_NEUFIN_ALERTS }}"
-          [ -z "$WEBHOOK" ] && exit 0
-          curl -s -X POST "$WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"❌ *neufin-web deploy FAILED*\",
-              \"attachments\": [{
-                \"color\": \"danger\",
-                \"fields\": [
-                  {\"title\": \"Commit\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}|${{ github.event.workflow_run.head_sha }}>\", \"short\": true},
-                  {\"title\": \"Run\", \"value\": \"<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>\", \"short\": false}
-                ]
-              }]
-            }" || true
+          environment: ${{ steps.env.outputs.name }}
+          version: ${{ github.sha }}
+        continue-on-error: true

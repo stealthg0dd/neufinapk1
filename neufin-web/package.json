@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "smoke:staging": "playwright test qa/smoke-staging.spec.ts",
+    "smoke:prod": "playwright test qa/smoke-production.spec.ts"
   },
   "dependencies": {
     "@radix-ui/react-tooltip": "^1.2.8",
