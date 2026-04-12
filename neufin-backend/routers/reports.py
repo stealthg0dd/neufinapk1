@@ -121,18 +121,14 @@ def _normalize_positions(positions: list) -> list:
         total_value = sum(
             float(p.get("shares") or 0)
             * float(
-                p.get("price")
-                or p.get("current_price")
-                or p.get("last_price")
-                or 0
+                p.get("price") or p.get("current_price") or p.get("last_price") or 0
             )
             for p in positions
         )
 
     # Check current weight sum
     weight_sum = sum(
-        float(p.get("weight_pct") or p.get("weight") or 0)
-        for p in positions
+        float(p.get("weight_pct") or p.get("weight") or 0) for p in positions
     )
 
     # Normalize if weights look like share counts (sum >> 100)
@@ -355,9 +351,7 @@ async def generate_report(
                     .limit(1)
                     .execute()
                 )
-                swarm_row = (
-                    fallback_result.data[0] if fallback_result.data else None
-                )
+                swarm_row = fallback_result.data[0] if fallback_result.data else None
                 if swarm_row:
                     logger.warning(
                         "reports.swarm_portfolio_mismatch",
@@ -452,9 +446,7 @@ async def generate_report(
         if not positions_raw:
             positions_raw = _positions_from_dna_row(existing_dna)
         for p in positions_raw:
-            p["price"] = float(
-                p.get("current_price") or p.get("last_price") or 0
-            )
+            p["price"] = float(p.get("current_price") or p.get("last_price") or 0)
         positions_raw = _normalize_positions(positions_raw)
 
         if not positions_raw:
@@ -482,10 +474,7 @@ async def generate_report(
 
         advisor_config = {
             "firm_name": (
-                body.firm_name
-                or adv.get("firm_name")
-                or profile.get("full_name")
-                or ""
+                body.firm_name or adv.get("firm_name") or profile.get("full_name") or ""
             ),
             "advisor_name": (
                 body.advisor_name
@@ -504,13 +493,9 @@ async def generate_report(
                 if body.color_scheme
                 else {"primary": profile.get("brand_primary_color") or "#1EB8CC"}
             ),
-            "white_label": (
-                body.white_label or bool(adv.get("white_label")) or False
-            ),
+            "white_label": (body.white_label or bool(adv.get("white_label")) or False),
             "advisor_email": (
-                body.advisor_email
-                or profile.get("email")
-                or "info@neufin.ai"
+                body.advisor_email or profile.get("email") or "info@neufin.ai"
             ),
             "client_name": body.client_name,
             "report_run_id": run_id,

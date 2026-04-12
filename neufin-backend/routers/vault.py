@@ -366,27 +366,27 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
         data = result.data or {}
-        tier   = data.get("subscription_tier", "free") or "free"
+        tier = data.get("subscription_tier", "free") or "free"
         status = data.get("subscription_status", "free") or "free"
         trial_started_at = data.get("trial_started_at")
         return {
-            "subscription_tier":   tier,
+            "subscription_tier": tier,
             "subscription_status": status,
-            "trial_started_at":    str(trial_started_at or ""),
-            "is_pro":              _compute_is_pro(tier, status, trial_started_at),
-            "advisor_name":        data.get("advisor_name"),
-            "firm_name":           data.get("firm_name"),
-            "is_admin":            bool(data.get("is_admin") or False),
-            "role":                data.get("role") or "user",
+            "trial_started_at": str(trial_started_at or ""),
+            "is_pro": _compute_is_pro(tier, status, trial_started_at),
+            "advisor_name": data.get("advisor_name"),
+            "firm_name": data.get("firm_name"),
+            "is_admin": bool(data.get("is_admin") or False),
+            "role": data.get("role") or "user",
         }
     except Exception:
         return {
-            "subscription_tier":   "free",
+            "subscription_tier": "free",
             "subscription_status": "free",
-            "trial_started_at":    "",
-            "is_pro":              False,
-            "is_admin":            False,
-            "role":                "user",
+            "trial_started_at": "",
+            "is_pro": False,
+            "is_admin": False,
+            "role": "user",
         }
 
 

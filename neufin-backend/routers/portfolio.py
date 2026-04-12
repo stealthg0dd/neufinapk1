@@ -143,7 +143,9 @@ def _candle_stooq(symbol: str, period_days: int) -> dict | None:
         rows = list(reader)
         if not rows:
             return None
-        cutoff = datetime.datetime.utcnow().date() - datetime.timedelta(days=period_days)
+        cutoff = datetime.datetime.utcnow().date() - datetime.timedelta(
+            days=period_days
+        )
         t_list: list[int] = []
         o_list: list[float] = []
         h_list: list[float] = []
