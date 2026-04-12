@@ -12,7 +12,8 @@ import re
 import uuid
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 # ── Prompt injection patterns ─────────────────────────────────────────────────
@@ -50,6 +51,7 @@ def _sanitize_message(message: str) -> str | None:
 
 
 from database import supabase  # noqa: E402
+from routers.reports import can_download_report_free  # noqa: E402
 from services.agent_swarm import chat_with_swarm, run_swarm  # noqa: E402
 from services.ai_router import get_ai_analysis  # noqa: E402
 from services.auth_dependency import (  # noqa: E402
@@ -58,6 +60,12 @@ from services.auth_dependency import (  # noqa: E402
     require_active_subscription,
 )
 from services.jwt_auth import JWTUser  # noqa: E402
+from services.market_cache import (  # noqa: E402
+    create_swarm_job,
+    get_swarm_job,
+    update_swarm_job,
+)
+from services.pdf_generator import build_swarm_ic_export_pdf  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
@@ -78,6 +86,7 @@ class SwarmAnalyzeRequest(BaseModel):
     positions: list[Position]
     total_value: float
     user_id: str | None = None
+    session_id: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -97,50 +106,103 @@ class GlobalChatRequest(BaseModel):
 
 
 # ── Background persistence helper ──────────────────────────────────────────────
-async def _persist_swarm_result(report_id: str, user_id: str | None, result: dict) -> None:
+async def _persist_swarm_result(
+    report_id: str, user_id: str | None, result: dict
+) -> str:
     """
     Persist swarm result to Supabase swarm_reports table.
     Now async and awaited directly in the analyze endpoint so the record is
     guaranteed to exist before the response (and any redirect to /report/{id}) fires.
     user_id is None for anonymous/guest users — saved as NULL in Supabase.
+
+    COLUMN MAPPING (actual swarm_reports schema):
+      alpha_signal        ← was incorrectly saved as "alpha_scout"
+      recommendation_summary ← synthesizer recommendation text
+      macro_advice        ← macro strategist narrative
+      tax_recommendation  ← tax text (TEXT column)
+      tax_report          ← tax structured data (TEXT column)
+      investment_thesis   ← full thesis text
+      risk_sentinel       ← risk sentinel object
+      market_regime       ← regime object
+      quant_analysis      ← quant object
     """
     import asyncio
 
+    thesis = (
+        result.get("investment_thesis", {})
+        if isinstance(result.get("investment_thesis"), dict)
+        else {}
+    )
+
+    # Build the row using ONLY real schema column names
+    row: dict = {
+        "id": report_id,
+        "user_id": user_id,  # NULL for anonymous — allowed by schema
+        "dna_score": thesis.get("dna_score") or thesis.get("health_score"),
+        "headline": thesis.get("headline"),
+        "briefing": thesis.get("briefing"),
+        "top_risks": thesis.get("top_risks"),
+        "macro_advice": thesis.get("macro_advice"),
+        "tax_recommendation": thesis.get("tax_recommendation"),
+        "stress_results": thesis.get("stress_results"),
+        "risk_factors": thesis.get("risk_factors"),
+        "score_breakdown": thesis.get("score_breakdown"),
+        "weighted_beta": thesis.get("weighted_beta"),
+        "sharpe_ratio": thesis.get("sharpe_ratio"),
+        "regime": thesis.get("regime"),
+        "agent_trace": result.get("agent_trace", []),
+        # ── Rich nested agent outputs (real column names) ───────────────────
+        # FIX: alpha_scout → alpha_signal (the actual DB column name)
+        "alpha_signal": (
+            thesis.get("alpha_signal")
+            or thesis.get("alpha_scout")  # fallback for old synthesizer key
+        ),
+        # Recommendation summary from synthesizer
+        "recommendation_summary": (
+            thesis.get("recommendation_summary") or thesis.get("action_plan")
+        ),
+        # Market context columns
+        "investment_thesis": thesis.get("investment_thesis_body")
+        or thesis.get("briefing"),
+        "market_regime": thesis.get("market_regime"),
+        "quant_analysis": thesis.get("quant_analysis"),
+        # tax_report is TEXT in schema — store as JSON string if it's a dict
+        "tax_report": (
+            json.dumps(thesis.get("tax_report"))
+            if isinstance(thesis.get("tax_report"), dict)
+            else thesis.get("tax_report")
+        ),
+        "risk_sentinel": thesis.get("risk_sentinel"),
+        # Additional structured columns
+        "alpha_outlook": thesis.get("alpha_outlook"),
+        "technical_outlook": thesis.get("technical_outlook"),
+        "market_context": thesis.get("market_context"),
+        "key_risks": thesis.get("key_risks"),
+        "risk_score": thesis.get("risk_score"),
+        "sentiment_score": thesis.get("sentiment_score"),
+        "portfolio_optimization": thesis.get("portfolio_optimization"),
+    }
+
+    # Strip None values to avoid overwriting existing data with nulls
+    row = {k: v for k, v in row.items() if v is not None}
+
     try:
-        thesis = result.get("investment_thesis", {})
-        row = {
-            "id": report_id,
-            "user_id": user_id,  # NULL for anonymous — allowed by schema
-            "dna_score": thesis.get("dna_score") or thesis.get("health_score"),
-            "headline": thesis.get("headline"),
-            "briefing": thesis.get("briefing"),
-            "top_risks": thesis.get("top_risks"),
-            "macro_advice": thesis.get("macro_advice"),
-            "tax_recommendation": thesis.get("tax_recommendation"),
-            "stress_results": thesis.get("stress_results"),
-            "risk_factors": thesis.get("risk_factors"),
-            "score_breakdown": thesis.get("score_breakdown"),
-            "weighted_beta": thesis.get("weighted_beta"),
-            "sharpe_ratio": thesis.get("sharpe_ratio"),
-            "regime": thesis.get("regime"),
-            "agent_trace": result.get("agent_trace", []),
-            # ── Rich nested agent outputs ─────────────────────────────────────
-            # These fields are populated by the synthesizer and stored as JSONB
-            # so that /api/swarm/report/latest can return fully structured data.
-            "market_regime": thesis.get("market_regime"),
-            "quant_analysis": thesis.get("quant_analysis"),
-            "tax_report": thesis.get("tax_report"),
-            "risk_sentinel": thesis.get("risk_sentinel"),
-            "alpha_scout": thesis.get("alpha_scout"),
-            "strategist_intel": thesis.get("strategist_intel"),
-        }
-        # Run the synchronous Supabase call in a thread so we don't block the event loop
         await asyncio.to_thread(
-            lambda: supabase.table("swarm_reports").upsert(row, on_conflict="id").execute()
+            lambda: supabase.table("swarm_reports")
+            .upsert(row, on_conflict="id")
+            .execute()
         )
-        logger.info("swarm.persist_ok", report_id=report_id)
+        logger.info("swarm.persist_ok", report_id=report_id, columns=list(row.keys()))
     except Exception as e:
-        logger.warning("swarm.persist_failed", report_id=report_id, error=str(e))
+        logger.error(
+            "swarm.persist_failed_detail",
+            error=str(e),
+            columns_attempted=list(row.keys()),
+            report_id=report_id,
+            exc_info=True,
+        )
+        # Return report_id anyway — don't let a persist failure crash the swarm
+    return report_id
 
 
 # ── MD context builder ─────────────────────────────────────────────────────────
@@ -227,8 +289,9 @@ Return ONLY valid JSON (no markdown):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 @router.post("/analyze")
-async def analyze_with_swarm(
-    body: SwarmAnalyzeRequest,
+async def start_swarm_analysis(
+    payload: SwarmAnalyzeRequest,
+    background_tasks: BackgroundTasks,
     user: JWTUser | None = Depends(get_optional_user),
 ):
     """
@@ -242,35 +305,198 @@ async def analyze_with_swarm(
     A `swarm_report_id` is injected into investment_thesis so the frontend
     can tie subsequent chat calls to this specific analysis.
     """
+    if not payload.positions:
+        raise HTTPException(status_code=400, detail="positions list must not be empty.")
+    if user:
+        require_active_subscription(user)
+
+    return {
+        **(
+            await _start_swarm_job(
+                payload=payload,
+                background_tasks=background_tasks,
+                user=user,
+            )
+        )
+    }
+
+
+async def _start_swarm_job(
+    payload: SwarmAnalyzeRequest,
+    background_tasks: BackgroundTasks,
+    user: JWTUser | None,
+) -> dict:
+    user_id = str(user.id) if user else None
+    session_id = payload.session_id or str(uuid.uuid4())
+
+    # Create job record in Redis
+    job_id = await create_swarm_job(user_id, session_id)
+
+    # Fire swarm in background — does NOT block response
+    background_tasks.add_task(
+        _run_swarm_background,
+        job_id=job_id,
+        positions=[p.model_dump() for p in payload.positions],
+        total_value=payload.total_value,
+        user_id=user_id,
+    )
+
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "poll_url": f"/api/swarm/status/{job_id}",
+        "estimated_seconds": 75,
+    }
+
+
+async def _run_swarm_background(
+    job_id: str,
+    positions: list[dict],
+    total_value: float,
+    user_id: str | None,
+):
+    """Runs in background after response is sent."""
+    try:
+        await update_swarm_job(job_id, status="running")
+
+        # Prepare ticker data exactly as before
+        ticker_data = {p["symbol"]: p for p in positions}
+
+        # Run swarm — now passes job_id for live trace updates
+        result = await run_swarm(
+            ticker_data=ticker_data,
+            total_value=total_value,
+            job_id=job_id,
+        )
+
+        # Persist to Supabase (existing _persist_swarm_result)
+        report_id = await _persist_swarm_result(str(uuid.uuid4()), user_id, result)
+        thesis = result.get("investment_thesis", {}) if isinstance(result, dict) else {}
+        if isinstance(thesis, dict):
+            thesis["swarm_report_id"] = report_id
+        result["swarm_report_id"] = report_id
+
+        # Final job state update
+        await update_swarm_job(
+            job_id,
+            status="complete",
+            result=result,
+        )
+    except Exception as e:
+        import traceback
+
+        await update_swarm_job(
+            job_id,
+            status="failed",
+            error=str(e),
+            error_detail=traceback.format_exc(),
+        )
+
+
+@router.get("/status/{job_id}")
+async def get_swarm_status(job_id: str):
+    """Poll this every 3s to get live agent trace and job status."""
+    job = await get_swarm_job(job_id)
+    if not job:
+        # Supabase fallback: job state lost (worker restart / TTL) but result may be persisted
+        import asyncio
+
+        try:
+            db = await asyncio.to_thread(
+                lambda: supabase.table("swarm_reports")
+                .select("id, headline, dna_score, created_at")
+                .eq("id", job_id)
+                .limit(1)
+                .execute()
+            )
+            if db.data:
+                row = db.data[0]
+                return {
+                    "job_id": job_id,
+                    "status": "complete",
+                    "agent_trace": [],
+                    "error": None,
+                    "created_at": row.get("created_at"),
+                    "updated_at": row.get("created_at"),
+                    "dna_score": row.get("dna_score"),
+                    "headline": row.get("headline"),
+                    "_source": "supabase_fallback",
+                }
+        except Exception as e:
+            logger.warning(
+                "swarm.status_db_fallback_failed", job_id=job_id, error=str(e)
+            )
+        raise HTTPException(404, "Job not found or expired")
+
+    result = job.get("result") or {}
+    thesis = result.get("investment_thesis", {}) if isinstance(result, dict) else {}
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],  # queued|running|complete|failed
+        "agent_trace": job.get("agent_trace", []),
+        "error": job.get("error"),
+        "created_at": job["created_at"],
+        "updated_at": job["updated_at"],
+        "dna_score": (
+            thesis.get("dna_score")
+            if isinstance(thesis, dict)
+            else result.get("dna_score")
+        ),
+        "headline": (thesis.get("headline") if isinstance(thesis, dict) else None),
+    }
+
+
+@router.get("/result/{job_id}")
+async def get_swarm_result(job_id: str):
+    """Fetch full result when status == complete."""
+    import asyncio
+
+    job = await get_swarm_job(job_id)
+
+    if job and job.get("status") == "complete" and job.get("result"):
+        return job["result"]
+
+    # Fallback 1: job exists but result not yet set (still running / lost in crash)
+    if job and job.get("status") not in ("complete", None):
+        raise HTTPException(202, "Job not yet complete")
+
+    # Fallback 2: query Supabase — result persisted before job state expired
+    try:
+        db = await asyncio.to_thread(
+            lambda: supabase.table("swarm_reports")
+            .select("*")
+            .eq("id", job_id)
+            .limit(1)
+            .execute()
+        )
+        if db.data:
+            logger.info("swarm.result_db_fallback_hit", job_id=job_id)
+            return db.data[0]
+    except Exception as e:
+        logger.warning("swarm.result_db_fallback_failed", job_id=job_id, error=str(e))
+
+    raise HTTPException(404, "Result not found or not yet complete")
+
+
+@router.post("/analyze-sync")
+async def analyze_with_swarm_sync(
+    body: SwarmAnalyzeRequest,
+    user: JWTUser | None = Depends(get_optional_user),
+):
+    """
+    Backward-compatible synchronous endpoint retained for internal fallback.
+    """
     if not body.positions:
         raise HTTPException(status_code=400, detail="positions list must not be empty.")
     if user:
         require_active_subscription(user)
 
     ticker_data = [p.model_dump() for p in body.positions]
-
-    try:
-        result = await run_swarm(ticker_data, body.total_value)
-    except Exception as e:
-        logger.warning("swarm.analyze_exception", error=str(e))
-        return {
-            "investment_thesis": {"error": str(e), "status": "failed"},
-            "risk_metrics": {},
-            "tax_analysis": {},
-            "macro_context": "",
-            "critique": "",
-            "agent_trace": [f"ERROR: {e}"],
-            # FIXED: key_numbers always present so frontend never crashes on undefined
-            "key_numbers": {"score": 0, "status": "unavailable"},
-        }
-
-    report_id = str(uuid.uuid4())
+    result = await run_swarm(ticker_data=ticker_data, total_value=body.total_value)
+    report_id = await _persist_swarm_result(str(uuid.uuid4()), body.user_id, result)
     thesis = result.get("investment_thesis", {})
-    thesis["swarm_report_id"] = report_id
-
-    # Always persist — user_id is NULL for anonymous users (allowed by schema)
-    await _persist_swarm_result(report_id, body.user_id, result)
-
+    if isinstance(thesis, dict):
+        thesis["swarm_report_id"] = report_id
     return {
         "investment_thesis": thesis,
         "risk_metrics": result.get("risk_metrics", {}),
@@ -278,9 +504,10 @@ async def analyze_with_swarm(
         "macro_context": result.get("macro_context", ""),
         "critique": result.get("critique", ""),
         "agent_trace": result.get("agent_trace", []),
-        # FIXED: key_numbers always present — extracted from thesis for convenience
         "key_numbers": {
-            "dna_score": str(thesis.get("dna_score") or thesis.get("health_score") or ""),
+            "dna_score": str(
+                thesis.get("dna_score") or thesis.get("health_score") or ""
+            ),
             "weighted_beta": str(thesis.get("weighted_beta") or ""),
             "sharpe_ratio": str(thesis.get("sharpe_ratio") or ""),
             "regime": str(thesis.get("regime") or ""),
@@ -299,7 +526,8 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
       market_regime, quant_analysis, tax_report,
       risk_sentinel, alpha_scout, strategist_intel, created_at
 
-    Returns 404 if the user has never run a swarm analysis.
+    Returns 200 with status=no_report when the user has never run a swarm analysis
+    (avoids noisy 404s on first login).
     """
     try:
         result = (
@@ -311,10 +539,16 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not fetch swarm report: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Could not fetch swarm report: {exc}"
+        ) from exc
 
     if not result.data:
-        raise HTTPException(status_code=404, detail="No swarm report found for this user.")
+        return {
+            "status": "no_report",
+            "message": "No analysis yet",
+            "report": None,
+        }
 
     row = result.data[0]
 
@@ -368,11 +602,19 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
         "mitigations": [],
     }
 
-    # alpha_scout / strategist_intel — stored directly after schema update
-    alpha_scout = row.get("alpha_scout") or {"opportunities": [], "watchlist": []}
-    strategist_intel = row.get("strategist_intel") or {}
+    # alpha_signal (new column name) / alpha_scout (old fallback) / strategist_intel
+    alpha_scout = (
+        row.get("alpha_signal")
+        or row.get("alpha_scout")
+        or {"opportunities": [], "watchlist": []}
+    )
+    # strategist_intel is not a real column — reconstruct from macro_advice/recommendation_summary
+    strategist_intel = row.get("strategist_intel") or {
+        "macro_narrative": row.get("macro_advice"),
+        "recommendation": row.get("recommendation_summary"),
+    }
 
-    return {
+    shaped = {
         "swarm_report_id": row["id"],
         "briefing": row.get("briefing") or row.get("headline"),
         "regime": row.get("regime"),
@@ -385,6 +627,11 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
         "strategist_intel": strategist_intel,
         "created_at": row.get("created_at"),
     }
+    return {
+        "status": "found",
+        "report": {**shaped, "id": row["id"]},
+        **shaped,
+    }
 
 
 @router.get("/report/{report_id}")
@@ -394,7 +641,13 @@ async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional
     Used by the frontend to restore thesis state on page refresh.
     """
     try:
-        row = supabase.table("swarm_reports").select("*").eq("id", report_id).single().execute()
+        row = (
+            supabase.table("swarm_reports")
+            .select("*")
+            .eq("id", report_id)
+            .single()
+            .execute()
+        )
         if not row.data:
             raise HTTPException(status_code=404, detail="Report not found.")
         report_user_id = row.data.get("user_id")
@@ -461,7 +714,9 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning("chat.supabase_fetch_failed", record_id=body.record_id, error=str(e))
+            logger.warning(
+                "chat.supabase_fetch_failed", record_id=body.record_id, error=str(e)
+            )
         # Fall through to positions fallback if DB lookup fails
 
     # ── 3. Positions fallback (guest / no persisted report) ───────────────────
@@ -501,9 +756,9 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
             },
         }
 
-    raise HTTPException(
-        status_code=400,
-        detail="Provide thesis_context, record_id, or positions+total_value.",
+    # Dashboard / copilot with message only: market intelligence (no 400 loop)
+    return await global_chat(
+        GlobalChatRequest(message=clean_message, agent_type="general")
     )
 
 
@@ -566,7 +821,9 @@ async def global_chat(body: GlobalChatRequest):
         }
 
     agent_type = body.agent_type.lower().strip() if body.agent_type else "general"
-    system_prose = _GLOBAL_AGENT_PROMPTS.get(agent_type, _GLOBAL_AGENT_PROMPTS["general"])
+    system_prose = _GLOBAL_AGENT_PROMPTS.get(
+        agent_type, _GLOBAL_AGENT_PROMPTS["general"]
+    )
 
     prompt = f"""{system_prose}
 
@@ -615,3 +872,56 @@ Return ONLY valid JSON (no markdown fences):
             "recommended_action": action,
         },
     }
+
+
+@router.post("/export-pdf")
+async def export_swarm_analysis_pdf(user: JWTUser = Depends(get_current_user)):
+    """
+    Export the user's latest Swarm IC row as a compact NeuFin PDF (light theme).
+    Gated like advisor reports: active trial or paid advisor/enterprise tier.
+    """
+    uid = str(user.id)
+    if not await can_download_report_free(uid):
+        raise HTTPException(
+            status_code=403,
+            detail="Swarm PDF export requires an active trial or Advisor subscription.",
+        )
+
+    try:
+        res = (
+            supabase.table("swarm_reports")
+            .select(
+                "headline,briefing,investment_thesis,regime,quant_analysis,"
+                "alpha_signal,recommendation_summary,macro_advice,risk_sentinel"
+            )
+            .eq("user_id", uid)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("swarm.export_pdf_query_failed", error=str(exc))
+        raise HTTPException(
+            status_code=500, detail="Could not load Swarm analysis."
+        ) from exc
+
+    if not res.data:
+        raise HTTPException(
+            status_code=404,
+            detail="No Swarm IC analysis found. Run Swarm from the portfolio or IC page first.",
+        )
+
+    row = res.data[0]
+    try:
+        pdf_bytes = build_swarm_ic_export_pdf(row)
+    except Exception as exc:
+        logger.error("swarm.export_pdf_build_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="Could not build PDF.") from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="neufin-swarm-ic-export.pdf"',
+        },
+    )

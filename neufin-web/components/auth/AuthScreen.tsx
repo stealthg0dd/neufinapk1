@@ -104,11 +104,23 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
     setLoading(true)
     setError('')
     sessionStorage.setItem('neufin_auth_method', 'google')
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
-    const redirectTo = `${appUrl}/auth/callback?next=${encodeURIComponent(next)}`
+    // Always redirect to the canonical domain so the Supabase OAuth callback
+    // URL is consistent regardless of which domain the user started on
+    // (neufin.ai, www.neufin.ai, or neufin-web.vercel.app).
+    // A mismatched redirectTo causes Supabase to fall back to implicit flow
+    // (landing on /#access_token= instead of /auth/callback?code=).
+    const CANONICAL_ORIGIN = 'https://www.neufin.ai'
+    const redirectTo = `${CANONICAL_ORIGIN}/auth/callback?next=${encodeURIComponent(next)}`
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo },
+      options: {
+        redirectTo,
+        skipBrowserRedirect: false,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
     })
     if (err) {
       setError(err.message)
@@ -233,8 +245,9 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
 
           <form onSubmit={handlePassword} className="space-y-4">
             <div>
-              <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Email</label>
+              <label htmlFor="auth-email" className="block text-xs text-[var(--text-secondary)] mb-1.5">Email</label>
               <input
+                id="auth-email"
                 type="email"
                 required
                 value={email}
@@ -245,8 +258,9 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
               />
             </div>
             <div>
-              <label className="block text-xs text-[var(--text-secondary)] mb-1.5">Password</label>
+              <label htmlFor="auth-password" className="block text-xs text-[var(--text-secondary)] mb-1.5">Password</label>
               <input
+                id="auth-password"
                 type="password"
                 required
                 minLength={6}

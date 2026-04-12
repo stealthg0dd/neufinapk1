@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { apiFetch } from '@/lib/api-client'
+import { getSupabaseClient } from '@/lib/supabase'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Position {
@@ -76,13 +78,10 @@ async function callSwarmChat(
   message:     string,
   positions:   Position[],
   total_value: number,
-  token:       string | null,
 ): Promise<ChatResult> {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
+  const supabase = getSupabaseClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
 
   const savedReportId = typeof window !== 'undefined'
     ? localStorage.getItem('neufin-swarm-report-id')
@@ -95,9 +94,9 @@ async function callSwarmChat(
     body.record_id = savedReportId
   }
 
-  const res = await fetch(`${apiBase}/api/swarm/chat`, {
+  const res = await apiFetch('/api/swarm/chat', {
     method:  'POST',
-    headers,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`Chat API ${res.status}: ${await res.text()}`)
@@ -174,12 +173,8 @@ export default function CommandPalette({
     setError(null)
     setQuery(text)
 
-    const token = typeof window !== 'undefined'
-      ? localStorage.getItem('neufin-auth-token')
-      : null
-
     try {
-      const res = await callSwarmChat(text, positions, total_value, token)
+      const res = await callSwarmChat(text, positions, total_value)
       setResult(res)
       onResponse?.(res)
     } catch (e: any) {

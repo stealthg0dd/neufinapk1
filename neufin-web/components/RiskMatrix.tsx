@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * RiskMatrix.tsx — Bloomberg Terminal dual-panel risk visualisation.
+ * RiskMatrix.tsx — Dual-panel risk visualisation.
  *
  * Panel 1 — Systemic Risk Cluster Map
  *   ScatterChart: X = Beta, Y = Correlation to SPY, Z = portfolio weight (bubble size).
@@ -13,7 +13,7 @@
  *   Dark red fill when portfolio loss > 20% (Structural Fragility threshold).
  *   Weakest-link ticker footer per scenario.
  *
- * Bloomberg strict style:
+ * Terminal strict style:
  *   Background  #0D0D0D   Surface  #111     Border/Grid  #222 / #333
  *   Amber label #FFB900   Green    #00FF00  Red          #FF4444
  *   Blue ref    #60A5FA   Dim      #444     Font 10px monospaced
@@ -69,7 +69,7 @@ const BODY = '#C8C8C8'
 const MONO_F = "'Fira Code','Courier New',monospace"
 const MONO   = `10px ${MONO_F}`
 
-// ── Panel wrapper — strict Bloomberg, no rounded corners ──────────────────────
+// ── Panel wrapper — terminal style, no rounded corners ────────────────────────
 function Panel({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
   return (
     <div style={{ background: BG, border: `1px solid ${GRID}`, overflow: 'hidden' }}>

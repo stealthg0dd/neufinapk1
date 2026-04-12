@@ -11,8 +11,8 @@
  */
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth-context'
+import { apiPost } from '@/lib/api-client'
+import { stripeSuccessUrlDashboard } from '@/lib/stripe-checkout-urls'
 
 const PLAN_OPTIONS = [
   {
@@ -35,11 +35,7 @@ const PLAN_OPTIONS = [
   },
 ]
 
-const API = process.env.NEXT_PUBLIC_API_URL
-
 export default function UpgradeModal() {
-  const { token } = useAuth()
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState('retail')
@@ -57,21 +53,15 @@ export default function UpgradeModal() {
     setLoading(true)
     try {
       const origin = window.location.origin
-      const res = await fetch(`${API}/api/reports/checkout`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
+      const data = await apiPost<{ checkout_url?: string }>(
+        '/api/reports/checkout',
+        {
           plan: selectedPlan,
           price_id: plan.priceId,
-          success_url: `${origin}/pricing/success`,
+          success_url: stripeSuccessUrlDashboard(origin),
           cancel_url: `${origin}/pricing`,
-        }),
-      })
-      if (!res.ok) throw new Error('Checkout failed')
-      const data = await res.json()
+        }
+      )
       if (data.checkout_url) {
         window.location.href = data.checkout_url
       }

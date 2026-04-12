@@ -28,14 +28,18 @@ def assert_error_shape(body: dict) -> None:
     assert "message" in body, f"Missing 'message' key: {body}"
     assert "trace_id" in body, f"Missing 'trace_id' key: {body}"
     assert "timestamp" in body, f"Missing 'timestamp' key: {body}"
-    assert isinstance(body["error"], str) and body["error"], "error must be a non-empty string"
-    assert isinstance(body["message"], str) and body["message"], (
-        "message must be a non-empty string"
-    )
-    assert isinstance(body["trace_id"], str) and body["trace_id"], (
-        "trace_id must be a non-empty string"
-    )
-    assert ISO8601_RE.match(body["timestamp"]), f"timestamp is not ISO-8601: {body['timestamp']}"
+    assert (
+        isinstance(body["error"], str) and body["error"]
+    ), "error must be a non-empty string"
+    assert (
+        isinstance(body["message"], str) and body["message"]
+    ), "message must be a non-empty string"
+    assert (
+        isinstance(body["trace_id"], str) and body["trace_id"]
+    ), "trace_id must be a non-empty string"
+    assert ISO8601_RE.match(
+        body["timestamp"]
+    ), f"timestamp is not ISO-8601: {body['timestamp']}"
 
 
 # ── test cases ─────────────────────────────────────────────────────────────────

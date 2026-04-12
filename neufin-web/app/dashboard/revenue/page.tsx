@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
+import { apiFetch } from "@/lib/api-client"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -149,10 +150,9 @@ export default function RevenuePage() {
     try {
       const token = await getAccessToken()
       if (!token) { setError("Not authenticated"); return }
-      const authHdr = { Authorization: `Bearer ${token}` }
       const [revRes, leadRes] = await Promise.all([
-        fetch("/api/revenue/stats", { headers: authHdr, cache: "no-store" }),
-        fetch("/api/admin/leads/stats", { headers: authHdr, cache: "no-store" }),
+        apiFetch("/api/revenue/stats", { cache: "no-store" }),
+        apiFetch("/api/admin/leads/stats", { cache: "no-store" }),
       ])
       if (revRes.status === 403) { setError("Admin role required."); return }
       if (!revRes.ok) throw new Error(`Revenue HTTP ${revRes.status}`)

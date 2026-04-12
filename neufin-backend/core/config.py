@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import sys
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     )
     SUPABASE_SERVICE_ROLE_KEY: str = Field(
         default="",
+        validation_alias=AliasChoices(
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_SECRET_KEY",
+        ),
         description=(
             "Supabase service-role key — bypasses RLS. Dashboard → Settings → API → service_role."
         ),
@@ -215,14 +219,26 @@ class Settings(BaseSettings):
     # ── AI providers (all optional — fallback chain used) ─────────────────────
     ANTHROPIC_API_KEY: str | None = Field(
         default=None,
+        validation_alias=AliasChoices(
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_KEY_1",
+        ),
         description="Anthropic Claude API key. console.anthropic.com → API Keys.",
     )
     GEMINI_KEY: str | None = Field(
         default=None,
+        validation_alias=AliasChoices(
+            "GEMINI_KEY",
+            "GOOGLE_API_KEY",
+        ),
         description="Google Gemini API key. aistudio.google.com → Get API key.",
     )
     OPENAI_KEY: str | None = Field(
         default=None,
+        validation_alias=AliasChoices(
+            "OPENAI_KEY",
+            "OPENAI_API_KEY",
+        ),
         description="OpenAI API key. platform.openai.com → API keys.",
     )
     GROQ_KEY: str | None = Field(
@@ -257,6 +273,10 @@ class Settings(BaseSettings):
     )
     AGENT_OS_API_KEY: str | None = Field(
         default=None,
+        validation_alias=AliasChoices(
+            "AGENT_OS_API_KEY",
+            "ROUTER_SECRET_KEY",
+        ),
         description="API key for the Agent OS router-system. Provided by the AgentOS administrator.",
     )
 

@@ -90,8 +90,43 @@ export async function claimAnonymousPortfolio(
   }
   return res.json()
 }
-const API = process.env.NEXT_PUBLIC_API_URL;
-if (!API) console.warn("WARNING: NEXT_PUBLIC_API_URL is not set!");
+// Empty string = relative URL → routes through Next.js /api/* rewrite proxy to Railway.
+// In Vercel production, set NEXT_PUBLIC_API_URL=https://neufin-web.vercel.app so
+// client-side fetch calls hit the same-origin proxy. Do NOT point directly at Railway.
+const API = process.env.NEXT_PUBLIC_API_URL ?? ''
+
+/** Absolute origin for server-side fetch to this deployment (RSC / ISR). Relative `/api` can throw without a base. */
+function resolveServerFetchOrigin(): string {
+  const app = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (app) {
+    try {
+      return new URL(app.includes('://') ? app : `https://${app}`).origin
+    } catch {
+      /* fall through */
+    }
+  }
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel}`
+  return ''
+}
+
+/** Research + server fetches: use explicit API base, else same-origin absolute URL on Vercel. */
+function researchRequestUrl(path: string): string {
+  const p = path.startsWith('/') ? path : `/${path}`
+  // During server rendering/build, always prefer same-deployment origin.
+  // This avoids static generation hitting stale NEXT_PUBLIC_API_URL hosts.
+  if (typeof window === 'undefined') {
+    const origin = resolveServerFetchOrigin()
+    if (origin) return `${origin}${p}`
+  }
+  if (API) {
+    const base = API.replace(/\/$/, '')
+    return `${base}${p}`
+  }
+  const origin = resolveServerFetchOrigin()
+  if (origin) return `${origin}${p}`
+  return p
+}
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
 function authHeaders(token?: string | null): Record<string, string> {
@@ -183,6 +218,7 @@ export interface DNAAnalysisResponse {
   share_token: string
   share_url: string
   record_id: string | null
+  portfolio_id: string | null
   /** Non-blocking warnings: stale prices, alias resolutions, excluded tickers */
   warnings?: string[]
   /** Tickers that could not be priced and were excluded from analysis */
@@ -252,7 +288,7 @@ export async function getPortfolioHistory(
     shares: shares.join(','),
     period,
   })
-  const res = await fetch(`${API}/api/portfolio/value-history?${params}`, {
+  const res = await fetch(`/api/portfolio/value-history?${params}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) throw new Error('Portfolio history unavailable')
@@ -292,7 +328,7 @@ export interface AdvisorProfile {
 
 export interface WhiteLabelReportRequest {
   portfolio_id: string
-  advisor_id: string
+  advisor_id?: string   // optional — backend defaults to authenticated user
   advisor_name?: string
   logo_base64?: string | null
   color_scheme?: { primary: string; secondary: string; accent: string } | null
@@ -302,7 +338,7 @@ export async function createCheckout(
   body: CheckoutRequest,
   token?: string | null
 ): Promise<{ checkout_url: string; report_id?: string }> {
-  const res = await fetch(`${API}/api/reports/checkout`, {
+  const res = await fetch('/api/reports/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(body),
@@ -318,7 +354,7 @@ export async function fulfillReport(
   reportId: string,
   token?: string | null
 ): Promise<{ pdf_url: string }> {
-  const res = await fetch(`${API}/api/reports/fulfill?report_id=${reportId}`, {
+  const res = await fetch(`/api/reports/fulfill?report_id=${reportId}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) {
@@ -362,12 +398,21 @@ export async function createCheckoutSession(
       weight: p.weight,
     }))
     : undefined
+  // Prefer the stored portfolio_id (correct portfolios table UUID) over
+  // record_id (which is the dna_scores table ID and cannot be used as portfolio_id)
+  const storedPortfolioId = (parsedResult as any)?.portfolio_id as string | null | undefined
+
+  const { stripeSuccessUrlReports } = await import('@/lib/stripe-checkout-urls')
   const data = await createCheckout(
     {
       plan:         'single',
-      ...(positions?.length ? { positions } : { portfolio_id: recordId }),
+      ...(storedPortfolioId
+        ? { portfolio_id: storedPortfolioId }
+        : positions?.length
+          ? { positions }
+          : { portfolio_id: recordId }),
       ref_token:    refToken,              // backend field name
-      success_url:  `${origin}/reports/success`,
+      success_url:  stripeSuccessUrlReports(origin),
       cancel_url:   `${origin}/results`,
     },
     token
@@ -423,18 +468,19 @@ export async function getAdvisorReports(
 
 export async function generateWhiteLabelReport(
   body: WhiteLabelReportRequest,
-  token?: string | null
 ): Promise<{ report_id: string | null; pdf_url: string | null; pdf_size_bytes: number; pages: number }> {
-  const res = await fetch(`${API}/api/reports/generate`, {
+  // Use apiFetch so getSession() auto-refreshes the token before every request.
+  // The old raw fetch() with a passed-in token could silently send an expired JWT.
+  const { apiFetch: _apiFetch } = await import('./api-client')
+  const res = await _apiFetch('/api/reports/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
     body: JSON.stringify(body),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || 'White-label PDF generation failed')
+    throw new Error((err as { detail?: string }).detail || 'White-label PDF generation failed')
   }
-  return res.json()
+  return res.json() as Promise<{ report_id: string | null; pdf_url: string | null; pdf_size_bytes: number; pages: number }>
 }
 
 // ── Vault ──────────────────────────────────────────────────────────────────────
@@ -450,10 +496,15 @@ export interface VaultRecord {
 }
 
 export interface SubscriptionInfo {
-  subscription_tier: 'free' | 'pro'
+  subscription_tier: 'free' | 'retail' | 'advisor' | 'enterprise' | 'pro'
+  subscription_status: 'free' | 'trial' | 'active' | 'expired'
+  trial_started_at: string
   is_pro: boolean
   advisor_name: string | null
   firm_name: string | null
+  /** NeuFin internal admin (user_profiles.is_admin) */
+  is_admin?: boolean
+  role?: string
 }
 
 /**
@@ -492,7 +543,17 @@ export async function getSubscription(
   const res = await fetch(`${API}/api/vault/subscription`, {
     headers: authHeaders(token),
   })
-  if (!res.ok) return { subscription_tier: 'free', is_pro: false, advisor_name: null, firm_name: null }
+  if (!res.ok)
+    return {
+      subscription_tier: 'free',
+      subscription_status: 'free',
+      trial_started_at: '',
+      is_pro: false,
+      advisor_name: null,
+      firm_name: null,
+      is_admin: false,
+      role: 'user',
+    }
   return res.json()
 }
 
@@ -693,11 +754,17 @@ export interface ResearchNote {
   is_public: boolean
 }
 
+const RESEARCH_FETCH_MS = 3000
+
 export async function getResearchRegime(): Promise<MarketRegime | null> {
   try {
-    const res = await fetch(`${API}/api/research/regime`, { cache: 'no-store' })
+    const res = await fetch(researchRequestUrl('/api/research/regime'), {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(RESEARCH_FETCH_MS),
+    })
     if (!res.ok) return null
-    return res.json()
+    const body = await res.json()
+    return body && typeof body === 'object' ? body : null
   } catch {
     return null
   }
@@ -708,24 +775,38 @@ export async function getResearchNotes(
   page = 1,
   perPage = 10,
 ): Promise<ResearchNote[]> {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API}/api/research/notes?page=${page}&per_page=${perPage}`, {
-    headers,
-    cache: 'no-store',
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return data.notes ?? data ?? []
+  try {
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(
+      researchRequestUrl(`/api/research/notes?page=${page}&per_page=${perPage}`),
+      {
+        headers,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(RESEARCH_FETCH_MS),
+      },
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    const raw = data?.notes ?? data
+    return Array.isArray(raw) ? raw : []
+  } catch {
+    return []
+  }
 }
 
 export async function getResearchNote(noteId: string, token?: string | null): Promise<ResearchNote | null> {
-  const headers: Record<string, string> = {}
-  if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API}/api/research/notes/${noteId}`, {
-    headers,
-    cache: 'no-store',
-  })
-  if (!res.ok) return null
-  return res.json()
+  try {
+    const headers: Record<string, string> = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+    const res = await fetch(researchRequestUrl(`/api/research/notes/${noteId}`), {
+      headers,
+      cache: 'no-store',
+      signal: AbortSignal.timeout(RESEARCH_FETCH_MS),
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }

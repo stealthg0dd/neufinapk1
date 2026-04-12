@@ -36,7 +36,9 @@ _JWT_LEEWAY = 60
 
 # Prefer the anon key for JWKS — some Supabase instances reject service_role here
 _SUPABASE_ANON_KEY = (
-    settings.SUPABASE_ANON_KEY or settings.NEXT_PUBLIC_SUPABASE_ANON_KEY or settings.SUPABASE_KEY
+    settings.SUPABASE_ANON_KEY
+    or settings.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    or settings.SUPABASE_KEY
 )
 
 _ALGORITHMS = ["ES256", "HS256"]
@@ -142,7 +144,9 @@ async def _fetch_jwks() -> list[dict]:
     except Exception as exc:
         _cache["fail_until"] = now + _JWKS_RETRY_AFTER
         if _cache["keys"]:
-            _log(f"JWKS refresh FAILED ({exc}); serving stale cache ({len(_cache['keys'])} key(s))")
+            _log(
+                f"JWKS refresh FAILED ({exc}); serving stale cache ({len(_cache['keys'])} key(s))"
+            )
             return _cache["keys"]
         static = _static_key_list()
         if static:
@@ -231,15 +235,20 @@ async def verify_jwt(token: str) -> JWTUser:
         # HS256 fallback — only attempted when the token itself declares HS256,
         # so we never try a symmetric secret against an ES256 token.
         if alg == "HS256" and _JWT_SECRET:
-            _log(f"JWKS unavailable ({jwks_exc}); token is HS256 — attempting JWT_SECRET fallback")
+            _log(
+                f"JWKS unavailable ({jwks_exc}); token is HS256 — attempting JWT_SECRET fallback"
+            )
             try:
                 payload = jwt.decode(
                     token,
                     _JWT_SECRET,
                     algorithms=["HS256"],
                     audience="authenticated",
-                    options={"verify_aud": True, "verify_exp": True},
-                    leeway=_JWT_LEEWAY,
+                    options={
+                        "verify_aud": True,
+                        "verify_exp": True,
+                        "leeway": _JWT_LEEWAY,
+                    },
                 )
                 user_id = payload.get("sub")
                 if not user_id:
@@ -267,15 +276,16 @@ async def verify_jwt(token: str) -> JWTUser:
             key,
             algorithms=_ALGORITHMS,
             audience="authenticated",
-            options={"verify_aud": True, "verify_exp": True},
-            leeway=_JWT_LEEWAY,
+            options={"verify_aud": True, "verify_exp": True, "leeway": _JWT_LEEWAY},
         )
 
     except ExpiredSignatureError as exc:
         try:
             raw = jwt.get_unverified_claims(token)
             exp_ts = raw.get("exp", 0)
-            exp_utc = datetime.datetime.utcfromtimestamp(exp_ts).strftime("%Y-%m-%d %H:%M:%S UTC")
+            exp_utc = datetime.datetime.utcfromtimestamp(exp_ts).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            )
             now_utc = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
             _log(f"REJECT — token EXPIRED  exp={exp_utc}  now={now_utc}")
         except Exception:

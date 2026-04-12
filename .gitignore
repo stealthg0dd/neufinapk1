@@ -72,3 +72,4 @@ neufin-mobile/build-*/
 *.apk
 *.aab
 expo-go-sdk51.apk.railway/
+.env*.local

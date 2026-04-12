@@ -24,8 +24,12 @@ import {
   Settings,
   ChevronDown,
   ArrowUpDown,
+  Dna,
+  Bot,
+  FolderUp,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import { apiPost } from '@/lib/api-client'
 import { authFetch, getPortfolioHistory, getResearchNotes, type ResearchNote } from '@/lib/api'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { TickerNumber } from '@/components/ui/TickerNumber'
@@ -249,23 +253,25 @@ export default function DashboardClient() {
     setAiBusy(true)
     setAiReply(null)
     try {
-      const res = await fetch('/api/swarm/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
-        body: JSON.stringify({
-          message: aiQ.slice(0, 500),
-          total_value: metrics.total_value,
-          positions: metrics.positions.map((p) => ({
-            symbol: p.symbol,
-            shares: p.shares,
-            price: p.current_price,
-            value: p.current_value,
-            weight: p.weight,
-          })),
-        }),
+      const data = await apiPost<{ reply?: string; response?: { answer?: string }; answer?: string; message?: string; content?: string }>('/api/swarm/chat', {
+        message: aiQ.slice(0, 500),
+        total_value: metrics.total_value,
+        positions: (metrics.positions ?? []).map((p) => ({
+          symbol: p.symbol,
+          shares: p.shares,
+          price: p.current_price,
+          value: p.current_value,
+          weight: p.weight,
+        })),
       })
-      const data = await res.json().catch(() => ({}))
-      setAiReply(typeof data.reply === 'string' ? data.reply : 'No response')
+      const reply =
+        data?.reply
+        || data?.response?.answer
+        || data?.answer
+        || data?.message
+        || data?.content
+        || 'No response received'
+      setAiReply(reply)
     } catch {
       setAiReply('Request failed. Try again.')
     } finally {
@@ -369,18 +375,56 @@ export default function DashboardClient() {
         )}
 
         {!portfolios?.length ? (
-          <GlassCard className="p-10 text-center max-w-lg mx-auto mt-8">
-            <p className="text-[var(--text-primary)] font-medium mb-2">No saved portfolio yet</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-6">
-              Upload a CSV to generate your DNA score and sync holdings to the dashboard.
-            </p>
-            <Link
-              href="/upload"
-              className="inline-flex px-5 py-2.5 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm"
-            >
-              Start analysis →
-            </Link>
-          </GlassCard>
+          <div className="space-y-6">
+            {/* Welcome hero */}
+            <GlassCard className="p-8 text-center border-[var(--border-accent)]">
+              <div className="mb-4 flex justify-center">
+                <Dna className="h-12 w-12 text-[var(--amber)]" aria-hidden />
+              </div>
+              <h2 className="font-display text-2xl text-[var(--text-primary)] mb-2">
+                Welcome to NeuFin
+              </h2>
+              <p className="text-[var(--text-secondary)] mb-1">
+                You have <span className="text-[var(--amber)] font-semibold">14 days full access</span> — no credit card required.
+              </p>
+              <p className="text-sm text-[var(--text-muted)] mb-8">
+                Upload a portfolio CSV to generate your Investor DNA Score and unlock AI swarm analysis.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/upload"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm hover:opacity-90 transition-opacity"
+                >
+                  <FolderUp className="h-4 w-4 shrink-0" aria-hidden />
+                  Upload Portfolio CSV
+                </Link>
+                <Link
+                  href="/swarm"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-[var(--glass-border)] text-[var(--text-primary)] font-semibold text-sm hover:border-[var(--border-accent)] transition-colors"
+                >
+                  <Bot className="h-4 w-4 shrink-0" aria-hidden />
+                  Try Swarm Analysis
+                </Link>
+              </div>
+            </GlassCard>
+
+            {/* What you get */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {(
+                [
+                  { Icon: Dna, title: 'DNA Score', desc: 'Behavioral bias detection across your portfolio' },
+                  { Icon: Bot, title: 'AI Swarm', desc: 'Multi-model analysis: Claude, GPT-4, Gemini' },
+                  { Icon: FileText, title: 'PDF Report', desc: 'Professional advisor-ready report download' },
+                ] as const
+              ).map(({ Icon, title, desc }) => (
+                <GlassCard key={title} className="p-5">
+                  <Icon className="mb-2 h-8 w-8 text-[var(--amber)]" aria-hidden />
+                  <p className="font-semibold text-[var(--text-primary)] text-sm mb-1">{title}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">{desc}</p>
+                </GlassCard>
+              ))}
+            </div>
+          </div>
         ) : (
           <>
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -392,7 +436,7 @@ export default function DashboardClient() {
                     onChange={(e) => setSelectedId(e.target.value)}
                     className="appearance-none font-mono text-sm bg-[var(--surface-2)] border border-[var(--glass-border)] rounded-lg pl-3 pr-9 py-2 text-[var(--text-primary)] focus-amber"
                   >
-                    {portfolios.map((p) => (
+                    {(portfolios ?? []).map((p) => (
                       <option key={p.portfolio_id} value={p.portfolio_id}>
                         {p.portfolio_name || p.portfolio_id.slice(0, 8)}
                       </option>
@@ -429,10 +473,10 @@ export default function DashboardClient() {
                 { label: 'Portfolio Beta', v: metrics?.weighted_beta ?? '—' },
                 { label: 'Max Drawdown', v: maxDd != null ? `${maxDd.toFixed(1)}%` : '—' },
               ].map((k) => (
-                <GlassCard key={k.label} className="p-4 md:p-5">
-                  <p className="text-xs text-[var(--text-secondary)] mb-2">{k.label}</p>
-                  <p className="font-mono text-2xl md:text-[28px] text-[var(--text-primary)] tabular-nums">{k.v}</p>
-                </GlassCard>
+                <div key={k.label} className="card-elevated rounded-2xl p-4 md:p-5">
+                  <p className="mb-2 text-xs text-slate-600">{k.label}</p>
+                  <p className="font-mono text-2xl text-slate-900 tabular-nums md:text-[28px]">{k.v}</p>
+                </div>
               ))}
             </div>
 
@@ -542,7 +586,7 @@ export default function DashboardClient() {
                   </thead>
                   <tbody>
                     <AnimatePresence initial={false}>
-                      {sortedPositions.map((p) => (
+                      {(sortedPositions ?? []).map((p) => (
                         <motion.tr
                           key={p.symbol}
                           layout
@@ -589,7 +633,7 @@ export default function DashboardClient() {
         <div className="space-y-3 max-h-[48vh] overflow-y-auto pr-1 mb-4">
           {loadNotes
             ? [1, 2, 3].map((i) => <div key={i} className="h-20 rounded-xl shimmer" />)
-            : notes.map((n) => (
+            : (notes ?? []).map((n) => (
                 <GlassCard key={n.id} className="p-3 border-l-2 border-l-[var(--amber)]">
                   <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{n.title}</p>
                   <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1">{n.executive_summary}</p>

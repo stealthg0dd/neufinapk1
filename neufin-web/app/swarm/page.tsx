@@ -3,12 +3,20 @@
 export const dynamic = 'force-dynamic'
 
 import React, { Suspense, useState, useCallback, useEffect, useMemo } from 'react'
+import AppHeader from '@/components/AppHeader'
 import SwarmTerminal from '@/components/SwarmTerminal'
+import type { AgentTraceItem } from '@/components/SwarmTerminal'
 import CommandPalette from '@/components/CommandPalette'
 import RiskMatrix from '@/components/RiskMatrix'
 import PaywallOverlay from '@/components/PaywallOverlay'
 import SlidingChatPane from '@/components/SlidingChatPane'
+import {
+  SwarmSourcesPanel,
+  type SwarmObservabilityPayload,
+  type SwarmSourcesPayload,
+} from '@/components/swarm/SwarmSourcesPanel'
 import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
+import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
 import { useUser } from '@/lib/store'
 import { debugAuth } from '@/lib/auth-debug'
@@ -63,6 +71,27 @@ function TypewriterText({ text, speed = 8 }: { text: string; speed?: number }) {
 
 // Positions are loaded from localStorage (set by the upload flow) — no hardcoded values
 type SwarmPosition = { symbol: string; shares: number; price: number; value: number; weight: number }
+type JobStatus = 'idle' | 'queued' | 'running' | 'complete' | 'failed' | 'result_unavailable'
+type SwarmResult = Record<string, any>
+
+/** Retry fetching the swarm result up to `retries` times with a 2s delay.
+ *  Needed because the backend persist is async — the result may be in Supabase
+ *  a few seconds after the job transitions to "complete" in the job store. */
+async function fetchResultWithRetry(id: string, retries = 3): Promise<SwarmResult> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const result = await apiGet<SwarmResult>(`/api/swarm/result/${id}`)
+      if (result && !('error' in result && result.error)) return result
+    } catch (err) {
+      if (i < retries - 1) {
+        await new Promise<void>(r => setTimeout(r, 2000))
+      } else {
+        throw err
+      }
+    }
+  }
+  throw new Error('Result not available after retries')
+}
 
 function loadPortfolioFromStorage(): { positions: SwarmPosition[]; totalValue: number } | null {
   if (typeof window === 'undefined') return null
@@ -324,7 +353,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
   const corrColor  = avgCorr > 0.80 ? '#ef4444' : avgCorr > 0.65 ? '#FFB900' : '#00FF00'
 
   const cmData   = data.corr_matrix_data as { symbols: string[]; values: number[][] } | undefined
-  const hasCm    = cmData && cmData.symbols.length > 0
+  const hasCm    = cmData && Array.isArray(cmData.symbols) && cmData.symbols.length > 0
 
   return (
     <IntelCard title="Quant Analysis" icon={<BarChart2 size={12} />} accent="#c084fc">
@@ -742,9 +771,13 @@ function ScorePill({ label, value, max, color }: { label: string; value: number;
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function SwarmPage() {
-  const [traces,          setTraces]         = useState<string[]>([])
-  const [isRunning,       setIsRunning]       = useState(false)
-  const [thesis,          setThesis]          = useState<Record<string, any> | null>(null)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobStatus, setJobStatus] = useState<JobStatus>('idle')
+  const [agentTrace, setAgentTrace] = useState<AgentTraceItem[]>([])
+  const [result, setResult] = useState<SwarmResult | null>(null)
+  const [resultError, setResultError] = useState<string | null>(null)
+  const [pollIntervalRef, setPollIntervalRef] = useState<ReturnType<typeof setInterval> | null>(null)
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [unlockedLocally, setUnlockedLocally] = useState(false)
   const [toast,           setToast]           = useState<string | null>(null)
@@ -752,21 +785,71 @@ export default function SwarmPage() {
   const [failedTickers,   setFailedTickers]   = useState<string[]>([])
   const [positions,       setPositions]       = useState<SwarmPosition[]>([])
   const [totalValue,      setTotalValue]      = useState(0)
+  const [exportingPdf,    setExportingPdf]    = useState(false)
+  const thesis = (result?.investment_thesis ?? result) as Record<string, any> | null
+  const isRunning = jobStatus === 'queued' || jobStatus === 'running'
 
-  const { isPro, token, loading: authLoading, user } = useUser()
+  const { isPro, loading: authLoading, user } = useUser()
   const { capture } = useNeufinAnalytics()
   const isTrialBypass = useMemo(() => {
+    // 1. Check subscription cache first (populated by mount effect below)
+    try {
+      const cached = localStorage.getItem('neufin:subscription-status:cache')
+      if (cached) {
+        const parsed = JSON.parse(cached) as { ts?: number; data?: { status?: string; plan?: string } }
+        const d = parsed?.data
+        if (
+          d?.status === 'trial' ||
+          d?.plan === 'advisor' ||
+          d?.plan === 'enterprise'
+        ) {
+          return true
+        }
+      }
+    } catch {}
+
+    // 2. Fallback: user object not available yet
+    if (!user) return false
+
+    // 3. created_at heuristic — broad fallback for accounts < 14 days old
     const createdAt = user?.created_at
-    if (!createdAt) return false
-    const createdTs = new Date(createdAt).getTime()
-    if (!Number.isFinite(createdTs)) return false
-    const ageDays = (Date.now() - createdTs) / (1000 * 60 * 60 * 24)
-    return ageDays < 14
-  }, [user?.created_at])
+    if (createdAt) {
+      const created = new Date(createdAt)
+      const daysSince = (Date.now() - created.getTime()) / 86_400_000
+      if (Number.isFinite(daysSince) && daysSince < 14) return true
+    }
+
+    return false
+  }, [user])
   const isUnlocked = isPro || unlockedLocally || isTrialBypass
 
   useEffect(() => {
     debugAuth('swarm:mount')
+  }, [])
+
+  // Refresh subscription cache on mount so isTrialBypass has fresh data
+  useEffect(() => {
+    apiGet<{
+      plan?: string
+      status?: string
+      days_remaining?: number
+    }>('/api/subscription/status')
+      .then((data) => {
+        if (data && typeof data === 'object') {
+          localStorage.setItem(
+            'neufin:subscription-status:cache',
+            JSON.stringify({
+              ts: Date.now(),
+              data: {
+                plan: data.plan,
+                status: data.status,
+                days_remaining: data.days_remaining,
+              },
+            })
+          )
+        }
+      })
+      .catch(() => {/* non-blocking */})
   }, [])
 
   // Load portfolio from localStorage (written by upload/analyze flow)
@@ -780,18 +863,17 @@ export default function SwarmPage() {
 
   useBackendHealth()
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+  const API_BASE = ''
 
   const handlePaymentSuccess = useCallback(async () => {
     const sessionId = typeof window !== 'undefined'
       ? localStorage.getItem('neufin-session-id')
       : null
 
-    if (sessionId && token) {
+    if (sessionId) {
       try {
-        await fetch(`${API_BASE}/api/vault/claim-session`, {
+        await apiFetch(`${API_BASE}/api/vault/claim-session`, {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body:    JSON.stringify({ session_id: sessionId }),
         })
         localStorage.removeItem('neufin-session-id')
@@ -808,7 +890,7 @@ export default function SwarmPage() {
       window.history.replaceState({}, '', url.toString())
     }
     setTimeout(() => setToast(null), 5000)
-  }, [API_BASE, token])
+  }, [API_BASE])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -827,10 +909,9 @@ export default function SwarmPage() {
   const startCheckout = useCallback(async () => {
     setCheckoutLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/api/reports/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({
+      const data = await apiPost<{ checkout_url?: string }>(
+        '/api/reports/checkout',
+        {
           plan: 'single',
           positions: positions.map((p) => ({
             symbol: p.symbol,
@@ -841,39 +922,56 @@ export default function SwarmPage() {
           })),
           success_url: `${window.location.origin}/swarm?checkout_success=1`,
           cancel_url: window.location.href,
-        }),
-      })
-      const data = await res.json()
+        }
+      )
       if (data.checkout_url) window.location.href = data.checkout_url
     } catch {
       setCheckoutLoading(false)
     }
-  }, [API_BASE, token, positions])
+  }, [positions])
 
-  // Restore last report from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const savedId = localStorage.getItem('neufin-swarm-report-id')
-    if (!savedId || thesis) return
-    fetch(`${API_BASE}/api/swarm/report/${savedId}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.investment_thesis) {
-          setThesis(data.investment_thesis)
-          setTraces(['[System] Previous session report restored.'])
+  async function pollStatus(id: string) {
+    try {
+      const status = await apiGet<{
+        status: JobStatus
+        agent_trace?: AgentTraceItem[]
+      }>(`/api/swarm/status/${id}`)
+
+      setJobStatus(status.status)
+      setAgentTrace(Array.isArray(status.agent_trace) ? status.agent_trace : [])
+
+      if (status.status === 'complete') {
+        if (pollIntervalRef) clearInterval(pollIntervalRef)
+        setPollIntervalRef(null)
+        try {
+          const fullResult = await fetchResultWithRetry(id)
+          setResult(fullResult)
+          setResultError(null)
+          localStorage.setItem('neufin-swarm-job-id', id)
+        } catch (err) {
+          console.error('[swarm] Result fetch failed after retries:', err)
+          setJobStatus('result_unavailable')
+          setResultError(
+            'Analysis completed but result could not be loaded. ' +
+            'This is a temporary issue — try refreshing or click Retry.'
+          )
         }
-      })
-      .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_BASE, token])
+      } else if (status.status === 'failed') {
+        if (pollIntervalRef) clearInterval(pollIntervalRef)
+        setPollIntervalRef(null)
+      }
+    } catch (err: any) {
+      console.error('[swarm] Poll error:', err)
+    }
+  }
 
-  const runSwarm = async () => {
+  const startSwarm = async () => {
     if (positions.length === 0) return
-    setTraces([])
-    setThesis(null)
-    setIsRunning(true)
+    setJobStatus('queued')
+    setAgentTrace([])
+    setResult(null)
+    setResultError(null)
+    setStartedAtMs(Date.now())
 
     const portfolioId = typeof window !== 'undefined'
       ? (JSON.parse(localStorage.getItem('dnaResult') ?? 'null')?.record_id ?? undefined)
@@ -882,43 +980,80 @@ export default function SwarmPage() {
     perfTimer.start('swarm')
 
     try {
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      }
-
-      const res = await fetch(`${API_BASE}/api/swarm/analyze`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          positions,
-          total_value: totalValue
-        }),
+      const data = await apiPost<{ job_id: string; status: JobStatus }>('/api/swarm/analyze', {
+        positions: positions.map((p) => ({
+          symbol: p.symbol,
+          shares: p.shares,
+          price: p.price,
+          value: p.value,
+          weight: p.weight,
+        })),
+        total_value: totalValue,
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
-      const data = await res.json()
-      const newThesis = data.investment_thesis ?? null
-      setTraces(data.agent_trace ?? [])
-      setThesis(newThesis)
-      if (data.failed_tickers?.length) setFailedTickers(data.failed_tickers)
-
-      const swarmDurationMs = perfTimer.end('swarm') ?? 0
-      capture('swarm_analysis_completed', {
-        report_id:   newThesis?.swarm_report_id,
-        duration_ms: swarmDurationMs,
-      })
-      captureSentrySlowOp('swarm_analysis', swarmDurationMs)
-
-      if (newThesis?.swarm_report_id && typeof window !== 'undefined') {
-        localStorage.setItem('neufin-swarm-report-id', newThesis.swarm_report_id)
-      }
+      setJobId(data.job_id)
+      setJobStatus(data.status ?? 'queued')
+      const interval = setInterval(() => {
+        void pollStatus(data.job_id)
+      }, 3000)
+      setPollIntervalRef(interval)
+      void pollStatus(data.job_id)
     } catch (e: any) {
       perfTimer.end('swarm') // clean up timer
-      setTraces(prev => [...prev, `[System] ERROR: ${e.message}`])
-    } finally {
-      setIsRunning(false)
+      setJobStatus('failed')
+      console.error('[swarm] Failed to start:', e)
     }
   }
+
+  async function exportSwarmPdf() {
+    if (!user) {
+      setToast('Sign in to export PDF')
+      return
+    }
+    setExportingPdf(true)
+    try {
+      const res = await apiFetch('/api/swarm/export-pdf', { method: 'POST' })
+      if (!res.ok) {
+        let msg = `Export failed (${res.status})`
+        try {
+          const j = (await res.json()) as { detail?: string }
+          if (j?.detail) msg = String(j.detail)
+        } catch {
+          /* non-JSON body */
+        }
+        setToast(msg)
+        return
+      }
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = 'neufin-swarm-ic-export.pdf'
+      a.click()
+      URL.revokeObjectURL(href)
+      setToast('PDF downloaded')
+    } catch (e) {
+      console.error('[swarm] PDF export:', e)
+      setToast('Export failed')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  useEffect(() => {
+    if (jobStatus !== 'complete' || !result) return
+    const swarmDurationMs = perfTimer.end('swarm') ?? 0
+    capture('swarm_analysis_completed', {
+      report_id: thesis?.swarm_report_id,
+      duration_ms: swarmDurationMs,
+    })
+    captureSentrySlowOp('swarm_analysis', swarmDurationMs)
+  }, [jobStatus, result, capture, thesis?.swarm_report_id])
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef) clearInterval(pollIntervalRef)
+    }
+  }, [pollIntervalRef])
 
   const sb = thesis?.score_breakdown ?? {}
 
@@ -935,6 +1070,7 @@ export default function SwarmPage() {
       className="min-h-screen bg-[#080808] text-white"
       style={{ fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace" }}
     >
+      <AppHeader />
       {/* Toast */}
       {toast && (
         <div style={{
@@ -963,9 +1099,32 @@ export default function SwarmPage() {
             <CommandPalette
               positions={positions}
               total_value={totalValue}
-              onResponse={r => setTraces(prev => [...prev, ...r.thinking_steps])}
+              onResponse={r => setAgentTrace(prev => [
+                ...prev,
+                ...(r.thinking_steps ?? []).map((step: string) => ({
+                  agent: 'synthesizer',
+                  status: 'complete' as const,
+                  summary: step,
+                  ts: new Date().toISOString(),
+                })),
+              ])}
             />
           </Suspense>
+          {user && (
+            <button
+              type="button"
+              onClick={() => void exportSwarmPdf()}
+              disabled={exportingPdf}
+              className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest border transition-all disabled:opacity-40"
+              style={{
+                background: 'transparent',
+                color:       '#94a3b8',
+                borderColor: '#334155',
+              }}
+            >
+              {exportingPdf ? 'Exporting...' : 'Export PDF'}
+            </button>
+          )}
           {thesis && (
             <button
               onClick={() => setChatOpen(o => !o)}
@@ -980,17 +1139,27 @@ export default function SwarmPage() {
             </button>
           )}
           <button
-            onClick={runSwarm}
+            onClick={startSwarm}
             disabled={isRunning || positions.length === 0}
             title={positions.length === 0 ? 'Upload a portfolio on neufin.app first' : undefined}
             className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded border transition-all disabled:opacity-40"
             style={{
-              background:  isRunning ? 'transparent' : '#FFB900',
-              color:       isRunning ? '#FFB900'     : '#000',
-              borderColor: '#FFB900',
+              background: jobStatus === 'failed' ? '#7f1d1d' : isRunning ? 'transparent' : '#06b6d4',
+              color: isRunning ? '#FFB900' : jobStatus === 'failed' ? '#fecaca' : '#000',
+              borderColor: isRunning ? '#FFB900' : jobStatus === 'failed' ? '#ef4444' : '#06b6d4',
             }}
           >
-            {isRunning ? '● RUNNING...' : positions.length === 0 ? '▶ NO PORTFOLIO' : '▶ RUN SWARM'}
+            {positions.length === 0
+              ? '▶ NO PORTFOLIO'
+              : jobStatus === 'queued'
+                ? 'Queuing...'
+                : jobStatus === 'running'
+                  ? `Agents running... ${agentTrace.filter((t) => t.status === 'complete').length}/7`
+                  : jobStatus === 'complete'
+                    ? '▶ Run New Analysis'
+                    : jobStatus === 'failed'
+                      ? '▶ Retry Analysis'
+                      : '▶ Run IC Analysis'}
           </button>
         </div>
       </nav>
@@ -1000,7 +1169,31 @@ export default function SwarmPage() {
 
         {/* Agent trace terminal */}
         <div className="xl:col-span-5">
-          <SwarmTerminal traces={traces} isRunning={isRunning} />
+          <SwarmTerminal status={jobStatus} trace={agentTrace} onRetry={startSwarm} />
+          {/* Result unavailable error state — analysis done but result fetch failed */}
+          {jobStatus === 'result_unavailable' && resultError && (
+            <div style={{
+              marginTop: 12, padding: '12px 16px',
+              background: '#201A08', border: '1px solid #F5A623',
+              borderRadius: 8, color: '#F5A623', fontSize: 13,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <span style={{ flex: 1 }}>{resultError}</span>
+              {jobId && (
+                <button
+                  onClick={() => { setJobStatus('complete'); void pollStatus(jobId) }}
+                  style={{
+                    padding: '4px 12px',
+                    background: '#F5A623', color: '#0B0F14',
+                    border: 'none', borderRadius: 4, fontSize: 12,
+                    cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+                  }}
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* IC Briefing */}
@@ -1166,6 +1359,58 @@ export default function SwarmPage() {
       </div>
 
       {/* ── Research Intelligence Grid ────────────────────────────────────────── */}
+      {thesis && (
+        <div className="max-w-[1600px] mx-auto px-4 pb-6">
+          <div className="mb-4 grid gap-3 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] p-4 md:grid-cols-4">
+            <div className="flex items-center gap-3">
+              <svg viewBox="0 0 120 120" className="h-16 w-16">
+                <circle cx="60" cy="60" r="52" stroke="#1f2937" strokeWidth="10" fill="none" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="52"
+                  stroke="#22d3ee"
+                  strokeWidth="10"
+                  fill="none"
+                  strokeDasharray={`${Math.max(0, Math.min(100, Number(thesis?.dna_score ?? 0))) * 3.27} 999`}
+                  transform="rotate(-90 60 60)"
+                />
+                <text x="60" y="65" textAnchor="middle" className="fill-white text-xl font-bold">
+                  {Number(thesis?.dna_score ?? 0)}
+                </text>
+              </svg>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-[#666]">DNA Score</p>
+                <p className="text-xs text-[#9ca3af]">Institutional fit signal</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">Investor Archetype</p>
+              <p className="mt-1 text-sm text-white">{thesis?.investor_type ?? 'Advisor'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">Market Regime</p>
+              <p className="mt-1 text-sm text-cyan-300">{thesis?.regime ?? 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-widest text-[#666]">Elapsed</p>
+              <p className="mt-1 text-sm text-white">
+                {startedAtMs ? Math.max(1, Math.round((Date.now() - startedAtMs) / 1000)) : 0}s
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {jobStatus === 'complete' && result ? (
+        <SwarmSourcesPanel
+          sources={(result as Record<string, unknown>).sources as SwarmSourcesPayload | undefined}
+          observability={
+            (result as Record<string, unknown>).observability as SwarmObservabilityPayload | undefined
+          }
+        />
+      ) : null}
+
       {thesis && (
         <div className="max-w-[1600px] mx-auto px-4 pb-8">
           <div className="border-t border-[#1e1e1e] pt-5 mb-4 flex items-center gap-3">

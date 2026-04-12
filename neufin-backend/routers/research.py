@@ -22,8 +22,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from database import supabase
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_subscribed_user
+from services.jwt_auth import JWTUser
 from services.research.regime_detector import get_current_regime_summary
+from services.research.slug_utils import estimate_read_time_minutes, slugify
 
 logger = structlog.get_logger("neufin.research")
 
@@ -69,6 +71,19 @@ def _require_plan(user_id: str, min_plan: str) -> str:
     return plan
 
 
+def _coerce_pagination(
+    value: str | None, *, default: int, minimum: int, maximum: int
+) -> int:
+    """Parse pagination query params defensively to avoid 422s from malformed input."""
+    if value is None or value == "":
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
+
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 
@@ -83,6 +98,19 @@ class GenerateNoteRequest(BaseModel):
         "macro_outlook"  # macro_outlook|sector_analysis|regime_change|risk_alert
     )
     context_days: int = 7
+
+
+class PublicBlogNote(BaseModel):
+    id: str
+    slug: str
+    title: str
+    executive_summary: str
+    note_type: str
+    confidence_score: float | None = None
+    created_at: str
+    read_time_minutes: int
+    asset_tickers: list[str]
+    meta_description: str
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -132,11 +160,8 @@ async def list_notes(
     user = getattr(request.state, "user", None)
     user_id: str | None = user.id if user else None
 
-    # Determine access level
-    show_all = False
-    if user_id:
-        plan = _get_user_plan(user_id)
-        show_all = _PLAN_RANK.get(plan, 0) >= _PLAN_RANK["retail"]
+    # Soft paywall: if authenticated, show all notes (even after trial expiry).
+    show_all = bool(user_id)
 
     offset = (page - 1) * per_page
 
@@ -172,10 +197,186 @@ async def list_notes(
     }
 
 
+@router.get("/blog", response_model=list[PublicBlogNote])
+async def list_blog_notes(
+    page: str | None = Query("1"),
+    limit: str | None = Query("10"),
+    type: str | None = Query(None, alias="type"),
+):
+    """
+    Public SEO feed of research notes for blog pages.
+    Query params:
+      - page
+      - limit
+      - type=MACRO_OUTLOOK|REGIME_CHANGE|SECTOR_ANALYSIS|BEHAVIORAL
+    """
+    page_num = _coerce_pagination(page, default=1, minimum=1, maximum=10_000)
+    limit_num = _coerce_pagination(limit, default=10, minimum=1, maximum=50)
+    offset = (page_num - 1) * limit_num
+
+    def _build_query(include_slug: bool):
+        select_fields = (
+            "id,slug,title,executive_summary,note_type,confidence_score,generated_at,affected_tickers,asset_tickers,full_content,content,body"
+            if include_slug
+            else "id,title,executive_summary,note_type,confidence_score,generated_at,affected_tickers,asset_tickers,full_content,content,body"
+        )
+        q = (
+            supabase.table("research_notes")
+            .select(select_fields)
+            .eq("is_public", True)
+            .order("generated_at", desc=True)
+            .range(offset, offset + limit_num - 1)
+        )
+        if type:
+            q = q.eq("note_type", type.lower())
+        return q
+
+    try:
+        result = _build_query(include_slug=True).execute()
+        rows = result.data or []
+    except Exception as exc:
+        message = str(exc).lower()
+        if "slug" in message and "does not exist" in message:
+            logger.warning("research.list_blog_slug_missing_fallback", error=str(exc))
+            try:
+                result = _build_query(include_slug=False).execute()
+                rows = result.data or []
+            except Exception as fallback_exc:
+                logger.warning("research.list_blog_failed", error=str(fallback_exc))
+                rows = []
+        else:
+            logger.warning("research.list_blog_failed", error=str(exc))
+            rows = []
+
+    out: list[PublicBlogNote] = []
+    for n in rows:
+        title = str(n.get("title") or "Untitled")
+        summary = str(n.get("executive_summary") or "")
+        slug = str(n.get("slug") or "").strip() or slugify(title)
+        content = str(n.get("content") or n.get("body") or n.get("full_content") or "")
+        tickers = n.get("asset_tickers") or n.get("affected_tickers") or []
+        if not isinstance(tickers, list):
+            tickers = []
+        out.append(
+            PublicBlogNote(
+                id=str(n.get("id")),
+                slug=slug,
+                title=title,
+                executive_summary=summary,
+                note_type=str(n.get("note_type") or ""),
+                confidence_score=n.get("confidence_score"),
+                created_at=str(n.get("generated_at") or datetime.now(UTC).isoformat()),
+                read_time_minutes=estimate_read_time_minutes(summary, content),
+                asset_tickers=[str(t).upper() for t in tickers if isinstance(t, str)],
+                meta_description=(summary[:160] if summary else title[:160]),
+            )
+        )
+    return out
+
+
+@router.get("/blog/{slug}")
+async def get_blog_note(slug: str):
+    """Public full research note by slug with related notes."""
+    try:
+        result = (
+            supabase.table("research_notes")
+            .select("*")
+            .eq("slug", slug)
+            .eq("is_public", True)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            # Backward-compatible fallback for legacy links that still use note UUID.
+            result = (
+                supabase.table("research_notes")
+                .select("*")
+                .eq("id", slug)
+                .eq("is_public", True)
+                .limit(1)
+                .execute()
+            )
+    except Exception as exc:
+        logger.error("research.blog_note_failed", slug=slug, error=str(exc))
+        raise HTTPException(
+            status_code=500, detail="Failed to retrieve blog note."
+        ) from exc
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Research note not found.")
+
+    note = result.data[0]
+    title = str(note.get("title") or "Untitled")
+    summary = str(note.get("executive_summary") or "")
+    note_slug = str(note.get("slug") or "").strip() or slugify(title)
+    content = note.get("content") or note.get("body") or note.get("full_content") or ""
+    if isinstance(content, dict):
+        content = json.dumps(content, indent=2)
+    elif not isinstance(content, str):
+        content = str(content)
+    tickers = note.get("asset_tickers") or note.get("affected_tickers") or []
+    if not isinstance(tickers, list):
+        tickers = []
+
+    related: list[dict[str, Any]] = []
+    try:
+        rel_res = (
+            supabase.table("research_notes")
+            .select(
+                "id,slug,title,executive_summary,note_type,generated_at,confidence_score"
+            )
+            .eq("is_public", True)
+            .eq("note_type", note.get("note_type"))
+            .neq("id", note.get("id"))
+            .order("generated_at", desc=True)
+            .limit(3)
+            .execute()
+        )
+        for r in rel_res.data or []:
+            r_title = str(r.get("title") or "Untitled")
+            related.append(
+                {
+                    "id": r.get("id"),
+                    "slug": r.get("slug") or slugify(r_title),
+                    "title": r_title,
+                    "executive_summary": r.get("executive_summary") or "",
+                    "note_type": r.get("note_type") or "",
+                    "created_at": r.get("generated_at"),
+                    "confidence_score": r.get("confidence_score"),
+                }
+            )
+    except Exception as exc:
+        logger.debug("research.blog_related_failed", error=str(exc))
+
+    ds = note.get("data_sources")
+    if isinstance(ds, str):
+        try:
+            ds = json.loads(ds)
+        except (json.JSONDecodeError, TypeError):
+            ds = []
+    macro_signal_count = len(ds) if isinstance(ds, list) else 0
+
+    return {
+        "id": note.get("id"),
+        "slug": note_slug,
+        "title": title,
+        "executive_summary": summary,
+        "content": content,
+        "note_type": note.get("note_type"),
+        "regime": note.get("regime"),
+        "confidence_score": note.get("confidence_score"),
+        "created_at": note.get("generated_at"),
+        "read_time_minutes": estimate_read_time_minutes(summary, content),
+        "asset_tickers": [str(t).upper() for t in tickers if isinstance(t, str)],
+        "meta_description": (summary[:160] if summary else title[:160]),
+        "related_notes": related,
+        "macro_signal_count": macro_signal_count,
+    }
+
+
 @router.get("/notes/{note_id}")
-async def get_note(note_id: str, user: dict = Depends(get_current_user)):
-    """Full research note — requires retail plan or above."""
-    _require_plan(user["id"], "retail")
+async def get_note(note_id: str, user: JWTUser = Depends(get_current_user)):
+    """Full research note — soft paywall (auth required, even if trial expired)."""
 
     try:
         result = (
@@ -206,15 +407,14 @@ async def get_note(note_id: str, user: dict = Depends(get_current_user)):
 
 @router.get("/signals")
 async def get_signals(
-    user: dict = Depends(get_current_user),
+    user: JWTUser = Depends(get_current_user),
     region: str | None = None,
     signal_type: str | None = None,
     significance: str | None = None,
     days: int = Query(30, ge=1, le=180),
     limit: int = Query(20, ge=1, le=100),
 ):
-    """Latest macro signals — requires retail plan or above."""
-    _require_plan(user["id"], "retail")
+    """Latest macro signals — soft paywall (auth required, even if trial expired)."""
 
     from datetime import timedelta
 
@@ -248,13 +448,13 @@ async def get_signals(
 
 @router.post("/query")
 async def semantic_search(
-    body: SemanticSearchRequest, user: dict = Depends(get_current_user)
+    body: SemanticSearchRequest, user: JWTUser = Depends(get_subscribed_user)
 ):
     """
     Semantic search across the knowledge base using pgvector cosine similarity.
     Requires advisor plan or above (this is the core moat endpoint).
     """
-    _require_plan(user["id"], "advisor")
+    # Hard paywall: advisor-tier feature (vector search). After trial ends, returns 402.
 
     if not body.query.strip():
         raise HTTPException(status_code=422, detail="Query cannot be empty.")
@@ -333,12 +533,13 @@ async def semantic_search(
 
 
 @router.get("/portfolio-context/{portfolio_id}")
-async def portfolio_context(portfolio_id: str, user: dict = Depends(get_current_user)):
+async def portfolio_context(
+    portfolio_id: str, user: JWTUser = Depends(get_current_user)
+):
     """
     Returns all recent research notes and signals relevant to a saved portfolio's holdings.
-    Requires retail plan or above.
+    Soft paywall: allow access after trial expiry (banner handled in UI).
     """
-    _require_plan(user["id"], "retail")
 
     # Fetch portfolio holdings
     try:
@@ -346,7 +547,7 @@ async def portfolio_context(portfolio_id: str, user: dict = Depends(get_current_
             supabase.table("portfolios")
             .select("id,ticker_data")
             .eq("id", portfolio_id)
-            .eq("user_id", user["id"])
+            .eq("user_id", user.id)
             .limit(1)
             .execute()
         )
@@ -426,13 +627,13 @@ async def portfolio_context(portfolio_id: str, user: dict = Depends(get_current_
 
 @router.post("/generate")
 async def generate_note(
-    body: GenerateNoteRequest, user: dict = Depends(get_current_user)
+    body: GenerateNoteRequest, user: JWTUser = Depends(get_subscribed_user)
 ):
     """
     Trigger on-demand research note generation.
     Requires advisor plan or above.
     """
-    _require_plan(user["id"], "advisor")
+    # Hard paywall: advisor-tier AI generation. After trial ends, returns 402.
 
     valid_types = {"macro_outlook", "sector_analysis", "regime_change", "risk_alert"}
     if body.note_type not in valid_types:

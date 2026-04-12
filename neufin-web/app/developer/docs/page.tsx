@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 
-const BASE = 'https://neufin-backend-production.up.railway.app'
+const BASE_URL = 'https://neufin101-production.up.railway.app'
+const BASE = BASE_URL
 
 interface Endpoint {
   method: 'GET' | 'POST' | 'DELETE' | 'PATCH'
@@ -105,17 +106,157 @@ console.log(data.results);`,
 }
 
 export default function DeveloperDocsPage() {
-  const [activeTab, setActiveTab] = useState<'curl' | 'python' | 'javascript'>('curl')
+  const [apiKey, setApiKey] = useState('')
+  const [endpoint, setEndpoint] = useState<'swarm' | 'regime' | 'chart'>('regime')
+  const [body, setBody] = useState('{}')
+  const [status, setStatus] = useState<number | null>(null)
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null)
+  const [response, setResponse] = useState<unknown>({ message: 'Send a request to start.' })
+  const [agentTrace, setAgentTrace] = useState<unknown[]>([])
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    const k = localStorage.getItem('neufin-api-key') || ''
+    if (k) setApiKey(k)
+  }, [])
+
+  useEffect(() => {
+    if (endpoint === 'swarm') {
+      setBody(
+        JSON.stringify(
+          {
+            positions: [
+              { symbol: 'AAPL', shares: 180, cost_basis: 150 },
+              { symbol: 'NVDA', shares: 60, cost_basis: 410 },
+              { symbol: 'MSFT', shares: 70, cost_basis: 320 },
+            ],
+            total_value: 100000,
+          },
+          null,
+          2,
+        ),
+      )
+      return
+    }
+    if (endpoint === 'chart') {
+      setBody(JSON.stringify({ ticker: 'AAPL', period: '3mo' }, null, 2))
+      return
+    }
+    setBody('{}')
+  }, [endpoint])
+
+  useEffect(() => () => {
+    if (pollRef.current) clearInterval(pollRef.current)
+  }, [])
+
+  const curl = useMemo(() => {
+    const k = apiKey || 'nf_live_sk_xxxxxxxxxxxx'
+    if (endpoint === 'swarm') {
+      return `curl -X POST "${BASE_URL}/api/swarm/analyze" \\
+  -H "Authorization: Bearer ${k}" \\
+  -H "X-NeuFin-API-Key: ${k}" \\
+  -H "Content-Type: application/json" \\
+  -d '${body.replace(/\n/g, ' ')}'`
+    }
+    if (endpoint === 'chart') {
+      let ticker = 'AAPL'
+      let period = '3mo'
+      try {
+        const parsed = JSON.parse(body) as { ticker?: string; period?: string }
+        ticker = (parsed.ticker || 'AAPL').toUpperCase()
+        period = parsed.period || '3mo'
+      } catch {}
+      return `curl "${BASE_URL}/api/portfolio/chart/${ticker}?period=${period}" \\
+  -H "Authorization: Bearer ${k}" \\
+  -H "X-NeuFin-API-Key: ${k}"`
+    }
+    return `curl "${BASE_URL}/api/research/regime" \\
+  -H "Authorization: Bearer ${k}" \\
+  -H "X-NeuFin-API-Key: ${k}"`
+  }, [apiKey, body, endpoint])
+
+  const sendRequest = async () => {
+    if (!apiKey.trim()) {
+      setResponse({ error: 'Add your API key from /developer/keys first.' })
+      setStatus(null)
+      setElapsedMs(null)
+      return
+    }
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+    const started = performance.now()
+    let url = `${BASE_URL}/api/research/regime`
+    let method: 'GET' | 'POST' = 'GET'
+    let payload: string | undefined
+    if (endpoint === 'swarm') {
+      method = 'POST'
+      url = `${BASE_URL}/api/swarm/analyze`
+      payload = body
+    } else if (endpoint === 'chart') {
+      const parsed = JSON.parse(body || '{}') as { ticker?: string; period?: string }
+      const ticker = (parsed.ticker || 'AAPL').toUpperCase()
+      const period = parsed.period || '3mo'
+      url = `${BASE_URL}/api/portfolio/chart/${encodeURIComponent(ticker)}?period=${encodeURIComponent(period)}`
+    }
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'X-NeuFin-API-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: payload,
+      })
+      const text = await res.text()
+      const elapsed = Math.round(performance.now() - started)
+      let parsed: unknown = {}
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        parsed = { raw: text }
+      }
+      setStatus(res.status)
+      setElapsedMs(elapsed)
+      setResponse(parsed)
+      setAgentTrace([])
+      if (endpoint === 'swarm' && res.ok) {
+        const jobId = (parsed as { job_id?: string }).job_id
+        if (jobId) {
+          pollRef.current = setInterval(async () => {
+            try {
+              const pollRes = await fetch(`${BASE_URL}/api/swarm/status/${jobId}`, {
+                headers: { Authorization: `Bearer ${apiKey}`, 'X-NeuFin-API-Key': apiKey },
+              })
+              const pollJson = (await pollRes.json()) as { status?: string; agent_trace?: unknown[] }
+              if (Array.isArray(pollJson.agent_trace)) setAgentTrace(pollJson.agent_trace)
+              setResponse((prev) => ({ ...(prev as Record<string, unknown>), latest_status: pollJson }))
+              if (pollJson.status === 'complete' || pollJson.status === 'failed') {
+                if (pollRef.current) clearInterval(pollRef.current)
+                pollRef.current = null
+              }
+            } catch {
+              if (pollRef.current) clearInterval(pollRef.current)
+              pollRef.current = null
+            }
+          }, 3000)
+        }
+      }
+    } catch (err) {
+      setStatus(0)
+      setElapsedMs(Math.round(performance.now() - started))
+      setResponse({ error: err instanceof Error ? err.message : 'Request failed' })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      {/* Nav */}
-      <nav className="border-b border-gray-800/60 sticky top-0 z-10 bg-gray-950/90 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <nav className="sticky top-0 z-10 border-b border-gray-800/60 bg-gray-950/90 backdrop-blur-sm">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-lg font-bold">NeuFin</Link>
-            <span className="text-gray-700">/</span>
-            <Link href="/developer" className="text-gray-400 hover:text-gray-100 text-sm">API</Link>
+            <Link href="/developer" className="text-gray-400 hover:text-gray-100 text-sm">Developer</Link>
             <span className="text-gray-700">/</span>
             <span className="text-sm text-gray-200">Docs</span>
           </div>
@@ -124,110 +265,103 @@ export default function DeveloperDocsPage() {
           </Link>
         </div>
       </nav>
-
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-14">
-
-        <div>
-          <h1 className="text-3xl font-bold mb-2">API Reference</h1>
-          <p className="text-gray-400">
-            Base URL: <code className="text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded">{BASE}</code>
-          </p>
-        </div>
-
-        {/* Code examples */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Example: Semantic Research Query</h2>
-          <div className="rounded-2xl border border-gray-800 overflow-hidden">
-            <div className="bg-gray-900 border-b border-gray-800 flex">
-              {(['curl', 'python', 'javascript'] as const).map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => setActiveTab(lang)}
-                  className={`px-5 py-2.5 text-sm font-medium transition-colors ${
-                    activeTab === lang
-                      ? 'bg-gray-800 text-gray-100 border-b-2 border-blue-500'
-                      : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  {lang}
-                </button>
-              ))}
-            </div>
-            <pre className="p-6 text-sm font-mono text-gray-300 overflow-x-auto leading-relaxed">
-              {CODE_EXAMPLES[activeTab]}
-            </pre>
-          </div>
+      <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+        <h1 className="text-3xl font-bold">NeuFin API documentation</h1>
+        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+          <h2 className="text-lg font-semibold">1) Authentication</h2>
+          <p className="mt-2 text-sm text-gray-400">Base URL: <code>{'https://neufin101-production.up.railway.app'}</code></p>
+          <p className="text-sm text-gray-400">Auth: Bearer token in Authorization header.</p>
+          <p className="text-sm text-gray-400">Getting started: create account → Developer → copy API key.</p>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">Authorization: Bearer nf_live_sk_xxxxxxxxxxxx</pre>
         </section>
-
-        {/* Endpoints */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Endpoints</h2>
-          <div className="space-y-3">
-            {ENDPOINTS.map((ep) => (
-              <details key={ep.path} className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden group">
-                <summary className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-gray-800/50 transition-colors list-none">
-                  <span className={`rounded px-2 py-0.5 text-xs font-bold font-mono flex-shrink-0 ${METHOD_COLORS[ep.method]}`}>
-                    {ep.method}
-                  </span>
-                  <code className="text-sm font-mono text-gray-200 flex-1">{ep.path}</code>
-                  <span className="text-xs text-gray-500 truncate hidden sm:block max-w-xs">{ep.summary}</span>
-                  {ep.plan && (
-                    <span className="rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/20 px-2 py-0.5 text-xs flex-shrink-0">
-                      {ep.plan}
-                    </span>
-                  )}
-                </summary>
-                <div className="px-5 pb-5 pt-2 space-y-3 border-t border-gray-800">
-                  <p className="text-sm text-gray-400">{ep.summary}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Auth:</span>
-                    <code className="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded">
-                      {ep.auth === 'api_key' ? 'X-NeuFin-API-Key header' : ep.auth === 'bearer' ? 'Bearer token' : 'None'}
-                    </code>
-                  </div>
-                  {ep.request && (
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1.5">Request body</p>
-                      <pre className="rounded-lg bg-gray-950 border border-gray-800 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto">
-                        {ep.request}
-                      </pre>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1.5">Response</p>
-                    <pre className="rounded-lg bg-gray-950 border border-gray-800 px-4 py-3 text-xs font-mono text-gray-300 overflow-x-auto">
-                      {ep.response}
-                    </pre>
-                  </div>
-                </div>
-              </details>
-            ))}
-          </div>
+        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+          <h2 className="text-lg font-semibold">2) POST /api/swarm/analyze</h2>
+          <p className="text-sm text-gray-400">Submit a portfolio for 7-agent IC analysis. Returns immediately with job_id. Poll /status/{'{job_id}'} for progress.</p>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+  "positions": [
+    {"symbol": "AAPL", "shares": 100, "cost_basis": 150.00},
+    {"symbol": "NVDA", "shares": 50, "cost_basis": 400.00}
+  ],
+  "total_value": 35000
+}`}</pre>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+  "job_id": "8f2a4b1c-...",
+  "status": "queued",
+  "poll_url": "/api/swarm/status/8f2a4b1c-...",
+  "estimated_seconds": 75
+}`}</pre>
         </section>
-
-        {/* Error codes */}
-        <section className="space-y-4">
-          <h2 className="text-xl font-semibold">Error Codes</h2>
-          <div className="rounded-xl border border-gray-800 overflow-hidden">
-            {[
-              { code: '200', desc: 'Success' },
-              { code: '400', desc: 'Bad request — check request body' },
-              { code: '401', desc: 'Missing or invalid API key' },
-              { code: '402', desc: 'Usage limit reached — upgrade plan' },
-              { code: '403', desc: 'Insufficient plan for this endpoint' },
-              { code: '429', desc: 'Rate limit exceeded (10,000 req/day)' },
-              { code: '500', desc: 'Internal server error — contact support' },
-            ].map((e, i) => (
-              <div key={e.code} className={`flex items-center gap-4 px-5 py-3 text-sm ${i % 2 === 0 ? 'bg-gray-950' : 'bg-gray-900/50'}`}>
-                <code className={`font-mono font-bold w-12 ${e.code.startsWith('2') ? 'text-emerald-400' : e.code.startsWith('4') ? 'text-yellow-400' : 'text-red-400'}`}>
-                  {e.code}
-                </code>
-                <span className="text-gray-400">{e.desc}</span>
+        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+          <h2 className="text-lg font-semibold">3) GET /api/swarm/status/{'{job_id}'}</h2>
+          <p className="text-sm text-gray-400">Poll every 3s to track agent progress and get results.</p>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+  "job_id": "8f2a4b1c-...",
+  "status": "running",
+  "progress_pct": 57,
+  "agent_trace": [
+    {"agent": "risk_agent", "status": "complete", "summary": "..."},
+    {"agent": "sector_agent", "status": "running", "summary": "..."}
+  ]
+}`}</pre>
+        </section>
+        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+          <h2 className="text-lg font-semibold">4) GET /api/swarm/result/{'{job_id}'}</h2>
+          <p className="text-sm text-gray-400">Fetch full IC briefing when status == complete.</p>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+  "ic_briefing": {
+    "portfolio_analyst": {...},
+    "macro_strategist": {...},
+    "risk_manager": {...},
+    "sector_specialist": {...},
+    "factor_quant": {...},
+    "behavioral_agent": {...},
+    "synthesis_agent": {...}
+  }
+}`}</pre>
+        </section>
+        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+          <h2 className="text-lg font-semibold">5) GET /api/research/regime</h2>
+          <p className="text-sm text-gray-400">Get current macro regime classification.</p>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+  "regime": "risk_off",
+  "confidence": 0.82,
+  "signals": ["vix_elevated", "yield_curve_inverted"],
+  "narrative": "...",
+  "updated_at": "2026-04-10T08:00:00Z"
+}`}</pre>
+        </section>
+        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
+          <h2 className="text-lg font-semibold">6) GET /api/portfolio/chart/{'{ticker}'}</h2>
+          <p className="text-sm text-gray-400">OHLCV chart data for candlestick rendering.</p>
+          <p className="text-sm text-gray-400">Params: period = 1mo | 3mo | 6mo | 1y | 3y</p>
+          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">[{`{"date":"2026-04-01","open":181.2,"high":184.3,"low":179.5,"close":183.7,"volume":61439200}`}]
+          </pre>
+        </section>
+        <section className="rounded-xl border border-gray-700 bg-black/40 p-4">
+          <h2 className="mb-3 text-lg font-semibold">Sandbox</h2>
+          <div className="mb-3">
+            <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="nf_live_sk_..." className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm" />
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <select value={endpoint} onChange={(e) => setEndpoint(e.target.value as 'swarm' | 'regime' | 'chart')} className="mb-2 w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm">
+                <option value="swarm">POST /api/swarm/analyze</option>
+                <option value="regime">GET /api/research/regime</option>
+                <option value="chart">GET /api/portfolio/chart/{'{ticker}'}</option>
+              </select>
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} className="w-full rounded border border-gray-700 bg-black/50 p-3 font-mono text-xs" />
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => void sendRequest()} className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold">Send Request →</button>
+                <button onClick={() => void navigator.clipboard.writeText(curl)} className="rounded border border-gray-700 px-4 py-2 text-sm">Copy as curl</button>
               </div>
-            ))}
+            </div>
+            <div>
+              <p className="mb-2 text-xs text-gray-400">HTTP {status ?? '—'} · {elapsedMs ?? '—'} ms</p>
+              <pre className="max-h-[320px] overflow-auto rounded border border-gray-800 bg-black/50 p-3 text-xs">{JSON.stringify(response, null, 2)}</pre>
+              {agentTrace.length > 0 && <pre className="mt-2 max-h-[200px] overflow-auto rounded border border-gray-800 bg-black/50 p-3 text-xs">{JSON.stringify(agentTrace, null, 2)}</pre>}
+            </div>
           </div>
         </section>
-
       </div>
     </div>
   )

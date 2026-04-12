@@ -1,91 +1,96 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
-/**
- * OAuth / Magic-Link callback handler.
- *
- * Supabase redirects here after:
- *   - Google OAuth sign-in  (PKCE: ?code=... in the URL)
- *   - Magic link click from email  (hash fragment: #access_token=...)
- *
- * Flow:
- *   1. Fast path — if a session is already established on mount, redirect immediately.
- *   2. Primary path — wait for SIGNED_IN / TOKEN_REFRESHED via onAuthStateChange.
- *      The Supabase JS client v2 exchanges the PKCE code automatically when it
- *      initialises with detectSessionInUrl:true (the default).
- *   3. Error path — if the URL contains ?error= (provider cancelled / denied),
- *      or the code exchange fails, redirects to /auth?error=<message>.
- *      The auth page reads this param and displays it to the user.
- *
- * The previous 10-second timeout was removed: it caused a race condition where
- * the redirect fired before the PKCE exchange completed on slow connections,
- * landing the user on a protected page with no session.
- */
-
-import { Suspense, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { syncAuthCookie } from '@/lib/sync-auth-cookie'
-import { logger } from '@/lib/logger'
-import { useNeufinAnalytics } from '@/lib/analytics'
 
-const TAG = '[AuthCallback]'
-
-const Spinner = () => (
-  <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-    <div className="text-center space-y-3">
-      <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin mx-auto" />
-      <p className="text-gray-500 text-sm">Signing you in…</p>
-    </div>
-  </div>
-)
-
-export default function AuthCallbackPage() {
-  return (
-    <Suspense fallback={<Spinner />}>
-      <AuthCallbackContent />
-    </Suspense>
-  )
-}
-
-function AuthCallbackContent() {
-  const searchParams = useSearchParams()
-  const next         = searchParams.get('next') || '/dashboard'
-  const { capture }  = useNeufinAnalytics()
+export default function AuthCallback() {
+  const router = useRouter()
+  const handled = useRef(false)
 
   useEffect(() => {
-    // ── 0. Check for provider-level error in URL params ───────────────
-    const urlError = searchParams.get('error')
-    const urlErrorDesc = searchParams.get('error_description')
-    if (urlError) {
-      logger.error({ tag: TAG, urlError, urlErrorDesc }, 'auth.callback_provider_error')
-      window.location.href = `/login?error=${encodeURIComponent(urlErrorDesc ?? urlError)}`
-      return
+    if (handled.current) return
+    handled.current = true
+
+    const tryRedirect = async () => {
+      // Poll for the session up to 10 times (3 seconds total).
+      // Supabase JS automatically exchanges the ?code= PKCE token when
+      // detectSessionInUrl is true — we just need to wait for it to finish.
+      for (let i = 0; i < 10; i++) {
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.access_token) {
+          // 1. Write neufin-auth cookie client-side (same as AuthProvider).
+          //    This must happen before the hard navigation so middleware can
+          //    read it on the first request to /dashboard.
+          syncAuthCookie(session)
+
+          // 2. Belt-and-suspenders: also write via server-side endpoint so
+          //    the cookie is HttpOnly-safe and persists across SSR requests.
+          try {
+            await fetch('/api/auth/set-cookie', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+              }),
+            })
+          } catch {
+            // Non-fatal — syncAuthCookie above already covers middleware.
+          }
+
+          // 3. Hard navigate (not router.push/replace) so the browser sends a
+          //    fresh full-page request with the cookie already in the jar.
+          //    This avoids stale React context state from the callback page
+          //    leaking into /dashboard.
+          const params = new URLSearchParams(window.location.search)
+          const next = params.get('next') || '/dashboard'
+          window.location.replace(next)
+          return
+        }
+
+        // 300 ms between attempts
+        await new Promise<void>((r) => setTimeout(r, 300))
+      }
+
+      // After 3 s with no session, redirect to login with an error flag.
+      window.location.replace('/login?error=auth_timeout')
     }
 
-    let cancelled = false;
-    (async () => {
-      // ── 1. Exchange code for session (primary path) ──
-      const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href)
-      if (cancelled) return
-      if (error) {
-        logger.error({ tag: TAG, error }, 'auth.callback_exchange_error')
-        window.location.href = `/login?error=oauth_failed`
-        return
-      }
-      if (data?.session) {
-        syncAuthCookie(data.session)
-        const method = sessionStorage.getItem('neufin_auth_method') ?? 'google'
-        sessionStorage.removeItem('neufin_auth_method')
-        capture('user_logged_in', { method })
-        window.location.href = next
-        return
-      }
-      window.location.href = `/login?error=oauth_failed`
-    })()
-    return () => { cancelled = true }
-  }, [next, searchParams, capture])
+    void tryRedirect()
+  }, [router])
 
-  return <Spinner />
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: '#0B0F14',
+        flexDirection: 'column',
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          border: '2px solid #1EB8CC',
+          borderTopColor: 'transparent',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ color: '#F0F4FF', fontSize: 15, fontWeight: 500 }}>
+        Signing you in to NeuFin...
+      </div>
+      <div style={{ color: '#64748B', fontSize: 12 }}>
+        Setting up your session
+      </div>
+    </div>
+  )
 }

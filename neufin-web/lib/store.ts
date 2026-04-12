@@ -4,7 +4,7 @@
  * Abstracts both guests (localStorage) and authenticated users (Supabase session)
  * into a single interface so components never need to branch on auth state.
  *
- * const { score, isPro, isGuest, user, token } = useUser()
+ * const { score, isPro, isGuest, isAdmin, user, token } = useUser()
  */
 
 'use client'
@@ -25,9 +25,11 @@ export interface UserState {
   /** True when there's no authenticated session */
   isGuest: boolean
   /** Subscription tier string */
-  subscriptionTier: 'free' | 'pro'
+  subscriptionTier: 'free' | 'retail' | 'advisor' | 'enterprise' | 'pro'
   /** Advisor/firm name if set */
   advisorName: string | null
+  /** Internal ops / dashboard admin access */
+  isAdmin: boolean
   /** Raw auth state passthrough */
   user: ReturnType<typeof useAuth>['user']
   token: ReturnType<typeof useAuth>['token']
@@ -68,8 +70,20 @@ export function useUser(): UserState {
       .finally(() => setSubLoading(false))
   }, [token])
 
-  const isPro   = subscription?.is_pro ?? false
+  // is_pro is true for any full-access state:
+  // - Backend now sets is_pro=true for trial + advisor + enterprise
+  // - Guard here for any stale cached response that still uses the old logic
+  const isPro = (
+    subscription?.is_pro === true ||
+    subscription?.subscription_status === 'trial' ||
+    subscription?.subscription_tier === 'advisor' ||
+    subscription?.subscription_tier === 'enterprise'
+  )
   const isGuest = !user
+
+  const isAdmin =
+    subscription?.is_admin === true ||
+    (subscription?.role ?? '').toLowerCase() === 'admin'
 
   return {
     score,
@@ -78,7 +92,8 @@ export function useUser(): UserState {
     isPro,
     isGuest,
     subscriptionTier: subscription?.subscription_tier ?? 'free',
-    advisorName:      subscription?.advisor_name ?? null,
+    advisorName: subscription?.advisor_name ?? null,
+    isAdmin,
     user,
     token,
     loading: authLoading || subLoading,

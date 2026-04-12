@@ -1,5 +1,275 @@
-import DashboardClient from '@/components/dashboard/DashboardClient'
+'use client'
+
+import Link from 'next/link'
+import { Loader2, PieChart } from 'lucide-react'
+import { usePortfolioData } from '@/hooks/usePortfolioData'
+import type { RegimeData } from '@/hooks/usePortfolioData'
+import { SwarmBriefingPreview } from '@/components/dashboard/SwarmBriefingPreview'
+import ResearchFeedClient from '@/components/dashboard/ResearchFeedClient'
+
+export const dynamic = 'force-dynamic'
+
+function formatRegimeLabel(regime: RegimeData | null): string {
+  const raw = regime?.regime ?? regime?.label
+  if (!raw || raw === 'unknown') return 'Macro regime pending'
+  return String(raw)
+    .replace(/_/g, ' ')
+    .replace(/-/g, '-')
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
+function regimePillClass(regime: RegimeData | null): string {
+  const u = (regime?.regime ?? regime?.label ?? '').toLowerCase()
+  if (u.includes('inflation')) {
+    return 'inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800'
+  }
+  if (u.includes('stagflation')) {
+    return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900'
+  }
+  if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession') || u.includes('crisis')) {
+    return 'inline-block rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-900'
+  }
+  if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery') || u.includes('growth')) {
+    return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900'
+  }
+  return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900'
+}
+
+function fmtMetric(v: number | null | undefined, digits = 2): string {
+  if (v == null || Number.isNaN(v)) return '—'
+  return Number(v).toFixed(digits)
+}
 
 export default function DashboardPage() {
-  return <DashboardClient />
+  const { portfolios, latestPortfolio, hasPortfolio, latestDna, swarmReport, regime, loading } = usePortfolioData()
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 320,
+          gap: 10,
+          color: '#64748B',
+          fontSize: 13,
+        }}
+      >
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading your portfolio intelligence…
+      </div>
+    )
+  }
+
+  const lastAnalyzed =
+    latestPortfolio?.analyzed_at ??
+    latestPortfolio?.updated_at ??
+    latestPortfolio?.created_at ??
+    null
+
+  const portfolioTitle =
+    latestPortfolio?.portfolio_name ??
+    latestPortfolio?.name ??
+    (hasPortfolio ? 'Primary portfolio' : 'No portfolio uploaded')
+
+  const dnaScore = latestDna?.dna_score ?? latestPortfolio?.dna_score ?? null
+
+  const positionsCount =
+    (latestPortfolio as { positions_count?: number } | null)?.positions_count ??
+    latestDna?.tax_analysis?.positions?.length ??
+    null
+
+  return (
+    <div className="grid grid-cols-1 gap-6">
+      <h1 className="mb-5 text-xl font-semibold leading-tight text-[#0F172A]">Dashboard</h1>
+
+      {/* Hero summary */}
+      <section className="card-elevated grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="min-w-0">
+          <p className="text-label">Portfolio intelligence</p>
+          <h2 className="text-section-title mt-2">{portfolioTitle}</h2>
+          {lastAnalyzed && (
+            <p className="mt-1 text-[12px] text-slate-500">
+              Last analysed{' '}
+              {new Date(lastAnalyzed).toLocaleDateString('en-SG', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+              })}
+            </p>
+          )}
+          <div className="mt-6 flex flex-wrap items-end gap-4">
+            {dnaScore != null && hasPortfolio ? (
+              <div>
+                <div className="text-metric tabular-nums">{dnaScore}</div>
+                <div className="text-muted-marketing mt-1">Portfolio health score</div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-metric text-slate-300">—</div>
+                <div className="text-muted-marketing mt-1">Portfolio health score</div>
+              </div>
+            )}
+            <div className="pb-1">
+              <span className={regimePillClass(regime)}>{formatRegimeLabel(regime)}</span>
+            </div>
+          </div>
+          {!hasPortfolio && (
+            <p className="mt-4 text-sm text-slate-600">
+              Welcome to NeuFin.{' '}
+              <Link href="/dashboard/portfolio" className="font-medium text-[#1D4ED8] hover:underline">
+                Upload a portfolio
+              </Link>{' '}
+              to see your DNA score and regime context.
+            </p>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-col justify-between gap-6 border-t border-[#E5E7EB] pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <div>
+              <p className="text-label">Beta</p>
+              <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">
+                {fmtMetric(latestDna?.weighted_beta ?? null, 2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-label">Sharpe</p>
+              <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">—</p>
+            </div>
+            <div>
+              <p className="text-label">Positions</p>
+              <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">
+                {positionsCount != null ? positionsCount : '—'}
+              </p>
+            </div>
+          </div>
+          <div>
+            <Link
+              href={hasPortfolio ? '/swarm' : '/dashboard/portfolio'}
+              className="inline-flex items-center justify-center rounded-lg bg-[#1D4ED8] px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-blue-800"
+            >
+              Generate IC report
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Secondary insight cards */}
+      {hasPortfolio && latestDna && (
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {(latestDna.strengths ?? []).length > 0 && (
+            <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Top strengths</p>
+              {latestDna.strengths.slice(0, 2).map((s, i) => (
+                <div key={i} className="mb-2 border-l-2 border-[#16A34A] pl-2.5 last:mb-0">
+                  <p className="text-xs text-slate-800">{s.split('.')[0]}.</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {latestDna.recommendation && (
+            <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Recommended action</p>
+              <div className="border-l-2 border-amber-400 pl-2.5">
+                <p className="text-xs text-slate-800">{latestDna.recommendation}</p>
+              </div>
+            </div>
+          )}
+
+          {(latestDna.weaknesses ?? []).length > 0 && (
+            <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Key risks</p>
+              {latestDna.weaknesses.slice(0, 2).map((w, i) => (
+                <div key={i} className="mb-2 border-l-2 border-[#DC2626] pl-2.5 last:mb-0">
+                  <p className="text-xs text-slate-800">{w.split('.')[0]}.</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {latestDna.tax_analysis &&
+            ((latestDna.tax_analysis.total_liability ?? 0) > 0 || (latestDna.tax_analysis.total_harvest_opp ?? 0) > 0) && (
+              <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm md:col-span-2 xl:col-span-1">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Tax snapshot</p>
+                {(latestDna.tax_analysis?.total_liability ?? 0) > 0 && (
+                  <div className="mb-2 border-l-2 border-amber-400 pl-2.5">
+                    <p className="text-xs text-slate-500">CGT exposure</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      ${(latestDna.tax_analysis!.total_liability!).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {(latestDna.tax_analysis?.total_harvest_opp ?? 0) > 0 && (
+                  <div className="border-l-2 border-[#16A34A] pl-2.5">
+                    <p className="text-xs text-slate-500">Harvest opportunity</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      ${(latestDna.tax_analysis!.total_harvest_opp!).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+        </section>
+      )}
+
+      {swarmReport && <SwarmBriefingPreview swarmReport={swarmReport} />}
+
+      {hasPortfolio && !swarmReport && (
+        <section className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Swarm IC analysis</p>
+          <p className="mb-3 text-xs text-slate-600">
+            Run the 7-agent swarm on your portfolio for regime-adjusted signals, tax context, and an IC-grade memo.
+          </p>
+          <Link
+            href="/swarm"
+            className="inline-block rounded-lg border border-blue-200 bg-[#EFF6FF] px-3 py-2 text-xs font-semibold text-[#1D4ED8] hover:bg-blue-100"
+          >
+            Run Swarm IC →
+          </Link>
+        </section>
+      )}
+
+      <section className="min-w-0">
+        <ResearchFeedClient limit={5} />
+      </section>
+
+      {!hasPortfolio && (
+        <section className="rounded-xl border border-dashed border-[#CBD5E1] bg-white px-5 py-12 text-center shadow-sm">
+          <div className="mb-3 flex justify-center">
+            <PieChart className="h-10 w-10 text-[#1D4ED8]" aria-hidden />
+          </div>
+          <p className="text-sm font-medium text-slate-900">Start your first analysis</p>
+          <p className="mt-1.5 text-xs text-slate-600">
+            Upload a CSV with your holdings to generate an IC-grade portfolio report
+          </p>
+          <Link
+            href="/dashboard/portfolio"
+            className="mt-5 inline-block rounded-lg bg-[#1D4ED8] px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+          >
+            Upload portfolio →
+          </Link>
+        </section>
+      )}
+
+      <section className="flex flex-col justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
+        <div>
+          <p className="text-sm font-medium text-slate-900">You&apos;re on NeuFin beta — your feedback shapes what we build.</p>
+          <p className="mt-0.5 text-xs text-slate-600">Takes about five minutes · Read by the founding team</p>
+        </div>
+        <Link href="/feedback" target="_blank" className="shrink-0">
+          <button
+            type="button"
+            className="rounded-lg border border-blue-200 bg-[#EFF6FF] px-4 py-2 text-xs font-semibold text-[#1D4ED8] hover:bg-blue-100"
+          >
+            Share feedback →
+          </button>
+        </Link>
+      </section>
+    </div>
+  )
 }

@@ -1,32 +1,20 @@
-'use client'
+import { DashboardShell } from '@/components/dashboard/DashboardShell'
+import { OnboardingGate } from '@/components/OnboardingGate'
+import { getResearchRegime } from '@/lib/api'
 
-import TrialBannerLoader from '@/components/TrialBannerLoader'
-import PaywallOverlay from '@/components/PaywallOverlay'
-import { useAuth } from '@/lib/auth-context'
-
-const TRIAL_PERIOD_DAYS = 14
-
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
-  let isTrialActive = true
-  if (user?.created_at) {
-    const createdAt = new Date(user.created_at)
-    const now = new Date()
-    const diffInDays = (now.getTime() - createdAt.getTime()) / (1000 * 3600 * 24)
-    isTrialActive = diffInDays <= TRIAL_PERIOD_DAYS
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  let regime: unknown = null
+  try {
+    regime = await getResearchRegime()
+  } catch {
+    regime = null
   }
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--canvas)]">
-      <TrialBannerLoader />
-      <main className="flex-1">
-        {!isTrialActive ? (
-          <PaywallOverlay locked={!isTrialActive} onUnlock={() => {}}>
-            {children}
-          </PaywallOverlay>
-        ) : (
-          children
-        )}
-      </main>
+    <div className="min-h-screen bg-app">
+      <DashboardShell regime={regime}>
+        <OnboardingGate />
+        {children}
+      </DashboardShell>
     </div>
   )
 }

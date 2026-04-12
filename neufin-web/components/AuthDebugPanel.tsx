@@ -5,13 +5,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { usePathname } from 'next/navigation'
+import { getSupabaseClient } from '@/lib/supabase'
 
 // Only rendered in development — zero bundle cost in production.
 export function AuthDebugPanel() {
   const { user, token, loading } = useAuth()
   const pathname = usePathname()
 
-  const [localStorageKey, setLocalStorageKey] = useState<string | null>(null)
+  const [sessionKey, setSessionKey] = useState<string | null>(null)
   const [hasCookie, setHasCookie]             = useState(false)
   const [expiresAt, setExpiresAt]             = useState<string | null>(null)
   const [cookieTokenLength, setCookieTokenLength] = useState<number | null>(null)
@@ -22,48 +23,36 @@ export function AuthDebugPanel() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Supabase JS v2 stores session at '<storageKey>-auth-token'
-    const raw = localStorage.getItem('neufin-auth-auth-token')
-    setLocalStorageKey(raw ? 'neufin-auth-auth-token' : null)
-
-    // Parse expiry from stored session
-    try {
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        const storageToken = parsed?.access_token
-        setLocalStorageTokenLength(typeof storageToken === 'string' ? storageToken.length : null)
-        if (parsed?.expires_at) {
-          setExpiresAt(new Date(parsed.expires_at * 1000).toISOString())
-        }
+    const supabase = getSupabaseClient()
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      const sessionToken = session?.access_token ?? null
+      setSessionKey(sessionToken ? 'supabase-session' : null)
+      setLocalStorageTokenLength(typeof sessionToken === 'string' ? sessionToken.length : null)
+      if (typeof session?.expires_at === 'number') {
+        setExpiresAt(new Date(session.expires_at * 1000).toISOString())
       }
-    } catch {}
 
-    // Check neufin-auth cookie (what middleware reads)
-    const cookieEntries = Object.fromEntries(
-      document.cookie
-        .split(';')
-        .map((cookie) => cookie.trim())
-        .filter(Boolean)
-        .map((cookie) => {
-          const [key, ...value] = cookie.split('=')
-          return [key, value.join('=')]
-        })
-    )
-    const cookieToken = cookieEntries['neufin-auth'] ?? null
-    setHasCookie(Boolean(cookieToken))
-    setCookieTokenLength(cookieToken?.length ?? null)
+      // Check neufin-auth cookie (what middleware reads)
+      const cookieEntries = Object.fromEntries(
+        document.cookie
+          .split(';')
+          .map((cookie) => cookie.trim())
+          .filter(Boolean)
+          .map((cookie) => {
+            const [key, ...value] = cookie.split('=')
+            return [key, value.join('=')]
+          })
+      )
+      const cookieToken = cookieEntries['neufin-auth'] ?? null
+      setHasCookie(Boolean(cookieToken))
+      setCookieTokenLength(cookieToken?.length ?? null)
 
-    try {
-      const parsed = raw ? JSON.parse(raw) : null
-      const storageToken = parsed?.access_token ?? null
       setTokensMatch(
         typeof cookieToken === 'string' &&
-        typeof storageToken === 'string' &&
-        cookieToken === storageToken
+        typeof sessionToken === 'string' &&
+        cookieToken === sessionToken
       )
-    } catch {
-      setTokensMatch(null)
-    }
+    }).catch(() => setTokensMatch(null))
   }, [token]) // re-read on every token change
 
   if (process.env.NODE_ENV !== 'development') return null
@@ -100,9 +89,9 @@ export function AuthDebugPanel() {
           />
           <Row
             label="localStorage"
-            value={localStorageKey ? '✓ neufin-auth-auth-token' : '✗ missing'}
-            ok={!!localStorageKey}
-            dim={!localStorageKey}
+            value={sessionKey ? '✓ supabase session present' : '✗ missing'}
+            ok={!!sessionKey}
+            dim={!sessionKey}
           />
           <Row
             label="Cookie"
@@ -145,22 +134,21 @@ export function AuthDebugPanel() {
           <div className="pt-1 flex gap-2">
             <button
               onClick={() => {
-                const raw = localStorage.getItem('neufin-auth-auth-token')
-                let session = null
-                try { session = raw ? JSON.parse(raw) : null } catch {}
-                const cookieMap = Object.fromEntries(
-                  document.cookie.split(';').map(c => {
-                    const [k, ...v] = c.trim().split('=')
-                    return [k, v.join('=')]
-                  })
-                )
-                console.group('[AUTH DEBUG] Full state snapshot')
-                console.log('User:', user)
-                console.log('Token (first 40):', token?.slice(0, 40))
-                console.log('Session (localStorage):', session)
-                console.log('Cookies:', cookieMap)
-                console.log('All localStorage keys:', Object.keys(localStorage))
-                console.groupEnd()
+                const supabase = createClient()
+                void supabase.auth.getSession().then(({ data: { session } }) => {
+                  const cookieMap = Object.fromEntries(
+                    document.cookie.split(';').map(c => {
+                      const [k, ...v] = c.trim().split('=')
+                      return [k, v.join('=')]
+                    })
+                  )
+                  console.group('[AUTH DEBUG] Full state snapshot')
+                  console.log('User:', user)
+                  console.log('Token (first 40):', token?.slice(0, 40))
+                  console.log('Session (supabase):', session)
+                  console.log('Cookies:', cookieMap)
+                  console.groupEnd()
+                })
               }}
               className="bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded transition-colors"
             >
@@ -168,17 +156,16 @@ export function AuthDebugPanel() {
             </button>
             <button
               onClick={() => {
-                // Force re-sync the cookie from localStorage
-                const raw = localStorage.getItem('neufin-auth-auth-token')
-                try {
-                  const s = raw ? JSON.parse(raw) : null
-                  if (s?.access_token) {
-                    const maxAge = s.expires_in ?? 3600
-                    document.cookie = `neufin-auth=${s.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
+                // Force re-sync the cookie from Supabase session
+                const supabase = createClient()
+                void supabase.auth.getSession().then(({ data: { session } }) => {
+                  if (session?.access_token) {
+                    const maxAge = session.expires_in ?? 3600
+                    document.cookie = `neufin-auth=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
                     setHasCookie(true)
                     console.log('[AUTH DEBUG] Cookie manually synced ✓')
                   }
-                } catch {}
+                })
               }}
               className="bg-orange-600 hover:bg-orange-500 px-2 py-1 rounded transition-colors"
             >

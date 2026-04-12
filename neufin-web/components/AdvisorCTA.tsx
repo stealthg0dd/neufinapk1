@@ -31,7 +31,7 @@ export default function AdvisorCTA({ refToken }: Props) {
     // Strategy: validate via /api/referrals/validate/{ref_token}, then
     // attempt GET /api/advisors/{ref_token} as a best-effort lookup
     // (backend can handle missing gracefully with 404).
-    const API = process.env.NEXT_PUBLIC_API_URL || 'https://neufin101-production.up.railway.app'
+    const API = process.env.NEXT_PUBLIC_API_URL || ''
     fetch(`${API}/api/advisors/by-token/${refToken}`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then((advisorData: AdvisorProfile) => {

@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { Check, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import { apiFetch } from '@/lib/api-client'
 import { GlassCard } from '@/components/ui/GlassCard'
 import toast from 'react-hot-toast'
+import { stripeSuccessUrlDashboard } from '@/lib/stripe-checkout-urls'
 
 const faqs = [
   {
@@ -73,15 +76,11 @@ export default function PricingPageClient() {
         return
       }
       const origin = window.location.origin
-      const res = await fetch('/api/payments/checkout', {
+      const res = await apiFetch('/api/payments/checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           plan: 'unlimited',
-          success_url: `${origin}/pricing/success`,
+          success_url: stripeSuccessUrlDashboard(origin),
           cancel_url: `${origin}/pricing`,
         }),
       })
@@ -259,7 +258,10 @@ export default function PricingPageClient() {
       </section>
 
       <footer className="border-t border-[var(--border)] py-6 text-center text-xs text-[var(--text-muted)]">
-        NeuFin © {new Date().getFullYear()}
+        <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
+          <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="mb-3 h-6 w-auto opacity-80" />
+          <span>NeuFin © {new Date().getFullYear()}</span>
+        </div>
       </footer>
     </div>
   )

@@ -96,6 +96,60 @@ async def list_api_keys(user: JWTUser = Depends(get_current_user)):
         raise HTTPException(500, f"Could not fetch API keys: {e}") from e
 
 
+@router.get("/keys/usage")
+async def get_api_key_usage(user: JWTUser = Depends(get_current_user)):
+    """
+    Usage summary for API keys:
+      - monthly_calls_by_key: calls aggregated per key for current UTC month
+      - last_7_days: total calls per day (all keys combined)
+    """
+    _require_enterprise_plan(user)
+    now = datetime.datetime.utcnow()
+    month_start = datetime.datetime(now.year, now.month, 1).date()
+    seven_days_ago = (now - datetime.timedelta(days=6)).date()
+    try:
+        keys_res = (
+            supabase.table("api_keys").select("id").eq("user_id", user.id).execute()
+        )
+        key_ids = [k["id"] for k in (keys_res.data or []) if k.get("id")]
+        if not key_ids:
+            return {"monthly_calls_by_key": {}, "last_7_days": []}
+
+        usage_res = (
+            supabase.table("api_keys_daily_usage")
+            .select("key_id,date,calls")
+            .in_("key_id", key_ids)
+            .gte("date", month_start.isoformat())
+            .order("date", desc=False)
+            .execute()
+        )
+        rows = usage_res.data or []
+
+        monthly_calls_by_key: dict[str, int] = {}
+        daily_totals: dict[str, int] = {}
+        for row in rows:
+            key_id = str(row.get("key_id") or "")
+            date = str(row.get("date") or "")
+            calls = int(row.get("calls") or 0)
+            if not key_id or not date:
+                continue
+            monthly_calls_by_key[key_id] = monthly_calls_by_key.get(key_id, 0) + calls
+            if date >= seven_days_ago.isoformat():
+                daily_totals[date] = daily_totals.get(date, 0) + calls
+
+        last_7_days = []
+        for i in range(7):
+            day = (seven_days_ago + datetime.timedelta(days=i)).isoformat()
+            last_7_days.append({"date": day, "calls": daily_totals.get(day, 0)})
+
+        return {
+            "monthly_calls_by_key": monthly_calls_by_key,
+            "last_7_days": last_7_days,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Could not fetch API usage: {e}") from e
+
+
 @router.post("/keys", status_code=201)
 async def create_api_key(
     body: CreateKeyRequest, user: JWTUser = Depends(get_current_user)
@@ -124,6 +178,7 @@ async def create_api_key(
 
     raw_key = f"nf_{secrets.token_urlsafe(32)}"
     key_hash = _hash_key(raw_key)
+    key_prefix = raw_key[:14] if len(raw_key) >= 14 else raw_key
 
     try:
         result = (
@@ -132,6 +187,7 @@ async def create_api_key(
                 {
                     "user_id": user.id,
                     "key_hash": key_hash,
+                    "key_prefix": key_prefix,
                     "name": body.name,
                     "is_active": True,
                     "rate_limit_per_day": 10000,

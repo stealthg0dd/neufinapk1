@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Neufin',
@@ -249,7 +250,10 @@ export default function PrivacyPage() {
 
       <footer className="border-t border-gray-800/60 py-6">
         <div className="max-w-3xl mx-auto px-6 flex items-center justify-between text-xs text-gray-600">
-          <span>© {new Date().getFullYear()} {COMPANY}</span>
+          <div className="flex items-center gap-3">
+            <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="h-6 w-auto opacity-80" />
+            <span>© {new Date().getFullYear()} {COMPANY}</span>
+          </div>
           <div className="flex gap-4">
             <Link href="/" className="hover:text-gray-400 transition-colors">Home</Link>
             <Link href="/upload" className="hover:text-gray-400 transition-colors">Analyse Portfolio</Link>

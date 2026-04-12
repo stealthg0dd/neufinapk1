@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from config import (
     APP_BASE_URL,
+    STRIPE_PRICE_ADVISOR_MONTHLY,
     STRIPE_PRICE_SINGLE,
     STRIPE_PRICE_UNLIMITED,
     STRIPE_REFERRAL_COUPON_ID,
@@ -30,7 +31,6 @@ from config import (
     STRIPE_WEBHOOK_SECRET,
 )
 from database import supabase
-from services.ai_router import get_ai_analysis
 from services.analytics import track
 from services.auth_dependency import get_optional_user, invalidate_subscription_cache
 from services.calculator import calculate_portfolio_metrics
@@ -62,7 +62,9 @@ class CheckoutRequest(BaseModel):
 
 
 def _upload_pdf(pdf_bytes: bytes, report_id: str) -> str | None:
-    filename = f"{datetime.datetime.utcnow().strftime('%Y/%m/%d')}/report-{report_id[:8]}.pdf"
+    filename = (
+        f"{datetime.datetime.utcnow().strftime('%Y/%m/%d')}/report-{report_id[:8]}.pdf"
+    )
     try:
         supabase.storage.from_("advisor-reports").upload(
             path=filename,
@@ -80,7 +82,7 @@ async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | No
     try:
         positions_result = (
             supabase.table("portfolio_positions")
-            .select("symbol, shares, cost_basis")
+            .select("symbol, shares")
             .eq("portfolio_id", portfolio_id)
             .execute()
         )
@@ -88,23 +90,48 @@ async def _generate_and_store_pdf(portfolio_id: str, report_id: str) -> str | No
             return None
 
         metrics = calculate_portfolio_metrics(positions_result.data)
-
-        prompt = f"""You are a senior portfolio strategist.
-Portfolio metrics: {metrics}
-Return ONLY valid JSON:
-{{
-  "dna_score": <0-100>,
-  "investor_type": "<Diversified Strategist | Conviction Growth | Momentum Trader | Defensive Allocator | Speculative Investor>",
-  "strengths": ["s1","s2","s3"],
-  "weaknesses": ["w1","w2"],
-  "recommendation": "<actionable recommendation>",
-  "risk_assessment": "<2-sentence risk overview>",
-  "market_outlook": "<2-sentence market positioning>",
-  "action_items": ["a1","a2","a3"]
-}}"""
-
-        analysis = await get_ai_analysis(prompt)
-        pdf_bytes = generate_advisor_report({"metrics": metrics}, analysis)
+        dna_row = None
+        try:
+            dna_result = (
+                supabase.table("dna_scores")
+                .select("*")
+                .eq("portfolio_id", portfolio_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            dna_row = dna_result.data[0] if dna_result.data else None
+        except Exception as e:
+            logger.debug("payments.dna_lookup_skipped", error=str(e))
+        try:
+            pr = (
+                supabase.table("portfolios")
+                .select("name, total_value")
+                .eq("id", portfolio_id)
+                .single()
+                .execute()
+            )
+            prow = pr.data or {}
+        except Exception:
+            prow = {}
+        portfolio_payload = {
+            "name": prow.get("name") or "Portfolio",
+            "total_value": float(
+                prow.get("total_value") or metrics.get("total_value") or 0
+            ),
+            "metrics": metrics,
+        }
+        advisor_config = {
+            "advisor_name": "NeuFin Intelligence",
+            "firm_name": "",
+            "report_run_id": report_id[:8],
+        }
+        pdf_bytes = await generate_advisor_report(
+            portfolio_payload,
+            dna_row or {},
+            None,
+            advisor_config,
+        )
         pdf_url = _upload_pdf(pdf_bytes, report_id)
 
         if pdf_url:
@@ -116,6 +143,87 @@ Return ONLY valid JSON:
     except Exception as e:
         logger.warning("pdf.generation_failed", report_id=report_id, error=str(e))
         return None
+
+
+async def _get_portfolio_for_report(portfolio_id: str) -> dict:
+    positions_result = (
+        supabase.table("portfolio_positions")
+        .select("symbol, shares")
+        .eq("portfolio_id", portfolio_id)
+        .execute()
+    )
+    if not positions_result.data:
+        raise RuntimeError("No portfolio positions found for report generation.")
+    metrics = calculate_portfolio_metrics(positions_result.data)
+    dna_row = None
+    try:
+        dna_result = (
+            supabase.table("dna_scores")
+            .select("*")
+            .eq("portfolio_id", portfolio_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        dna_row = dna_result.data[0] if dna_result.data else None
+    except Exception as e:
+        logger.debug("payments.dna_lookup_skipped", error=str(e))
+    try:
+        pr = (
+            supabase.table("portfolios")
+            .select("name, total_value")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+        prow = pr.data or {}
+    except Exception:
+        prow = {}
+    return {
+        "portfolio_data": {
+            "name": prow.get("name") or "Portfolio",
+            "total_value": float(
+                prow.get("total_value") or metrics.get("total_value") or 0
+            ),
+            "metrics": metrics,
+        },
+        "dna_data": dna_row or {},
+        "swarm_data": None,
+    }
+
+
+async def _generate_pdf_background(report_id: str, portfolio_id: str):
+    """Runs after webhook response. Generates PDF and updates status."""
+    try:
+        payload = await _get_portfolio_for_report(portfolio_id)
+        pdf_bytes = await generate_advisor_report(
+            payload["portfolio_data"],
+            payload["dna_data"],
+            payload["swarm_data"],
+            {
+                "advisor_name": "NeuFin Intelligence",
+                "firm_name": "",
+                "report_run_id": report_id[:8],
+            },
+        )
+        pdf_url = _upload_pdf(pdf_bytes, report_id)
+        if not pdf_url:
+            raise RuntimeError("PDF upload failed")
+        supabase.table("advisor_reports").update(
+            {
+                "pdf_url": pdf_url,
+                "status": "ready",
+                "generation_completed_at": datetime.datetime.utcnow().isoformat(),
+                "error_message": None,
+            }
+        ).eq("id", report_id).execute()
+    except Exception as e:
+        supabase.table("advisor_reports").update(
+            {
+                "status": "failed",
+                "error_message": str(e),
+            }
+        ).eq("id", report_id).execute()
 
 
 def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
@@ -142,7 +250,9 @@ def _ensure_portfolio_access(portfolio_id: str, user: JWTUser) -> None:
 
 
 @router.post("/api/reports/checkout")
-async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(get_optional_user)):
+async def create_checkout(
+    body: CheckoutRequest, user: JWTUser | None = Depends(get_optional_user)
+):
     """
     Create a Stripe Checkout session.
     Returns { checkout_url, report_id } for the frontend to redirect.
@@ -154,9 +264,16 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
     if plan not in ("single", "unlimited"):
         raise HTTPException(400, "plan must be 'single' or 'unlimited'")
 
-    price_id = STRIPE_PRICE_SINGLE if plan == "single" else STRIPE_PRICE_UNLIMITED
+    # Advisor monthly plan should use STRIPE_PRICE_ADVISOR_MONTHLY (Railway env).
+    # Keep STRIPE_PRICE_UNLIMITED as backwards-compatible fallback.
+    if plan == "single":
+        price_id = STRIPE_PRICE_SINGLE
+    else:
+        price_id = STRIPE_PRICE_ADVISOR_MONTHLY or STRIPE_PRICE_UNLIMITED
     if not price_id:
-        raise HTTPException(503, f"Stripe price ID for plan '{plan}' is not configured.")
+        raise HTTPException(
+            503, f"Stripe price ID for plan '{plan}' is not configured."
+        )
 
     effective_advisor_id = "anonymous"
     if user:
@@ -195,14 +312,15 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                             "portfolio_id": portfolio_id,
                             "symbol": pos["symbol"],
                             "shares": pos["shares"],
-                            "cost_basis": pos.get("cost_basis"),
                         }
                     ).execute()
             except Exception as e:
                 raise HTTPException(422, f"Could not create portfolio: {e}") from e
 
         if not portfolio_id:
-            raise HTTPException(400, "portfolio_id or positions required for single report plan")
+            raise HTTPException(
+                400, "portfolio_id or positions required for single report plan"
+            )
 
         # Create pending advisor_report record
         try:
@@ -212,7 +330,9 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                     {
                         "portfolio_id": portfolio_id,
                         "advisor_id": (
-                            None if effective_advisor_id == "anonymous" else effective_advisor_id
+                            None
+                            if effective_advisor_id == "anonymous"
+                            else effective_advisor_id
                         ),
                         "is_paid": False,
                     }
@@ -253,29 +373,39 @@ async def create_checkout(body: CheckoutRequest, user: JWTUser | None = Depends(
                 "advisor_id": effective_advisor_id,
                 "ref_token": body.ref_token or "",
             },
-            "allow_promotion_codes": not bool(discounts),  # no promo codes if coupon applied
+            "allow_promotion_codes": not bool(
+                discounts
+            ),  # no promo codes if coupon applied
         }
         if discounts:
             session_params["discounts"] = discounts
 
         # FIXED: run blocking Stripe call in a thread to avoid holding the event loop (502 timeout fix)
-        session = await asyncio.to_thread(lambda: stripe.checkout.Session.create(**session_params))
+        session = await asyncio.to_thread(
+            lambda: stripe.checkout.Session.create(**session_params)
+        )
     except stripe.StripeError as e:
         raise HTTPException(502, f"Stripe error: {e.user_message}") from e
 
     # Funnel event: checkout initiated
-    await track(
-        "checkout_initiated",
-        {
-            "plan": plan,
-            "has_referral": bool(discounts),
-            "ref_token": body.ref_token or "",
-        },
-    )
+    try:
+        await track(
+            "checkout_initiated",
+            {
+                "plan": plan,
+                "has_referral": bool(discounts),
+                "ref_token": body.ref_token or "",
+            },
+        )
+    except Exception as e:
+        logger.debug("payments.track_checkout_init_failed", error=str(e))
 
     # Log referral use
     if discounts and body.ref_token:
-        await track("referral_used", {"ref_token": body.ref_token, "plan": plan})
+        try:
+            await track("referral_used", {"ref_token": body.ref_token, "plan": plan})
+        except Exception as e:
+            logger.debug("payments.track_referral_failed", error=str(e))
 
     return {
         "checkout_url": session.url,
@@ -304,7 +434,9 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
     sig_header = request.headers.get("stripe-signature", "")
 
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, STRIPE_WEBHOOK_SECRET
+        )
     except stripe.SignatureVerificationError as e:
         # CRITICAL: potential replay attack or misconfigured webhook secret
         msg = (
@@ -354,34 +486,44 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
         meta = session.get("metadata", {})
         plan = meta.get("plan")
         # Funnel event: payment confirmed
-        await track(
-            "payment_completed",
-            {
-                "plan": plan,
-                "amount_total": session.get("amount_total"),
-                "ref_token": meta.get("ref_token", ""),
-            },
-        )
+        try:
+            await track(
+                "payment_completed",
+                {
+                    "plan": plan,
+                    "amount_total": session.get("amount_total"),
+                    "ref_token": meta.get("ref_token", ""),
+                },
+            )
+        except Exception as e:
+            logger.debug("payments.track_payment_completed_failed", error=str(e))
         report_id = meta.get("report_id") or None
         portfolio_id = meta.get("portfolio_id") or None
         advisor_id = meta.get("advisor_id")
         stripe_customer_id = session.get("customer")
 
         if plan == "single" and report_id:
-            # Mark paid synchronously — fast DB call
-            supabase.table("advisor_reports").update({"is_paid": True}).eq(
-                "id", report_id
-            ).execute()
-            # Queue PDF generation as background task so we return 200 to Stripe
-            # immediately — PDF generation can take 3-30 seconds.
+            # Mark as paid and set async generation state.
+            supabase.table("advisor_reports").update(
+                {
+                    "is_paid": True,
+                    "status": "generating",
+                    "generation_started_at": datetime.datetime.utcnow().isoformat(),
+                    "error_message": None,
+                }
+            ).eq("id", report_id).execute()
+            # Queue PDF generation in background to return to Stripe immediately.
             if portfolio_id:
-                background_tasks.add_task(_generate_and_store_pdf, portfolio_id, report_id)
+                background_tasks.add_task(
+                    _generate_pdf_background, report_id, portfolio_id
+                )
 
         elif plan == "unlimited" and advisor_id and advisor_id != "anonymous":
             # Upgrade subscription status and store Stripe customer ID
             try:
                 supabase.table("user_profiles").update(
                     {
+                        "subscription_tier": "advisor",
                         "subscription_status": "active",
                         "stripe_customer_id": stripe_customer_id,
                         "trial_started_at": None,
@@ -398,7 +540,9 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
         sub = event["data"]["object"]
         customer_id = sub.get("customer")
         try:
-            customer = await asyncio.to_thread(lambda: stripe.Customer.retrieve(customer_id))
+            customer = await asyncio.to_thread(
+                lambda: stripe.Customer.retrieve(customer_id)
+            )
             advisor_id = customer.get("metadata", {}).get("advisor_id")
             if advisor_id:
                 supabase.table("user_profiles").update(
@@ -415,16 +559,30 @@ async def stripe_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
 @router.get("/api/reports/fulfill")
-async def fulfill_report(report_id: str, user: JWTUser | None = Depends(get_optional_user)):
+async def fulfill_report(
+    report_id: str, user: JWTUser | None = Depends(get_optional_user)
+):
     """
     Called from the frontend success page.
-    If the report is paid but has no PDF yet, generates it now.
-    Returns { pdf_url } or triggers generation.
+    Returns explicit report status state for polling UX.
     """
+    # Supabase migration to run before deploying this flow:
+    # /*
+    # ALTER TABLE advisor_reports
+    #   ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending',
+    #   ADD COLUMN IF NOT EXISTS error_message TEXT,
+    #   ADD COLUMN IF NOT EXISTS generation_started_at TIMESTAMPTZ,
+    #   ADD COLUMN IF NOT EXISTS generation_completed_at TIMESTAMPTZ;
+    #
+    # CREATE INDEX IF NOT EXISTS idx_advisor_reports_status
+    #   ON advisor_reports(status);
+    # */
     try:
         result = (
             supabase.table("advisor_reports")
-            .select("id, portfolio_id, advisor_id, is_paid, pdf_url")
+            .select(
+                "id, portfolio_id, advisor_id, is_paid, pdf_url, status, error_message, created_at"
+            )
             .eq("id", report_id)
             .single()
             .execute()
@@ -439,19 +597,15 @@ async def fulfill_report(report_id: str, user: JWTUser | None = Depends(get_opti
             raise HTTPException(401, "Authentication required for this report.")
         if record.get("advisor_id") != user.id:
             raise HTTPException(404, "Report not found.")
-    if not record["is_paid"]:
-        raise HTTPException(402, "Payment not yet confirmed. Please wait a moment and retry.")
 
-    # Already has PDF
-    if record.get("pdf_url"):
-        return {"pdf_url": record["pdf_url"], "ready": True}
-
-    # Generate now
-    pdf_url = await _generate_and_store_pdf(record["portfolio_id"], report_id)
-    if not pdf_url:
-        raise HTTPException(500, "PDF generation failed. Please contact support.")
-
-    return {"pdf_url": pdf_url, "ready": True}
+    return {
+        "report_id": report_id,
+        "status": record.get("status", "pending"),  # pending|generating|ready|failed
+        "is_paid": record.get("is_paid", False),
+        "pdf_url": record.get("pdf_url"),
+        "error": record.get("error_message"),
+        "created_at": record.get("created_at"),
+    }
 
 
 @router.get("/api/payments/plans")

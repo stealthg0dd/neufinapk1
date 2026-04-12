@@ -35,56 +35,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   useEffect(() => {
     debugAuth('AuthProvider:mount')
-    supabase.auth.getSession().then(({ data }) => {
-      logger.debug({
-        hasSession: Boolean(data.session),
-        hasToken: Boolean(data.session?.access_token),
-        userId: data.session?.user?.id ?? null,
-      }, 'auth.initial_session')
-      setUser(data.session?.user ?? null)
-      setToken(data.session?.access_token ?? null)
-      setIsLoading(false)
-      syncAuthCookie(data.session ?? null)
-      debugAuth('AuthProvider:getSession')
-    })
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      logger.debug({
-        event,
-        hasSession: Boolean(session),
-        hasToken: Boolean(session?.access_token),
-        userId: session?.user?.id ?? null,
-      }, 'auth.state_change')
+    let listener: { subscription: { unsubscribe: () => void } } | null = null
+    let refreshInterval: ReturnType<typeof setInterval> | null = null
+    const detachSupabaseDebug = attachSupabaseAuthDebug()
+
+    const run = async () => {
+      // Extract hash tokens BEFORE any component can clear them
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash
+        if (hash.includes('access_token=')) {
+          const params = new URLSearchParams(hash.substring(1))
+          const accessToken = params.get('access_token')
+          const refreshToken = params.get('refresh_token')
+          if (accessToken && refreshToken) {
+            // Clear hash immediately so no other component races with us
+            window.history.replaceState(null, '', window.location.pathname + window.location.search)
+            // Set session synchronously before any other auth code runs
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          }
+        }
+      }
+
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        logger.debug(
+          {
+            event,
+            hasSession: Boolean(session),
+            hasToken: Boolean(session?.access_token),
+            userId: session?.user?.id ?? null,
+          },
+          'auth.state_change',
+        )
+        setUser(session?.user ?? null)
+        setToken(session?.access_token ?? null)
+        setIsLoading(false)
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          syncAuthCookie(session ?? null)
+        }
+        if (event === 'SIGNED_OUT') {
+          syncAuthCookie(null)
+          setUser(null)
+        }
+        debugAuth(`AuthProvider:${event}`)
+        if (session?.user) {
+          Sentry.setUser({ id: session.user.id, email: session.user.email })
+        } else {
+          Sentry.setUser(null)
+        }
+      })
+      listener = data
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      logger.debug(
+        {
+          hasSession: Boolean(session),
+          hasToken: Boolean(session?.access_token),
+          userId: session?.user?.id ?? null,
+        },
+        'auth.initial_session',
+      )
       setUser(session?.user ?? null)
       setToken(session?.access_token ?? null)
       setIsLoading(false)
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        syncAuthCookie(session ?? null)
-      }
-      if (event === 'SIGNED_OUT') {
-        syncAuthCookie(null)
-        setUser(null)
-      }
-      debugAuth(`AuthProvider:${event}`)
-      if (session?.user) {
-        Sentry.setUser({ id: session.user.id, email: session.user.email })
-      } else {
-        Sentry.setUser(null)
-      }
-    })
-    const refreshInterval = setInterval(async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data.session) {
-        logger.debug({ userId: data.session.user?.id ?? null }, 'auth.proactive_refresh')
-        syncAuthCookie(data.session)
-        setToken(data.session.access_token)
-      }
-    }, 5 * 60 * 1000)
+      syncAuthCookie(session ?? null)
+      debugAuth('AuthProvider:getSession')
 
-    const detachSupabaseDebug = attachSupabaseAuthDebug()
+      refreshInterval = setInterval(async () => {
+        const { data } = await supabase.auth.getSession()
+        if (data.session) {
+          logger.debug({ userId: data.session.user?.id ?? null }, 'auth.proactive_refresh')
+          syncAuthCookie(data.session)
+          setToken(data.session.access_token)
+        }
+      }, 5 * 60 * 1000)
+    }
+
+    void run()
 
     return () => {
-      listener.subscription.unsubscribe()
-      clearInterval(refreshInterval)
+      listener?.subscription.unsubscribe()
+      if (refreshInterval) clearInterval(refreshInterval)
       detachSupabaseDebug()
     }
   }, [])

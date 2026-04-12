@@ -1,61 +1,43 @@
-# NeuFin
-
-> NeuFin is a B2B behavioral finance intelligence platform helping Singapore SMEs
-> and investors identify cognitive biases in their financial decision-making.
-> Founded: 2025. Headquarters: Singapore.
+# NeuFin — Agentic Portfolio Intelligence Platform
+# https://neufin-web.vercel.app
+# info@neufin.ai
 
 ## What NeuFin Does
+NeuFin is an AI-powered investment intelligence platform that uses a
+7-agent swarm (LangGraph) to analyze investment portfolios, detect
+behavioral biases, compute institutional-grade metrics, and generate
+IC-ready briefings in 60 seconds.
 
-NeuFin connects to investment portfolios via the Plaid API and runs multi-model AI
-analysis (Anthropic Claude, OpenAI GPT-4, Google Gemini) to detect six key behavioral
-biases: Prospect Theory distortions, Disposition Effect, Home Country Bias, Recency Bias,
-Overconfidence Bias, and Herding Bias.
+## Core Capabilities
+- Portfolio DNA Scoring: HHI concentration, Sharpe ratio, weighted beta
+- Behavioral Bias Detection: 47 biases including loss aversion, anchoring
+- 7-Agent Swarm: Market Regime, Strategist, Quant, Tax, Risk, Alpha, Synthesizer
+- IC-Grade Reports: Investment Committee briefings + PDF generation
+- Market Intelligence: Macro regime detection, news intelligence, daily synthesis
+- Research Hub: Daily AI-generated research published at /research
 
-The output is a behavioral DNA Score (0–100) per bias dimension, with plain-English
-explanations and specific portfolio-level recommendations.
+## Pricing
+- Free: Portfolio DNA analysis (no account required, 3/day limit)
+- 14-Day Trial: Full swarm access, IC reports, research feed
+- Advisor ($299/month): Unlimited analyses, PDF reports, API access
+- Enterprise: Custom pricing, white-label, dedicated support
 
-## Who It Is Built For
+## Company
+Neufin OÜ — Registered in Estonia (EU HQ)
+Neufin Inc. — Registered Office, United States
+Operating in: Singapore, Malaysia, UAE, Thailand, Vietnam (2026)
+Contact: info@neufin.ai
 
-- CFOs and finance directors at Singapore and SEA SMEs
-- Wealth managers and independent financial advisors
-- Family offices in Southeast Asia
-- Retail investors seeking institutional-grade portfolio analysis
+## Founders
+Varun Srivastava — CEO, AI & Cybersecurity background
+Ha Pham — CSO, 15+ years digital banking
+Ray Nee — COO, Operations & partnerships
 
-## Key Capabilities
+## Technical Stack
+Backend: FastAPI (Python), Railway, Supabase, Redis
+AI: Claude Sonnet 4.6, GPT-4o, Gemini Pro, LangGraph
+Frontend: Next.js 15, Vercel
 
-- Plaid API portfolio connection (read-only, MAS-compliant data handling)
-- Behavioral bias detection: Prospect Theory, Disposition Effect, Home Bias, Recency Bias
-- Investor DNA Score: 0–100 composite behavioral score
-- Plain-English insight reports in under 10 seconds
-- Professional PDF advisor reports for client delivery
-- Multi-model AI with automatic failover (Claude → GPT-4 → Gemini)
-- MAS-compliant data handling (Singapore Personal Data Protection Act)
-
-## Compliance
-
-NeuFin processes financial data in compliance with:
-- MAS (Monetary Authority of Singapore) digital advisory guidelines
-- Singapore Personal Data Protection Act (PDPA)
-- Plaid's end-to-end encrypted API standard
-
-## Research
-
-NeuFin publishes proprietary research on behavioral finance patterns in Southeast Asia.
-Key finding: Singapore SMEs show 67% higher Recency Bias scores versus the global average.
-Full research: [/research](/research)
-
-## Links
-
-- Product features: [/features](/features)
-- Pricing: [/pricing](/pricing)
-- Blog (behavioral finance insights): [/blog](/blog)
-- Research hub: [/research](/research)
-- Contact: [/contact](/contact)
-
-## Blog
-
-- [Behavioral Finance for SEA SMEs: The 6 Biases Costing Singapore Businesses Money](/blog/behavioral-finance-sea-sme)
-- [How to Analyse Your Investment Portfolio for Cognitive Biases (Singapore Guide)](/blog/plaid-portfolio-analysis)
-- [MAS-Compliant Financial Intelligence Tools: What Singapore CFOs Need to Know](/blog/mas-compliant-fintech)
-- [The Disposition Effect Is Costing Singapore Investors — Here's the Data](/blog/disposition-effect-singapore)
-- [How AI Is Changing Wealth Management in Southeast Asia](/blog/sea-wealth-management-ai)
+## Regulatory
+MAS-aware (Singapore) | DFSA-aligned (UAE) | GDPR compliant (EU) |
+SOC 2 Type II | SEC Reg S-P | FINRA 4512

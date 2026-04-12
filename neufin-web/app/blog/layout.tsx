@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function BlogLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -32,7 +33,7 @@ export default function BlogLayout({ children }: { children: React.ReactNode }) 
       <footer className="border-t border-gray-800 mt-16">
         <div className="max-w-3xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <span className="font-bold text-gradient">NeuFin</span>
+            <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="h-6 w-auto mb-3 opacity-80" />
             <p className="text-xs text-gray-500 mt-1">
               Behavioral finance intelligence for SEA SMEs · Founded 2025 · Singapore
             </p>

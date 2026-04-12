@@ -17,6 +17,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { apiFetch } from "@/lib/api-client"
 import type { NeuFinHealthData, RepoHeartbeat, ScanFinding, RepoDeployment } from "@/app/api/neufin/health/route"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -667,7 +668,7 @@ export default function AgentOSDashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const res  = await fetch("/api/agent-os/status", { cache: "no-store" })
+      const res  = await apiFetch("/api/agent-os/status", { cache: "no-store" })
       const json = await res.json() as DashboardData
       if (!res.ok || json.error) throw new Error(json.error ?? `HTTP ${res.status}`)
       setData(json)
@@ -684,7 +685,7 @@ export default function AgentOSDashboard() {
   // ── NeuFin health refresh (60s poll) ────────────────────────────────────────
   const refreshNeufinHealth = useCallback(async () => {
     try {
-      const res = await fetch("/api/neufin/health", { cache: "no-store" })
+      const res = await apiFetch("/api/neufin/health", { cache: "no-store" })
       if (res.ok) setNeufinHealth(await res.json())
     } catch { /* non-critical — fail silently */ }
   }, [])
@@ -694,7 +695,7 @@ export default function AgentOSDashboard() {
     setScanRunning(true)
     setScanError(null)
     try {
-      const res = await fetch("/api/agent-os/repos/neufin-backend/run-scan", { method: "POST" })
+      const res = await apiFetch("/api/agent-os/repos/neufin-backend/run-scan", { method: "POST" })
       if (!res.ok) {
         const j = await res.json().catch(() => ({})) as { detail?: string }
         throw new Error(j.detail ?? `HTTP ${res.status}`)

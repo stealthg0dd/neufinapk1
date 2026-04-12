@@ -25,6 +25,7 @@ except ImportError:
 import os  # noqa: E402
 
 import sentry_sdk  # noqa: E402
+import stripe  # noqa: E402
 from sentry_sdk.integrations.fastapi import FastApiIntegration  # noqa: E402
 from sentry_sdk.integrations.starlette import StarletteIntegration  # noqa: E402
 
@@ -96,6 +97,7 @@ from routers import (  # noqa: E402
     market,
     payments,
     portfolio,
+    profile as profile_router,
     referrals,
     reports,
     research as research_router,
@@ -146,6 +148,16 @@ def _check_supabase_connected() -> bool:
 
 # ── Router-system registration + heartbeat ────────────────────────────────────
 _heartbeat_task: asyncio.Task | None = None
+_heartbeat_422_logged = False
+
+
+def _first_present_env(*names: str) -> str:
+    """Return first env name that is present/non-empty, else MISSING."""
+    for name in names:
+        val = os.getenv(name)
+        if val and val.strip():
+            return name
+    return "MISSING"
 
 
 async def _register_with_router_system() -> None:
@@ -180,18 +192,40 @@ async def _heartbeat_loop() -> None:
     """Send a heartbeat to the Agent OS router-system every 60 seconds."""
     import httpx
 
+    global _heartbeat_422_logged
+
     while True:
         await asyncio.sleep(60)
         if not settings.AGENT_OS_API_KEY:
             continue
         try:
+            payload = {
+                "service": "neufin-backend",
+                "status": "ok",
+                "version": settings.APP_VERSION,
+                "environment": settings.ENVIRONMENT,
+                "uptime_seconds": round(time.monotonic() - _startup_time, 1),
+                "base_url": settings.APP_BASE_URL,
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            }
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
                     f"{settings.AGENT_OS_URL}/api/heartbeat/neufin-backend",
+                    json=payload,
                     headers={"x-api-key": settings.AGENT_OS_API_KEY},
                 )
-                resp.raise_for_status()
-                logger.debug("router_system.heartbeat_sent", status=resp.status_code)
+                if resp.status_code == 422:
+                    if not _heartbeat_422_logged:
+                        logger.warning(
+                            "router_system.heartbeat_schema_mismatch_with_agent_os",
+                            status=resp.status_code,
+                        )
+                        _heartbeat_422_logged = True
+                else:
+                    resp.raise_for_status()
+                    logger.debug(
+                        "router_system.heartbeat_sent", status=resp.status_code
+                    )
         except Exception as exc:
             logger.warning("router_system.heartbeat_failed", error=str(exc))
 
@@ -210,6 +244,16 @@ async def lifespan(app: FastAPI):
         version=settings.APP_VERSION,
         environment=settings.ENVIRONMENT,
         sentry_active=bool(settings.SENTRY_DSN),
+    )
+    logger.info(
+        "env.alias_resolution",
+        anthropic_key_source=_first_present_env("ANTHROPIC_API_KEY", "ANTHROPIC_KEY_1"),
+        gemini_key_source=_first_present_env("GEMINI_KEY", "GOOGLE_API_KEY"),
+        openai_key_source=_first_present_env("OPENAI_KEY", "OPENAI_API_KEY"),
+        supabase_service_key_source=_first_present_env(
+            "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"
+        ),
+        agent_os_key_source=_first_present_env("AGENT_OS_API_KEY", "ROUTER_SECRET_KEY"),
     )
 
     # Register with router-system (non-blocking — warning on failure)
@@ -522,7 +566,7 @@ except ImportError:
     )
 
 # ── CORS — origins from settings ──────────────────────────────────────────────
-_origin_regex = r"https://[a-zA-Z0-9\-]+\.vercel\.app"
+_origin_regex = r"https://(www\.)?neufin\.ai|https://[a-zA-Z0-9\-]+\.vercel\.app"
 
 # ── Middleware ordering ────────────────────────────────────────────────────────
 #
@@ -572,6 +616,30 @@ async def request_logging_middleware(request: Request, call_next):
     t0 = time.monotonic()
     response = await call_next(request)
     duration_ms = round((time.monotonic() - t0) * 1000, 1)
+
+    # Lightweight latency / error samples for GET /api/admin/system (in-process).
+    try:
+        p = request.url.path
+        if p not in (
+            "/health",
+            "/api/admin/health",
+            "/metrics",
+            "/favicon.ico",
+            "/openapi.json",
+        ):
+            from services.request_metrics import record_http_sample
+
+            record_http_sample(
+                duration_ms=duration_ms,
+                status_code=response.status_code,
+                path=p,
+            )
+    except Exception as exc:
+        logger.warning(
+            "http.request_metrics_sample_failed",
+            error=str(exc),
+            path=request.url.path,
+        )
 
     user_id = getattr(getattr(request.state, "user", None), "id", None)
     logger.info(
@@ -648,6 +716,7 @@ app.include_router(alerts.router)
 app.include_router(admin_router.router)
 app.include_router(revenue_router.router)
 app.include_router(research_router.router)
+app.include_router(profile_router.router)
 
 
 # ── Global OPTIONS handler ─────────────────────────────────────────────────────
@@ -759,11 +828,82 @@ async def analyze_dna(
             )
 
     # ── 2.1 Subscription usage gate ─────────────────────────────────────────────
-    # For authenticated users, enforce monthly DNA analysis limits based on plan.
+    # Paywall rules:
+    # - Viewing existing portfolios/metrics is soft-paywall (handled by other endpoints).
+    # - Upload + analysis is hard-paywall after trial expiry: return 402 + checkout_url.
+    # - During trial: treat as Advisor-tier (full access).
     if user_id:
         try:
             from routers.vault import PLAN_DNA_LIMITS
+            from services.auth_dependency import get_subscription_status as _sub_status
             from services.usage_tracker import check_dna_limit
+
+            sub = _sub_status(user_id)
+            status_val = sub.get("status")
+            tier_val = str(sub.get("tier") or "").lower()
+
+            if status_val == "expired" and tier_val not in (
+                "retail",
+                "advisor",
+                "enterprise",
+            ):
+                # Trial expired and no paid subscription: block new analyses and provide Stripe checkout URL.
+                price_id = (
+                    settings.STRIPE_PRICE_ADVISOR_MONTHLY
+                    or settings.STRIPE_PRICE_ADVISOR_REPORT_ONETIME
+                )
+                if not (settings.STRIPE_SECRET_KEY and price_id):
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "message": "Trial expired. Subscribe to upload a new portfolio.",
+                            "upgrade_url": "/pricing",
+                        },
+                    )
+
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                mode = (
+                    "subscription"
+                    if settings.STRIPE_PRICE_ADVISOR_MONTHLY
+                    else "payment"
+                )
+                session_params: dict = {
+                    "line_items": [{"price": price_id, "quantity": 1}],
+                    "mode": mode,
+                    "success_url": f"{settings.APP_BASE_URL}/dashboard?billing=success&session_id={{CHECKOUT_SESSION_ID}}",
+                    "cancel_url": f"{settings.APP_BASE_URL}/dashboard/portfolio?billing=cancelled",
+                    "metadata": {
+                        "plan": "unlimited" if mode == "subscription" else "single",
+                        "user_id": user_id,
+                    },
+                }
+                try:
+                    session = await asyncio.to_thread(
+                        lambda: stripe.checkout.Session.create(**session_params)
+                    )
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "message": "Trial expired. Subscribe to upload a new portfolio.",
+                            "checkout_url": session.url,
+                        },
+                    )
+                except stripe.StripeError as e:
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "message": "Trial expired. Subscribe to continue.",
+                            "upgrade_url": "/pricing",
+                            "stripe_error": e.user_message,
+                        },
+                    ) from e
+
+            # Trial override for usage limits (treat as advisor tier).
+            if status_val == "trial":
+                tier_val = "advisor"
 
             _profile = (
                 supabase.table("user_profiles")
@@ -772,9 +912,10 @@ async def analyze_dna(
                 .limit(1)
                 .execute()
             )
-            _tier = (
+            stored_tier = (
                 _profile.data[0].get("subscription_tier") if _profile.data else None
             ) or "free"
+            _tier = tier_val or str(stored_tier).lower()
             _limit = PLAN_DNA_LIMITS.get(_tier, 3)
             _check = check_dna_limit(user_id, _limit)
             if not _check["allowed"]:
@@ -961,7 +1102,6 @@ Return ONLY valid JSON:
                             "portfolio_id": portfolio_id,
                             "symbol": pos["symbol"],
                             "shares": pos["shares"],
-                            "cost_basis": None,
                         }
                     ).execute()
                 except Exception:
@@ -1269,3 +1409,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)
+
+# rebuild: activate research intelligence routes

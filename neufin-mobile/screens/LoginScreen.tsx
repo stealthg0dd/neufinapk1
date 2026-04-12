@@ -14,12 +14,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
-  Image,
-  Platform,
+  Linking as RNLinking,
 } from 'react-native'
+import Svg, { Path } from 'react-native-svg'
 import * as WebBrowser from 'expo-web-browser'
 import * as Linking from 'expo-linking'
 import { getOAuthRedirectUrl, supabase } from '@/lib/supabase'
+import { colors } from '@/lib/theme'
 
 // Required for expo-web-browser to dismiss the auth session properly on Android
 WebBrowser.maybeCompleteAuthSession()
@@ -133,35 +134,21 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Brand */}
-      <View style={styles.brand}>
-        <Text style={styles.logo}>🧬</Text>
-        <Text style={styles.appName}>Neufin</Text>
-        <Text style={styles.tagline}>AI Portfolio Intelligence</Text>
+      <View style={styles.top}>
+        <View style={styles.logoBox}>
+          <Text style={styles.logoN}>N</Text>
+        </View>
+        <Text style={styles.brand}>NEUFIN</Text>
+        <Text style={styles.tagline}>7 AI Agents. IC-Grade Intelligence.</Text>
+        <Text style={styles.proof}>500+ investors · SOC 2 Certified · MAS Aware</Text>
       </View>
 
-      {/* Value props */}
-      <View style={styles.features}>
-        {[
-          { icon: '🧬', text: 'Discover your Investor DNA score' },
-          { icon: '🤖', text: 'Multi-model AI swarm analysis' },
-          { icon: '🔔', text: 'Regime-change push alerts' },
-        ].map(({ icon, text }) => (
-          <View key={text} style={styles.featureRow}>
-            <Text style={styles.featureIcon}>{icon}</Text>
-            <Text style={styles.featureText}>{text}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Error */}
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
 
-      {/* Google sign-in */}
       <TouchableOpacity
         style={[styles.googleBtn, loading && styles.btnDisabled]}
         onPress={signInWithGoogle}
@@ -169,75 +156,73 @@ export default function LoginScreen({ onAuthSuccess }: Props) {
         activeOpacity={0.8}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
+          <ActivityIndicator color={colors.background} size="small" />
         ) : (
           <>
-            <Text style={styles.googleIcon}>G</Text>
+            <GoogleIcon />
             <Text style={styles.googleBtnText}>Continue with Google</Text>
           </>
         )}
       </TouchableOpacity>
 
       <Text style={styles.disclaimer}>
-        By signing in you agree to our Terms of Service.{'\n'}
-        Your portfolio data is encrypted at rest.
+        By continuing you agree to our Terms and Privacy Policy{'\n'}
+        <Text style={styles.email} onPress={() => RNLinking.openURL('mailto:info@neufin.ai')}>
+          info@neufin.ai
+        </Text>
       </Text>
     </View>
+  )
+}
+
+function GoogleIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24">
+      <Path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.04 5.04 0 0 1-2.21 3.31v2.77h3.57a10.99 10.99 0 0 0 3.28-8.09z" />
+      <Path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+      <Path fill="#FBBC05" d="M5.84 14.09A6.96 6.96 0 0 1 5.5 12c0-.73.13-1.43.35-2.09V7.07H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.93l3.66-2.84z" />
+      <Path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.96 10.96 0 0 0 12 1 11 11 0 0 0 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
+    </Svg>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#030712',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingHorizontal: 24,
   },
-  brand: {
+  top: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 28,
   },
-  logo: {
-    fontSize: 56,
-    marginBottom: 12,
+  logoBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: 'rgba(30,184,204,0.20)',
+    borderWidth: 1,
+    borderColor: 'rgba(30,184,204,0.30)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  appName: {
-    fontSize: 32,
+  logoN: {
+    fontFamily: 'monospace',
+    fontSize: 30,
+    color: colors.primary,
     fontWeight: '800',
-    color: '#f1f5f9',
-    letterSpacing: -0.5,
   },
+  brand: { fontFamily: 'monospace', fontSize: 20, fontWeight: '800', letterSpacing: 2, color: colors.primary, marginTop: 14 },
   tagline: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.mutedForeground,
     marginTop: 4,
+    textAlign: 'center',
+    marginBottom: 10,
   },
-  features: {
-    alignSelf: 'stretch',
-    gap: 14,
-    marginBottom: 40,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#0d1117',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-  },
-  featureIcon: {
-    fontSize: 20,
-  },
-  featureText: {
-    fontSize: 14,
-    color: '#cbd5e1',
-    flex: 1,
-  },
+  proof: { fontSize: 11, color: 'rgba(148,163,184,0.6)', textAlign: 'center', marginBottom: 8 },
   errorBox: {
     alignSelf: 'stretch',
     backgroundColor: 'rgba(239,68,68,0.1)',
@@ -254,32 +239,30 @@ const styles = StyleSheet.create({
   },
   googleBtn: {
     alignSelf: 'stretch',
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#2563eb',
-    borderRadius: 14,
-    paddingVertical: 16,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
     marginBottom: 16,
   },
   btnDisabled: {
     opacity: 0.5,
   },
-  googleIcon: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
   googleBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '600',
   },
   disclaimer: {
     fontSize: 11,
-    color: '#374151',
+    color: colors.mutedForeground,
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
+  email: { color: colors.primary },
 })

@@ -3,15 +3,18 @@
 /**
  * /dashboard/admin
  *
- * Internal ops admin panel — advisor role only.
+ * Internal ops admin panel — advisor or internal admin.
  * Displays all NeuFin user profiles with actions for trial extension
  * and onboarding email resend.
  *
- * Not linked from public navigation. Access via direct URL.
+ * Linked from the dashboard sidebar when is_admin / admin role.
  */
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
+import { useUser } from "@/lib/store"
+import { apiFetch } from "@/lib/api-client"
 import type { UserAdminRow } from "@/app/api/admin/users/route"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,12 +69,10 @@ function StatCard({ label, value, sub }: { label: string; value: number | string
 
 function ExtendTrialModal({
   user,
-  token,
   onClose,
   onSuccess,
 }: {
   user: UserAdminRow
-  token: string
   onClose: () => void
   onSuccess: (msg: string) => void
 }) {
@@ -83,9 +84,8 @@ function ExtendTrialModal({
     setLoading(true)
     setErr(null)
     try {
-      const res = await fetch(`/api/admin/users/${user.id}/extend-trial`, {
+      const res = await apiFetch(`/api/admin/users/${user.id}/extend-trial`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ days }),
       })
       const json = await res.json()
@@ -141,7 +141,9 @@ function ExtendTrialModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
+  const router = useRouter()
   const { user, getAccessToken } = useAuth()
+  const { isAdmin, loading: authSubscriptionLoading, subscriptionTier } = useUser()
   const [rows, setRows]         = useState<UserAdminRow[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -150,23 +152,16 @@ export default function AdminPage() {
   const [toast, setToast]       = useState<string | null>(null)
   const [extending, setExtending] = useState<UserAdminRow | null>(null)
   const [resending, setResending] = useState<string | null>(null)
-  const [token, setToken]       = useState<string | null>(null)
-
-  // Resolve token once
-  useEffect(() => {
-    getAccessToken().then(setToken)
-  }, [getAccessToken])
 
   const load = useCallback(async (plan: PlanFilter) => {
     const t = await getAccessToken()
-    setToken(t)
     if (!t) { setError("Not authenticated"); setLoading(false); return }
     setLoading(true)
     setError(null)
     try {
       const url = plan === "all" ? "/api/admin/users" : `/api/admin/users?plan=${plan}`
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${t}` } })
-      if (res.status === 403) { setError("Advisor role required to access admin panel."); return }
+      const res = await apiFetch(url, { cache: "no-store" })
+      if (res.status === 403) { setError("Advisor or admin access required for this panel."); return }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setRows(await res.json())
     } catch (e) {
@@ -178,19 +173,26 @@ export default function AdminPage() {
 
   useEffect(() => { load(filter) }, [filter, load])
 
+  const canAccessPanel =
+    isAdmin || subscriptionTier === "advisor" || subscriptionTier === "enterprise"
+
+  useEffect(() => {
+    if (authSubscriptionLoading || !user) return
+    if (!canAccessPanel) {
+      router.replace("/dashboard")
+    }
+  }, [authSubscriptionLoading, user, canAccessPanel, router])
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 4000)
   }
 
   async function resendOnboarding(row: UserAdminRow) {
-    const t = token
-    if (!t) return
     setResending(row.id)
     try {
-      const res = await fetch(`/api/admin/users/${row.id}/resend-onboarding`, {
+      const res = await apiFetch(`/api/admin/users/${row.id}/resend-onboarding`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${t}` },
       })
       const json = await res.json()
       showToast(json.ok ? `Onboarding email sent to ${row.email || row.id}` : "Failed to send email")
@@ -213,6 +215,18 @@ export default function AdminPage() {
   const trial   = rows.filter((r) => r.subscription_status === "trial").length
   const expired = rows.filter((r) => r.subscription_status === "expired").length
 
+  if (authSubscriptionLoading || !user) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center text-sm text-slate-500">
+        Loading…
+      </div>
+    )
+  }
+
+  if (!canAccessPanel) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -221,10 +235,10 @@ export default function AdminPage() {
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">User Admin</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Internal ops panel · advisor only</p>
+            <p className="text-sm text-gray-400 mt-0.5">Internal ops panel · advisor or admin</p>
           </div>
           <div className="text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 bg-amber-500/10">
-            ⚠ Internal use only — not visible to regular users
+            Internal use only — not visible to regular users
           </div>
         </div>
 
@@ -357,10 +371,9 @@ export default function AdminPage() {
       </div>
 
       {/* Extend trial modal */}
-      {extending && token && (
+      {extending && (
         <ExtendTrialModal
           user={extending}
-          token={token}
           onClose={() => setExtending(null)}
           onSuccess={showToast}
         />

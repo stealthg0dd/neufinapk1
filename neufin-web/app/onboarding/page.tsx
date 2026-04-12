@@ -1,344 +1,429 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-/**
- * /onboarding — New-user onboarding flow.
- *
- * Step 1: User-type selection (Investor | Advisor).
- * Step 2: Advisor only — firm name + optional logo upload.
- * Step 3: Stores user_type + onboarding_complete in Supabase auth
- *         user_metadata, then redirects to the correct destination.
- *
- * Redirects to /auth if the user isn't logged in yet.
- * Redirects to /dashboard (or localStorage "onboarding_next") once done.
- */
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { apiFetch, apiGet } from '@/lib/api-client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/lib/auth-context'
-import { debugAuth } from '@/lib/auth-debug'
-import { upsertAdvisorProfile } from '@/lib/api'
-import { useNeufinAnalytics } from '@/lib/analytics'
+const ROLES = [
+  { id: 'retail', label: 'Individual Investor', desc: 'Managing my own portfolio' },
+  { id: 'advisor', label: 'Financial Advisor / IFA', desc: 'Managing portfolios for clients' },
+  { id: 'pm', label: 'Portfolio Manager / PE', desc: 'Institutional portfolio management' },
+  { id: 'enterprise', label: 'Platform / B2B', desc: 'Integrating NeuFin into my platform' },
+]
 
-type UserType = 'investor' | 'advisor'
-
-const fadeUp = {
-  hidden:  { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
-  exit:    { opacity: 0, y: -16, transition: { duration: 0.25 } },
-}
-
-function OnboardingContent() {
-  const router       = useRouter()
-  const searchParams = useSearchParams()
-  const { token, loading: authLoading } = useAuth()
-  const { capture } = useNeufinAnalytics()
-
-  const [step, setStep]         = useState<1 | 2 | 3>(1)
-    // For portfolio upload (step 3)
-    const [csvFile, setCsvFile] = useState<File | null>(null)
-    const [uploading, setUploading] = useState(false)
-    const [uploadError, setUploadError] = useState<string | null>(null)
-  const [userType, setUserType] = useState<UserType | null>(null)
+export default function OnboardingPage() {
+  const router = useRouter()
+  const [step, setStep] = useState(1)
+  const [role, setRole] = useState('')
+  const [name, setName] = useState('')
+  const [wantWhiteLabel, setWantWhiteLabel] = useState(false)
   const [firmName, setFirmName] = useState('')
-  const [logoB64, setLogoB64]   = useState<string | null>(null)
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState<string | null>(null)
+  const [advisorName, setAdvisorName] = useState('')
+  const [brandColor, setBrandColor] = useState('#1EB8CC')
+  const [logoBase64, setLogoBase64] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const isAdvisorRole = ['advisor', 'pm', 'enterprise'].includes(role)
 
   useEffect(() => {
-    debugAuth('onboarding:mount')
-  }, [])
+    apiGet<{ onboarding_completed?: boolean }>('/api/subscription/status')
+      .then((d) => {
+        if (d?.onboarding_completed === true) router.replace('/dashboard')
+      })
+      .catch(() => {})
+  }, [router])
 
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  // Redirect unauthenticated visitors back to /auth
-  useEffect(() => {
-    if (!authLoading && !token) {
-      const hint = searchParams.get('user_type') ? `&user_type=${searchParams.get('user_type')}` : ''
-      router.replace(`/login?next=/onboarding${hint}`)
-    }
-  }, [authLoading, token, router, searchParams])
-
-  // Pre-select user_type if passed via URL (?user_type=advisor from landing CTA)
-  useEffect(() => {
-    const hint = searchParams.get('user_type') as UserType | null
-    if (hint === 'investor' || hint === 'advisor') {
-      setUserType(hint)
-    }
-  }, [searchParams])
-
-  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 1_000_000) { setError('Logo must be under 1 MB'); return }
     const reader = new FileReader()
-    reader.onload = () => setLogoB64(reader.result as string)
+    reader.onload = (ev) => {
+      const res = ev.target?.result
+      if (typeof res !== 'string') return
+      const parts = res.split(',')
+      setLogoBase64(parts.length > 1 ? parts[1]! : parts[0]!)
+    }
     reader.readAsDataURL(file)
   }
 
-  async function handlePortfolioUpload() {
-    if (!token || !csvFile) return
-    setUploading(true)
-    setUploadError(null)
+  async function handleComplete() {
+    setLoading(true)
     try {
-      const formData = new FormData()
-      formData.append('file', csvFile)
-      const res = await fetch('/api/portfolio/upload', {
+      const res = await apiFetch('/api/profile/complete-onboarding', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+        body: JSON.stringify({
+          user_type: role || undefined,
+          advisor_name: (isAdvisorRole ? advisorName.trim() : name.trim()) || name.trim(),
+          firm_name: isAdvisorRole && wantWhiteLabel ? firmName.trim() : undefined,
+          white_label: Boolean(isAdvisorRole && wantWhiteLabel),
+          brand_color: brandColor,
+          logo_base64: logoBase64 || undefined,
+        }),
       })
-      if (!res.ok) throw new Error('Upload failed')
-      await supabase.auth.updateUser({
-        data: { user_type: 'investor', onboarding_complete: true },
-      })
-      capture('onboarding_completed', { steps_skipped: 1, user_type: 'investor' })
-      const dest = localStorage.getItem('onboarding_next') || '/dashboard'
-      localStorage.removeItem('onboarding_next')
-      router.replace(dest)
-    } catch (e: unknown) {
-      setUploadError(e instanceof Error ? e.message : 'Something went wrong')
+      if (!res.ok) {
+        console.error('[onboarding] HTTP', res.status, await res.text().catch(() => ''))
+      }
+      router.push('/dashboard')
+    } catch (e) {
+      console.error('[onboarding] Failed:', e)
+      router.push('/dashboard')
     } finally {
-      setUploading(false)
+      setLoading(false)
     }
-  }
-
-  async function handleInvestorContinue() {
-    if (!token) return
-    setStep(3)
-  }
-
-  async function handleAdvisorContinue() {
-    if (!token) return
-    if (!firmName.trim()) { setError('Please enter your firm name.'); return }
-    setSaving(true)
-    setError(null)
-    try {
-      // Save advisor profile (firm name + optional logo)
-      await upsertAdvisorProfile(
-        { firm_name: firmName.trim(), logo_base64: logoB64 ?? undefined, white_label: true },
-        token,
-      )
-      // Mark onboarding complete
-      await supabase.auth.updateUser({
-        data: { user_type: 'advisor', onboarding_complete: true },
-      })
-      capture('onboarding_completed', { steps_skipped: 0, user_type: 'advisor' })
-      const dest = localStorage.getItem('onboarding_next') || '/advisor/dashboard'
-      localStorage.removeItem('onboarding_next')
-      router.replace(dest)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
-      </div>
-    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-6 py-16">
-      {/* Progress indicator */}
-      <div className="flex gap-2 mb-10">
-        {[1, 2].map((n) => (
-          <div
-            key={n}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              n <= step ? 'w-8 bg-blue-500' : 'w-4 bg-gray-700'
-            }`}
-          />
-        ))}
-      </div>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#0B0F14',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 560,
+          background: '#161D2E',
+          borderRadius: 16,
+          border: '1px solid #2A3550',
+          padding: 40,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, marginBottom: 32 }}>
+          {[1, 2, 3].map((s) => (
+            <div
+              key={s}
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 2,
+                background: s <= step ? '#1EB8CC' : '#2A3550',
+              }}
+            />
+          ))}
+        </div>
 
-      <AnimatePresence mode="wait">
-        {/* ── Step 1: User-type selection ─────────────────────────────── */}
         {step === 1 && (
-          <motion.div
-            key="step1"
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="w-full max-w-lg"
-          >
-            <h1 className="text-3xl font-bold text-white text-center mb-2">Welcome to Neufin</h1>
-            <p className="text-gray-400 text-center mb-10">How will you use Neufin?</p>
+          <div>
+            <h2 style={{ color: '#F0F4FF', fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>
+              Welcome to NeuFin
+            </h2>
+            <p style={{ color: '#64748B', fontSize: 13, margin: '0 0 24px' }}>
+              Tell us about yourself so we can personalise your experience.
+            </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-              {/* Investor option */}
-              <button
-                onClick={() => setUserType('investor')}
-                className={`glass-card rounded-2xl p-6 text-left flex flex-col gap-3 transition-all duration-200 border-2 ${
-                  userType === 'investor'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-gray-700/60 hover:border-blue-500/40'
-                }`}
-              >
-                <span className="text-3xl">🧬</span>
-                <div>
-                  <p className="font-semibold text-white">Retail Investor</p>
-                  <p className="text-sm text-gray-400 mt-1">Upload my portfolio and discover my investor DNA score.</p>
-                </div>
-                <span className="text-xs text-gray-500 mt-auto">Free to start · no account required for analysis</span>
-              </button>
+            <label style={{ color: '#94A3B8', fontSize: 12, display: 'block', marginBottom: 6 }}>
+              YOUR NAME
+            </label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                background: '#0B0F14',
+                border: '1px solid #2A3550',
+                borderRadius: 8,
+                color: '#F0F4FF',
+                fontSize: 13,
+                marginBottom: 20,
+                boxSizing: 'border-box',
+              }}
+            />
 
-              {/* Advisor option */}
-              <button
-                onClick={() => setUserType('advisor')}
-                className={`glass-card rounded-2xl p-6 text-left flex flex-col gap-3 transition-all duration-200 border-2 ${
-                  userType === 'advisor'
-                    ? 'border-purple-500 bg-purple-500/10'
-                    : 'border-gray-700/60 hover:border-purple-500/40'
-                }`}
-              >
-                <span className="text-3xl">💼</span>
-                <div>
-                  <p className="font-semibold text-white">Financial Advisor</p>
-                  <p className="text-sm text-gray-400 mt-1">Generate white-label PDF reports for my clients.</p>
+            <label style={{ color: '#94A3B8', fontSize: 12, display: 'block', marginBottom: 10 }}>
+              YOUR ROLE
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {ROLES.map((r) => (
+                <div
+                  key={r.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setRole(r.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') setRole(r.id)
+                  }}
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    border: role === r.id ? '2px solid #1EB8CC' : '1px solid #2A3550',
+                    background: role === r.id ? '#0D1F2A' : '#0B0F14',
+                  }}
+                >
+                  <div style={{ color: '#F0F4FF', fontSize: 13, fontWeight: 500 }}>{r.label}</div>
+                  <div style={{ color: '#64748B', fontSize: 11, marginTop: 2 }}>{r.desc}</div>
                 </div>
-                <span className="text-xs text-gray-500 mt-auto">$99/mo for unlimited reports</span>
-              </button>
+              ))}
             </div>
 
-            {error && <p className="text-red-400 text-sm text-center mb-4">{error}</p>}
-
             <button
-              disabled={!userType || saving}
-              onClick={() => {
-                if (userType === 'investor') handleInvestorContinue()
-                else setStep(2)
+              type="button"
+              onClick={() => setStep(2)}
+              disabled={!role || !name.trim()}
+              style={{
+                width: '100%',
+                marginTop: 24,
+                padding: '12px',
+                background: !role || !name.trim() ? '#2A3550' : '#1EB8CC',
+                color: !role || !name.trim() ? '#64748B' : '#0B0F14',
+                border: 'none',
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: !role || !name.trim() ? 'not-allowed' : 'pointer',
               }}
-              className="btn-primary w-full py-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving…' : 'Continue →'}
+              Continue
             </button>
-          </motion.div>
+          </div>
         )}
 
-        {/* ── Step 2: Advisor setup ──────────────────────────────────── */}
         {step === 2 && (
-          <motion.div
-            key="step2"
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="w-full max-w-lg"
-          >
-            <button
-              onClick={() => setStep(1)}
-              className="text-gray-500 text-sm hover:text-gray-300 mb-6 flex items-center gap-1 transition-colors"
-            >
-              ← Back
-            </button>
+          <div>
+            <h2 style={{ color: '#F0F4FF', fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>
+              {isAdvisorRole ? 'Your Firm' : 'Almost done'}
+            </h2>
 
-            <h1 className="text-2xl font-bold text-white mb-1">Set up your advisor profile</h1>
-            <p className="text-gray-400 text-sm mb-8">Your firm name and logo appear on every white-label report.</p>
+            {isAdvisorRole ? (
+              <>
+                <p style={{ color: '#64748B', fontSize: 13, margin: '0 0 24px' }}>
+                  White-label NeuFin reports with your firm branding. Your clients see your name, not ours.
+                </p>
 
-            {/* Firm name */}
-            <label className="block mb-5">
-              <span className="text-sm text-gray-300 mb-1.5 block">Firm name <span className="text-red-400">*</span></span>
-              <input
-                type="text"
-                value={firmName}
-                onChange={(e) => setFirmName(e.target.value)}
-                placeholder="e.g. Apex Capital Advisors"
-                className="w-full rounded-xl bg-gray-900 border border-gray-700 px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500/60 transition-colors text-sm"
-              />
-            </label>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setWantWhiteLabel(!wantWhiteLabel)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') setWantWhiteLabel(!wantWhiteLabel)
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px 16px',
+                    background: '#0D1F2A',
+                    border: '1px solid #1EB8CC40',
+                    borderRadius: 8,
+                    marginBottom: 20,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={wantWhiteLabel}
+                    onChange={(e) => setWantWhiteLabel(e.target.checked)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <div>
+                    <div style={{ color: '#F0F4FF', fontSize: 13, fontWeight: 500 }}>
+                      Enable white-label branding on reports
+                    </div>
+                    <div style={{ color: '#64748B', fontSize: 11, marginTop: 2 }}>
+                      Your logo and firm name on every IC report PDF
+                    </div>
+                  </div>
+                </div>
 
-            {/* Logo upload (optional) */}
-            <label className="block mb-8">
-              <span className="text-sm text-gray-300 mb-1.5 block">Logo <span className="text-gray-500">(optional · PNG / JPG · max 1 MB)</span></span>
-              <div
-                onClick={() => fileRef.current?.click()}
-                className="w-full rounded-xl border border-dashed border-gray-700 hover:border-purple-500/40 p-6 text-center cursor-pointer transition-colors flex flex-col items-center gap-2"
-              >
-                {logoB64 ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={logoB64} alt="Logo preview" className="h-16 object-contain rounded" />
-                ) : (
-                  <>
-                    <span className="text-2xl">🖼️</span>
-                    <span className="text-gray-500 text-sm">Click to upload logo</span>
-                  </>
+                {wantWhiteLabel && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div>
+                      <label style={{ color: '#94A3B8', fontSize: 11, display: 'block', marginBottom: 4 }}>
+                        FIRM NAME
+                      </label>
+                      <input
+                        value={firmName}
+                        onChange={(e) => setFirmName(e.target.value)}
+                        placeholder="e.g. Acme Wealth Management"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          background: '#0B0F14',
+                          border: '1px solid #2A3550',
+                          borderRadius: 8,
+                          color: '#F0F4FF',
+                          fontSize: 13,
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ color: '#94A3B8', fontSize: 11, display: 'block', marginBottom: 4 }}>
+                        YOUR NAME ON REPORTS
+                      </label>
+                      <input
+                        value={advisorName}
+                        onChange={(e) => setAdvisorName(e.target.value)}
+                        placeholder="e.g. John Smith, CFA"
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          background: '#0B0F14',
+                          border: '1px solid #2A3550',
+                          borderRadius: 8,
+                          color: '#F0F4FF',
+                          fontSize: 13,
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ color: '#94A3B8', fontSize: 11, display: 'block', marginBottom: 4 }}>
+                        FIRM LOGO (PNG, recommended 300×100px)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/png,image/svg+xml,image/jpeg"
+                        onChange={handleLogoUpload}
+                        style={{ color: '#F0F4FF', fontSize: 12 }}
+                      />
+                      {logoBase64 && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`data:image/png;base64,${logoBase64}`}
+                          style={{ height: 40, marginTop: 8, borderRadius: 4 }}
+                          alt="Logo preview"
+                        />
+                      )}
+                    </div>
+
+                    <div>
+                      <label style={{ color: '#94A3B8', fontSize: 11, display: 'block', marginBottom: 4 }}>
+                        BRAND COLOUR
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <input
+                          type="color"
+                          value={brandColor}
+                          onChange={(e) => setBrandColor(e.target.value)}
+                          style={{ width: 40, height: 32, cursor: 'pointer', border: 'none' }}
+                        />
+                        <span style={{ color: '#64748B', fontSize: 12 }}>{brandColor}</span>
+                      </div>
+                    </div>
+                  </div>
                 )}
+              </>
+            ) : (
+              <p style={{ color: '#94A3B8', fontSize: 13, margin: '0 0 24px' }}>
+                You are set up as an individual investor. You can add firm details later in Settings.
+              </p>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'transparent',
+                  border: '1px solid #2A3550',
+                  borderRadius: 8,
+                  color: '#64748B',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                style={{
+                  flex: 2,
+                  padding: '12px',
+                  background: '#1EB8CC',
+                  color: '#0B0F14',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div>
+            <h2 style={{ color: '#F0F4FF', fontSize: 22, fontWeight: 600, margin: '0 0 8px' }}>
+              You are ready
+            </h2>
+            <p style={{ color: '#64748B', fontSize: 13, margin: '0 0 24px' }}>
+              Here is how your reports will appear:
+            </p>
+
+            <div
+              style={{
+                background: '#0B0F14',
+                borderRadius: 8,
+                border: '1px solid #2A3550',
+                padding: 16,
+                marginBottom: 24,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 12,
+                }}
+              >
+                {logoBase64 ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`data:image/png;base64,${logoBase64}`} style={{ height: 32 }} alt="Firm logo" />
+                ) : (
+                  <div style={{ color: '#1EB8CC', fontWeight: 700, fontSize: 16 }}>
+                    {firmName || 'NeuFin Intelligence'}
+                  </div>
+                )}
+                <div style={{ color: '#64748B', fontSize: 10 }}>PORTFOLIO INTELLIGENCE REPORT</div>
               </div>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                className="hidden"
-                onChange={handleLogoChange}
-              />
-            </label>
-
-            {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+              <div style={{ height: 1, background: '#2A3550', marginBottom: 12 }} />
+              <div style={{ color: '#64748B', fontSize: 11 }}>
+                Prepared by: {(advisorName || name).trim() || 'You'} · {firmName || 'NeuFin Intelligence'}
+              </div>
+            </div>
 
             <button
-              disabled={saving}
-              onClick={handleAdvisorContinue}
-              className="btn-primary w-full py-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              type="button"
+              onClick={() => void handleComplete()}
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '14px',
+                background: loading ? '#2A3550' : '#1EB8CC',
+                color: loading ? '#64748B' : '#0B0F14',
+                border: 'none',
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 15,
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
             >
-              {saving ? 'Creating profile…' : 'Launch Advisor Dashboard →'}
+              {loading ? 'Setting up...' : 'Start Analysing Portfolios'}
             </button>
-            <p className="text-xs text-gray-600 text-center mt-3">You can update these settings any time in your profile.</p>
-          </motion.div>
+
+            <p style={{ color: '#64748B', fontSize: 11, textAlign: 'center', marginTop: 12 }}>
+              You can update your branding anytime in Settings
+            </p>
+          </div>
         )}
-
-        {/* ── Step 3: Portfolio upload for investors ─────────────────── */}
-        {step === 3 && userType === 'investor' && (
-          <motion.div
-            key="step3"
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="w-full max-w-lg"
-          >
-            <h1 className="text-2xl font-bold text-white mb-1">Upload Your Portfolio</h1>
-            <p className="text-gray-400 text-sm mb-8">Upload your portfolio CSV to receive your DNA score and analysis.</p>
-
-            <input
-              type="file"
-              accept=".csv"
-              onChange={e => setCsvFile(e.target.files?.[0] || null)}
-              className="mb-4"
-            />
-            {uploadError && <p className="text-red-400 text-sm mb-4">{uploadError}</p>}
-
-            <button
-              disabled={!csvFile || uploading}
-              onClick={handlePortfolioUpload}
-              className="btn-primary w-full py-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {uploading ? 'Uploading…' : 'Analyze Portfolio →'}
-            </button>
-            <p className="text-xs text-gray-600 text-center mt-3">CSV format only. Example: symbol,shares,price</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-export default function OnboardingPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
       </div>
-    }>
-      <OnboardingContent />
-    </Suspense>
+    </div>
   )
 }

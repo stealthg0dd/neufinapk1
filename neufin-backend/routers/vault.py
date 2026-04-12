@@ -14,14 +14,26 @@ GET  /api/plans                  → all subscription plans (public, no auth)
 GET  /api/subscription/status    → current user's plan + monthly usage (auth required)
 """
 
+from datetime import UTC, datetime, timedelta
+
 import stripe
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config import APP_BASE_URL, STRIPE_SECRET_KEY
+from config import (
+    APP_BASE_URL,
+    STRIPE_PRICE_ADVISOR_MONTHLY,
+    STRIPE_PRICE_ENTERPRISE_MONTHLY,
+    STRIPE_PRICE_RETAIL_MONTHLY,
+    STRIPE_SECRET_KEY,
+)
 from database import claim_guest_data, supabase
 from services.auth_dependency import get_current_user
+from services.auth_dependency import get_subscription_status as get_sub_status
 from services.jwt_auth import JWTUser
+
+logger = structlog.get_logger("neufin.vault")
 
 # ── Subscription plan definitions ─────────────────────────────────────────────
 # stripe_price_id values are populated after running scripts/setup_stripe_products.py
@@ -37,7 +49,7 @@ PLANS: dict = {
     "retail": {
         "name": "Retail Investor",
         "price_monthly": 29,
-        "stripe_price_id": "price_1TIuPkGVXReXuoyMrADQfcSQ",
+        "stripe_price_id": STRIPE_PRICE_RETAIL_MONTHLY,
         "dna_analyses_per_month": -1,
         "swarm_analyses": True,
         "advisor_reports": False,
@@ -46,7 +58,7 @@ PLANS: dict = {
     "advisor": {
         "name": "Financial Advisor",
         "price_monthly": 299,
-        "stripe_price_id": "price_1TIuPlGVXReXuoyMICYnUmXR",
+        "stripe_price_id": STRIPE_PRICE_ADVISOR_MONTHLY,
         "dna_analyses_per_month": -1,
         "swarm_analyses": True,
         "advisor_reports": True,
@@ -57,7 +69,7 @@ PLANS: dict = {
     "enterprise": {
         "name": "Enterprise / API",
         "price_monthly": 999,
-        "stripe_price_id": "price_1TIuPlGVXReXuoyMgx5yT4Bu",
+        "stripe_price_id": STRIPE_PRICE_ENTERPRISE_MONTHLY,
         "dna_analyses_per_month": -1,
         "swarm_analyses": True,
         "advisor_reports": True,
@@ -97,7 +109,11 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
     try:
         result = (
             supabase.table("user_profiles")
-            .select("subscription_tier, advisor_name, firm_name")
+            .select(
+                "subscription_tier, subscription_status, trial_started_at,"
+                "advisor_name, firm_name, onboarding_completed,"
+                "is_admin, role"
+            )
             .eq("id", uid)
             .single()
             .execute()
@@ -106,13 +122,25 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
     except Exception:
         data = {}
 
+    # Trial users get full Advisor-tier access for 14 days, even if subscription_tier is still 'free'.
+    sub = get_sub_status(uid)
+    status = sub.get("status") or "expired"
+    days_remaining = sub.get("days_remaining", 0)
+    trial_started_at = data.get("trial_started_at")
+
     tier = data.get("subscription_tier", "free") or "free"
+    if status == "trial":
+        tier = "advisor"
+
     plan = PLANS.get(tier, PLANS["free"])
     dna_limit = PLAN_DNA_LIMITS.get(tier, 3)
     usage = get_monthly_usage(uid)
 
     return {
         "plan": tier,
+        "status": status,
+        "days_remaining": days_remaining,
+        "trial_started_at": trial_started_at,
         "plan_details": plan,
         "usage": {
             **usage,
@@ -123,6 +151,9 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         },
         "advisor_name": data.get("advisor_name"),
         "firm_name": data.get("firm_name"),
+        "onboarding_completed": data.get("onboarding_completed", True),
+        "is_admin": bool(data.get("is_admin") or False),
+        "role": data.get("role") or "user",
     }
 
 
@@ -135,22 +166,73 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
     """
     Return all DNA scores for the authenticated user, newest first.
     Excludes positions/raw data — just the scored records.
+
+    Enriches each row with portfolio_id, portfolio_name (from portfolios),
+    and the latest advisor_reports pdf_url / is_paid for that portfolio when
+    the report belongs to this user.
     """
     uid = user.id
     try:
         result = (
             supabase.table("dna_scores")
             .select(
-                "id, dna_score, investor_type, recommendation, share_token, total_value, created_at"
+                "id, dna_score, investor_type, recommendation, share_token, total_value, created_at, portfolio_id"
             )
             .eq("user_id", uid)
             .order("created_at", desc=True)
             .limit(limit)
             .execute()
         )
-        return {"history": result.data or []}
+        rows = result.data or []
     except Exception as e:
         raise HTTPException(500, f"Could not fetch history: {e}") from e
+
+    pids = list({str(r["portfolio_id"]) for r in rows if r.get("portfolio_id")})
+    names: dict[str, str | None] = {}
+    if pids:
+        try:
+            pr = (
+                supabase.table("portfolios")
+                .select("id, name")
+                .in_("id", pids)
+                .execute()
+            )
+            for p in pr.data or []:
+                names[str(p["id"])] = p.get("name")
+        except Exception as e:
+            logger.debug("vault.portfolio_names_enrich_failed", error=str(e))
+
+    pdf_by_pid: dict[str, str | None] = {}
+    paid_by_pid: dict[str, bool] = {}
+    if pids:
+        try:
+            rep = (
+                supabase.table("advisor_reports")
+                .select("portfolio_id, pdf_url, is_paid, created_at")
+                .eq("advisor_id", uid)
+                .in_("portfolio_id", pids)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            for r in rep.data or []:
+                pid = str(r.get("portfolio_id") or "")
+                if pid and pid not in pdf_by_pid:
+                    pdf_by_pid[pid] = r.get("pdf_url")
+                    paid_by_pid[pid] = bool(r.get("is_paid"))
+        except Exception as e:
+            logger.debug("vault.advisor_reports_enrich_failed", error=str(e))
+
+    enriched = []
+    for r in rows:
+        pid = r.get("portfolio_id")
+        pid_str = str(pid) if pid else None
+        row = dict(r)
+        row["portfolio_name"] = names.get(pid_str) if pid_str else None
+        row["pdf_url"] = pdf_by_pid.get(pid_str) if pid_str else None
+        row["is_paid"] = paid_by_pid.get(pid_str, False) if pid_str else False
+        enriched.append(row)
+
+    return {"history": enriched}
 
 
 # ── Claim anonymous record (single, by record_id) ──────────────────────────────
@@ -241,27 +323,71 @@ async def claim_session_portfolios(
 # ── Subscription ───────────────────────────────────────────────────────────────
 
 
+def _compute_is_pro(tier: str, status: str, trial_started_at: object) -> bool:
+    """
+    Returns True when the user has full (Advisor-tier) access:
+      - Paid advisor/enterprise subscription that is currently active, OR
+      - An active 14-day trial (trial_started_at is within the last 14 days).
+    """
+    # Paid tiers
+    if tier in ("advisor", "enterprise") and status == "active":
+        return True
+
+    # Trial period
+    if status == "trial" and trial_started_at:
+        try:
+            ts = trial_started_at
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if getattr(ts, "tzinfo", None) is None:
+                ts = ts.replace(tzinfo=UTC)
+            trial_end = ts + timedelta(days=14)
+            if datetime.now(UTC) < trial_end:
+                return True
+        except Exception as exc:
+            logger.debug("vault.trial_window_parse_failed", error=str(exc))
+
+    return False
+
+
 @router.get("/subscription")
 async def get_subscription(user: JWTUser = Depends(get_current_user)):
-    """Return the user's current subscription_tier from user_profiles."""
+    """Return the user's current subscription tier and access level."""
     uid = user.id
     try:
         result = (
             supabase.table("user_profiles")
-            .select("subscription_tier, advisor_name, firm_name")
+            .select(
+                "subscription_tier, subscription_status, trial_started_at, "
+                "advisor_name, firm_name, is_admin, role"
+            )
             .eq("id", uid)
             .single()
             .execute()
         )
         data = result.data or {}
+        tier = data.get("subscription_tier", "free") or "free"
+        status = data.get("subscription_status", "free") or "free"
+        trial_started_at = data.get("trial_started_at")
         return {
-            "subscription_tier": data.get("subscription_tier", "free"),
-            "is_pro": data.get("subscription_tier") == "pro",
+            "subscription_tier": tier,
+            "subscription_status": status,
+            "trial_started_at": str(trial_started_at or ""),
+            "is_pro": _compute_is_pro(tier, status, trial_started_at),
             "advisor_name": data.get("advisor_name"),
             "firm_name": data.get("firm_name"),
+            "is_admin": bool(data.get("is_admin") or False),
+            "role": data.get("role") or "user",
         }
     except Exception:
-        return {"subscription_tier": "free", "is_pro": False}
+        return {
+            "subscription_tier": "free",
+            "subscription_status": "free",
+            "trial_started_at": "",
+            "is_pro": False,
+            "is_admin": False,
+            "role": "user",
+        }
 
 
 # ── Stripe Customer Portal ─────────────────────────────────────────────────────

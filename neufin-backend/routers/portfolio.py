@@ -1,4 +1,6 @@
+import csv
 import datetime
+import io
 
 import requests
 import structlog
@@ -8,7 +10,7 @@ from pydantic import BaseModel
 from config import ALPHA_VANTAGE_API_KEY, FINNHUB_API_KEY
 from database import decrypt_value, encrypt_value, supabase
 from services.ai_router import get_ai_analysis
-from services.auth_dependency import get_current_user
+from services.auth_dependency import get_current_user, get_subscribed_user
 from services.calculator import (
     _fetch_prices,
     calculate_portfolio_metrics,
@@ -105,7 +107,10 @@ def _candle(symbol: str, period_days: int) -> dict | None:
                 )
                 if rows:
                     return {
-                        "t": [int(datetime.datetime.fromisoformat(k).timestamp()) for k, _ in rows],
+                        "t": [
+                            int(datetime.datetime.fromisoformat(k).timestamp())
+                            for k, _ in rows
+                        ],
                         "o": [float(v["1. open"]) for _, v in rows],
                         "h": [float(v["2. high"]) for _, v in rows],
                         "l": [float(v["3. low"]) for _, v in rows],
@@ -115,7 +120,86 @@ def _candle(symbol: str, period_days: int) -> dict | None:
         except Exception:
             logger.warning("AlphaVantage OHLC fetch failed", exc_info=True)
 
+    # ── 3. Stooq (daily CSV, no API key) ───────────────────────────────────────
+    stooq = _candle_stooq(symbol, period_days)
+    if stooq and stooq.get("c"):
+        return stooq
+
     return None
+
+
+def _candle_stooq(symbol: str, period_days: int) -> dict | None:
+    """Fallback OHLCV from Stooq daily endpoint (US listings as ``sym.us``)."""
+    raw = symbol.strip().upper().replace(".", "-")
+    key = f"{raw.lower()}.us"
+    url = f"https://stooq.com/q/d/l/?s={key}&i=d"
+    try:
+        r = requests.get(url, timeout=15.0)
+        if r.status_code != 200 or not r.text.strip():
+            return None
+        if r.text.lstrip().lower().startswith("no data"):
+            return None
+        reader = csv.DictReader(io.StringIO(r.text))
+        rows = list(reader)
+        if not rows:
+            return None
+        cutoff = datetime.datetime.utcnow().date() - datetime.timedelta(
+            days=period_days
+        )
+        t_list: list[int] = []
+        o_list: list[float] = []
+        h_list: list[float] = []
+        l_list: list[float] = []
+        c_list: list[float] = []
+        v_list: list[int] = []
+        for row in rows:
+            ds = row.get("Date") or row.get("date")
+            if not ds:
+                continue
+            try:
+                d_only = datetime.date.fromisoformat(str(ds)[:10])
+            except ValueError:
+                continue
+            if d_only < cutoff:
+                continue
+            try:
+                o_ = float(row.get("Open") or row.get("open") or 0)
+                h_ = float(row.get("High") or row.get("high") or 0)
+                l_ = float(row.get("Low") or row.get("low") or 0)
+                c_ = float(row.get("Close") or row.get("close") or 0)
+            except (TypeError, ValueError):
+                continue
+            if c_ <= 0:
+                continue
+            vol_raw = row.get("Volume") or row.get("volume") or "0"
+            try:
+                v_ = int(float(vol_raw))
+            except (TypeError, ValueError):
+                v_ = 0
+            ts = int(
+                datetime.datetime(
+                    d_only.year, d_only.month, d_only.day, tzinfo=datetime.UTC
+                ).timestamp()
+            )
+            t_list.append(ts)
+            o_list.append(o_)
+            h_list.append(h_)
+            l_list.append(l_)
+            c_list.append(c_)
+            v_list.append(v_)
+        if not c_list:
+            return None
+        return {
+            "t": t_list,
+            "o": o_list,
+            "h": h_list,
+            "l": l_list,
+            "c": c_list,
+            "v": v_list,
+        }
+    except Exception:
+        logger.warning("stooq.candle_failed", symbol=symbol, exc_info=True)
+        return None
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────────
@@ -137,11 +221,15 @@ async def claim_portfolio(
         )
         if result.data and len(result.data) > 0:
             return {"claimed": True, "portfolio_id": body.portfolio_id}
-        raise HTTPException(status_code=404, detail="Portfolio not found or already claimed.")
+        raise HTTPException(
+            status_code=404, detail="Portfolio not found or already claimed."
+        )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not claim portfolio: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Could not claim portfolio: {e}"
+        ) from e
 
 
 @router.post("/create")
@@ -163,7 +251,9 @@ async def create_portfolio(body: PortfolioCreate):
         port_result = supabase.table("portfolios").insert(port_row).execute()
         portfolio_id = port_result.data[0]["id"]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save portfolio: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Could not save portfolio: {e}"
+        ) from e
 
     # Insert positions
     for pos in metrics["positions"]:
@@ -187,8 +277,31 @@ async def create_portfolio(body: PortfolioCreate):
 
 
 @router.get("/{portfolio_id}/metrics")
-async def get_portfolio_metrics(portfolio_id: str):
-    """Recalculate live metrics for an existing portfolio."""
+async def get_portfolio_metrics(
+    portfolio_id: str, user: JWTUser = Depends(get_current_user)
+):
+    """
+    Soft paywall: basic metrics remain accessible after trial expiry.
+    Always enforce portfolio ownership.
+    """
+    try:
+        port = (
+            supabase.table("portfolios")
+            .select("id,user_id")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+        row = port.data or {}
+        if not row or row.get("user_id") != user.id:
+            raise HTTPException(
+                status_code=404, detail="Portfolio or positions not found."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
     try:
         positions_result = (
             supabase.table("portfolio_positions")
@@ -227,8 +340,11 @@ async def get_portfolio_metrics(portfolio_id: str):
 
 
 @router.post("/signals")
-async def generate_trading_signals(body: SignalRequest):
-    """Generate AI trading signals for a list of symbols."""
+async def generate_trading_signals(
+    body: SignalRequest,
+    user: JWTUser = Depends(get_subscribed_user),
+):
+    """Hard paywall: AI trading signals require active Advisor/Enterprise (trial counts as advisor)."""
     price_summary = {}
     for symbol in body.symbols[:10]:  # cap at 10
         try:
@@ -239,7 +355,9 @@ async def generate_trading_signals(body: SignalRequest):
                 price_summary[symbol] = {
                     "current": round(float(closes[-1]), 2),
                     "change_3mo_pct": (
-                        round((closes[-1] - closes[0]) / closes[0] * 100, 2) if closes[0] else 0
+                        round((closes[-1] - closes[0]) / closes[0] * 100, 2)
+                        if closes[0]
+                        else 0
                     ),
                     "avg_volume": int(sum(volumes) / len(volumes)) if volumes else 0,
                 }
@@ -268,7 +386,9 @@ For each symbol return a signal. Return ONLY valid JSON:
     try:
         analysis = await get_ai_analysis(prompt)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI signal generation failed: {e}") from e
+        raise HTTPException(
+            status_code=503, detail=f"AI signal generation failed: {e}"
+        ) from e
 
     # Persist signals to Supabase
     saved = []
@@ -278,7 +398,7 @@ For each symbol return a signal. Return ONLY valid JSON:
                 supabase.table("trading_signals")
                 .insert(
                     {
-                        "user_id": body.user_id,
+                        "user_id": user.id,
                         "symbol": signal["symbol"],
                         "signal_type": signal["signal_type"],
                         "confidence": signal["confidence"],
@@ -295,9 +415,22 @@ For each symbol return a signal. Return ONLY valid JSON:
 
 
 @router.get("/{portfolio_id}/sentiment")
-async def get_portfolio_sentiment(portfolio_id: str):
-    """Return cached sentiment data for all symbols in a portfolio."""
+async def get_portfolio_sentiment(
+    portfolio_id: str, user: JWTUser = Depends(get_current_user)
+):
+    """Soft paywall: cached sentiment is viewable, but enforce ownership."""
     try:
+        port = (
+            supabase.table("portfolios")
+            .select("id,user_id")
+            .eq("id", portfolio_id)
+            .single()
+            .execute()
+        )
+        row = port.data or {}
+        if not row or row.get("user_id") != user.id:
+            raise HTTPException(status_code=404, detail="Portfolio not found.")
+
         positions_result = (
             supabase.table("portfolio_positions")
             .select("symbol")
@@ -341,7 +474,9 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not fetch portfolios: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Could not fetch portfolios: {exc}"
+        ) from exc
 
     portfolios = port_result.data or []
     if not portfolios:
@@ -397,8 +532,12 @@ async def list_portfolios(user: JWTUser = Depends(get_current_user)):
 
 
 @router.get("/user/{user_id}")
-async def get_user_portfolios(user_id: str):
-    """List all portfolios for a user."""
+async def get_user_portfolios(user_id: str, user: JWTUser = Depends(get_current_user)):
+    """Soft paywall: list portfolios, but only for the authenticated user (prevents data leaks)."""
+    if user_id != user.id:
+        raise HTTPException(
+            status_code=403, detail="You do not have access to these portfolios."
+        )
     try:
         result = (
             supabase.table("portfolios")
@@ -415,7 +554,9 @@ async def get_user_portfolios(user_id: str):
 @router.get("/chart/{symbol}")
 async def get_stock_chart(symbol: str, period: str = "3mo"):
     """Return OHLCV candlestick data for a symbol (lightweight-charts format)."""
-    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}.get(period, 90)
+    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "3y": 1095}.get(
+        period, 90
+    )
     candle = _candle(symbol.upper(), period_days)
     if not candle or not candle.get("c"):
         raise HTTPException(status_code=404, detail=f"No data for {symbol}")
@@ -436,14 +577,16 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
             candle["l"],
             candle["c"],
             candle.get("v", [0] * len(candle["c"])),
-            strict=False,
+            strict=True,
         )
     ]
     return {"symbol": symbol.upper(), "period": period, "data": data}
 
 
 @router.post("/risk-report")
-async def get_risk_report(body: RiskReportRequest):
+async def get_risk_report(
+    body: RiskReportRequest, user: JWTUser = Depends(get_subscribed_user)
+):
     """
     Institutional risk report for a list of symbols.
 
@@ -460,7 +603,8 @@ async def get_risk_report(body: RiskReportRequest):
     # Resolve weights: use provided map, fall back to equal weight
     if body.weights:
         weights = {
-            s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0)) for s in symbols
+            s.upper(): body.weights.get(s, body.weights.get(s.upper(), 1.0))
+            for s in symbols
         }
     else:
         eq = 1.0 / len(symbols)
@@ -479,7 +623,12 @@ async def get_risk_report(body: RiskReportRequest):
 
 
 @router.get("/value-history")
-async def get_portfolio_value_history(symbols: str, shares: str, period: str = "1mo"):
+async def get_portfolio_value_history(
+    symbols: str,
+    shares: str,
+    period: str = "1mo",
+    user: JWTUser = Depends(get_subscribed_user),
+):
     """
     Compute portfolio value over time for a line chart.
     symbols: comma-separated e.g. AAPL,MSFT
@@ -489,10 +638,14 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     try:
         shares_list = [float(s.strip()) for s in shares.split(",")]
     except ValueError as e:
-        raise HTTPException(status_code=400, detail="shares must be numeric values.") from e
+        raise HTTPException(
+            status_code=400, detail="shares must be numeric values."
+        ) from e
 
     if len(sym_list) != len(shares_list):
-        raise HTTPException(status_code=400, detail="symbols and shares counts must match.")
+        raise HTTPException(
+            status_code=400, detail="symbols and shares counts must match."
+        )
 
     try:
         prices = _fetch_prices(sym_list, period)
@@ -502,10 +655,16 @@ async def get_portfolio_value_history(symbols: str, shares: str, period: str = "
     weight_map = dict(zip(sym_list, shares_list, strict=False))
     history = []
     for date_idx, row in prices.iterrows():
-        day_value = sum(float(row.get(sym, 0) or 0) * wt for sym, wt in weight_map.items())
+        day_value = sum(
+            float(row.get(sym, 0) or 0) * wt for sym, wt in weight_map.items()
+        )
         history.append(
             {
-                "time": (date_idx.isoformat() if hasattr(date_idx, "isoformat") else str(date_idx)),
+                "time": (
+                    date_idx.isoformat()
+                    if hasattr(date_idx, "isoformat")
+                    else str(date_idx)
+                ),
                 "value": round(day_value, 2),
             }
         )
@@ -555,7 +714,9 @@ async def validate_tickers(body: ValidateTickersRequest):
             "status": r.status,
             "warning": r.warning,
             "alias_used": r.alias_used,
-            "stale_age_hours": (round(r.stale_age_hours, 1) if r.stale_age_hours else None),
+            "stale_age_hours": (
+                round(r.stale_age_hours, 1) if r.stale_age_hours else None
+            ),
         }
 
     results = await asyncio.to_thread(lambda: [_resolve(s) for s in symbols])
@@ -592,4 +753,6 @@ async def verify_prices(body: VerifyPricesRequest):
             "warnings": [c for c in checks if c.get("warned")],
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Price integrity check failed: {e}") from e
+        raise HTTPException(
+            status_code=500, detail=f"Price integrity check failed: {e}"
+        ) from e

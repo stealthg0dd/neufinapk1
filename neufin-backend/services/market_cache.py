@@ -13,11 +13,15 @@ Tier-2 returns the serialised pandas Series immediately — no Alpha Vantage cal
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 import math
+import tempfile
 import time
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 import structlog
@@ -105,7 +109,9 @@ def _get_redis():
 # ── Serialisation helpers ──────────────────────────────────────────────────────
 def _series_to_json(s: pd.Series) -> str:
     """Serialise a pandas Series (string-indexed) to a compact JSON string."""
-    return json.dumps({"index": list(s.index), "values": list(s.values), "name": s.name})
+    return json.dumps(
+        {"index": list(s.index), "values": list(s.values), "name": s.name}
+    )
 
 
 def _json_to_series(raw: str) -> pd.Series:
@@ -191,7 +197,8 @@ def set_closes(symbol: str, days: int, series: pd.Series) -> None:
         try:
             sb = get_supabase_client()
             exp = (
-                datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=_SUPABASE_TTL)
+                datetime.datetime.now(datetime.UTC)
+                + datetime.timedelta(seconds=_SUPABASE_TTL)
             ).isoformat()
             sb.table(_TABLE).upsert(
                 {"cache_key": k, "payload": raw, "expires_at": exp},
@@ -226,7 +233,9 @@ class MarketCache:
     Exposes get_historical_range(ticker, start, end) for StressTester.
     """
 
-    async def get_historical_range(self, ticker: str, start: str, end: str) -> pd.Series:
+    async def get_historical_range(
+        self, ticker: str, start: str, end: str
+    ) -> pd.Series:
         """
         Return daily closes for *ticker* between *start* and *end* (YYYY-MM-DD).
         Fetches full AV history, caches it with the _FULL_HIST_SENTINEL key,
@@ -296,7 +305,9 @@ class MarketCache:
                     ts = payload.get("Time Series (Daily)", {})
                     if ts:
                         closes = {
-                            d: float(v.get("5. adjusted close") or v.get("4. close") or 0)
+                            d: float(
+                                v.get("5. adjusted close") or v.get("4. close") or 0
+                            )
                             for d, v in ts.items()
                             if v.get("5. adjusted close") or v.get("4. close")
                         }
@@ -304,8 +315,12 @@ class MarketCache:
                         series.name = sym
                         return series
                 else:
-                    _reason = "premium" if "premium" in _av_msg.lower() else "rate-limit"
-                    logger.warning("market_cache.av_blocked", symbol=sym, reason=_reason)
+                    _reason = (
+                        "premium" if "premium" in _av_msg.lower() else "rate-limit"
+                    )
+                    logger.warning(
+                        "market_cache.av_blocked", symbol=sym, reason=_reason
+                    )
             except Exception as e:
                 logger.warning("market_cache.av_fetch_error", symbol=sym, error=str(e))
 
@@ -345,7 +360,9 @@ class MarketCache:
                         )
                         return series
             except Exception as e:
-                logger.warning("market_cache.finnhub_fallback_error", symbol=sym, error=str(e))
+                logger.warning(
+                    "market_cache.finnhub_fallback_error", symbol=sym, error=str(e)
+                )
 
         # ── 3. Polygon fallback ───────────────────────────────────────────────
         pg_key = settings.POLYGON_API_KEY or ""
@@ -367,7 +384,9 @@ class MarketCache:
                     results = r.json().get("results") or []
                     if results:
                         closes = {
-                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): float(bar["c"])
+                            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): float(
+                                bar["c"]
+                            )
                             for bar in results
                             if _coerce_price(bar.get("c")) is not None
                         }
@@ -381,7 +400,9 @@ class MarketCache:
                             )
                             return series
             except Exception as e:
-                logger.warning("market_cache.polygon_fallback_error", symbol=sym, error=str(e))
+                logger.warning(
+                    "market_cache.polygon_fallback_error", symbol=sym, error=str(e)
+                )
 
         return pd.Series(dtype=float, name=sym)
 
@@ -426,7 +447,9 @@ def upsert_ticker_price_cache(symbol: str, price: float, source: str = "live") -
             on_conflict="symbol",
         ).execute()
     except Exception as e:
-        logger.warning("market_cache.pricecache_upsert_failed", symbol=symbol, error=str(e))
+        logger.warning(
+            "market_cache.pricecache_upsert_failed", symbol=symbol, error=str(e)
+        )
 
 
 def get_ticker_price_cache(symbol: str) -> dict | None:
@@ -454,5 +477,244 @@ def get_ticker_price_cache(symbol: str) -> dict | None:
         row_data["price"] = safe_price
         return row_data
     except Exception as e:
-        logger.warning("market_cache.pricecache_get_failed", symbol=symbol, error=str(e))
+        logger.warning(
+            "market_cache.pricecache_get_failed", symbol=symbol, error=str(e)
+        )
         return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Swarm async job cache (Redis)
+# ══════════════════════════════════════════════════════════════════════════════
+SWARM_JOB_TTL = 86_400  # 24 hours
+_SWARM_JOB_MEMORY: dict[str, dict] = {}
+
+# ── File-based job store — shared across all Gunicorn workers via /tmp ──────────
+# When Redis is unavailable, worker A creates a job and writes it to the OS temp dir.
+# Worker B polls for status and reads the same file — shared across Gunicorn workers.
+# This solves the cross-worker 404 that occurs with _SWARM_JOB_MEMORY (per-process).
+_JOB_STORE_PATH = Path(tempfile.gettempdir()) / "neufin_swarm_jobs"
+try:
+    _JOB_STORE_PATH.mkdir(exist_ok=True)
+except Exception as exc:
+    logger.debug(
+        "swarm.job_store_mkdir_skipped",
+        path=str(_JOB_STORE_PATH),
+        error=str(exc),
+    )
+
+_FILE_LOCK = asyncio.Lock()
+
+
+async def _file_job_get(job_id: str) -> dict | None:
+    """Read job state from shared /tmp file store."""
+    path = _JOB_STORE_PATH / f"{job_id}.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except Exception:
+            return None
+    return None
+
+
+async def _file_job_set(job_id: str, data: dict) -> None:
+    """Write job state to shared /tmp file store (with async lock)."""
+    path = _JOB_STORE_PATH / f"{job_id}.json"
+    try:
+        async with _FILE_LOCK:
+            path.write_text(json.dumps(data, default=str))
+    except Exception as exc:
+        logger.warning("swarm.file_job_set_failed", job_id=job_id, error=str(exc))
+
+
+async def _file_job_delete(job_id: str) -> None:
+    """Remove a job file from /tmp store."""
+    path = _JOB_STORE_PATH / f"{job_id}.json"
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception as exc:
+        logger.debug(
+            "swarm.file_job_delete_failed",
+            job_id=job_id,
+            error=str(exc),
+        )
+
+
+async def get_redis():
+    """Async wrapper around the module Redis singleton getter."""
+    return await asyncio.to_thread(_get_redis)
+
+
+async def create_swarm_job(user_id: str | None, session_id: str) -> str:
+    """Create a new swarm job, return job_id."""
+    job_id = str(uuid.uuid4())
+    now = datetime.datetime.now(datetime.UTC).isoformat()
+    job = {
+        "job_id": job_id,
+        "user_id": user_id,
+        "session_id": session_id,
+        "status": "queued",  # queued | running | complete | failed
+        "agent_trace": [],  # list of {agent, status, summary, ts}
+        "result": None,
+        "error": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+    # Mirror in-process for same-worker fast path
+    _SWARM_JOB_MEMORY[job_id] = job
+    redis = await get_redis()
+    if redis:
+        import asyncio
+
+        try:
+            await asyncio.to_thread(
+                redis.setex,
+                f"swarm:job:{job_id}",
+                SWARM_JOB_TTL,
+                json.dumps(job),
+            )
+            return job_id
+        except Exception as e:
+            logger.warning("swarm.job_redis_set_failed", job_id=job_id, error=str(e))
+    # File-based fallback — shared across all Gunicorn workers via /tmp
+    await _file_job_set(job_id, job)
+    logger.warning("swarm.job_store_fallback_file", job_id=job_id)
+    return job_id
+
+
+async def update_swarm_job(job_id: str, **kwargs) -> None:
+    """Patch fields on a swarm job. Call after each agent completes."""
+    import asyncio
+
+    redis = await get_redis()
+    job = None
+
+    # Try Redis first
+    if redis:
+        try:
+            raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+            if raw:
+                job = json.loads(raw)
+        except Exception as e:
+            logger.warning("swarm.job_redis_get_failed", job_id=job_id, error=str(e))
+
+    # Redis miss → try file store (cross-worker case), then in-process
+    if job is None:
+        job = await _file_job_get(job_id)
+    if job is None:
+        job = _SWARM_JOB_MEMORY.get(job_id)
+    if job is None:
+        return
+
+    job.update(kwargs)
+    job["updated_at"] = datetime.datetime.now(datetime.UTC).isoformat()
+
+    # Write back to in-process mirror
+    _SWARM_JOB_MEMORY[job_id] = job
+
+    # Write back to Redis if available
+    if redis:
+        try:
+            await asyncio.to_thread(
+                redis.setex,
+                f"swarm:job:{job_id}",
+                SWARM_JOB_TTL,
+                json.dumps(job),
+            )
+            return
+        except Exception as e:
+            logger.warning("swarm.job_redis_update_failed", job_id=job_id, error=str(e))
+
+    # File fallback
+    await _file_job_set(job_id, job)
+
+
+async def get_swarm_job(job_id: str) -> dict | None:
+    """Fetch swarm job state. Checks Redis → file store → in-process memory."""
+    import asyncio
+
+    redis = await get_redis()
+
+    # 1. Redis (fastest, shared across workers when available)
+    if redis:
+        try:
+            raw = await asyncio.to_thread(redis.get, f"swarm:job:{job_id}")
+            if raw:
+                return json.loads(raw)
+        except Exception as e:
+            logger.warning("swarm.job_redis_get_failed", job_id=job_id, error=str(e))
+
+    # 2. File store (shared across workers via /tmp — survives Redis unavailability)
+    job = await _file_job_get(job_id)
+    if job is not None:
+        return job
+
+    # 3. In-process memory (same-worker fast path, not cross-worker)
+    return _SWARM_JOB_MEMORY.get(job_id)
+
+
+async def count_active_swarm_jobs() -> int:
+    """
+    Count swarm async jobs in ``queued`` or ``running`` across memory, file store,
+    and Redis. Deduplicated by ``job_id``.
+    """
+    active_ids: set[str] = set()
+
+    def _consider(job_id: str, data: dict) -> None:
+        if not job_id or job_id in active_ids:
+            return
+        if data.get("status") in ("queued", "running"):
+            active_ids.add(job_id)
+
+    for jid, data in list(_SWARM_JOB_MEMORY.items()):
+        _consider(jid, data)
+
+    try:
+        for path in _JOB_STORE_PATH.glob("*.json"):
+            try:
+                data = json.loads(path.read_text())
+            except Exception as exc:
+                logger.debug(
+                    "swarm.count_jobs_bad_json", path=str(path), error=str(exc)
+                )
+                continue
+            jid = str(data.get("job_id") or path.stem)
+            _consider(jid, data)
+    except Exception as exc:
+        logger.debug("swarm.count_jobs_files", error=str(exc))
+
+    redis = await get_redis()
+    if redis:
+        try:
+            cursor = 0
+            while True:
+                cursor, keys = await asyncio.to_thread(
+                    redis.scan, cursor, match="swarm:job:*", count=200
+                )
+                for k in keys:
+                    key = k.decode() if isinstance(k, bytes) else str(k)
+                    jid = key.split("swarm:job:", 1)[-1]
+                    if jid in active_ids:
+                        continue
+                    raw = await asyncio.to_thread(redis.get, k)
+                    if not raw:
+                        continue
+                    try:
+                        data = json.loads(
+                            raw.decode() if isinstance(raw, bytes) else raw
+                        )
+                    except Exception as exc:
+                        logger.debug("swarm.count_jobs_bad_redis_json", error=str(exc))
+                        continue
+                    _consider(jid, data)
+                try:
+                    cur = int(cursor)  # redis-py returns int; be defensive
+                except (TypeError, ValueError):
+                    cur = 0
+                if cur == 0:
+                    break
+        except Exception as exc:
+            logger.debug("swarm.count_jobs_redis", error=str(exc))
+
+    return len(active_ids)
