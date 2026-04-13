@@ -30,7 +30,7 @@ function fmt(iso: string | undefined) {
 }
 
 function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-gray-800 ${className}`} />
+  return <div className={`animate-pulse rounded bg-surface-3 ${className}`} />
 }
 
 export default function DeveloperKeysPage() {
@@ -134,102 +134,112 @@ export default function DeveloperKeysPage() {
   }))
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 px-4 py-6">
-      <div className="max-w-3xl mx-auto space-y-8">
-
-        {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
+    <div className="min-h-screen bg-app px-4 py-6 text-navy">
+      <div className="mx-auto max-w-3xl space-y-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-3">
-              <Link href="/developer" className="text-gray-500 hover:text-gray-300 text-sm">← API Portal</Link>
+              <Link href="/developer" className="text-sm text-muted2 transition-colors hover:text-navy">
+                ← API Portal
+              </Link>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight mt-2">API Keys</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Manage your NeuFin Enterprise API keys</p>
+            <h1 className="mt-2 text-2xl font-bold tracking-tight text-navy">API Keys</h1>
+            <p className="mt-0.5 text-sm text-muted2">Manage your NeuFin Enterprise API keys</p>
           </div>
         </div>
 
-        {/* New raw key banner */}
         {newKey && (
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-3">
-            <p className="text-sm font-semibold text-emerald-400">✓ API Key Created — Copy it now, it won&apos;t be shown again</p>
+          <div className="space-y-3 rounded-xl border border-success2/30 bg-success2/5 p-5">
+            <p className="text-sm font-semibold text-emerald-800">
+              API key created — copy it now; it will not be shown again.
+            </p>
             <div className="flex items-center gap-3">
-              <code className="flex-1 rounded-lg bg-gray-900 border border-gray-700 px-4 py-2.5 text-sm font-mono text-emerald-300 overflow-x-auto">
+              <code className="flex-1 overflow-x-auto rounded-lg border border-border bg-surface-2 px-4 py-2.5 font-mono text-sm text-emerald-900">
                 {newKey}
               </code>
               <button
+                type="button"
                 onClick={() => navigator.clipboard.writeText(newKey)}
-                className="flex-shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900 transition-colors hover:bg-emerald-100"
               >
                 Copy
               </button>
             </div>
-            <button onClick={() => setNewKey(null)} className="text-xs text-gray-500 hover:text-gray-300">Dismiss</button>
+            <button type="button" onClick={() => setNewKey(null)} className="text-xs text-muted2 hover:text-navy">
+              Dismiss
+            </button>
           </div>
         )}
 
-        {/* Create new key form */}
-        <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6 space-y-4">
-          <h2 className="text-base font-semibold">Create New Key</h2>
+        <div className="space-y-4 rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <h2 className="text-base font-semibold text-navy">Create new key</h2>
           <button
             type="button"
             onClick={() => setShowModal(true)}
-            className="rounded-xl bg-blue-600 hover:bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+            className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
           >
             Create New Key
           </button>
-          <p className="text-xs text-gray-500">
-            Rate limit: 10,000 requests/day per key. Keys are stored as hashes — copy your key immediately after creation.
+          <p className="text-sm text-muted2">
+            Rate limit: 10,000 requests/day per key. Keys are stored as hashes — copy your key immediately after
+            creation.
           </p>
         </div>
 
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-            <p className="text-sm text-red-400">{error}</p>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm text-red-800">{error}</p>
             {error.includes('Enterprise') && (
-              <Link href="/pricing" className="mt-2 inline-block text-sm text-blue-400 hover:underline">
+              <Link href="/pricing" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">
                 Upgrade to Enterprise →
               </Link>
             )}
           </div>
         )}
 
-        {/* Keys list */}
-        <div className="rounded-2xl border border-gray-800 overflow-hidden">
-          <div className="bg-gray-900 border-b border-gray-800 px-5 py-3 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Your API Keys</p>
-            <button onClick={load} className="text-xs text-gray-500 hover:text-gray-300">Refresh</button>
+        <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-border-light bg-surface-2 px-5 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted2">Your API Keys</p>
+            <button type="button" onClick={load} className="text-xs text-muted2 hover:text-navy">
+              Refresh
+            </button>
           </div>
           {loading ? (
-            <div className="p-5 space-y-3">
-              {[1,2].map(i => <Skeleton key={i} className="h-16" />)}
+            <div className="space-y-3 p-5">
+              {[1, 2].map((i) => (
+                <Skeleton key={i} className="h-16" />
+              ))}
             </div>
           ) : mergedKeys.length === 0 ? (
-            <div className="p-10 text-center text-gray-500 text-sm">
-              No API keys yet. Create one above.
-            </div>
+            <div className="p-10 text-center text-sm text-muted2">No API keys yet. Create one above.</div>
           ) : (
-            <div className="divide-y divide-gray-800/60 bg-gray-950">
+            <div className="divide-y divide-border-light bg-white">
               {mergedKeys.map((k) => (
-                <div key={k.id} className="flex items-center justify-between px-5 py-4 hover:bg-gray-900/40">
-                  <div className="space-y-1 min-w-0">
+                <div key={k.id} className="flex items-center justify-between px-5 py-4 transition-colors hover:bg-surface-2/60">
+                  <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-gray-100">{k.name}</p>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${k.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                      <p className="text-sm font-medium text-navy">{k.name}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          k.is_active ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'
+                        }`}
+                      >
                         {k.is_active ? 'Active' : 'Revoked'}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      Created {fmt(k.created_at)} · Last used {fmt(k.last_used_at)} · Usage this month {k.usage_this_month?.toLocaleString() || 0} calls · Rate limit {k.rate_limit_per_day.toLocaleString()} calls/day
+                    <p className="text-sm text-muted2">
+                      Created {fmt(k.created_at)} · Last used {fmt(k.last_used_at)} · Usage this month{' '}
+                      {k.usage_this_month?.toLocaleString() || 0} calls · Rate limit{' '}
+                      {k.rate_limit_per_day.toLocaleString()} calls/day
                     </p>
-                    {k.key_prefix && (
-                      <code className="text-xs font-mono text-gray-600">{k.key_prefix}…</code>
-                    )}
+                    {k.key_prefix && <code className="font-mono text-xs text-slate2">{k.key_prefix}…</code>}
                   </div>
                   {k.is_active && (
                     <button
+                      type="button"
                       onClick={() => handleRevoke(k.id)}
                       disabled={revoking === k.id}
-                      className="flex-shrink-0 ml-4 rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                      className="ml-4 shrink-0 rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-800 transition-colors hover:bg-red-50 disabled:opacity-50"
                     >
                       {revoking === k.id ? 'Revoking…' : 'Revoke'}
                     </button>
@@ -240,44 +250,42 @@ export default function DeveloperKeysPage() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-gray-800 bg-gray-900 p-6">
-          <h2 className="mb-3 text-base font-semibold">Usage (last 7 days)</h2>
+        <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-navy">Usage (last 7 days)</h2>
           {chartData.length === 0 ? (
-            <p className="text-sm text-gray-500">No API calls recorded yet.</p>
+            <p className="text-sm text-muted2">No API calls recorded yet.</p>
           ) : (
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="day" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip />
-                  <Bar dataKey="calls" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="day" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} />
+                  <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                  <Bar dataKey="calls" fill="#1EB8CC" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
 
-        {/* Usage info */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-200">Using Your API Key</h3>
-          <pre className="text-xs font-mono text-gray-400 overflow-x-auto leading-relaxed">
-{`# Authenticate all requests with:
+        <div className="space-y-3 rounded-xl border border-border bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-navy">Using your API key</h3>
+          <pre className="overflow-x-auto font-mono text-sm leading-relaxed text-slate2">
+            {`# Authenticate all requests with:
 curl -H "X-NeuFin-API-Key: YOUR_KEY" \\
      https://neufin-backend-production.up.railway.app/api/research/regime`}
           </pre>
-          <Link href="/developer/docs" className="text-sm text-blue-400 hover:text-blue-300">
+          <Link href="/developer/docs" className="text-sm font-medium text-primary hover:underline">
             View full API reference →
           </Link>
         </div>
-
       </div>
       {showModal && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-gray-800 bg-gray-900 p-6">
-            <h3 className="text-lg font-semibold">Create API key</h3>
-            <p className="mt-1 text-sm text-gray-400">Example: Production - MYTHEO Integration</p>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-navy/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-navy">Create API key</h3>
+            <p className="mt-1 text-sm text-muted2">Example: Production — MYTHEO Integration</p>
             <form onSubmit={handleCreate} className="mt-4 space-y-3">
               <input
                 type="text"
@@ -285,16 +293,26 @@ curl -H "X-NeuFin-API-Key: YOUR_KEY" \\
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Key name"
                 required
-                className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-navy placeholder:text-muted2 focus:border-primary focus:outline-none"
               />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg border border-gray-700 px-4 py-2 text-sm">Cancel</button>
-                <button type="submit" disabled={creating || !newName.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm text-slate2 hover:bg-surface-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating || !newName.trim()}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-primary-dark"
+                >
                   {creating ? 'Creating…' : 'Create New Key'}
                 </button>
               </div>
             </form>
-            <p className="mt-3 text-xs text-amber-300">Save this key — it won&apos;t be shown again.</p>
+            <p className="mt-3 text-xs text-warning2">Save this key — it will not be shown again.</p>
           </div>
         </div>
       )}

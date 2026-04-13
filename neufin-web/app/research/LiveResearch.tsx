@@ -24,11 +24,11 @@ interface ResearchNote {
 }
 
 const REGIME_COLORS: Record<string, string> = {
-  risk_on: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-  risk_off: 'text-red-400 bg-red-500/10 border-red-500/30',
-  stagflation: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
-  recovery: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-  recession_risk: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+  risk_on: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+  risk_off: 'text-red-800 bg-red-50 border-red-200',
+  stagflation: 'text-amber-900 bg-amber-50 border-amber-200',
+  recovery: 'text-sky-800 bg-sky-50 border-sky-200',
+  recession_risk: 'text-yellow-900 bg-yellow-50 border-yellow-200',
 }
 
 const REGIME_LABELS: Record<string, string> = {
@@ -50,12 +50,12 @@ function NoteTypeLabel({ type }: { type: string }) {
     regime_change: 'Regime Change',
     risk_alert: 'Risk Alert',
   }
-  return <span className="text-xs text-gray-500">{labels[type] ?? type.replace(/_/g, ' ')}</span>
+  return <span className="text-sm text-muted2">{labels[type] ?? type.replace(/_/g, ' ')}</span>
 }
 
 export default function LiveResearch() {
   const [regime, setRegime] = useState<MarketRegime | null>(null)
-  const [notes, setNotes]   = useState<ResearchNote[]>([])
+  const [notes, setNotes] = useState<ResearchNote[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -70,8 +70,11 @@ export default function LiveResearch() {
           const data = await notesRes.json()
           setNotes((data.notes ?? data ?? []).slice(0, 3))
         }
-      } catch {}
-      finally { setLoading(false) }
+      } catch {
+        /* ignore */
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -79,8 +82,8 @@ export default function LiveResearch() {
   if (loading) {
     return (
       <div className="space-y-4">
-        {[1,2,3].map(i => (
-          <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-800/50" />
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-3" />
         ))}
       </div>
     )
@@ -88,19 +91,20 @@ export default function LiveResearch() {
 
   return (
     <div className="space-y-8">
-      {/* Market Regime */}
       {regime && (
-        <div className={`rounded-2xl border p-6 ${REGIME_COLORS[regime.regime] ?? 'text-gray-400 bg-gray-800 border-gray-700'}`}>
-          <div className="flex items-start justify-between flex-wrap gap-4">
+        <div
+          className={`rounded-2xl border p-6 ${REGIME_COLORS[regime.regime] ?? 'border-border bg-white text-navy'}`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest opacity-70 mb-1">Current Market Regime</p>
-              <p className="text-2xl font-bold">{REGIME_LABELS[regime.regime] ?? regime.regime}</p>
-              <p className="text-sm opacity-70 mt-1">
+              <p className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted2">Current Market Regime</p>
+              <p className="text-2xl font-bold text-navy">{REGIME_LABELS[regime.regime] ?? regime.regime}</p>
+              <p className="mt-1 text-sm text-slate2">
                 Confidence: {(regime.confidence * 100).toFixed(0)}% · Active since {formatDate(regime.started_at)}
               </p>
             </div>
             <div className="text-right">
-              <div className="rounded-xl border border-current/20 px-4 py-2 text-sm font-medium opacity-80">
+              <div className="rounded-xl border border-border bg-surface-2 px-4 py-2 text-sm font-medium text-slate2">
                 Live Signal
               </div>
             </div>
@@ -108,12 +112,11 @@ export default function LiveResearch() {
         </div>
       )}
 
-      {/* Research Notes */}
       {notes.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-100">Latest Research</h3>
-            <Link href="/auth?next=/research" className="text-sm text-blue-400 hover:text-blue-300">
+            <h3 className="text-lg font-bold text-navy">Latest Research</h3>
+            <Link href="/auth?next=/research" className="text-sm font-medium text-primary hover:underline">
               Sign in for full access →
             </Link>
           </div>
@@ -121,30 +124,32 @@ export default function LiveResearch() {
             <Link
               key={note.id}
               href={`/research/${note.id}`}
-              className="block rounded-xl border border-gray-800 bg-gray-900 p-5 hover:border-gray-600 transition-colors group"
+              className="group block rounded-xl border border-border bg-white p-5 shadow-sm transition-colors hover:border-primary/40"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <NoteTypeLabel type={note.note_type} />
                     {note.regime && (
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium border ${REGIME_COLORS[note.regime] ?? 'text-gray-400 bg-gray-800 border-gray-700'}`}>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-xs font-medium ${REGIME_COLORS[note.regime] ?? 'border-border bg-surface-2 text-muted2'}`}
+                      >
                         {REGIME_LABELS[note.regime] ?? note.regime}
                       </span>
                     )}
                     {note.time_horizon && (
-                      <span className="text-[10px] text-gray-600">{note.time_horizon.replace(/_/g, ' ')}</span>
+                      <span className="text-sm text-muted2">{note.time_horizon.replace(/_/g, ' ')}</span>
                     )}
                   </div>
-                  <h4 className="font-semibold text-gray-100 group-hover:text-white transition-colors">{note.title}</h4>
-                  <p className="text-sm text-gray-400 leading-relaxed line-clamp-2">{note.executive_summary}</p>
+                  <h4 className="font-semibold text-navy transition-colors group-hover:text-primary-dark">{note.title}</h4>
+                  <p className="line-clamp-2 text-sm leading-relaxed text-slate2">{note.executive_summary}</p>
                 </div>
-                <div className="flex-shrink-0 text-right space-y-1">
-                  <p className="text-xs text-gray-600">{formatDate(note.generated_at)}</p>
+                <div className="flex-shrink-0 space-y-1 text-right">
+                  <p className="text-sm text-muted2">{formatDate(note.generated_at)}</p>
                   {note.confidence_score && (
-                    <p className="text-xs text-gray-600">{(note.confidence_score * 100).toFixed(0)}% confidence</p>
+                    <p className="text-sm text-muted2">{(note.confidence_score * 100).toFixed(0)}% confidence</p>
                   )}
-                  <span className="text-xs text-blue-400 group-hover:text-blue-300">Read →</span>
+                  <span className="text-sm font-medium text-primary group-hover:underline">Read →</span>
                 </div>
               </div>
             </Link>
@@ -153,23 +158,27 @@ export default function LiveResearch() {
       )}
 
       {notes.length === 0 && !regime && (
-        <div className="rounded-xl border border-dashed border-gray-700 p-8 text-center">
-          <p className="text-gray-500 text-sm">Live research data will appear here once the intelligence layer is active.</p>
+        <div className="rounded-xl border border-dashed border-border bg-white p-8 text-center">
+          <p className="text-sm text-muted2">
+            Live research data will appear here once the intelligence layer is active.
+          </p>
         </div>
       )}
 
-      {/* CTA */}
-      <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-6 text-center space-y-3">
-        <p className="font-semibold text-gray-100">Access All Research Intelligence</p>
-        <p className="text-sm text-gray-400">
-          Semantic search, macro signals, sector analysis, and daily AI-generated research notes.
-          Available on Retail plan and above.
+      <div className="space-y-3 rounded-2xl border border-primary/20 bg-primary-light/30 p-6 text-center">
+        <p className="font-semibold text-navy">Access All Research Intelligence</p>
+        <p className="text-sm text-slate2">
+          Semantic search, macro signals, sector analysis, and daily AI-generated research notes. Available on Retail
+          plan and above.
         </p>
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <Link href="/auth" className="rounded-xl bg-blue-600 hover:bg-blue-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/auth"
+            className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+          >
             Sign up free
           </Link>
-          <Link href="/pricing" className="text-sm text-gray-400 hover:text-gray-200">
+          <Link href="/pricing" className="text-sm text-muted2 transition-colors hover:text-navy">
             See all plans →
           </Link>
         </div>

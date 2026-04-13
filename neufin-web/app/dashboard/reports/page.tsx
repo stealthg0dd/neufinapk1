@@ -140,12 +140,20 @@ export default function DashboardReportsPage() {
             Generate and manage institutional-grade portfolio reports.
           </p>
         </div>
-        <Link
-          href="/dashboard/portfolio"
-          className="rounded-md border border-primary/35 bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20"
-        >
-          Generate New Report
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/reports/preview"
+            className="rounded-md border border-border bg-white px-3 py-2 text-xs font-medium text-slate2 shadow-sm hover:border-primary/40 hover:text-primary-dark"
+          >
+            HTML print preview
+          </Link>
+          <Link
+            href="/dashboard/portfolio"
+            className="rounded-md border border-primary/35 bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20"
+          >
+            Generate New Report
+          </Link>
+        </div>
       </div>
 
       {error && (

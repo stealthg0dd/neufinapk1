@@ -48,6 +48,14 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from services.calculator import canonical_metrics_for_institutional_report
+from services.report_state import (
+    REPORT_DRAFT,
+    REPORT_FINAL,
+    assess_report_state,
+    build_section_confidence,
+)
+
 # Optional: matplotlib for donut chart (degrades to ReportLab bar if absent)
 try:
     import matplotlib
@@ -231,8 +239,7 @@ def _quality_check(ctx: dict) -> list[str]:
     beta = float(ctx.get("weighted_beta") or 0)
     if beta > 5:
         warnings.append(
-            f"⚠  Beta anomaly detected: weighted_beta = {beta:.2f}. "
-            "This suggests position data may be incomplete or weights are unnormalized."
+            "Beta headline capped for display; verify position weights and pricing."
         )
 
     positions = ctx.get("positions") or []
@@ -242,28 +249,23 @@ def _quality_check(ctx: dict) -> list[str]:
         )
         if wsum < 50:
             warnings.append(
-                "⚠  Position weights appear unnormalized (sum < 50%). "
-                "Weights have been recomputed from position values where possible."
+                "Position weights appear unnormalized; AUM reconciled from marks."
             )
 
     if not ctx.get("swarm_available"):
         warnings.append(
-            "Note: Swarm IC analysis not run for this portfolio. "
-            "Regime classification, quant signals, and alpha opportunities "
-            "are portfolio-derived estimates; run Swarm IC for full intelligence."
+            "Swarm IC analysis not run; regime and alpha sections use portfolio estimates."
         )
 
     if not ctx.get("tax_positions"):
         warnings.append(
-            "Note: Cost basis not provided. Tax section shows estimates only. "
-            "Upload cost basis data to unlock precise CGT and harvesting analysis."
+            "Cost basis not provided; tax figures are limited or illustrative only."
         )
 
     dna_score = int(ctx.get("dna_score") or 0)
     if dna_score == 0:
         warnings.append(
-            "⚠  DNA score is 0 - behavioral assessment may be incomplete. "
-            "Re-run DNA analysis for full archetype classification."
+            "DNA score unavailable; run behavioral analysis for full classification."
         )
 
     return warnings
@@ -706,9 +708,13 @@ def _build_report_context(
     if not isinstance(thesis_obj, dict):
         thesis_obj = {}
 
-    # ── Portfolio basics ───────────────────────────────────────────────────────
+    # ── Portfolio basics (canonical AUM / beta / Sharpe — single source) ───────
     positions: list[dict] = p.get("positions_with_basis") or m.get("positions") or []
-    total_value = float(p.get("total_value") or m.get("total_value") or 0)
+    _canon = canonical_metrics_for_institutional_report(p, d, thesis_obj, positions)
+    total_value = float(_canon["total_value"])
+    weighted_beta = float(_canon["weighted_beta"])
+    sharpe_ratio = _canon.get("sharpe_ratio")
+    report_metrics_note = str(_canon.get("sources_note") or "")
 
     # ── DNA ────────────────────────────────────────────────────────────────────
     dna_score = int(d.get("dna_score") or 0)
@@ -720,26 +726,16 @@ def _build_report_context(
     if not isinstance(tax_analysis, dict):
         tax_analysis = {}
 
-    # ── Quant ──────────────────────────────────────────────────────────────────
-    weighted_beta = float(
-        d.get("weighted_beta")
-        or thesis_obj.get("weighted_beta")
-        or s.get("weighted_beta")
-        or m.get("weighted_beta")
-        or 0
-    )
-    if weighted_beta > 5:
-        logger.info(
-            "pdf.weighted_beta_capped",
-            raw_beta=weighted_beta,
-            capped=min(weighted_beta, 3.0),
-        )
-        weighted_beta = min(weighted_beta, 3.0)
+    # ── Quant (correlation / HHI — prefer calculator metrics, else DNA) ───────
     avg_corr = float(d.get("avg_correlation") or m.get("avg_correlation") or 0)
-    hhi_raw = float(
-        (d.get("score_breakdown") or {}).get("hhi_concentration") or m.get("hhi") or 0
-    )
-    hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
+    hhi_from_canon = float(_canon.get("hhi") or 0)
+    if hhi_from_canon > 0:
+        hhi = hhi_from_canon
+    else:
+        hhi_raw = float(
+            (d.get("score_breakdown") or {}).get("hhi_concentration") or m.get("hhi") or 0
+        )
+        hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
 
     # ── Tax from DNA ───────────────────────────────────────────────────────────
     tax_positions: list[dict] = tax_analysis.get("positions") or []
@@ -1103,8 +1099,10 @@ def _build_report_context(
         "weaknesses": weaknesses,
         # Quant
         "weighted_beta": weighted_beta,
+        "sharpe_ratio": sharpe_ratio,
         "avg_corr": avg_corr,
         "hhi": hhi,
+        "report_metrics_note": report_metrics_note,
         # Tax
         "tax_positions": tax_positions,
         "total_tax_liability": total_tax_liability,
@@ -1207,7 +1205,14 @@ def _generate_emergency_pdf(
             base["BodyText"],
         ),
         Spacer(1, 14),
-        Paragraph(_xml(str(message)[:4000]), base["BodyText"]),
+        Paragraph(
+            _xml(
+                "Technical reference (truncated): "
+                + str(message)[:400].replace("\n", " ")
+                + ("…" if len(str(message)) > 400 else "")
+            ),
+            base["BodyText"],
+        ),
         Spacer(1, 20),
         Paragraph(_xml(f"Reference: {ref}"), base["Normal"]),
     ]
@@ -1259,16 +1264,21 @@ def build_swarm_ic_export_pdf(swarm_row: dict) -> bytes:
         story.append(Spacer(1, 10))
 
     qraw = norm.get("quant_analysis") or thesis.get("quant_analysis")
-    if isinstance(qraw, dict):
-        qa = json.dumps(qraw, default=str)[:8000]
-    elif qraw:
-        qa = str(qraw)[:8000]
-    else:
-        qa = ""
-    if qa:
+    if isinstance(qraw, dict) and qraw:
         story.append(PageBreak())
-        story.append(Paragraph("<b>Quantitative analysis</b>", st["h3"]))
-        story.append(Paragraph(_xml(qa), st["body_sm"]))
+        story.append(Paragraph("<b>Quantitative summary</b>", st["h3"]))
+        hhi = qraw.get("hhi_pts")
+        wb = qraw.get("weighted_beta")
+        sh = qraw.get("sharpe_ratio")
+        bits = []
+        if hhi is not None:
+            bits.append(f"HHI score (concentration): {hhi}")
+        if wb is not None:
+            bits.append(f"Weighted beta: {wb}")
+        if sh is not None:
+            bits.append(f"Sharpe ratio: {sh}")
+        summary = "; ".join(bits) if bits else "Quantitative detail available in the NeuFin app."
+        story.append(Paragraph(_xml(summary), st["body"]))
         story.append(Spacer(1, 8))
 
     rec = str(
@@ -1328,11 +1338,9 @@ def _make_cover_callback(
     dna_score = ctx["dna_score"]
     regime = ctx["regime_label"] or "Pending IC Analysis"
     beta = ctx["weighted_beta"]
-    sharpe_str = (
-        _fnum(advisor_config.get("sharpe_ratio") or 0)
-        if advisor_config.get("sharpe_ratio")
-        else "—"
-    )
+    sr = ctx.get("sharpe_ratio")
+    sharpe_str = _fnum(sr) if sr is not None else "—"
+    report_state = str(ctx.get("report_state") or REPORT_DRAFT)
 
     def callback(canvas, doc):
         canvas.saveState()
@@ -1348,9 +1356,23 @@ def _make_cover_callback(
         canvas.drawCentredString(
             A4_W / 2, A4_H - 14, "RESTRICTED — INVESTMENT COMMITTEE USE ONLY"
         )
+        # Report state ribbon (draft / review — not IC-final)
+        if report_state != REPORT_FINAL:
+            canvas.setFillColor(ACCENT_AMBER)
+            canvas.rect(0, A4_H - 44, A4_W, 22, fill=1, stroke=0)
+            canvas.setFont("Helvetica-Bold", 7)
+            canvas.setFillColor(HexColor("#0F172A"))
+            state_msg = (
+                "DRAFT — DATA INCOMPLETE · NOT FOR EXTERNAL IC DISTRIBUTION"
+                if report_state == REPORT_DRAFT
+                else "ADVISOR REVIEW — VERIFY INPUTS BEFORE IC PRESENTATION"
+            )
+            canvas.drawCentredString(A4_W / 2, A4_H - 36, state_msg)
+            y_logo = A4_H - 55 - 22
+        else:
+            y_logo = A4_H - 55
 
         # ── Logo / firm name (top-left) ─────────────────────────────────────
-        y_logo = A4_H - 55
         if logo_bytes:
             try:
                 ir = ImageReader(io.BytesIO(logo_bytes))
@@ -1535,6 +1557,23 @@ def _page_executive_memo(
     items: list = []
     warnings: list[str] = extra.get("warnings") or []
 
+    items.append(Paragraph("EXECUTIVE SUMMARY", st["h1"]))
+    items.append(Spacer(1, 4))
+    rs = str(ctx.get("report_state") or REPORT_DRAFT).upper()
+    sc = ctx.get("section_confidence") or {}
+    sc_bits = [f"{k.replace('_', ' ')}: {v}" for k, v in sorted(sc.items())]
+    items.append(
+        Paragraph(
+            _xml(f"Report status: {rs}. Section confidence — " + "; ".join(sc_bits)),
+            st["muted8"],
+        )
+    )
+    if ctx.get("report_metrics_note"):
+        items.append(
+            Paragraph(_xml(str(ctx["report_metrics_note"])), st["muted8"]),
+        )
+    items.append(Spacer(1, 8))
+
     # Quality warning banners
     for w in warnings:
         items.append(_amber_banner_table(w, pal, st, cw))
@@ -1689,7 +1728,7 @@ def _page_executive_memo(
                 [
                     [
                         Paragraph(
-                            f'<font color="{_hex(ACCENT_AMBER)}">⚠  </font>{_xml(ctx["weaknesses"][0])}',
+                            f'<font color="{_hex(ACCENT_AMBER)}">Note: </font>{_xml(ctx["weaknesses"][0])}',
                             st["body"],
                         )
                     ]
@@ -1700,17 +1739,16 @@ def _page_executive_memo(
         )
         items.append(Spacer(1, 8))
 
-    # Confidence statement
-    conf_pct = 72 if ctx.get("swarm_available") else 65
+    # Overall confidence (ties to report_state)
     conf_basis = (
-        "DNA analysis (live market data) + Swarm IC synthesis"
+        "DNA + live marks + Swarm IC synthesis."
         if ctx.get("swarm_available")
-        else "DNA analysis (live market data). Run Swarm IC for full synthesis."
+        else "DNA + live marks; run Swarm IC for full regime and scenario synthesis."
     )
     items.append(
         Paragraph(
             f'<font color="{_hex(pal["text_mut"])}">'
-            f"Confidence: {conf_pct}% · Basis: {_xml(conf_basis)}</font>",
+            f"Overall narrative confidence: {_xml(conf_basis)}</font>",
             st["muted8"],
         )
     )
@@ -1798,18 +1836,15 @@ def _page_portfolio_snapshot(
                 ),
             )
 
-    # ── Right: metrics table ────────────────────────────────────────────────
+    # ── Right: metrics table (canonical ctx — same as cover) ────────────────
     total_value = ctx["total_value"]
-    beta = float(metrics.get("weighted_beta") or ctx["weighted_beta"] or 0)
-    sharpe = float(metrics.get("sharpe_ratio") or 0)
-    hhi = float(metrics.get("hhi") or ctx["hhi"] or 0)
+    beta = float(ctx.get("weighted_beta") or 0)
+    sr = ctx.get("sharpe_ratio")
+    sharpe = float(sr) if sr is not None else None
+    hhi = float(ctx.get("hhi") or metrics.get("hhi") or 0)
     cash_w = float(metrics.get("cash_weight") or 0)
     ytd = metrics.get("ytd_return")
     n_pos = int(metrics.get("num_positions") or ctx["num_positions"])
-
-    beta_note = ""
-    if beta > 5:
-        beta_note = " ⚠ ANOMALY"
 
     stats_data = [
         ["Metric", "Value"],
@@ -1817,8 +1852,8 @@ def _page_portfolio_snapshot(
         ["# Positions", str(n_pos)],
         ["Cash Weight", f"{cash_w:.1f}%"],
         ["Concentration HHI", f"{hhi:.4f}"],
-        ["Weighted Beta", f"{beta:.2f}{beta_note}"],
-        ["Sharpe Ratio", f"{sharpe:.2f}" if sharpe else "—"],
+        ["Weighted Beta", f"{beta:.2f}"],
+        ["Sharpe Ratio", f"{sharpe:.2f}" if sharpe is not None else "Unavailable"],
         ["YTD Return", _fpct(ytd) if ytd is not None else "—"],
     ]
     right = Table(stats_data, colWidths=[140, 110], style=_tbl_std(pal))
@@ -1979,7 +2014,7 @@ def _page_behavioral_dna(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("BEHAVIORAL DNA ANALYSIS", st["h1"]))
+    items.append(Paragraph("BEHAVIORAL INSIGHTS", st["h1"]))
     items.append(Spacer(1, 8))
 
     # Gauge + archetype side by side
@@ -2153,7 +2188,7 @@ def _page_behavioral_dna(
 
 def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
-    items.append(Paragraph("MARKET REGIME & MACRO CONTEXT", st["h1"]))
+    items.append(Paragraph("MACRO REGIME & MARKET CONTEXT", st["h1"]))
     items.append(Spacer(1, 8))
 
     regime = ctx["regime_label"] or "Pending IC Analysis"
@@ -2306,7 +2341,7 @@ def _page_risk_correlation(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("RISK & CORRELATION ANALYSIS", st["h1"]))
+    items.append(Paragraph("RISK ANALYSIS", st["h1"]))
     items.append(Spacer(1, 8))
 
     quant = extra.get("quant") or {}
@@ -2551,7 +2586,7 @@ def _page_stress_testing(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("STRESS TESTING & SCENARIO ANALYSIS", st["h1"]))
+    items.append(Paragraph("SCENARIO ANALYSIS", st["h1"]))
     items.append(Spacer(1, 8))
 
     thesis = extra.get("thesis") or {}
@@ -2682,6 +2717,20 @@ def _page_stress_testing(
             stress_raw = list(stress_results.values())
         elif isinstance(stress_results, list):
             stress_raw = stress_results
+
+        def _stress_row_usable(row: dict) -> bool:
+            if row.get("data_status") == "unavailable":
+                return False
+            pr = row.get("portfolio_return_pct", row.get("portfolio_impact"))
+            if pr is None:
+                return False
+            try:
+                v = float(str(pr).replace("%", "").strip())
+            except (TypeError, ValueError):
+                return False
+            return abs(v) <= 200
+
+        stress_raw = [r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)]
 
         if not stress_raw:
             items.append(
@@ -3082,7 +3131,7 @@ def _page_agent_attribution(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("HOW THIS REPORT WAS GENERATED", st["h1"]))
+    items.append(Paragraph("APPENDIX · METHODOLOGY & ATTRIBUTION", st["h1"]))
     items.append(
         Paragraph(
             "Full transparency on AI agent contributions and data sources.",
@@ -3204,6 +3253,7 @@ def _build_pdf_sync(
     logo_bytes: bytes | None,
     swarm_data_present: bool,
     theme: str = "light",
+    ic_grade_only: bool = False,
 ) -> bytes:
     pal = _palette(theme)
     st = _styles(pal)
@@ -3212,6 +3262,13 @@ def _build_pdf_sync(
     # Build unified context
     ctx = _build_report_context(portfolio_data, dna_data, swarm_norm, advisor_config)
     ctx["swarm_available"] = swarm_data_present
+    ctx["report_state"] = assess_report_state(ctx)
+    ctx["section_confidence"] = build_section_confidence(ctx)
+    if ic_grade_only and ctx["report_state"] == REPORT_DRAFT:
+        raise ValueError(
+            "IC-grade PDF export requires complete portfolio data, DNA analysis, "
+            "and normalized weights (report is currently in draft state)."
+        )
 
     # Quality gates
     warnings = _quality_check(ctx)
@@ -3300,19 +3357,22 @@ def _build_pdf_sync(
             )
             elems.append(
                 Paragraph(
-                    f"[Page render error: {builder.__name__} — {_xml(str(e))}]",
+                    "This section could not be rendered completely. "
+                    "Regenerate the report or contact support if the issue persists.",
                     st["muted"],
                 )
             )
         elems.append(PageBreak())
 
+    # Body order: executive → snapshot → macro & risk → behavioral → scenarios
+    # → tax → recommendations (alpha + directives) → appendix
     _add_page(_page_executive_memo, ctx, extra, pal, st, cw)
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
-    _add_page(_page_behavioral_dna, ctx, extra, pal, st, cw)
     _add_page(_page_macro_regime, ctx, extra, pal, st, cw)
     _add_page(_page_risk_correlation, ctx, extra, pal, st, cw)
-    _add_page(_page_tax_optimization, ctx, extra, pal, st, cw)
+    _add_page(_page_behavioral_dna, ctx, extra, pal, st, cw)
     _add_page(_page_stress_testing, ctx, extra, pal, st, cw)
+    _add_page(_page_tax_optimization, ctx, extra, pal, st, cw)
     _add_page(_page_alpha_opportunities, ctx, extra, pal, st, cw)
     _add_page(_page_directives, ctx, extra, pal, st, cw)
     _add_page(_page_agent_attribution, ctx, extra, pal, st, cw)
@@ -3339,6 +3399,7 @@ async def generate_advisor_report(
     swarm_data: Any | None,
     advisor_config: dict,
     theme: str = "light",
+    ic_grade_only: bool = False,
 ) -> bytes:
     """
     Async orchestrator: fetch logo → normalize swarm → synchronous PDF build.
@@ -3349,6 +3410,7 @@ async def generate_advisor_report(
         swarm_data:      raw swarm_reports row or None
         advisor_config:  dict with keys: advisor_name, firm_name, logo_url, …
         theme:           "light" (default, institutional) or "white" (alias) or "dark"
+        ic_grade_only:   When True, refuse to build if report_state would be ``draft``.
 
     Returns:
         Raw PDF bytes.
@@ -3367,7 +3429,11 @@ async def generate_advisor_report(
             logo_bytes,
             swarm_present,
             theme=theme,
+            ic_grade_only=ic_grade_only,
         )
+    except ValueError:
+        # Intentional gate (e.g. ic_grade_only + draft state) — never mask as emergency PDF
+        raise
     except Exception as e:
         logger.error("pdf.orchestrator_failed", error=str(e), exc_info=True)
         try:

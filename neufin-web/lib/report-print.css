@@ -1,0 +1,115 @@
+/**
+ * Institutional print stylesheet — use with Paged.js or browser Print → Save as PDF.
+ * Import alongside HTML from report-template.tsx.
+ */
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 20mm 16mm;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.neufin-report {
+  font-family: ui-sans-serif, system-ui, 'Inter', 'Segoe UI', sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.45;
+  color: #0f172a;
+  background: #fff;
+}
+
+.neufin-report h1 {
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  border-bottom: 2px solid #1eb8cc;
+  padding-bottom: 6px;
+  margin: 0 0 12px;
+  break-after: avoid;
+}
+
+.neufin-report h2 {
+  font-size: 12pt;
+  font-weight: 700;
+  color: #158a99;
+  margin: 18px 0 8px;
+  break-after: avoid;
+}
+
+.neufin-report .meta {
+  font-size: 8.5pt;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+
+.neufin-report .section {
+  margin-bottom: 14px;
+}
+
+.neufin-report .confidence {
+  display: inline-block;
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+  margin-left: 8px;
+}
+
+.neufin-report .confidence-high {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.neufin-report .confidence-medium {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.neufin-report .confidence-low {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.neufin-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  margin: 8px 0;
+}
+
+.neufin-report th,
+.neufin-report td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.neufin-report th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #334155;
+}
+
+.neufin-report .footer {
+  margin-top: 24px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 8pt;
+  color: #64748b;
+}
+
+/* Paged.js chrome (optional) */
+.pagedjs_page {
+  background: #fff;
+}
