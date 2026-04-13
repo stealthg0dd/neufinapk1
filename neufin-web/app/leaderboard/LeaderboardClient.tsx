@@ -28,7 +28,7 @@ const PODIUM_CONFIG = [
 
 const PODIUM_COLORS = {
   Gold:   { border: 'border-yellow-500/50',  bg: 'bg-yellow-500/10', glow: '#eab308' },
-  Silver: { border: 'border-gray-400/40',    bg: 'bg-gray-400/5',    glow: '#9ca3af' },
+  Silver: { border: 'border-shell-muted/40',    bg: 'bg-shell-muted/5',    glow: '#9ca3af' },
   Bronze: { border: 'border-orange-600/40',  bg: 'bg-orange-600/5',  glow: '#c2410c' },
 } as const
 
@@ -75,7 +75,7 @@ function PodiumCard({
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
       >
         {isMe && (
-          <span className="absolute top-1.5 right-1.5 text-[9px] font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-1.5 py-0.5 leading-none">
+          <span className="absolute top-1.5 right-1.5 text-sm font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-1.5 py-0.5 leading-none">
             YOU
           </span>
         )}
@@ -83,7 +83,7 @@ function PodiumCard({
         <div className="text-xl font-extrabold" style={{ color: sc }}>
           {entry.dna_score}
         </div>
-        <div className="text-[10px] text-gray-500 leading-none mb-1">/100</div>
+        <div className="text-sm text-shell-subtle leading-none mb-1">/100</div>
         <div className="text-xs font-medium truncate" style={{ color: cfg.color }}>
           {entry.investor_type}
         </div>
@@ -94,7 +94,7 @@ function PodiumCard({
         className={`w-full ${config.barH} rounded-t-lg flex items-center justify-center`}
         style={{ background: `${pCfg.glow}22`, borderTop: `2px solid ${pCfg.glow}44` }}
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-gray-200">{config.label}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-shell-fg">{config.label}</span>
       </div>
     </motion.div>
   )
@@ -126,11 +126,11 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="card text-center py-16"
+        className="card text-center py-section"
       >
         <Trophy className="mx-auto mb-4 h-14 w-14 text-amber-500/80" aria-hidden />
-        <p className="text-gray-300 font-semibold mb-1">The leaderboard is empty</p>
-        <p className="text-gray-500 text-sm mb-6">Be the first investor to claim the top spot.</p>
+        <p className="text-shell-fg/90 font-semibold mb-1">The leaderboard is empty</p>
+        <p className="text-shell-subtle text-sm mb-6">Be the first investor to claim the top spot.</p>
         <Link href="/upload" className="btn-primary inline-block">
           Analyze My Portfolio →
         </Link>
@@ -155,12 +155,12 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
             <Dna className="h-8 w-8 shrink-0 text-blue-400" aria-hidden />
             <div>
               <p className="text-sm font-semibold text-blue-300">Your current rank</p>
-              <p className="text-xs text-gray-500">Based on your last analysis</p>
+              <p className="text-xs text-shell-subtle">Based on your last analysis</p>
             </div>
           </div>
           <div className="text-right shrink-0">
             <span className="text-2xl font-extrabold text-white">#{myRank}</span>
-            <p className="text-xs text-gray-500">of {entries.length}</p>
+            <p className="text-xs text-shell-subtle">of {entries.length}</p>
           </div>
         </motion.div>
       )}
@@ -188,12 +188,12 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
       {/* ── Rankings (4+) ─────────────────────────────────────────── */}
       {rest.length > 0 && (
         <motion.div variants={fadeUp} className="card overflow-hidden p-0">
-          <div className="px-5 py-3 border-b border-gray-800/60">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <div className="px-5 py-3 border-b border-shell-border/60">
+            <h2 className="text-xs font-semibold text-shell-subtle uppercase tracking-wide">
               Rankings
             </h2>
           </div>
-          <ul className="divide-y divide-gray-800/50">
+          <ul className="divide-y divide-shell-border/50">
             {rest.map((entry, i) => {
               const rank   = i + 4
               const cfg = TYPE_CONFIG[entry.investor_type] ?? { mono: 'NA', color: '#6b7280' }
@@ -208,21 +208,21 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                 >
                   <Link
                     href={`/share/${entry.share_token}`}
-                    className={`flex items-center gap-4 px-5 py-3.5 hover:bg-gray-800/30 transition-colors group relative
+                    className={`flex items-center gap-4 px-5 py-3.5 hover:bg-shell-raised/30 transition-colors group relative
                       ${isMe ? 'bg-blue-950/20 border-l-2 border-l-blue-500' : ''}`}
                   >
                     {/* Rank */}
-                    <span className="w-8 text-center text-sm font-bold text-gray-600 shrink-0">
+                    <span className="w-8 text-center text-sm font-bold text-shell-subtle shrink-0">
                       #{rank}
                     </span>
 
                     {/* Type */}
-                    <span className="agent-badge shrink-0 text-[9px]">{cfg.mono}</span>
+                    <span className="agent-badge shrink-0 text-sm">{cfg.mono}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: cfg.color }}>
                         {entry.investor_type}
                       </p>
-                      <p className="text-xs text-gray-600 hidden sm:block">
+                      <p className="text-xs text-shell-subtle hidden sm:block">
                         {new Date(entry.created_at).toLocaleDateString('en-US', {
                           month: 'short', day: 'numeric', year: 'numeric',
                         })}
@@ -231,7 +231,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
 
                     {/* "You" badge */}
                     {isMe && (
-                      <span className="text-[10px] font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-2 py-0.5 shrink-0">
+                      <span className="text-sm font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-2 py-0.5 shrink-0">
                         You
                       </span>
                     )}
@@ -241,10 +241,10 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                       <span className="text-xl font-extrabold" style={{ color: sc }}>
                         {entry.dna_score}
                       </span>
-                      <span className="text-xs text-gray-600">/100</span>
+                      <span className="text-xs text-shell-subtle">/100</span>
                     </div>
 
-                    <span className="text-gray-700 group-hover:text-gray-400 transition-colors text-sm shrink-0">
+                    <span className="text-shell-subtle group-hover:text-shell-muted transition-colors text-sm shrink-0">
                       →
                     </span>
                   </Link>
@@ -258,10 +258,10 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
       {/* ── Bottom CTA ────────────────────────────────────────────── */}
       <motion.div
         variants={fadeUp}
-        className="card text-center border-blue-800/30 bg-gradient-to-br from-blue-950/40 to-purple-950/30 pb-8"
+        className="card text-center border-blue-800/30 bg-gradient-to-br from-blue-950/40 to-purple-950/30 pb-6"
       >
-        <p className="text-gray-200 font-semibold mb-1">Think you can beat the top score?</p>
-        <p className="text-gray-500 text-sm mb-4">
+        <p className="text-shell-fg font-semibold mb-1">Think you can beat the top score?</p>
+        <p className="text-shell-subtle text-sm mb-4">
           Upload your portfolio CSV and get your Investor DNA Score in seconds.
         </p>
         <Link href="/upload" className="btn-primary inline-block px-10 py-3">

@@ -19,7 +19,7 @@ const REGIME_LABELS: Record<string, string> = {
 
 function typeStyle(t: string): string {
   if (t.includes('macro') || t.includes('regime')) return 'border-primary/40 text-primary bg-primary/10'
-  if (t.includes('sector')) return 'border-[var(--blue)]/40 text-[var(--blue)] bg-[var(--blue)]/10'
+  if (t.includes('sector')) return 'border-primary/40 text-primary bg-primary/10'
   return 'border-[var(--emerald)]/40 text-[var(--emerald)] bg-[var(--emerald)]/10'
 }
 
@@ -116,7 +116,7 @@ export default function ResearchHubClient({
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 space-y-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-section space-y-12">
         <header className="space-y-4">
           <p className="text-sm font-medium uppercase tracking-wide text-muted2">Live intelligence</p>
           <h1 className="font-sans text-4xl md:text-5xl leading-tight">
@@ -249,7 +249,7 @@ export default function ResearchHubClient({
         </GlassCard>
       </div>
 
-      <footer className="mt-12 border-t border-border px-4 py-8">
+      <footer className="mt-12 border-t border-border px-4 py-6">
         <div className="mx-auto flex max-w-5xl flex-wrap justify-between gap-4 text-sm text-muted2">
           <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="h-6 w-auto opacity-80" />
           <div className="flex gap-4">

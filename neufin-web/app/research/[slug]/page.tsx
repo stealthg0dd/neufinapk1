@@ -94,7 +94,7 @@ export default async function ResearchArticlePage({ params }: { params: Promise<
   const note = await fetchResearchNote(slug)
   if (!note) {
     return (
-      <div className="min-h-screen bg-background px-6 py-20 text-foreground">
+      <div className="min-h-screen bg-background px-6 py-section-hero text-foreground">
         <div className="mx-auto max-w-4xl">
           <p className="text-muted-foreground">Research note not found.</p>
         </div>
@@ -110,7 +110,7 @@ export default async function ResearchArticlePage({ params }: { params: Promise<
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-12 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-section lg:grid-cols-[minmax(0,1fr)_300px]">
         <article>
           <div className="mb-6 text-sm text-muted-foreground">
             <Link href="/research" className="hover:text-foreground">
@@ -122,7 +122,7 @@ export default async function ResearchArticlePage({ params }: { params: Promise<
           <header className="mb-8">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium ${regimeBadgeClass(note.regime)}`}
+                className={`inline-flex rounded-full border px-2 py-0.5 text-sm font-medium ${regimeBadgeClass(note.regime)}`}
               >
                 {regimeBadge(note.regime)}
               </span>
@@ -130,7 +130,7 @@ export default async function ResearchArticlePage({ params }: { params: Promise<
             </div>
             <h1 className="mt-4 text-3xl font-bold leading-tight">{note.title}</h1>
             <p className="mt-4 text-lg text-muted-foreground leading-relaxed">{note.executive_summary}</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] font-mono text-muted-foreground">
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-mono text-muted-foreground">
               <span>{new Date(note.created_at).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' })}</span>
               <span>{Math.round((note.confidence_score ?? 0) <= 1 ? (note.confidence_score ?? 0) * 100 : (note.confidence_score ?? 0))}% confidence</span>
               <span>{note.read_time_minutes} min read</span>
@@ -185,7 +185,7 @@ export default async function ResearchArticlePage({ params }: { params: Promise<
             <h3 className="mb-2 text-xs font-mono uppercase tracking-widest text-muted-foreground">Asset Mentions</h3>
             <div className="flex flex-wrap gap-2">
               {note.asset_tickers.map((t) => (
-                <span key={t} className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[11px] text-primary">
+                <span key={t} className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-sm text-primary">
                   {t}
                 </span>
               ))}

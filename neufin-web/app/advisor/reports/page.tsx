@@ -22,7 +22,7 @@ function fmt(iso: string) {
 }
 
 function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-gray-800 ${className}`} />
+  return <div className={`animate-pulse rounded bg-shell-raised ${className}`} />
 }
 
 export default function AdvisorReportsPage() {
@@ -60,7 +60,7 @@ export default function AdvisorReportsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 p-6 max-w-4xl mx-auto space-y-6">
+      <div className="min-h-screen bg-shell-deep p-6 max-w-4xl mx-auto space-y-6">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-16" />
         <div className="space-y-3">
@@ -71,37 +71,37 @@ export default function AdvisorReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 px-4 py-6">
+    <div className="min-h-screen bg-shell-deep text-shell-fg px-4 py-6">
       <div className="max-w-4xl mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Client Reports</h1>
-            <p className="text-sm text-gray-400 mt-0.5">White-label PDF reports for all clients</p>
+            <p className="text-sm text-shell-muted mt-0.5">White-label PDF reports for all clients</p>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/advisor/dashboard" className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
+            <Link href="/advisor/dashboard" className="rounded-lg border border-shell-border px-3 py-1.5 text-xs text-shell-fg/90 hover:border-shell-muted">
               Dashboard
             </Link>
-            <button onClick={load} className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
+            <button onClick={load} className="rounded-lg border border-shell-border px-3 py-1.5 text-xs text-shell-fg/90 hover:border-shell-muted">
               Refresh
             </button>
           </div>
         </div>
 
         {/* Usage meter */}
-        <div className="rounded-xl border border-gray-800 bg-gray-900 p-4">
+        <div className="rounded-xl border border-shell-border bg-shell p-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-medium text-gray-200">Reports This Month</p>
+            <p className="text-sm font-medium text-shell-fg">Reports This Month</p>
             <p className="text-sm font-bold">
-              <span className={usedThisMonth >= REPORT_LIMIT ? 'text-red-400' : 'text-gray-100'}>
+              <span className={usedThisMonth >= REPORT_LIMIT ? 'text-red-400' : 'text-shell-fg'}>
                 {usedThisMonth}
               </span>
-              <span className="text-gray-500">/{REPORT_LIMIT}</span>
+              <span className="text-shell-subtle">/{REPORT_LIMIT}</span>
             </p>
           </div>
-          <div className="h-2 w-full rounded-full bg-gray-800">
+          <div className="h-2 w-full rounded-full bg-shell-raised">
             <div
               className={`h-2 rounded-full transition-all duration-700 ${usagePct >= 100 ? 'bg-red-500' : usagePct >= 80 ? 'bg-yellow-500' : 'bg-blue-500'}`}
               style={{ width: `${usagePct}%` }}
@@ -121,28 +121,28 @@ export default function AdvisorReportsPage() {
         )}
 
         {/* Reports table */}
-        <div className="rounded-xl border border-gray-800 overflow-hidden">
-          <div className="bg-gray-900 border-b border-gray-800 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <div className="rounded-xl border border-shell-border overflow-hidden">
+          <div className="bg-shell border-b border-shell-border px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-shell-subtle">
               All Reports ({reports.length})
             </p>
           </div>
           {reports.length === 0 ? (
             <div className="p-12 text-center">
-              <p className="text-gray-500 text-sm">No reports generated yet.</p>
+              <p className="text-shell-subtle text-sm">No reports generated yet.</p>
               <Link href="/advisor/dashboard" className="mt-3 inline-block text-sm text-blue-400 hover:text-blue-300">
                 Go to dashboard to generate your first report →
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-gray-800/60 bg-gray-950">
+            <div className="divide-y divide-shell-border/60 bg-shell-deep">
               {reports.map((r) => (
-                <div key={r.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-900/40 transition-colors">
+                <div key={r.id} className="flex items-center justify-between px-4 py-3 hover:bg-shell/40 transition-colors">
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-gray-200">
+                    <p className="text-sm font-medium text-shell-fg">
                       {r.client_name ?? `Portfolio ${r.portfolio_id.slice(0, 8)}…`}
                     </p>
-                    <p className="text-xs text-gray-500">{fmt(r.created_at)}</p>
+                    <p className="text-xs text-shell-subtle">{fmt(r.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     {r.is_paid ? (
@@ -150,7 +150,7 @@ export default function AdvisorReportsPage() {
                         Paid
                       </span>
                     ) : (
-                      <span className="rounded-full bg-gray-700 text-gray-400 px-2 py-0.5 text-xs">
+                      <span className="rounded-full bg-shell-raised text-shell-muted px-2 py-0.5 text-xs">
                         Free
                       </span>
                     )}
@@ -164,7 +164,7 @@ export default function AdvisorReportsPage() {
                         Download PDF
                       </a>
                     ) : (
-                      <span className="text-xs text-gray-600">Generating…</span>
+                      <span className="text-xs text-shell-subtle">Generating…</span>
                     )}
                   </div>
                 </div>

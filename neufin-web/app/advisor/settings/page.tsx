@@ -92,7 +92,7 @@ export default function AdvisorSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-shell-deep flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
       </div>
     )
@@ -100,39 +100,39 @@ export default function AdvisorSettingsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4 text-center px-6">
+      <div className="min-h-screen bg-shell-deep flex flex-col items-center justify-center gap-4 text-center px-6">
         <p className="text-2xl font-bold text-white">Sign in required</p>
-        <p className="text-gray-500 text-sm">You need an account to manage your advisor profile.</p>
+        <p className="text-shell-subtle text-sm">You need an account to manage your advisor profile.</p>
         <Link href="/auth?next=/advisor/settings" className="btn-primary px-6 py-2">Sign In</Link>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-shell-deep">
       {/* Nav */}
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           <div className="flex items-center gap-4">
-            <Link href="/advisor/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors">
+            <Link href="/advisor/dashboard" className="text-shell-muted hover:text-white text-sm transition-colors">
               Dashboard
             </Link>
-            <Link href="/results" className="text-gray-400 hover:text-white text-sm transition-colors">
+            <Link href="/results" className="text-shell-muted hover:text-white text-sm transition-colors">
               DNA Results
             </Link>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-2xl mx-auto px-6 py-10 w-full">
+      <main className="flex-1 max-w-2xl mx-auto px-6 py-section w-full">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
           <h1 className="text-2xl font-bold text-white mb-1">Advisor Settings</h1>
-          <p className="text-gray-500 text-sm mb-8">
+          <p className="text-shell-subtle text-sm mb-8">
             Personalise your white-label reports and client-facing profile.
           </p>
 
@@ -140,10 +140,10 @@ export default function AdvisorSettingsPage() {
 
             {/* ── Identity ── */}
             <section className="card space-y-4">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Identity</h2>
+              <h2 className="text-sm font-semibold text-shell-fg/90 uppercase tracking-wider">Identity</h2>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Advisor Name</label>
+                <label className="block text-xs text-shell-muted mb-1">Advisor Name</label>
                 <input
                   type="text"
                   value={form.advisor_name}
@@ -154,7 +154,7 @@ export default function AdvisorSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Firm Name</label>
+                <label className="block text-xs text-shell-muted mb-1">Firm Name</label>
                 <input
                   type="text"
                   value={form.firm_name}
@@ -165,7 +165,7 @@ export default function AdvisorSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Calendly / Booking Link</label>
+                <label className="block text-xs text-shell-muted mb-1">Calendly / Booking Link</label>
                 <input
                   type="url"
                   value={form.calendar_link}
@@ -173,17 +173,17 @@ export default function AdvisorSettingsPage() {
                   placeholder="https://calendly.com/your-link"
                   className="input w-full"
                 />
-                <p className="text-xs text-gray-600 mt-1">Shown as a CTA button when clients view their shared results.</p>
+                <p className="text-xs text-shell-subtle mt-1">Shown as a CTA button when clients view their shared results.</p>
               </div>
             </section>
 
             {/* ── Branding ── */}
             <section className="card space-y-4">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Branding</h2>
+              <h2 className="text-sm font-semibold text-shell-fg/90 uppercase tracking-wider">Branding</h2>
 
               {/* Logo upload */}
               <div>
-                <label className="block text-xs text-gray-400 mb-2">Firm Logo</label>
+                <label className="block text-xs text-shell-muted mb-2">Firm Logo</label>
                 <div className="flex items-center gap-4">
                   {logoPreview ? (
                     <Image
@@ -192,10 +192,10 @@ export default function AdvisorSettingsPage() {
                       width={64}
                       height={64}
                       unoptimized
-                      className="w-16 h-16 object-contain rounded-lg border border-gray-700 bg-gray-900 p-1"
+                      className="w-16 h-16 object-contain rounded-lg border border-shell-border bg-shell p-1"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-lg border border-dashed border-gray-700 bg-gray-900 flex items-center justify-center text-gray-600 text-xs text-center">
+                    <div className="w-16 h-16 rounded-lg border border-dashed border-shell-border bg-shell flex items-center justify-center text-shell-subtle text-xs text-center">
                       No<br/>Logo
                     </div>
                   )}
@@ -211,12 +211,12 @@ export default function AdvisorSettingsPage() {
                       <button
                         type="button"
                         onClick={() => { setLogoPreview(null); handleField('logo_base64', null) }}
-                        className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                        className="text-xs text-shell-subtle hover:text-red-400 transition-colors"
                       >
                         Remove
                       </button>
                     )}
-                    <p className="text-xs text-gray-600">PNG or JPG · max {MAX_LOGO_KB} KB</p>
+                    <p className="text-xs text-shell-subtle">PNG or JPG · max {MAX_LOGO_KB} KB</p>
                   </div>
                 </div>
                 <input
@@ -230,7 +230,7 @@ export default function AdvisorSettingsPage() {
 
               {/* Brand color */}
               <div>
-                <label className="block text-xs text-gray-400 mb-2">Brand Color</label>
+                <label className="block text-xs text-shell-muted mb-2">Brand Color</label>
                 <div className="flex items-center gap-3 flex-wrap">
                   {BRAND_COLORS.map(color => (
                     <button
@@ -239,7 +239,7 @@ export default function AdvisorSettingsPage() {
                       onClick={() => handleField('brand_color', color)}
                       className={`w-8 h-8 rounded-full transition-all ${
                         form.brand_color === color
-                          ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-900 scale-110'
+                          ? 'ring-2 ring-white ring-offset-2 ring-offset-shell scale-110'
                           : 'opacity-80 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: color }}
@@ -252,7 +252,7 @@ export default function AdvisorSettingsPage() {
                       onChange={e => handleField('brand_color', e.target.value)}
                       className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
                     />
-                    <span className="text-xs text-gray-500 font-mono">{form.brand_color}</span>
+                    <span className="text-xs text-shell-subtle font-mono">{form.brand_color}</span>
                   </div>
                 </div>
               </div>
@@ -260,14 +260,14 @@ export default function AdvisorSettingsPage() {
               {/* White-label toggle */}
               <div className="flex items-center justify-between pt-1">
                 <div>
-                  <p className="text-sm text-gray-300 font-medium">White-label PDFs</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Replace Neufin branding with your firm logo and colors in generated reports.</p>
+                  <p className="text-sm text-shell-fg/90 font-medium">White-label PDFs</p>
+                  <p className="text-xs text-shell-subtle mt-0.5">Replace Neufin branding with your firm logo and colors in generated reports.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleField('white_label', !form.white_label)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    form.white_label ? 'bg-blue-600' : 'bg-gray-700'
+                    form.white_label ? 'bg-blue-600' : 'bg-shell-raised'
                   }`}
                 >
                   <span
@@ -281,7 +281,7 @@ export default function AdvisorSettingsPage() {
 
             {/* ── Preview card ── */}
             <section className="card space-y-3">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Profile Preview</h2>
+              <h2 className="text-sm font-semibold text-shell-fg/90 uppercase tracking-wider">Profile Preview</h2>
               <div
                 className="rounded-xl p-4 flex items-center gap-4 border"
                 style={{ borderColor: `${form.brand_color}40`, background: `${form.brand_color}10` }}
@@ -307,7 +307,7 @@ export default function AdvisorSettingsPage() {
                   <p className="text-white font-semibold text-sm truncate">
                     {form.advisor_name || 'Your Name'}
                   </p>
-                  <p className="text-gray-400 text-xs truncate">
+                  <p className="text-shell-muted text-xs truncate">
                     {form.firm_name || 'Your Firm'}
                   </p>
                   {form.calendar_link && (
@@ -317,7 +317,7 @@ export default function AdvisorSettingsPage() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-gray-600">This card appears on results pages shared via your referral link.</p>
+              <p className="text-xs text-shell-subtle">This card appears on results pages shared via your referral link.</p>
             </section>
 
             {/* ── Save ── */}

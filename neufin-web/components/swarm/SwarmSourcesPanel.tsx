@@ -42,23 +42,23 @@ export function SwarmSourcesPanel({
     <div className="max-w-[1600px] mx-auto px-4 pb-6">
       <div className="rounded-md border border-[#2a2a2a] bg-[#0d0d0d] p-4">
         <div className="mb-3 flex flex-wrap items-baseline gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-400/90">
+          <span className="text-sm font-bold uppercase tracking-widest text-cyan-400/90">
             Sources & methodology
           </span>
           {observability?.runtime ? (
-            <span className="text-[10px] text-[#555]">
+            <span className="text-sm text-[#555]">
               · runtime: {observability.runtime}
             </span>
           ) : null}
           {observability?.pipeline ? (
-            <span className="text-[10px] text-[#555]">· {observability.pipeline}</span>
+            <span className="text-sm text-[#555]">· {observability.pipeline}</span>
           ) : null}
         </div>
 
         {items.length > 0 ? (
           <ul className="mb-4 space-y-2 border-b border-[#1e1e1e] pb-4">
             {items.map((s) => (
-              <li key={s.id} className="text-[11px] leading-relaxed">
+              <li key={s.id} className="text-sm leading-relaxed">
                 <span className="font-bold text-[#e5e5e5]">{s.label}</span>
                 <span className="text-[#666]"> — </span>
                 <span className="text-[#9ca3af]">{s.description}</span>
@@ -68,7 +68,7 @@ export function SwarmSourcesPanel({
         ) : null}
 
         {sources?.tickers && sources.tickers.length > 0 ? (
-          <p className="mb-4 font-mono text-[10px] text-[#6b7280]">
+          <p className="mb-4 font-mono text-sm text-[#6b7280]">
             Tickers in this run:{' '}
             <span className="text-[#a1a1aa]">{sources.tickers.join(', ')}</span>
           </p>
@@ -76,11 +76,11 @@ export function SwarmSourcesPanel({
 
         {steps.length > 0 ? (
           <details className="group">
-            <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-widest text-[#FFB900] hover:text-[#ffc933]">
+            <summary className="cursor-pointer list-none text-sm font-bold uppercase tracking-widest text-[#FFB900] hover:text-[#ffc933]">
               <span className="inline group-open:hidden">Show agent run log ({steps.length} events)</span>
               <span className="hidden group-open:inline">Hide agent run log</span>
             </summary>
-            <div className="mt-4 max-h-64 overflow-y-auto rounded border border-[#1e1e1e] bg-[#080808] p-2 font-mono text-[10px] text-[#9ca3af]">
+            <div className="mt-4 max-h-64 overflow-y-auto rounded border border-[#1e1e1e] bg-[#080808] p-2 font-mono text-sm text-[#9ca3af]">
               {steps.map((ev, i) => (
                 <div
                   key={`${ev.agent}-${ev.ts}-${i}`}
@@ -102,7 +102,7 @@ export function SwarmSourcesPanel({
         ) : null}
 
         {sources?.disclaimer ? (
-          <p className="mt-4 text-[10px] leading-relaxed text-[#555]">{sources.disclaimer}</p>
+          <p className="mt-4 text-sm leading-relaxed text-[#555]">{sources.disclaimer}</p>
         ) : null}
       </div>
     </div>

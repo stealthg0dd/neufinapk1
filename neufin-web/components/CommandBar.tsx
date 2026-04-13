@@ -156,7 +156,7 @@ export function CommandBar({
       </header>
 
       {paletteOpen ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24">
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-section-hero">
           <button
             type="button"
             className="absolute inset-0 bg-navy/40 backdrop-blur-sm"

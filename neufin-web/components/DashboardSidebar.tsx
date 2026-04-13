@@ -61,10 +61,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
     <Link
       href={item.href}
       className={[
-        'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ease-out',
         active
           ? 'bg-[#E0F7FA] font-semibold text-primary'
-          : 'text-[#334155] hover:bg-[#F8FAFC] hover:text-[#0F172A]',
+          : 'text-[#334155] hover:bg-[#F8FAFC] hover:text-[#0F172A] active:scale-[0.99]',
       ].join(' ')}
     >
       <Icon className="h-[15px] w-[15px] shrink-0 opacity-90" strokeWidth={1.5} aria-hidden />

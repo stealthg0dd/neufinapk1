@@ -23,18 +23,18 @@ function formatRegimeLabel(regime: RegimeData | null): string {
 function regimePillClass(regime: RegimeData | null): string {
   const u = (regime?.regime ?? regime?.label ?? '').toLowerCase()
   if (u.includes('inflation')) {
-    return 'inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800'
+    return 'inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold text-red-800'
   }
   if (u.includes('stagflation')) {
-    return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900'
+    return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
   }
   if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession') || u.includes('crisis')) {
-    return 'inline-block rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-900'
+    return 'inline-block rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-sm font-semibold text-blue-900'
   }
   if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery') || u.includes('growth')) {
-    return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900'
+    return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-semibold text-emerald-900'
   }
-  return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900'
+  return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
 }
 
 function fmtMetric(v: number | null | undefined, digits = 2): string {
@@ -92,7 +92,7 @@ export default function DashboardPage() {
           <p className="text-label">Portfolio intelligence</p>
           <h2 className="text-section-title mt-2">{portfolioTitle}</h2>
           {lastAnalyzed && (
-            <p className="mt-1 text-[12px] text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               Last analysed{' '}
               {new Date(lastAnalyzed).toLocaleDateString('en-SG', {
                 day: 'numeric',
@@ -239,7 +239,7 @@ export default function DashboardPage() {
       </section>
 
       {!hasPortfolio && (
-        <section className="rounded-xl border border-dashed border-[#CBD5E1] bg-white px-5 py-12 text-center shadow-sm">
+        <section className="rounded-xl border border-dashed border-[#CBD5E1] bg-white px-5 py-section text-center shadow-sm">
           <div className="mb-3 flex justify-center">
             <PieChart className="h-10 w-10 text-[#1D4ED8]" aria-hidden />
           </div>

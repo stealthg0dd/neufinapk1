@@ -165,6 +165,8 @@ def _styles(p: dict) -> dict:
     B = p["text_bod"]
     M = p["text_mut"]
     T = p["teal"]
+    use_light = t in ("light", "white")
+    h3_color = B if use_light else T
 
     return {
         "h1": ps("h1", fontName="Helvetica-Bold", fontSize=18, textColor=W, leading=22),
@@ -173,7 +175,7 @@ def _styles(p: dict) -> dict:
             "h3",
             fontName="Helvetica-Bold",
             fontSize=12,
-            textColor=T,
+            textColor=h3_color,
             leading=15,
             spaceAfter=3,
         ),
@@ -319,7 +321,25 @@ def _w(pos: dict) -> float:
 
 
 def _tbl_std(p: dict, header_accent: HexColor | None = None) -> TableStyle:
-    """Standard table: accent header, alternating rows, muted grid."""
+    """Standard table — light themes use neutral header and black type (IC style)."""
+    if p["theme"] in ("light", "white"):
+        hdr_bg = HexColor("#F4F4F5")
+        hdr_fg = p["text_pri"]
+        return TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), hdr_bg),
+                ("TEXTCOLOR", (0, 0), (-1, 0), hdr_fg),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [p["bg"], p["bg"]]),
+                ("GRID", (0, 0), (-1, -1), 0.25, p["border"]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
     hdr = header_accent or p["teal"]
     return TableStyle(
         [
@@ -1389,8 +1409,9 @@ def _make_cover_callback(
             canvas.drawString(MARGIN, y_logo - 12, firm_name[:40])
 
         # ── Report title (centred) ──────────────────────────────────────────
+        _light_cover = pal["theme"] in ("light", "white")
         canvas.setFont("Helvetica-Bold", 24)
-        canvas.setFillColor(ACCENT_TEAL)
+        canvas.setFillColor(pal["text_pri"] if _light_cover else ACCENT_TEAL)
         canvas.drawCentredString(
             A4_W / 2, A4_H / 2 + 70, "PORTFOLIO INTELLIGENCE REPORT"
         )
@@ -1399,12 +1420,12 @@ def _make_cover_callback(
         canvas.drawCentredString(
             A4_W / 2,
             A4_H / 2 + 46,
-            "Behavioral DNA  ·  Risk Analysis  ·  Strategic Recommendations",
+            "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations",
         )
 
         # ── Horizontal rule ─────────────────────────────────────────────────
-        canvas.setStrokeColor(ACCENT_TEAL)
-        canvas.setLineWidth(1.5)
+        canvas.setStrokeColor(pal["border"] if _light_cover else ACCENT_TEAL)
+        canvas.setLineWidth(1.0 if _light_cover else 1.5)
         canvas.line(A4_W * 0.18, A4_H / 2 + 30, A4_W * 0.82, A4_H / 2 + 30)
 
         # ── 3-column metadata grid ──────────────────────────────────────────
@@ -1505,7 +1526,9 @@ def _make_cover_callback(
             canvas.drawCentredString(A4_W / 2, MARGIN + 12, footer_text)
         else:
             canvas.setFont("Helvetica-Bold", 8)
-            canvas.setFillColor(ACCENT_TEAL)
+            canvas.setFillColor(
+                pal["text_mut"] if pal["theme"] in ("light", "white") else ACCENT_TEAL
+            )
             canvas.drawCentredString(
                 A4_W / 2, MARGIN + 12, "Powered by NeuFin Intelligence"
             )
@@ -1528,9 +1551,10 @@ def _make_hf_callback(ctx: dict, pal: dict, firm_name: str) -> Any:
         # Background fill (essential for dark theme)
         canvas.setFillColor(pal["bg"])
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-        # Header accent line
-        canvas.setStrokeColor(ACCENT_TEAL)
-        canvas.setLineWidth(2)
+        # Header rule — minimal on light themes
+        is_light = pal["theme"] in ("light", "white")
+        canvas.setStrokeColor(pal["border"] if is_light else ACCENT_TEAL)
+        canvas.setLineWidth(0.75 if is_light else 2)
         canvas.line(MARGIN, A4_H - MARGIN, A4_W - MARGIN, A4_H - MARGIN)
         # Header text
         canvas.setFont("Helvetica-Bold", 8)
@@ -1548,6 +1572,38 @@ def _make_hf_callback(ctx: dict, pal: dict, firm_name: str) -> Any:
     return callback
 
 
+def _ic_body_section_header(
+    section_num: str,
+    title: str,
+    subtitle: str | None,
+    pal: dict,
+    st: dict,
+    cw: float,
+) -> list:
+    """Section number, rule, and title block (institutional body pages)."""
+    out: list = []
+    rule = Table(
+        [[""]],
+        colWidths=[cw],
+        rowHeights=[0.75],
+        style=TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.75, pal["border"])]),
+    )
+    out.append(rule)
+    out.append(Spacer(1, 10))
+    num_c = _hex(pal["text_mut"])
+    ttl_c = _hex(pal["text_pri"])
+    title_pc = (
+        f'<font name="Helvetica" size="8" color="{num_c}">{_xml(section_num)}</font>'
+        f'<br/><font name="Helvetica-Bold" size="12" color="{ttl_c}">{_xml(title)}</font>'
+    )
+    out.append(Paragraph(title_pc, st["body"]))
+    if subtitle:
+        out.append(Spacer(1, 3))
+        out.append(Paragraph(_xml(subtitle), st["muted8"]))
+    out.append(Spacer(1, 12))
+    return out
+
+
 # ─── PAGE 2 — EXECUTIVE MEMO ──────────────────────────────────────────────────
 
 
@@ -1557,17 +1613,29 @@ def _page_executive_memo(
     items: list = []
     warnings: list[str] = extra.get("warnings") or []
 
-    items.append(Paragraph("EXECUTIVE SUMMARY", st["h1"]))
-    items.append(Spacer(1, 4))
+    items.extend(_ic_body_section_header("2", "EXECUTIVE SUMMARY", None, pal, st, cw))
+
     rs = str(ctx.get("report_state") or REPORT_DRAFT).upper()
-    sc = ctx.get("section_confidence") or {}
-    sc_bits = [f"{k.replace('_', ' ')}: {v}" for k, v in sorted(sc.items())]
-    items.append(
-        Paragraph(
-            _xml(f"Report status: {rs}. Section confidence — " + "; ".join(sc_bits)),
-            st["muted8"],
+    if (ctx.get("report_state") or REPORT_DRAFT) != REPORT_FINAL:
+        items.append(
+            Paragraph(
+                _xml(
+                    f"Report status: {rs}. This document is preliminary until "
+                    "inputs are reconciled and approved for distribution."
+                ),
+                st["muted8"],
+            ),
         )
-    )
+    else:
+        items.append(
+            Paragraph(
+                _xml(
+                    "Report status: Final — inputs reconciled for committee use; "
+                    "advisor attestation still required before external circulation."
+                ),
+                st["muted8"],
+            ),
+        )
     if ctx.get("report_metrics_note"):
         items.append(
             Paragraph(_xml(str(ctx["report_metrics_note"])), st["muted8"]),
@@ -1616,7 +1684,16 @@ def _page_executive_memo(
 
     # 3-column metric cards: DNA | Regime | Mandate
     score = ctx["dna_score"]
-    sc_hex = "#22C55E" if score >= 71 else ("#F5A623" if score >= 41 else "#EF4444")
+    _light_body = pal["theme"] in ("light", "white")
+    if _light_body:
+        dna_col = pal["text_pri"]
+        regime_col = pal["text_pri"]
+        mandate_col = pal["text_pri"]
+    else:
+        sc_hex = "#22C55E" if score >= 71 else ("#F5A623" if score >= 41 else "#EF4444")
+        dna_col = HexColor(sc_hex)
+        regime_col = ACCENT_AMBER
+        mandate_col = ACCENT_TEAL
     conf_label = (
         f"{int(ctx['regime_conf'] * 100)}% conf"
         if ctx["regime_conf"] > 0
@@ -1632,7 +1709,7 @@ def _page_executive_memo(
                         "sc_" + pal["theme"],
                         fontName="Helvetica-Bold",
                         fontSize=26,
-                        textColor=HexColor(sc_hex),
+                        textColor=dna_col,
                         alignment=TA_CENTER,
                     ),
                 ),
@@ -1642,7 +1719,7 @@ def _page_executive_memo(
                         "rc_" + pal["theme"],
                         fontName="Helvetica-Bold",
                         fontSize=13,
-                        textColor=ACCENT_AMBER,
+                        textColor=regime_col,
                         alignment=TA_CENTER,
                     ),
                 ),
@@ -1652,7 +1729,7 @@ def _page_executive_memo(
                         "mc_" + pal["theme"],
                         fontName="Helvetica-Bold",
                         fontSize=12,
-                        textColor=ACCENT_TEAL,
+                        textColor=mandate_col,
                         alignment=TA_CENTER,
                     ),
                 ),
@@ -1765,8 +1842,7 @@ def _page_portfolio_snapshot(
     metrics = extra.get("metrics") or {}
     pos_sorted = extra.get("pos_sorted") or []
 
-    items.append(Paragraph("PORTFOLIO SNAPSHOT", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(_ic_body_section_header("3", "PORTFOLIO SNAPSHOT", None, pal, st, cw))
 
     positions = list(ctx.get("positions") or [])
     total_weight = sum(float(p.get("weight_pct") or 0) for p in positions)
@@ -1840,20 +1916,28 @@ def _page_portfolio_snapshot(
     total_value = ctx["total_value"]
     beta = float(ctx.get("weighted_beta") or 0)
     sr = ctx.get("sharpe_ratio")
-    sharpe = float(sr) if sr is not None else None
+    sharpe: float | None = None
+    if sr is not None:
+        try:
+            v = float(sr)
+            if v == v and abs(v) != float("inf"):
+                sharpe = v
+        except (TypeError, ValueError):
+            sharpe = None
     hhi = float(ctx.get("hhi") or metrics.get("hhi") or 0)
     cash_w = float(metrics.get("cash_weight") or 0)
     ytd = metrics.get("ytd_return")
     n_pos = int(metrics.get("num_positions") or ctx["num_positions"])
+    hhi_disp = f"{hhi:.4f}" if hhi > 0 else "—"
 
     stats_data = [
         ["Metric", "Value"],
         ["Total AUM", f"${total_value:,.0f}"],
         ["# Positions", str(n_pos)],
         ["Cash Weight", f"{cash_w:.1f}%"],
-        ["Concentration HHI", f"{hhi:.4f}"],
+        ["Concentration HHI", hhi_disp],
         ["Weighted Beta", f"{beta:.2f}"],
-        ["Sharpe Ratio", f"{sharpe:.2f}" if sharpe is not None else "Unavailable"],
+        ["Sharpe ratio", f"{sharpe:.2f}" if sharpe is not None else "—"],
         ["YTD Return", _fpct(ytd) if ytd is not None else "—"],
     ]
     right = Table(stats_data, colWidths=[140, 110], style=_tbl_std(pal))
@@ -2014,8 +2098,7 @@ def _page_behavioral_dna(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("BEHAVIORAL INSIGHTS", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(_ic_body_section_header("5", "BEHAVIORAL INSIGHTS", None, pal, st, cw))
 
     # Gauge + archetype side by side
     dna_score = ctx["dna_score"]
@@ -2188,8 +2271,11 @@ def _page_behavioral_dna(
 
 def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
-    items.append(Paragraph("MACRO REGIME & MARKET CONTEXT", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(
+        _ic_body_section_header(
+            "4", "RISK ANALYSIS", "Macro & regime", pal, st, cw
+        )
+    )
 
     regime = ctx["regime_label"] or "Pending IC Analysis"
     _, regime_color = _regime_display(regime)
@@ -2341,8 +2427,16 @@ def _page_risk_correlation(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("RISK ANALYSIS", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(
+        _ic_body_section_header(
+            "4",
+            "RISK ANALYSIS",
+            "Correlation & concentration",
+            pal,
+            st,
+            cw,
+        )
+    )
 
     quant = extra.get("quant") or {}
     sentinel = extra.get("sentinel") or {}
@@ -2478,8 +2572,11 @@ def _page_tax_optimization(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("TAX & OPTIMIZATION", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(
+        _ic_body_section_header(
+            "7", "RECOMMENDATIONS", "Tax & implementation", pal, st, cw
+        )
+    )
 
     cgt_total = ctx["total_tax_liability"]
     harvest_total = ctx["total_harvest_opp"]
@@ -2586,8 +2683,7 @@ def _page_stress_testing(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("SCENARIO ANALYSIS", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(_ic_body_section_header("6", "SCENARIO ANALYSIS", None, pal, st, cw))
 
     thesis = extra.get("thesis") or {}
     swarm_norm = extra.get("swarm_norm") or {}
@@ -2859,8 +2955,11 @@ def _page_alpha_opportunities(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("ALPHA OPPORTUNITIES", st["h1"]))
-    items.append(Spacer(1, 6))
+    items.extend(
+        _ic_body_section_header(
+            "7", "RECOMMENDATIONS", "Alpha & opportunities", pal, st, cw
+        )
+    )
 
     swarm_norm = extra.get("swarm_norm") or {}
     thesis = extra.get("thesis") or {}
@@ -3020,8 +3119,11 @@ def _page_alpha_opportunities(
 
 def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
-    items.append(Paragraph("90-DAY DIRECTIVES & NEXT STEPS", st["h1"]))
-    items.append(Spacer(1, 8))
+    items.extend(
+        _ic_body_section_header(
+            "7", "RECOMMENDATIONS", "Strategic directives (90 days)", pal, st, cw
+        )
+    )
 
     thesis = extra.get("thesis") or {}
     pos_sorted = extra.get("pos_sorted") or []
@@ -3131,14 +3233,16 @@ def _page_agent_attribution(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.append(Paragraph("APPENDIX · METHODOLOGY & ATTRIBUTION", st["h1"]))
-    items.append(
-        Paragraph(
-            "Full transparency on AI agent contributions and data sources.",
-            st["muted"],
+    items.extend(
+        _ic_body_section_header(
+            "8",
+            "APPENDIX",
+            "Methodology, data sources, and AI attribution",
+            pal,
+            st,
+            cw,
         )
     )
-    items.append(Spacer(1, 8))
 
     swarm_available = ctx.get("swarm_available")
     if not swarm_available:
@@ -3345,7 +3449,7 @@ def _build_pdf_sync(
 
     elems: list = [Spacer(1, 1), NextPageTemplate("Body"), PageBreak()]
 
-    # ── 11 body pages ────────────────────────────────────────────────────────
+    # ── Body: §2 executive … §8 appendix (cover is separate template) ─────────
     def _add_page(builder, *args):
         try:
             elems.extend(builder(*args))
@@ -3364,8 +3468,8 @@ def _build_pdf_sync(
             )
         elems.append(PageBreak())
 
-    # Body order: executive → snapshot → macro & risk → behavioral → scenarios
-    # → tax → recommendations (alpha + directives) → appendix
+    # Order: §2 executive → §3 snapshot → §4 risk (macro, correlation) →
+    # §5 behavioral → §6 scenarios → §7 recommendations (tax, alpha, directives) → §8 appendix
     _add_page(_page_executive_memo, ctx, extra, pal, st, cw)
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
     _add_page(_page_macro_regime, ctx, extra, pal, st, cw)

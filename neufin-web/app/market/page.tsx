@@ -20,6 +20,9 @@ interface MarketHealth {
 }
 interface TrendPoint { date: string; avg_score: number; count: number }
 
+// Avoid static generation at build time (heavy upstream / DB); safe for Vercel CI.
+export const dynamic = 'force-dynamic'
+
 // ── Metadata ───────────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
@@ -34,7 +37,14 @@ export const metadata: Metadata = {
 
 // ── Data fetching ──────────────────────────────────────────────────────────────
 
-const API = process.env.NEXT_PUBLIC_API_URL || ''
+/** Server-only: prefer public URL; fall back to RAILWAY_API_URL (set on Vercel for rewrites parity). */
+function marketApiBase(): string {
+  const raw =
+    process.env.NEXT_PUBLIC_API_URL || process.env.RAILWAY_API_URL || ''
+  return raw.replace(/\/$/, '')
+}
+
+const FETCH_MS = 25_000
 
 const EMPTY_HEALTH: MarketHealth = {
   total_portfolios: 0,
@@ -47,8 +57,11 @@ const EMPTY_HEALTH: MarketHealth = {
 
 async function getMarketHealth(): Promise<MarketHealth> {
   try {
-    const res = await fetch(`${API}/api/market/health`, {
-      next: { revalidate: 300 },  // matches backend 5-min cache
+    const base = marketApiBase()
+    const url = base ? `${base}/api/market/health` : '/api/market/health'
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(FETCH_MS),
     })
     if (!res.ok) return EMPTY_HEALTH
     return res.json()
@@ -59,8 +72,11 @@ async function getMarketHealth(): Promise<MarketHealth> {
 
 async function getScoreTrend(): Promise<TrendPoint[]> {
   try {
-    const res = await fetch(`${API}/api/market/score-trend`, {
-      next: { revalidate: 300 },
+    const base = marketApiBase()
+    const url = base ? `${base}/api/market/score-trend` : '/api/market/score-trend'
+    const res = await fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(FETCH_MS),
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -76,13 +92,13 @@ export default async function MarketPage() {
   const [health, trend] = await Promise.all([getMarketHealth(), getScoreTrend()])
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-shell-deep">
       {/* Nav */}
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           <div className="flex items-center gap-4">
-            <Link href="/leaderboard" className="text-gray-400 hover:text-white text-sm transition-colors">
+            <Link href="/leaderboard" className="text-shell-muted hover:text-white text-sm transition-colors">
               Leaderboard
             </Link>
             <Link href="/upload" className="btn-primary text-sm px-4 py-2">
@@ -92,7 +108,7 @@ export default async function MarketPage() {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-4xl mx-auto px-6 py-10 w-full">
+      <main className="flex-1 max-w-4xl mx-auto px-6 py-section w-full">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-2">
@@ -103,9 +119,9 @@ export default async function MarketPage() {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
             </span>
           </div>
-          <p className="text-gray-500 text-sm">
+          <p className="text-shell-subtle text-sm">
             Aggregated, anonymised intelligence across{' '}
-            <span className="text-gray-300 font-medium">
+            <span className="text-shell-fg/90 font-medium">
               {health.total_portfolios.toLocaleString()}
             </span>{' '}
             portfolios. Updated every 5 minutes.

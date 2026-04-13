@@ -41,3 +41,4 @@ lighthouse-neufin-web.report.json
 lighthouse-neufin-web.report.html
 psi-neufin-web.json
 test-results/
+.vercel

@@ -308,7 +308,7 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--canvas)] flex flex-col md:flex-row pb-20 md:pb-0">
+    <div className="min-h-screen bg-[var(--canvas)] flex flex-col md:flex-row pb-section md:pb-0">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex w-[240px] shrink-0 border-r border-[var(--border)] flex-col bg-[var(--surface-1)]/50 backdrop-blur-xl">
         <div className="p-5 border-b border-[var(--border)]">
@@ -343,7 +343,7 @@ export default function DashboardClient() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-[var(--text-muted)] truncate">{user?.email}</p>
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)]">Plan · Trial</span>
+              <span className="text-sm uppercase tracking-wider text-[var(--text-secondary)]">Plan · Trial</span>
             </div>
           </div>
           <Link href="/pricing" className="text-xs text-primary font-medium hover:underline block">
@@ -487,7 +487,7 @@ export default function DashboardClient() {
               {loadChart ? (
                 <div className="h-64 shimmer rounded-xl" />
               ) : history.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)] py-12 text-center">No history for this range.</p>
+                <p className="text-sm text-[var(--text-muted)] py-section text-center">No history for this range.</p>
               ) : (
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -637,7 +637,7 @@ export default function DashboardClient() {
                 <GlassCard key={n.id} className="p-3 border-l-2 border-l-primary">
                   <p className="text-sm font-medium text-[var(--text-primary)] line-clamp-2">{n.title}</p>
                   <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1">{n.executive_summary}</p>
-                  <p className="text-[10px] font-mono text-[var(--text-muted)] mt-2">
+                  <p className="text-sm font-mono text-[var(--text-muted)] mt-2">
                     {new Date(n.generated_at).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })}
                   </p>
                 </GlassCard>
@@ -675,7 +675,7 @@ export default function DashboardClient() {
         {NAV.slice(0, 5).map(({ href, icon: Icon }) => (
           <Link key={href} href={href} className="flex flex-col items-center gap-0.5 p-2 text-[var(--text-secondary)]">
             <Icon className="w-5 h-5" aria-hidden />
-            <span className="text-[9px]">{href.split('/').pop() || 'home'}</span>
+            <span className="text-sm">{href.split('/').pop() || 'home'}</span>
           </Link>
         ))}
       </nav>

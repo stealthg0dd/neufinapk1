@@ -118,13 +118,13 @@ export default function PlaidPortfolioAnalysisArticle() {
         <div className="mb-8">
           <div className="flex flex-wrap gap-2 mb-4">
             {['Portfolio Analysis', 'Plaid', 'How-To Guide'].map((t) => (
-              <span key={t} className="badge bg-gray-800 text-gray-400 text-[10px] px-2 py-0.5">{t}</span>
+              <span key={t} className="badge bg-shell-raised text-shell-muted text-sm px-2 py-0.5">{t}</span>
             ))}
           </div>
           <h1 className="text-3xl font-extrabold leading-tight mb-4">
             How to Analyse Your Investment Portfolio for Cognitive Biases (Singapore Guide)
           </h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500 mb-6">
+          <div className="flex items-center gap-3 text-sm text-shell-subtle mb-6">
             <span>NeuFin Guide</span>
             <span>·</span>
             <time dateTime="2025-02-12">12 February 2025</time>
@@ -134,7 +134,7 @@ export default function PlaidPortfolioAnalysisArticle() {
         </div>
 
         {/* Intro — answer in first 100 words */}
-        <p className="text-lg text-gray-300 leading-relaxed mb-6 font-medium">
+        <p className="text-lg text-shell-fg/90 leading-relaxed mb-6 font-medium">
           Analysing your investment portfolio for cognitive biases takes under 10 minutes
           with NeuFin. Connect your Singapore brokerage or bank accounts via the Plaid
           API, and NeuFin runs multi-model AI analysis (Claude, GPT-4, Gemini) across
@@ -144,7 +144,7 @@ export default function PlaidPortfolioAnalysisArticle() {
           explains what the scores mean, and outlines the actions to take.
         </p>
 
-        <hr className="border-gray-800 my-8" />
+        <hr className="border-shell-border my-8" />
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-6">Step-by-Step: Running a Behavioral Bias Analysis</h2>
@@ -209,11 +209,11 @@ export default function PlaidPortfolioAnalysisArticle() {
                   {step}
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-200 mb-2">{title}</h3>
+                  <h3 className="font-bold text-shell-fg mb-2">{title}</h3>
                   <ul className="space-y-2">
                     {content.map((item) => (
-                      <li key={item} className="flex items-start gap-2 text-sm text-gray-400">
-                        <span className="text-gray-600 mt-1 flex-shrink-0">›</span>
+                      <li key={item} className="flex items-start gap-2 text-sm text-shell-muted">
+                        <span className="text-shell-subtle mt-1 flex-shrink-0">›</span>
                         {item}
                       </li>
                     ))}
@@ -226,7 +226,7 @@ export default function PlaidPortfolioAnalysisArticle() {
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">What the Singapore Benchmark Looks Like</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             NeuFin&apos;s Singapore SME benchmark (based on first-time analysis results,
             January–December 2024):
           </p>
@@ -239,10 +239,10 @@ export default function PlaidPortfolioAnalysisArticle() {
               { bias: 'Herding Bias', score: '65/100', note: 'IPO over-participation' },
               { bias: 'Status Quo Bias', score: '70/100', note: 'Lowest impact bias' },
             ].map(({ bias, score, note }) => (
-              <div key={bias} className="rounded-lg bg-gray-800/40 p-3 text-center">
-                <p className="text-xs text-gray-500 mb-1">{bias}</p>
-                <p className="text-xl font-bold text-gray-100">{score}</p>
-                <p className="text-[10px] text-gray-500 mt-1">{note}</p>
+              <div key={bias} className="rounded-lg bg-shell-raised/40 p-3 text-center">
+                <p className="text-xs text-shell-subtle mb-1">{bias}</p>
+                <p className="text-xl font-bold text-shell-fg">{score}</p>
+                <p className="text-sm text-shell-subtle mt-1">{note}</p>
               </div>
             ))}
           </div>
@@ -257,15 +257,15 @@ export default function PlaidPortfolioAnalysisArticle() {
           </Link>
         </div>
 
-        <hr className="border-gray-800 my-10" />
+        <hr className="border-shell-border my-10" />
 
         <section>
           <h2 className="text-xl font-bold mb-6">Frequently Asked Questions</h2>
           <div className="space-y-6">
             {faqSchema.mainEntity.map(({ name, acceptedAnswer }) => (
-              <div key={name} className="border-b border-gray-800 pb-5">
-                <h3 className="font-semibold text-gray-200 mb-2">{name}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{acceptedAnswer.text}</p>
+              <div key={name} className="border-b border-shell-border pb-5">
+                <h3 className="font-semibold text-shell-fg mb-2">{name}</h3>
+                <p className="text-sm text-shell-muted leading-relaxed">{acceptedAnswer.text}</p>
               </div>
             ))}
           </div>
@@ -273,7 +273,7 @@ export default function PlaidPortfolioAnalysisArticle() {
 
         <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
           <h2 className="text-xl font-bold mb-2">Ready to Analyse Your Portfolio?</h2>
-          <p className="text-gray-400 text-sm mb-5">
+          <p className="text-shell-muted text-sm mb-5">
             Upload your portfolio CSV or connect via Plaid. Get your Investor DNA Score
             in under 10 seconds. Free — no account required.
           </p>

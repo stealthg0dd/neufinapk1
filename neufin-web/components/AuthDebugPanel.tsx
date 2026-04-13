@@ -62,18 +62,18 @@ export function AuthDebugPanel() {
   return (
     <div
       style={{ zIndex: 99999 }}
-      className="fixed bottom-4 right-4 bg-black/95 border border-gray-700 text-white rounded-lg text-xs max-w-xs shadow-2xl"
+      className="fixed bottom-4 right-4 bg-black/95 border border-shell-border text-white rounded-lg text-xs max-w-xs shadow-2xl"
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-3 py-2 border-b border-gray-700 cursor-pointer"
+        className="flex items-center justify-between px-3 py-2 border-b border-shell-border cursor-pointer"
         onClick={() => setExpanded(e => !e)}
       >
-        <span className="font-bold text-gray-300">🔐 Auth Debug</span>
+        <span className="font-bold text-shell-fg/90">🔐 Auth Debug</span>
         <span className={`font-mono ${statusColor}`}>
           {loading ? '⏳ loading' : user ? '✅ authed' : '❌ guest'}
         </span>
-        <span className="text-gray-500 ml-2">{expanded ? '▼' : '▲'}</span>
+        <span className="text-shell-subtle ml-2">{expanded ? '▼' : '▲'}</span>
       </div>
 
       {expanded && (
@@ -192,11 +192,11 @@ function Row({
   const valueColor =
     ok === true  ? 'text-green-400' :
     ok === false ? 'text-red-400'   :
-    dim          ? 'text-gray-600'  :
-                   'text-gray-300'
+    dim          ? 'text-shell-subtle'  :
+                   'text-shell-fg/90'
   return (
     <div className="flex justify-between gap-2">
-      <span className="text-gray-500 shrink-0">{label}:</span>
+      <span className="text-shell-subtle shrink-0">{label}:</span>
       <span className={`${valueColor} truncate text-right`}>{value}</span>
     </div>
   )

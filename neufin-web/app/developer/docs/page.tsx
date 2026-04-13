@@ -270,7 +270,7 @@ export default function DeveloperDocsPage() {
           </Link>
         </div>
       </nav>
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+      <div className="mx-auto max-w-6xl space-y-6 px-6 py-section">
         <h1 className="text-3xl font-bold text-navy">NeuFin API documentation</h1>
         <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-navy">1) Authentication</h2>
@@ -296,7 +296,7 @@ export default function DeveloperDocsPage() {
   ],
   "total_value": 35000
 }`}</pre>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+          <pre className="mt-2 rounded-lg border border-shell-border bg-black/40 p-3 text-xs">{`{
   "job_id": "8f2a4b1c-...",
   "status": "queued",
   "poll_url": "/api/swarm/status/8f2a4b1c-...",

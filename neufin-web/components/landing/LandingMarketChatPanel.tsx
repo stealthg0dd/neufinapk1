@@ -107,9 +107,9 @@ export default function LandingMarketChatPanel() {
   }
 
   return (
-    <section className="border-y border-border/40 bg-surface/20 py-16 md:py-20" aria-labelledby="landing-chat-heading">
+    <section className="border-y border-border/40 bg-surface/20 py-section" aria-labelledby="landing-chat-heading">
       <div className="mx-auto max-w-4xl px-6">
-        <p className="text-center font-mono text-[11px] uppercase tracking-widest text-primary">Market intelligence</p>
+        <p className="text-center font-mono text-sm uppercase tracking-widest text-primary">Market intelligence</p>
         <h2 id="landing-chat-heading" className="mt-2 text-center text-2xl font-bold text-foreground md:text-3xl">
           Ask Neufin anything
         </h2>
@@ -123,7 +123,7 @@ export default function LandingMarketChatPanel() {
               <span className="agent-badge">{currentAgent.mono}</span>
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-foreground">Neufin market desk</p>
-                <p className={`truncate text-[10px] uppercase tracking-widest ${currentAgent.color}`}>
+                <p className={`truncate text-sm uppercase tracking-widest ${currentAgent.color}`}>
                   {currentAgent.fullLabel}
                 </p>
               </div>
@@ -136,7 +136,7 @@ export default function LandingMarketChatPanel() {
                 key={a.value}
                 type="button"
                 onClick={() => setAgent(a.value)}
-                className={`flex-1 rounded-md border py-2 text-[10px] font-medium transition-all sm:text-[11px] ${
+                className={`flex-1 rounded-md border py-2 text-sm font-medium transition-all sm:text-sm ${
                   agent === a.value
                     ? `bg-surface-2 ${a.color} ${a.accent}`
                     : 'border-transparent text-muted-foreground hover:bg-surface-2/80 hover:text-foreground'
@@ -155,7 +155,7 @@ export default function LandingMarketChatPanel() {
                     key={i}
                     type="button"
                     onClick={() => void send(s)}
-                    className="rounded-full border border-border bg-surface-2 px-3 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                    className="rounded-full border border-border bg-surface-2 px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
                   >
                     {s}
                   </button>
@@ -172,7 +172,7 @@ export default function LandingMarketChatPanel() {
                 )}
                 <div className="max-w-[90%] sm:max-w-[85%]">
                   {msg.loading ? (
-                    <div className="rounded-2xl rounded-bl-sm border border-border bg-surface-2 px-3 py-2 text-[12px] text-muted-foreground">
+                    <div className="rounded-2xl rounded-bl-sm border border-border bg-surface-2 px-3 py-2 text-sm text-muted-foreground">
                       <span className="animate-pulse">●</span> Thinking…
                     </div>
                   ) : msg.role === 'user' ? (
@@ -188,8 +188,8 @@ export default function LandingMarketChatPanel() {
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-border bg-background/50 px-3 py-2">
                           {Object.entries(msg.keyNumbers).map(([k, v]) => (
                             <div key={k} className="flex items-center gap-1.5">
-                              <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{k}:</span>
-                              <span className={`text-[11px] font-semibold tabular-nums ${currentAgent.color}`}>
+                              <span className="text-sm uppercase tracking-wider text-muted-foreground">{k}:</span>
+                              <span className={`text-sm font-semibold tabular-nums ${currentAgent.color}`}>
                                 {String(v)}
                               </span>
                             </div>
@@ -197,7 +197,7 @@ export default function LandingMarketChatPanel() {
                         </div>
                       )}
                       {msg.action ? (
-                        <div className={`mt-2 border-l-2 pl-2.5 text-[11px] leading-relaxed ${currentAgent.accent} ${currentAgent.color}`}>
+                        <div className={`mt-2 border-l-2 pl-2.5 text-sm leading-relaxed ${currentAgent.accent} ${currentAgent.color}`}>
                           ▶ {msg.action}
                         </div>
                       ) : null}
@@ -229,7 +229,7 @@ export default function LandingMarketChatPanel() {
                 {loading ? '…' : 'Send'}
               </button>
             </div>
-            <p className="mt-2 text-[10px] text-muted-foreground/70">Enter to send · Shift+Enter for newline</p>
+            <p className="mt-2 text-sm text-muted-foreground/70">Enter to send · Shift+Enter for newline</p>
           </div>
         </div>
       </div>

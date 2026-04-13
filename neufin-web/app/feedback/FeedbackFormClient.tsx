@@ -128,7 +128,7 @@ export default function FeedbackFormClient() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#0B0F14] px-6 py-16 text-foreground">
+      <div className="min-h-screen bg-[#0B0F14] px-6 py-section text-foreground">
         <div className="mx-auto max-w-xl rounded-2xl border border-border bg-surface p-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-primary/30 bg-primary/20 font-mono text-2xl font-bold text-primary">
             N
@@ -148,7 +148,7 @@ export default function FeedbackFormClient() {
 
   return (
     <div className="min-h-screen bg-[#0B0F14] text-foreground">
-      <div className="mx-auto max-w-4xl px-6 py-10">
+      <div className="mx-auto max-w-4xl px-6 py-section">
         <h1 className="text-3xl font-semibold">NeuFin Beta Feedback</h1>
         <p className="mt-2 text-sm text-muted-foreground">Takes 5 minutes. Read by the founding team.</p>
         <div className="mt-4">
@@ -236,7 +236,7 @@ export default function FeedbackFormClient() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-border/60 bg-surface/40 p-5">
-      <h2 className="mb-4 font-mono text-[11px] uppercase tracking-widest text-primary">{title}</h2>
+      <h2 className="mb-4 font-mono text-sm uppercase tracking-widest text-primary">{title}</h2>
       <div className="space-y-4">{children}</div>
     </section>
   )

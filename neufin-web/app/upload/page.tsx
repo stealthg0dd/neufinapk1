@@ -87,7 +87,7 @@ export default function UploadPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+        <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
             <span className="text-xl font-bold text-gradient">Neufin</span>
           </div>
@@ -100,7 +100,7 @@ export default function UploadPage() {
                 <span className="inline-block w-3.5 h-3.5 border-2 border-blue-400/40 border-t-blue-400 rounded-full animate-spin" />
                 AI is analyzing your portfolio…
               </div>
-              <p className="text-xs text-gray-600">This usually takes 5–10 seconds</p>
+              <p className="text-xs text-shell-subtle">This usually takes 5–10 seconds</p>
             </div>
 
             {/* Shimmer skeleton cards */}
@@ -142,9 +142,9 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Suspense fallback={null}><RefCapture /></Suspense>
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
-          <Link href="/" className="text-gray-400 hover:text-white transition-colors text-sm">← Back</Link>
+          <Link href="/" className="text-shell-muted hover:text-white transition-colors text-sm">← Back</Link>
           <span className="text-xl font-bold text-gradient">Neufin</span>
         </div>
       </nav>
@@ -152,7 +152,7 @@ export default function UploadPage() {
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-xl">
           <h1 className="text-3xl font-bold mb-2">Upload your portfolio</h1>
-          <p className="text-gray-400 mb-8">CSV with columns: <code className="text-blue-400">symbol</code>, <code className="text-blue-400">shares</code>, and optional <code className="text-blue-400">cost_basis</code></p>
+          <p className="text-shell-muted mb-8">CSV with columns: <code className="text-blue-400">symbol</code>, <code className="text-blue-400">shares</code>, and optional <code className="text-blue-400">cost_basis</code></p>
 
           {/* Drop zone */}
           <div
@@ -161,7 +161,7 @@ export default function UploadPage() {
             onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
             className={`relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200
-              ${dragging ? 'border-blue-500 bg-blue-500/5' : 'border-gray-700 hover:border-gray-500 hover:bg-gray-900/50'}
+              ${dragging ? 'border-blue-500 bg-blue-500/5' : 'border-shell-border hover:border-shell-muted hover:bg-shell/50'}
               ${file ? 'border-green-600/60 bg-green-500/5' : ''}`}
           >
             <input
@@ -175,13 +175,13 @@ export default function UploadPage() {
               <>
                 <div className="text-4xl mb-3">✅</div>
                 <p className="font-semibold text-green-400">{file.name}</p>
-                <p className="text-sm text-gray-500 mt-1">{(file.size / 1024).toFixed(1)} KB · Ready to analyze</p>
+                <p className="text-sm text-shell-subtle mt-1">{(file.size / 1024).toFixed(1)} KB · Ready to analyze</p>
               </>
             ) : (
               <>
                 <div className="text-4xl mb-3">📂</div>
-                <p className="font-semibold text-gray-300">Drop your CSV here</p>
-                <p className="text-sm text-gray-500 mt-1">or click to browse</p>
+                <p className="font-semibold text-shell-fg/90">Drop your CSV here</p>
+                <p className="text-sm text-shell-subtle mt-1">or click to browse</p>
               </>
             )}
           </div>
@@ -214,8 +214,8 @@ export default function UploadPage() {
 
           {/* Format hint */}
           <div className="mt-6 card text-sm">
-            <p className="text-gray-400 font-medium mb-2">Expected CSV format:</p>
-            <pre className="text-xs text-gray-500 font-mono leading-relaxed">{SAMPLE_CSV.trim()}</pre>
+            <p className="text-shell-muted font-medium mb-2">Expected CSV format:</p>
+            <pre className="text-xs text-shell-subtle font-mono leading-relaxed">{SAMPLE_CSV.trim()}</pre>
           </div>
         </div>
       </main>

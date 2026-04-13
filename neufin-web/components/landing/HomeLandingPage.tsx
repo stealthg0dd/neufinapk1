@@ -1,47 +1,247 @@
 import Link from 'next/link'
-import { Brain, Check, CheckCircle, Dna, Globe, MessageSquareQuote, Shield, X } from 'lucide-react'
+import {
+  ArrowRight,
+  BarChart3,
+  Brain,
+  Check,
+  Code2,
+  Cpu,
+  FileText,
+  Layers,
+  LineChart,
+  Lock,
+  Shield,
+  Sparkles,
+  Users,
+  Zap,
+} from 'lucide-react'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
 import { GlassCard } from '@/components/ui/GlassCard'
 import LandingNav from '@/components/landing/LandingNav'
-import LandingMarketChatPanel from '@/components/landing/LandingMarketChatPanel'
-import StockTickerMarquee from '@/components/landing/StockTickerMarquee'
-import SwarmHeroTerminal from '@/components/landing/SwarmHeroTerminal'
 import Footer from '@/components/landing/Footer'
 
-const REGIME_LABELS: Record<string, string> = {
-  risk_on: 'Risk-On',
-  risk_off: 'Risk-Off',
-  stagflation: 'Stagflation',
-  recovery: 'Recovery',
-  recession_risk: 'Recession Risk',
+const TRUST_LOGOS = ['Polygon', 'Anthropic', 'Supabase'] as const
+
+const VALUE_CARDS = [
+  {
+    icon: Cpu,
+    title: 'Seven-agent swarm',
+    line: 'Parallel specialist models on every upload — macro, quant, risk, tax, alpha, and synthesis.',
+  },
+  {
+    icon: LineChart,
+    title: 'IC-grade output',
+    line: 'Structured briefings with scores, citations, and next actions — not generic chat paragraphs.',
+  },
+  {
+    icon: Shield,
+    title: 'Built for compliance',
+    line: 'Designed for regulated contexts: encryption, audit-friendly flows, and jurisdiction-aware defaults.',
+  },
+  {
+    icon: Zap,
+    title: 'Seconds, not weeks',
+    line: 'From CSV to committee-ready narrative in about a minute — no terminals or analyst bench.',
+  },
+] as const
+
+const STEPS = [
+  { n: '01', title: 'Upload', desc: 'Drop a positions CSV. No setup wizard.' },
+  { n: '02', title: 'Analyze', desc: 'Seven agents score regime, risk, bias, and tax in parallel.' },
+  { n: '03', title: 'Deliver', desc: 'Export an IC-style PDF or wire results into your stack.' },
+] as const
+
+const AGENTS = [
+  { mono: 'MR', label: 'Macro regime' },
+  { mono: 'PS', label: 'Strategist' },
+  { mono: 'QA', label: 'Quant' },
+  { mono: 'TX', label: 'Tax' },
+  { mono: 'RS', label: 'Risk' },
+  { mono: 'AS', label: 'Alpha' },
+  { mono: 'IC', label: 'Synthesis' },
+] as const
+
+const TESTIMONIALS = [
+  {
+    quote:
+      'We replaced a three-day reporting cycle with a single upload. Clients finally see bias and concentration in one view.',
+    name: 'Private wealth desk',
+    role: 'Singapore',
+  },
+  {
+    quote:
+      'The API fits our robo stack without a science project. DNA score and flags land next to our existing risk tiles.',
+    name: 'Platform engineering lead',
+    role: 'EU fintech',
+  },
+  {
+    quote:
+      'Output reads like an internal memo — which is exactly what compliance and IC reviewers expect.',
+    name: 'CIO office',
+    role: 'Advisory, UAE',
+  },
+] as const
+
+function SectionShell({
+  id,
+  className = '',
+  children,
+}: {
+  id?: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      id={id}
+      className={`border-t border-border/50 py-section first:border-t-0 ${className}`.trim()}
+    >
+      <div className="mx-auto max-w-7xl px-6">{children}</div>
+    </section>
+  )
+}
+
+function HeroProductPreview() {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-border bg-surface shadow-[0_24px_80px_-20px_rgba(15,23,42,0.12)]">
+      <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="ml-2 text-xs font-medium text-muted-foreground">NeuFin · Portfolio cockpit</span>
+      </div>
+      <div className="grid gap-4 p-5 sm:grid-cols-3">
+        {[
+          { label: 'DNA score', value: '78', sub: 'vs. peer median 64' },
+          { label: 'Regime', value: 'Risk-off', sub: 'Confidence 82%' },
+          { label: 'Top risk', value: 'Tech cluster', sub: '67% correlated sleeve' },
+        ].map((k) => (
+          <div key={k.label} className="rounded-lg border border-border/80 bg-background px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{k.label}</p>
+            <p className="mt-1 font-finance text-2xl font-semibold tabular-nums text-foreground">{k.value}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-border/60 bg-surface-2/80 px-5 py-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">Holdings vs. benchmark</span>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">Live</span>
+        </div>
+        <div className="flex h-36 items-end gap-1.5">
+          {[40, 62, 48, 70, 55, 78, 52, 68, 44, 72, 58, 80].map((h, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-t-sm bg-gradient-to-t from-primary/25 to-primary/5"
+              style={{ height: `${h}%` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SwarmDiagram() {
+  return (
+    <div className="mx-auto max-w-4xl text-center">
+      <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+        {AGENTS.map((a) => (
+          <div
+            key={a.mono}
+            className="flex w-[calc(50%-0.25rem)] flex-col items-center rounded-lg border border-border bg-surface px-2 py-2.5 text-center shadow-sm sm:w-auto sm:min-w-[4.75rem]"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 font-mono text-xs font-bold text-primary">
+              {a.mono}
+            </span>
+            <span className="mt-1 text-sm font-medium leading-tight text-muted-foreground">{a.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/5 px-5 py-2 text-sm font-semibold text-primary">
+        <Layers className="h-4 w-4" aria-hidden />
+        Converges to IC briefing
+      </div>
+    </div>
+  )
+}
+
+function ReportPreviewMock() {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <div className="border-b border-border bg-surface-2 px-6 py-4">
+        <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Investment committee memorandum</p>
+        <h3 className="mt-1 text-lg font-semibold text-foreground">Portfolio review — confidential</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Prepared by NeuFin swarm · DNA score 78 · Risk-off regime</p>
+      </div>
+      <div className="space-y-5 px-6 py-6 text-sm leading-relaxed text-muted-foreground">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Executive summary</p>
+          <p className="mt-2">
+            Concentration and behavioral bias materially increase drawdown risk relative to stated risk tolerance.
+            Defensive rotation and tax-aware harvesting are recommended before next rebalance.
+          </p>
+        </div>
+        <div className="grid gap-4 border-y border-border/60 py-4 sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Key metrics</p>
+            <ul className="mt-2 space-y-1.5 font-mono text-xs">
+              <li className="flex justify-between border-b border-border/40 py-1">
+                <span>HHI concentration</span>
+                <span className="text-foreground">0.34</span>
+              </li>
+              <li className="flex justify-between border-b border-border/40 py-1">
+                <span>Portfolio beta</span>
+                <span className="text-foreground">0.82</span>
+              </li>
+              <li className="flex justify-between py-1">
+                <span>Sharpe (12m)</span>
+                <span className="text-foreground">1.24</span>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Bias flags</p>
+            <ul className="mt-2 space-y-1.5 text-xs">
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+                Overconfidence — 3 positions
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-risk" />
+                Loss aversion — overweight defensives
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                Anchoring — stale cost basis references
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Recommendations</p>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-5">
+            <li>Reduce correlated technology sleeve from 42% to under 30%.</li>
+            <li>Harvest losses in two names before year-end; estimated tax alpha $4.2k.</li>
+            <li>Re-test allocation against risk-off stress scenario next quarter.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function formatRegimeName(regime: string) {
-  return REGIME_LABELS[regime] ?? regime.replace(/_/g, ' ')
-}
-
-function regimeTone(regime: string) {
-  const r = regime.toLowerCase()
-  if (r.includes('risk_off') || r.includes('recession') || r.includes('stagflation')) {
-    return { dot: 'bg-risk', text: 'text-risk' }
+  const map: Record<string, string> = {
+    risk_on: 'Risk-on',
+    risk_off: 'Risk-off',
+    stagflation: 'Stagflation',
+    recovery: 'Recovery',
+    recession_risk: 'Recession risk',
   }
-  if (r.includes('risk_on') || r.includes('recovery')) {
-    return { dot: 'bg-positive', text: 'text-positive' }
-  }
-  return { dot: 'bg-warning', text: 'text-warning' }
+  return map[regime] ?? regime.replace(/_/g, ' ')
 }
 
-function noteStripeClass(noteType?: string) {
-  const u = (noteType ?? '').toUpperCase()
-  if (u.includes('MACRO')) return 'bg-warning'
-  if (u.includes('SECTOR')) return 'bg-primary'
-  if (u.includes('REGIME')) return 'bg-risk'
-  return 'bg-accent'
-}
-
-const DEMO_DNA = 78
-
-/** API may return flat MarketRegime or nested `{ current: { regime, confidence, ... } }`. */
 function normalizeRegime(regime: MarketRegime | null) {
   const r = regime as (MarketRegime & { current?: Partial<MarketRegime> }) | null
   const slug = (r?.current?.regime ?? r?.regime ?? '').toString().trim()
@@ -51,8 +251,7 @@ function normalizeRegime(regime: MarketRegime | null) {
     const x = raw > 1 ? raw / 100 : raw
     confidence = Math.max(0, Math.min(1, x))
   }
-  const startedAt = r?.current?.started_at ?? r?.started_at
-  return { slug, confidence, startedAt }
+  return { slug, confidence }
 }
 
 export default function HomeLandingPage({
@@ -62,656 +261,249 @@ export default function HomeLandingPage({
   regime: MarketRegime | null
   researchTeaser: ResearchNote[]
 }) {
-  const { slug: regimeSlug, confidence: regimeConf, startedAt: regimeStartedAt } = normalizeRegime(regime)
+  const { slug: regimeSlug, confidence: regimeConf } = normalizeRegime(regime)
   const confPct = regimeConf !== null ? Math.round(regimeConf * 100) : null
   const regimeLabel = regimeSlug ? formatRegimeName(regimeSlug) : null
-  const tone = regimeSlug ? regimeTone(regimeSlug) : { dot: 'bg-muted-foreground', text: 'text-muted-foreground' }
+  const teaser = researchTeaser.filter((n): n is ResearchNote => Boolean(n?.id)).slice(0, 2)
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <LandingNav />
 
-      <div className="marketing-section flex flex-col">
-      {/* SECTION 1 — HERO */}
-      <section className="relative min-h-screen overflow-hidden marketing-section-white marketing-hero-subtle">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            animation: 'grid-move-50 25s linear infinite',
-          }}
-        />
-        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-16 px-6 pb-20 pt-28 sm:pt-32 md:pt-24 lg:grid-cols-2">
-          <div>
-            <span className="eyebrow-badge">Portfolio Intelligence</span>
-
-            <p className="mb-3 font-mono text-sm uppercase tracking-widest text-primary">
-              7 AI Agents. IC-Grade Intelligence. 60 Seconds.
-            </p>
-
-            <h1 className="mb-4 font-sans text-5xl font-bold leading-tight tracking-tight text-[var(--navy)] md:text-6xl">
-              <span className="block">7 AI Agents.</span>
-              <span className="block">One portfolio.</span>
-              <span className="block text-primary">Institutional clarity.</span>
-            </h1>
-
-            <p className="mb-6 max-w-xl text-lg leading-relaxed text-[var(--slate)]">
-              Upload your portfolio. Our swarm of 7 specialized AI agents analyzes market regime, behavioral biases, risk
-              clusters, and alpha opportunities — delivering an Investment Committee briefing in 60 seconds.
-              No expensive data terminals required.
-            </p>
-
-            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {[
-                { k: '7 Specialized AI Agents', v: 'working in parallel on your portfolio' },
-                { k: '47 Behavioral Biases Detected', v: 'including loss aversion, anchoring' },
-                { k: 'IC-Grade Output', v: 'investment committee briefings in 60 seconds' },
-              ].map((p) => (
-                <div key={p.k} className="mkt-card-sm">
-                  <p className="text-card-title text-sm">{p.k}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-[var(--slate)]">{p.v}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="mb-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
-              <Link href="/upload" className="btn-primary justify-center text-base">
-                Analyze My Portfolio Free →
-              </Link>
-              <Link href="#swarm-demo" className="btn-secondary justify-center text-base">
-                Watch Swarm Demo
-              </Link>
-            </div>
-
-            <p className="mb-4 text-sm text-[var(--muted)]">
-              In beta with advisors across Singapore, UAE & UK · Enterprise-grade security · info@neufin.ai
-            </p>
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--muted)]">
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="h-4 w-4 shrink-0 text-positive" />
-                14-day free trial
-              </span>
-              <span className="text-[var(--border)]" aria-hidden>
-                ·
-              </span>
-              <span className="flex items-center gap-1.5">
-                <CheckCircle className="h-4 w-4 shrink-0 text-positive" />
-                No credit card required
-              </span>
-              <span className="text-[var(--border)]" aria-hidden>
-                ·
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Shield className="h-4 w-4 shrink-0 text-primary" />
-                Enterprise-grade security
-              </span>
-              <span className="text-[var(--border)]" aria-hidden>
-                ·
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Globe className="h-4 w-4 shrink-0 text-primary" />
-                MAS · GDPR · MiFID II aligned
-              </span>
-            </div>
-          </div>
-
-          <div className="swarm-terminal-chrome w-full max-w-lg justify-self-center lg:justify-self-end">
-            <SwarmHeroTerminal />
-          </div>
-        </div>
-      </section>
-
-      <StockTickerMarquee />
-
-      <section id="swarm-demo" className="section relative scroll-mt-20 bg-[var(--bg-app)]">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="mb-16 text-center">
-            <p className="mb-3 font-mono text-sm font-medium uppercase tracking-widest text-primary">AGENTIC AI SYSTEM</p>
-            <h2 className="text-3xl font-bold text-[var(--navy)] md:text-4xl">
-              Seven specialized agents.
-              <br />
-              One Investment Committee briefing.
-            </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--slate)]">
-              Most platforms give you data. NeuFin gives you a complete Investment Committee. Seven specialized AI agents run simultaneously the
-              moment you upload your portfolio — each one an expert in its domain.
-            </p>
-          </div>
-
-          {(() => {
-            const agents = [
-              {
-                id: 'market_regime',
-                name: 'MACRO INTELLIGENCE',
-                mono: 'MR',
-                tagline: 'Monitors the macro environment',
-                description:
-                  'Monitors VIX, PMI, yield curve, and CPI signals via FRED to classify the current regime across 5 categories. Every portfolio decision is regime-aware.',
-                output: 'Current: Risk-Off · Confidence 82%',
-                color: 'risk',
-              },
-              {
-                id: 'strategist',
-                name: 'PORTFOLIO STRATEGIST',
-                mono: 'PS',
-                tagline: 'Turns macro signals into positioning',
-                description:
-                  'Synthesizes macro signals and news flow into a positioning thesis specific to your holdings. Tells you what to do, not just what is happening.',
-                output: 'Defensive rotation recommended',
-                color: 'warning',
-              },
-              {
-                id: 'quant',
-                name: 'QUANTITATIVE ANALYSIS',
-                mono: 'QA',
-                tagline: 'Pure portfolio mathematics',
-                description:
-                  'Computes HHI concentration, weighted beta, Sharpe ratio, and correlation clusters across six data providers. No model assumptions — pure portfolio mathematics.',
-                output: 'Sharpe 1.24 · Beta 0.82 · 3 clusters',
-                color: 'primary',
-              },
-              {
-                id: 'tax_arch',
-                name: 'TAX OPTIMISATION',
-                mono: 'TO',
-                tagline: 'Protects after-tax alpha',
-                description:
-                  'Calculates per-position CGT liability and flags tax-loss harvesting opportunities before year-end. Protects after-tax alpha without manual spreadsheets.',
-                output: 'CGT exposure: $4,200',
-                color: 'warning',
-              },
-              {
-                id: 'risk_sentinel',
-                name: 'INDEPENDENT RISK REVIEW',
-                mono: 'RR',
-                tagline: 'A second opinion on every portfolio',
-                description:
-                  'Runs a fully independent risk assessment — not influenced by any other agent. A second opinion on concentration, tail risk, and drawdown exposure.',
-                output: 'Risk: HIGH · Tech cluster 67%',
-                color: 'risk',
-              },
-              {
-                id: 'alpha_scout',
-                name: 'ALPHA DISCOVERY',
-                mono: 'AD',
-                tagline: 'Finds what your portfolio is missing',
-                description:
-                  'Scans for opportunities your portfolio is not capturing — sector rotations, momentum signals, and underweighted positions relative to live regime.',
-                output: '2 opportunities identified',
-                color: 'positive',
-              },
-              {
-                id: 'synthesizer',
-                name: 'IC SYNTHESIS',
-                mono: 'IC',
-                tagline: 'Produces the Investment Committee briefing',
-                description:
-                  'Aggregates all agent outputs into a single Investment Committee briefing — structured, cited, and ready for client or committee delivery.',
-                output: 'IC Briefing → PDF ready',
-                color: 'accent',
-              },
-            ] as const
-
-            const colorVar = (c: string) => (['risk', 'warning', 'primary', 'positive', 'accent'].includes(c) ? c : 'primary')
-            const borderHover = (c: string) => {
-              const map: Record<string, string> = {
-                risk: 'hover:border-danger2/40',
-                warning: 'hover:border-warning2/40',
-                primary: 'hover:border-primary/40',
-                positive: 'hover:border-success2/40',
-                accent: 'hover:border-accent/40',
-              }
-              return map[colorVar(c)] ?? 'hover:border-primary/40'
-            }
-
-            const firstRow = agents.slice(0, 4)
-            const secondRow = agents.slice(4)
-
-            const Card = (a: (typeof agents)[number]) => (
-              <div
-                key={a.id}
-                className={[
-                  'rounded-[10px] border border-[#E5E7EB] bg-white p-5 transition-colors shadow-sm',
-                  borderHover(a.color),
-                ].join(' ')}
-              >
-                <div className="flex items-center">
-                  <span className="agent-badge" aria-hidden>
-                    {a.mono}
-                  </span>
-                  <span className="font-mono text-base font-semibold uppercase tracking-wider text-[var(--navy)]">
-                    {a.name}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{a.tagline}</p>
-                <p className="mb-3 mt-1 text-sm leading-relaxed text-[var(--slate)]">{a.description}</p>
-                <span className="agent-status-pill font-mono">→ {a.output}</span>
-              </div>
-            )
-
-            return (
-              <>
-                <div className="mb-12">
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    {firstRow.map((a) => Card(a))}
-                  </div>
-                  <div className="mx-auto mt-4 max-w-5xl">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {secondRow.map((a) => Card(a))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mx-auto mt-8 max-w-4xl">
-                  <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-                    <div className="w-full rounded-xl border border-border/60 border-dashed bg-surface/40 p-4 text-center md:w-[28%]">
-                      <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Your Portfolio CSV</p>
-                    </div>
-
-                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
-                    <div className="hidden text-muted-foreground/60 md:block" aria-hidden>
-                      →
-                    </div>
-                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
-
-                    <div className="w-full rounded-xl border border-border/60 bg-surface p-4 text-center md:w-[44%]">
-                      <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">7 Agents</p>
-                      <div className="mt-3 grid grid-cols-4 gap-2">
-                        {(
-                          [
-                            ['primary', '#1EB8CC'],
-                            ['accent', '#8b5cf6'],
-                            ['warning', '#F5A623'],
-                            ['risk', '#EF4444'],
-                            ['positive', '#22C55E'],
-                            ['primary', '#1EB8CC'],
-                            ['accent', '#8b5cf6'],
-                          ] as const
-                        ).map(([c, hex], i) => (
-                          <span
-                            key={`${c}-${i}`}
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: hex }}
-                            aria-hidden
-                          />
-                        ))}
-                      </div>
-                      <p className="mt-3 text-sm text-muted-foreground">in parallel</p>
-                    </div>
-
-                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
-                    <div className="hidden text-muted-foreground/60 md:block" aria-hidden>
-                      →
-                    </div>
-                    <div className="hidden h-px flex-1 bg-border/60 md:block" aria-hidden />
-
-                    <div className="w-full rounded-xl border border-primary/40 bg-primary/5 p-4 text-center md:w-[28%]">
-                      <p className="font-mono text-xs uppercase tracking-widest text-primary">IC-Grade Briefing</p>
-                    </div>
-                  </div>
-
-                  <p className="mt-4 text-center text-sm text-body-sm">
-                    Average analysis time: 60 seconds
-                  </p>
-                </div>
-
-                <div className="mt-12 text-center">
-                  <h3 className="text-2xl font-bold text-navy">Ready to see your agents work?</h3>
-                  <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <Link
-                      href="/upload"
-                      className="rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-all hover:scale-105 hover:bg-primary/90"
-                    >
-                      Upload Portfolio — It&apos;s Free
-                    </Link>
-                  </div>
-                  <p className="mt-3 text-sm text-muted-foreground">No account required for your first analysis</p>
-                </div>
-              </>
-            )
-          })()}
-        </div>
-      </section>
-
-      {/* SECTION 2 — PROBLEM / SOLUTION */}
-      <section className="py-20">
-        <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-[var(--navy)]">Why leading advisors are switching to NeuFin</h2>
-        </div>
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
-          <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
-              <X className="h-4 w-4 text-risk" strokeWidth={2} />
-              <span className="text-risk">What you're losing right now</span>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                '3 hours building a single quarterly report — manually, every time',
-                'No clear explanation when clients ask why their portfolio is underperforming',
-                'Robo-advisors at 0.25% AUM competing directly against your 1% fee',
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
-                  <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-xl border border-positive/20 bg-positive/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[var(--navy)]">
-              <Check className="h-4 w-4 text-positive" strokeWidth={2} />
-              <span className="text-positive">What you get instead</span>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                "Investment Committee brief in 60 seconds — white-labeled with your firm's branding",
-                'Behavioral bias detection with quantified dollar impact per client portfolio',
-                'IC-grade analysis that demonstrates the value of human advisory beyond any algorithm',
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
-                  <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-      <section className="py-20">
-        <div className="mx-auto mb-12 max-w-5xl px-6 text-center">
-          <h2 className="mb-4 text-3xl font-bold text-navy">Why wealth platforms choose NeuFin over building in-house</h2>
-        </div>
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 px-6 md:grid-cols-2">
-          <div className="rounded-xl border border-risk/20 bg-risk/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
-              <X className="h-4 w-4 text-risk" strokeWidth={2} />
-              <span className="text-risk">What your engineering team quotes you</span>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                '6 to 12 months to build a behavioral intelligence layer from scratch',
-                'Three engineers and over $200,000 in development cost before launch',
-                'Client churn spikes 15 to 25 percent in every market correction',
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
-                  <X className="mt-0.5 h-3 w-3 shrink-0 text-risk" strokeWidth={2} />
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-xl border border-positive/20 bg-positive/5 p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
-              <Check className="h-4 w-4 text-positive" strokeWidth={2} />
-              <span className="text-positive">What you get with NeuFin API</span>
-            </h3>
-            <ul className="space-y-3">
-              {[
-                'REST API integration in a single weekend — not six months',
-                'Behavioral DNA score and bias flags per user portfolio, out of the box',
-                'Churn risk detection before clients panic-sell — automated and scalable',
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2 text-base leading-relaxed text-[var(--slate)]">
-                  <Check className="mt-0.5 h-3 w-3 shrink-0 text-positive" strokeWidth={2} />
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* Multi-Region Compliance */}
-      <section className="border-y border-border/40 bg-surface/20 py-16">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="mb-10 text-center">
-            <p className="mb-2 font-mono text-sm font-medium uppercase tracking-widest text-primary">REGULATORY FRAMEWORK</p>
-            <h2 className="text-2xl font-bold text-navy">Compliance Across Every Market We Operate</h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-              Neufin is built for global institutional deployment with jurisdiction-specific compliance frameworks.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                code: 'SG',
-                region: 'Singapore',
-                regulatory: 'MAS (Monetary Authority of Singapore)',
-                items: ['Capital Markets Services regime awareness'],
-                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
-              },
-              {
-                code: 'MY',
-                region: 'Malaysia',
-                regulatory: 'Securities Commission Malaysia (SC)',
-                items: ['CMSA compliance framework'],
-                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
-              },
-              {
-                code: 'TH',
-                region: 'Thailand',
-                regulatory: 'SEC Thailand oversight',
-                items: ['Investment Advisory Act alignment'],
-                status: { label: 'Launching 2026', tone: 'bg-warning/10 text-warning border-warning/30' },
-              },
-              {
-                code: 'VN',
-                region: 'Vietnam',
-                regulatory: 'SSC (State Securities Commission)',
-                items: ['Securities Law 2019 framework'],
-                status: { label: 'Launching 2026', tone: 'bg-warning/10 text-warning border-warning/30' },
-              },
-              {
-                code: 'AE',
-                region: 'UAE',
-                regulatory: 'ADGM / DFSA regulatory framework',
-                items: ['FinTech permission alignment'],
-                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
-              },
-              {
-                code: 'EU',
-                region: 'European Union / Estonia HQ',
-                regulatory: 'GDPR compliance (full)',
-                items: ['MiFID II awareness', 'ESMA regulatory alignment', 'Neufin OÜ registered entity'],
-                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
-              },
-              {
-                code: 'US',
-                region: 'United States',
-                regulatory: 'SEC Reg S-P, FINRA 4512 alignment',
-                items: ['SOC 2 Type II in preparation', 'CCPA aligned', 'Registered office: USA'],
-                status: { label: 'Active', tone: 'bg-positive/10 text-positive border-positive/30' },
-              },
-            ].map((c) => (
-              <div key={c.region} className="rounded-xl border border-border bg-surface p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <span
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface-2 font-mono text-xs font-semibold text-muted2"
-                      aria-hidden
-                    >
-                      {c.code}
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-navy">{c.region}</p>
-                      <p className="mt-1 font-mono text-sm text-primary">{c.regulatory}</p>
-                    </div>
-                  </div>
-                  <span className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-xs ${c.status.tone}`}>
-                    {c.status.label}
-                  </span>
-                </div>
-
-                <ul className="mt-4 space-y-2">
-                  {c.items.map((it) => (
-                    <li key={it} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-positive" />
-                      <span>{it}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 3 — MARKET INTELLIGENCE */}
-      <section className="border-y border-border/40 bg-surface/30 py-20">
-        <p className="mb-2 text-center font-mono text-sm font-medium uppercase tracking-widest text-primary">
-          LIVE MARKET INTELLIGENCE
-        </p>
-        <p className="mb-10 text-center text-muted-foreground">
-          Our agents monitor 40+ macro signals continuously
-        </p>
-        <div className="mx-auto max-w-2xl px-6">
-          <div className="rounded-xl border border-border bg-surface p-6">
-            <p className="font-mono text-4xl font-bold text-navy">
-              {regimeLabel ?? 'Awaiting regime signal'}
-            </p>
-            <div className="mt-4">
-              <div className="mb-1 flex justify-between font-mono text-sm text-muted-foreground">
-                <span>Confidence</span>
-                <span>{confPct !== null ? `${confPct}%` : '—'}</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
-                  style={{ width: confPct !== null ? `${confPct}%` : '0%' }}
-                />
-              </div>
-            </div>
-            <p className="mt-3 font-mono text-sm text-muted-foreground/70">
-              Last updated:{' '}
-              {regimeStartedAt
-                ? new Date(regimeStartedAt).toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short' })
-                : '—'}
-            </p>
-          </div>
-        </div>
-
-        <div className="mx-auto mt-12 max-w-5xl px-6">
-          {researchTeaser.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {researchTeaser
-                .filter((note): note is ResearchNote => Boolean(note?.id))
-                .map((note) => {
-                  const stripe = noteStripeClass(note?.note_type)
-                  const nconf = Math.round((note?.confidence_score ?? 0) * 100)
-                  const genAt = note?.generated_at
-                  return (
-                    <div
-                      key={note.id}
-                      className="relative overflow-hidden rounded-lg border border-border bg-surface p-4 pl-5 transition-colors hover:border-primary/20"
-                    >
-                      <div className={`absolute bottom-3 left-0 top-3 w-0.5 rounded-full ${stripe}`} aria-hidden />
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-                          {(note?.note_type ?? 'note').replace(/_/g, ' ')}
-                        </span>
-                        <span className="shrink-0 font-mono text-sm text-muted-foreground">{nconf}% conf</span>
-                      </div>
-                      <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-navy">
-                        {note?.title ?? 'Untitled'}
-                      </h3>
-                      <p className="line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
-                        {note?.executive_summary ?? ''}
-                      </p>
-                      <div className="mt-2.5 flex items-center justify-between">
-                        <span className="font-mono text-sm text-muted-foreground/70">
-                          {genAt
-                            ? new Date(genAt).toLocaleString('en-SG', { dateStyle: 'short', timeStyle: 'short' })
-                            : '—'}
-                        </span>
-                        <Link
-                          href={`/research/${note.id}`}
-                          className="cursor-pointer text-sm text-primary"
-                        >
-                          Read →
-                        </Link>
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
-          ) : (
-            <p className="text-center text-sm text-muted-foreground">
-              Research notes will appear here when the intelligence layer is live.
-            </p>
-          )}
-          <div className="mt-8 text-center">
-            <Link href="/research" className="text-sm font-medium text-primary hover:underline">
-              View all research →
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 4 — API PLATFORM */}
-      <section id="api-platform" className="scroll-mt-20 py-20">
-        <div className="mx-auto max-w-5xl px-6">
-          <h2 className="text-center text-3xl font-bold text-navy">Embed behavioral intelligence into your platform</h2>
-          <p className="mt-2 text-center text-muted-foreground">
-            Three API endpoints. One weekend integration. No behavioral layer to build.
-          </p>
-          <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-            {[
-              {
-                icon: Dna,
-                name: 'DNA Score API',
-                desc: 'DNA Score (0–100) + behavioral archetype + top bias flags for any portfolio CSV.',
-              },
-              {
-                icon: Brain,
-                name: 'Behavioral Bias API',
-                desc: '47 behavioral bias flags with severity scores and dollar impact per position.',
-              },
-              {
-                icon: MessageSquareQuote,
-                name: 'Regime Commentary API',
-                desc: 'Live macro regime (Risk-On / Risk-Off / Neutral) with natural-language commentary.',
-              },
-            ].map(({ icon: Icon, name, desc }) => (
-              <div
-                key={name}
-                className="mkt-card-elevated flex flex-col transition-colors hover:border-[hsl(var(--primary)/0.35)]"
-              >
-                <Icon className="accent-blue mb-3 h-8 w-8" strokeWidth={1.5} />
-                <h3 className="text-section-title text-lg">{name}</h3>
-                <p className="text-body-sm mt-1 flex-1">{desc}</p>
-                <p className="text-muted-marketing mt-3 text-sm">Available on Growth and Institutional plans.</p>
-                <Link
-                  href="/partners"
-                  className="accent-blue mt-3 inline-flex text-sm font-semibold hover:underline"
-                >
-                  View API Documentation →
+      <main className="flex-1">
+        {/* 1 — Hero */}
+        <section className="border-b border-border/40 bg-surface py-section-hero">
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 lg:grid-cols-[1fr_minmax(0,28rem)] lg:gap-16">
+            <div>
+              <p className="mb-3 text-sm font-medium uppercase tracking-widest text-primary">Institutional portfolio intelligence</p>
+              <h1 className="max-w-[20ch] text-4xl font-bold leading-[1.1] tracking-tight text-foreground sm:text-5xl">
+                IC-grade briefings from a single CSV upload.
+              </h1>
+              <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted-foreground">
+                NeuFin runs seven specialized agents on every portfolio — regime, quant, risk, tax, alpha, and synthesis
+                — so advisors and platforms can ship committee-ready output without a research bench.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Link href="/upload" className="btn-primary inline-flex justify-center px-8 py-3 text-base">
+                  Analyze a portfolio
+                  <ArrowRight className="ml-2 h-4 w-4" strokeWidth={2} />
+                </Link>
+                <Link href="/pricing" className="btn-secondary inline-flex justify-center px-8 py-3 text-base">
+                  View pricing
                 </Link>
               </div>
+              <p className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Lock className="h-4 w-4 text-primary" />
+                  Encrypted uploads
+                </span>
+                <span className="hidden sm:inline text-border" aria-hidden>
+                  ·
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-4 w-4 text-primary" />
+                  Built for advisors &amp; platforms
+                </span>
+              </p>
+            </div>
+            <HeroProductPreview />
+          </div>
+        </section>
+
+        {/* 2 — Trust */}
+        <SectionShell className="bg-background">
+          <p className="text-center text-sm font-medium text-muted-foreground">Trusted by investors and advisors</p>
+          <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-12 gap-y-6">
+            {TRUST_LOGOS.map((name) => (
+              <span
+                key={name}
+                className="text-lg font-semibold tracking-tight text-muted-foreground/70 transition-colors hover:text-muted-foreground"
+              >
+                {name}
+              </span>
             ))}
           </div>
-          <pre className="mt-10 overflow-x-auto rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] p-5 font-mono text-sm text-[#475569]">
-            {`{
-  "dna_score": 78,
-  "investor_type": "Growth-Oriented",
-  "behavioral_flags": ["overconfidence", "anchoring"],
-  "regime": "risk_off",
-  "recommendation": "Reduce concentration in correlated positions"
-}`}
-          </pre>
-        </div>
-      </section>
+        </SectionShell>
 
-      {/* SECTION 5 — PRICING */}
-      <section className="bg-[var(--bg-app)] py-[72px]">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-10 text-center text-3xl font-bold text-navy">Pricing</h2>
-          <div className="grid items-stretch gap-6 md:grid-cols-3">
-            <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
-              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Free</p>
-              <p className="mb-1 font-sans text-5xl font-bold text-navy">$0</p>
-              <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
-              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
+        {/* 3 — Value grid */}
+        <SectionShell className="bg-surface/50">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Why teams standardize on NeuFin</h2>
+            <p className="mt-3 text-muted-foreground">One platform for analysis, narrative, and API delivery — aligned to how ICs actually work.</p>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {VALUE_CARDS.map(({ icon: Icon, title, line }) => (
+              <div
+                key={title}
+                className="flex flex-col rounded-xl border border-border bg-surface p-6 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" strokeWidth={1.75} />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{line}</p>
+              </div>
+            ))}
+          </div>
+        </SectionShell>
+
+        {/* 4 — How it works */}
+        <SectionShell id="how-it-works" className="scroll-mt-24 bg-background">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">How the seven-agent swarm runs</h2>
+            <p className="mt-3 text-muted-foreground">A fixed pipeline from file to committee memo — observable, repeatable, auditable.</p>
+          </div>
+          <div className="mt-12 grid gap-8 md:grid-cols-3">
+            {STEPS.map((s) => (
+              <div key={s.n} className="relative rounded-xl border border-border bg-surface p-6 text-left shadow-sm">
+                <span className="font-mono text-xs font-bold text-primary">{s.n}</span>
+                <h3 className="mt-2 text-lg font-semibold text-foreground">{s.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-14">
+            <SwarmDiagram />
+          </div>
+          <div className="mt-10 text-center">
+            <Link href="/upload" className="text-sm font-semibold text-primary hover:underline">
+              Run a sample analysis
+              <ArrowRight className="ml-1 inline h-4 w-4 align-text-bottom" />
+            </Link>
+          </div>
+        </SectionShell>
+
+        {/* 5 — Product preview */}
+        <SectionShell className="bg-surface/50">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Product preview</h2>
+            <p className="mt-3 text-muted-foreground">
+              Cockpit metrics, regime context, and narrative — designed to drop into advisor workflows.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-8 lg:grid-cols-2">
+            <div className="space-y-4">
+              <HeroProductPreview />
+              {(regimeLabel || teaser.length > 0) && (
+                <div className="flex flex-wrap gap-3">
+                  {regimeLabel ? (
+                    <div className="rounded-lg border border-border bg-surface px-4 py-2 text-sm">
+                      <span className="text-muted-foreground">Regime · </span>
+                      <span className="font-medium text-foreground">{regimeLabel}</span>
+                      {confPct !== null ? (
+                        <span className="text-muted-foreground"> · {confPct}% confidence</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {teaser.map((note) => (
+                    <Link
+                      key={note.id}
+                      href={`/research/${note.id}`}
+                      className="rounded-lg border border-border bg-surface px-4 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <span className="font-medium text-foreground">{note.title ?? 'Research note'}</span>
+                      <span className="ml-2 text-muted-foreground">→</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground">Holdings snapshot</span>
+                <BarChart3 className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+              </div>
+              <div className="space-y-2 font-mono text-xs">
+                {['AAPL 18%', 'MSFT 14%', 'NVDA 11%', 'Cash 8%', 'Other 49%'].map((row) => (
+                  <div key={row} className="flex justify-between border-b border-border/50 py-2 last:border-0">
+                    <span className="text-muted-foreground">{row.split(' ')[0]}</span>
+                    <span className="text-foreground">{row.split(' ')[1]}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-xs text-muted-foreground">Illustrative weights · not investment advice.</p>
+            </div>
+          </div>
+        </SectionShell>
+
+        {/* 6 — Report */}
+        <SectionShell className="bg-background">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">IC-grade report layout</h2>
+            <p className="mt-3 text-muted-foreground">
+              The same sections your committee expects: summary, metrics, behavioral flags, and clear recommendations.
+            </p>
+          </div>
+          <div className="mx-auto mt-12 max-w-3xl">
+            <ReportPreviewMock />
+          </div>
+        </SectionShell>
+
+        {/* 7 — API */}
+        <SectionShell id="api" className="scroll-mt-24 bg-surface/50">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Plug into advisors and robo platforms</h2>
+            <p className="mt-3 text-muted-foreground">
+              REST endpoints for DNA scores, behavioral flags, and regime commentary — white-label friendly, JSON in, PDF
+              or JSON out.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-8 lg:grid-cols-2 lg:items-start">
+            <ul className="space-y-4 text-sm text-muted-foreground">
+              <li className="flex gap-3">
+                <Code2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">DNA Score API</strong> — score, archetype, and top bias flags for any
+                  uploaded portfolio.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <Brain className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">Behavioral API</strong> — structured severity and dollar-impact hints
+                  per position.
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <FileText className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">Reporting</strong> — generate IC-style PDFs from the same pipeline your
+                  advisors use in-product.
+                </span>
+              </li>
+            </ul>
+            <pre className="overflow-x-auto rounded-xl border border-border bg-surface-2 p-5 font-mono text-xs leading-relaxed text-muted-foreground shadow-inner sm:text-sm">
+              {`POST /api/portfolio/analyze
+Content-Type: multipart/form-data
+
+{
+  "dna_score": 78,
+  "investor_type": "Defensive allocator",
+  "regime": "risk_off",
+  "flags": ["overconfidence", "anchoring"]
+}`}
+            </pre>
+          </div>
+          <div className="mt-8 text-center">
+            <Link href="/partners" className="text-sm font-semibold text-primary hover:underline">
+              Partner &amp; API documentation
+              <ArrowRight className="ml-1 inline h-4 w-4 align-text-bottom" />
+            </Link>
+          </div>
+        </SectionShell>
+
+        {/* 8 — Pricing */}
+        <SectionShell className="bg-background">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Pricing</h2>
+            <p className="mt-3 text-muted-foreground">Transparent tiers — upgrade when you are ready to automate distribution.</p>
+          </div>
+          <div className="mt-12 grid items-stretch gap-6 md:grid-cols-3">
+            <GlassCard className="flex flex-col rounded-xl border border-border bg-surface p-7 shadow-sm">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-foreground">Free</p>
+              <p className="font-finance text-4xl font-bold text-foreground">$0</p>
+              <p className="mb-6 mt-1 text-sm text-muted-foreground">per month</p>
+              <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
                 {['3 DNA analyses', 'Basic behavioral report', 'CSV upload'].map((f) => (
                   <li key={f} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
@@ -719,27 +511,23 @@ export default function HomeLandingPage({
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/upload"
-                className="block w-full rounded-lg border-[1.5px] border-[var(--border)] py-3 text-center text-sm font-semibold text-navy transition-colors hover:border-primary hover:text-primary"
-              >
-                Start Free
+              <Link href="/upload" className="btn-secondary block w-full py-3 text-center text-sm font-semibold">
+                Start free
               </Link>
             </GlassCard>
 
-            <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-white p-7 shadow-[var(--shadow-sm)]">
-              <span className="absolute -top-3 right-4 rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide text-white">
-                Most Popular
+            <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-surface p-7 shadow-sm">
+              <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
+                Popular
               </span>
-              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Advisor</p>
-              <p className="mb-1 font-sans text-5xl font-bold text-primary">$299</p>
-              <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
-              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-foreground">Advisor</p>
+              <p className="font-finance text-4xl font-bold text-primary">$299</p>
+              <p className="mb-6 mt-1 text-sm text-muted-foreground">per month</p>
+              <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
                 {[
                   'Unlimited portfolio analyses',
-                  'Unlimited advisor client briefs (white-label PDF)',
+                  'White-label PDF briefs',
                   'Multi-client workspace',
-                  'Behavioral bias reports per client',
                   'API access (3 endpoints)',
                 ].map((f) => (
                   <li key={f} className="flex gap-2">
@@ -748,26 +536,22 @@ export default function HomeLandingPage({
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/pricing"
-                className="block w-full rounded-lg bg-primary py-3 text-center text-sm font-semibold text-white"
-              >
-                Start 14-Day Free Trial
+              <Link href="/pricing" className="btn-primary block w-full py-3 text-center text-sm font-semibold">
+                Start 14-day trial
               </Link>
             </GlassCard>
 
-            <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
-              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Enterprise</p>
-              <p className="mb-1 font-sans text-5xl font-bold text-navy">$999</p>
-              <p className="mb-2 text-sm text-[var(--slate)]">per month</p>
+            <GlassCard className="flex flex-col rounded-xl border border-border bg-surface p-7 shadow-sm">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-foreground">Enterprise</p>
+              <p className="font-finance text-4xl font-bold text-foreground">$999</p>
+              <p className="mb-1 mt-1 text-sm text-muted-foreground">per month</p>
               <p className="mb-6 text-xs text-primary">Custom pricing available</p>
-              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
+              <ul className="mb-6 flex-1 space-y-2 text-sm text-muted-foreground">
                 {[
                   'Everything in Advisor',
-                  'Unlimited reports + white-label output',
-                  'API embed for your platform (portal / reporting / CRM layer)',
-                  'Revenue share model available',
-                  'Dedicated integration support + SLA',
+                  'Platform embed and SLA',
+                  'Dedicated integration support',
+                  'Revenue-share options',
                 ].map((f) => (
                   <li key={f} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
@@ -775,21 +559,38 @@ export default function HomeLandingPage({
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/contact-sales"
-                className="block w-full rounded-lg border-[1.5px] border-[var(--border)] py-3 text-center text-sm font-semibold text-navy transition-colors hover:border-primary hover:text-primary"
-              >
-                Contact Sales
+              <Link href="/contact-sales" className="btn-secondary block w-full py-3 text-center text-sm font-semibold">
+                Contact sales
               </Link>
             </GlassCard>
           </div>
-        </div>
-      </section>
+        </SectionShell>
 
-      <LandingMarketChatPanel />
+        {/* 9 — Social proof */}
+        <SectionShell className="bg-surface/50">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">What teams say</h2>
+            <p className="mt-3 text-muted-foreground">Representative feedback from design partners and early deployments.</p>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <blockquote
+                key={t.name}
+                className="flex flex-col rounded-xl border border-border bg-surface p-6 shadow-sm"
+              >
+                <Sparkles className="h-5 w-5 text-primary" strokeWidth={1.5} />
+                <p className="mt-4 flex-1 text-sm leading-relaxed text-muted-foreground">&ldquo;{t.quote}&rdquo;</p>
+                <footer className="mt-6 border-t border-border/60 pt-4 text-sm">
+                  <p className="font-medium text-foreground">{t.name}</p>
+                  <p className="text-muted-foreground">{t.role}</p>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        </SectionShell>
+      </main>
 
       <Footer />
-      </div>
     </div>
   )
 }

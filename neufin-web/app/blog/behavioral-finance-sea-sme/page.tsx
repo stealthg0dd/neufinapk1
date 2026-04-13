@@ -121,13 +121,13 @@ export default function Article1() {
         <div className="mb-8">
           <div className="flex flex-wrap gap-2 mb-4">
             {['Behavioral Finance', 'Singapore SME', 'Cognitive Bias'].map((t) => (
-              <span key={t} className="badge bg-gray-800 text-gray-400 text-[10px] px-2 py-0.5">{t}</span>
+              <span key={t} className="badge bg-shell-raised text-shell-muted text-sm px-2 py-0.5">{t}</span>
             ))}
           </div>
           <h1 className="text-3xl font-extrabold leading-tight mb-4">
             Behavioral Finance for SEA SMEs: The 6 Biases Costing Singapore Businesses Money
           </h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500 mb-6">
+          <div className="flex items-center gap-3 text-sm text-shell-subtle mb-6">
             <span>NeuFin Research</span>
             <span>·</span>
             <time dateTime="2025-01-15">15 January 2025</time>
@@ -137,7 +137,7 @@ export default function Article1() {
         </div>
 
         {/* Intro — answer in first 100 words for LLM citation */}
-        <p className="text-lg text-gray-300 leading-relaxed mb-6 font-medium">
+        <p className="text-lg text-shell-fg/90 leading-relaxed mb-6 font-medium">
           Singapore SMEs lose an estimated 12–18% in annual portfolio returns due to six
           cognitive biases that distort financial decision-making. Behavioral finance — the
           study of how psychology influences economic decisions — has become essential for
@@ -147,19 +147,19 @@ export default function Article1() {
           detect it in your own investment decisions.
         </p>
 
-        <hr className="border-gray-800 my-8" />
+        <hr className="border-shell-border my-8" />
 
         {/* Section: What is behavioral finance */}
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">What Is Behavioral Finance?</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             Traditional finance theory assumes investors are rational — they process all
             available information, have consistent preferences, and make decisions that
             maximise expected utility. Behavioral finance, pioneered by Nobel laureates
             Daniel Kahneman (2002) and Richard Thaler (2017), demonstrates that investors
             are systematically irrational in predictable ways.
           </p>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-shell-muted leading-relaxed">
             For Singapore SMEs — where the CFO or founder-operator often manages both
             company treasury and personal investments simultaneously — these biases are
             especially costly because they compound over time and across multiple decision
@@ -175,16 +175,16 @@ export default function Article1() {
 
           <div className="space-y-8">
             {/* Bias 1 */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
               <h3 className="font-bold text-blue-400 mb-2">1. Recency Bias</h3>
-              <p className="text-gray-400 leading-relaxed mb-3">
+              <p className="text-shell-muted leading-relaxed mb-3">
                 Recency Bias causes investors to overweight recent events when making
                 decisions. During a market rally, affected SMEs increase equity exposure.
                 During a correction, they panic-sell. The result is a systematic buy-high,
                 sell-low pattern that destroys compounding returns.
               </p>
-              <p className="text-gray-400 leading-relaxed">
-                NeuFin analysis finds that Singapore SMEs show <strong className="text-gray-300">67%
+              <p className="text-shell-muted leading-relaxed">
+                NeuFin analysis finds that Singapore SMEs show <strong className="text-shell-fg/90">67%
                 higher Recency Bias scores</strong> versus the global average — likely
                 explained by concentrated exposure to the SGX and US tech sectors, both of
                 which experienced high-amplitude cycles between 2021–2024. Detection: compare
@@ -194,16 +194,16 @@ export default function Article1() {
             </div>
 
             {/* Bias 2 */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
               <h3 className="font-bold text-purple-400 mb-2">2. Disposition Effect</h3>
-              <p className="text-gray-400 leading-relaxed mb-3">
+              <p className="text-shell-muted leading-relaxed mb-3">
                 The Disposition Effect, documented by economists Hersh Shefrin and Meir
                 Statman in 1985, causes investors to sell winning positions too early (locking
                 in gains) while holding losing positions far too long (hoping to break even).
               </p>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-shell-muted leading-relaxed">
                 In NeuFin&apos;s Singapore portfolio dataset, investors affected by this bias hold
-                loss-making positions an average of <strong className="text-gray-300">2.3×
+                loss-making positions an average of <strong className="text-shell-fg/90">2.3×
                 longer</strong> than their winning positions. Compounded over a 5-year period,
                 this pattern results in a portfolio systematically weighted toward its
                 worst-performing assets. NeuFin&apos;s DNA Score includes a Disposition Effect
@@ -212,17 +212,17 @@ export default function Article1() {
             </div>
 
             {/* Bias 3 */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
               <h3 className="font-bold text-emerald-400 mb-2">3. Overconfidence Bias</h3>
-              <p className="text-gray-400 leading-relaxed mb-3">
+              <p className="text-shell-muted leading-relaxed mb-3">
                 Overconfidence causes decision-makers to overestimate their ability to predict
                 market outcomes. In practice, this manifests as excessive trading frequency,
                 under-diversification, and willingness to take concentrated positions in single
                 stocks or sectors.
               </p>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-shell-muted leading-relaxed">
                 Studies across Singapore and global retail investors find overconfident
-                investors trade approximately <strong className="text-gray-300">40% more
+                investors trade approximately <strong className="text-shell-fg/90">40% more
                 frequently</strong> than is optimal — generating higher transaction costs and
                 tax events without commensurate return improvement. Overconfident portfolios
                 also show 15% lower risk-adjusted returns annually. NeuFin measures
@@ -232,15 +232,15 @@ export default function Article1() {
             </div>
 
             {/* Bias 4 */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
               <h3 className="font-bold text-amber-400 mb-2">4. Home Country Bias</h3>
-              <p className="text-gray-400 leading-relaxed mb-3">
+              <p className="text-shell-muted leading-relaxed mb-3">
                 Home Country Bias causes investors to dramatically overweight locally-listed
                 securities. Singapore equities represent approximately 1.2% of global market
                 capitalisation — yet the average Singapore SME treasury or retail portfolio
                 allocates 40–60% of equity exposure to SGX-listed stocks.
               </p>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-shell-muted leading-relaxed">
                 This creates concentrated exposure to Singapore-specific macro risk: MAS
                 interest rate decisions, SGD/USD fluctuations, and the REIT market cycle.
                 NeuFin flags Home Country Bias when Singapore-listed securities and
@@ -250,9 +250,9 @@ export default function Article1() {
             </div>
 
             {/* Bias 5 */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
               <h3 className="font-bold text-rose-400 mb-2">5. Herding Bias</h3>
-              <p className="text-gray-400 leading-relaxed mb-3">
+              <p className="text-shell-muted leading-relaxed mb-3">
                 Herding occurs when investors follow the crowd — buying trending assets or
                 following institutional flows — rather than conducting independent analysis.
                 In Singapore&apos;s tightly networked business community, herding is especially
@@ -260,8 +260,8 @@ export default function Article1() {
                 sector rotation into AI and semiconductor names in 2023–2024, and REIT
                 accumulation during low-rate periods.
               </p>
-              <p className="text-gray-400 leading-relaxed">
-                Herding investors typically overpay on entry by <strong className="text-gray-300">
+              <p className="text-shell-muted leading-relaxed">
+                Herding investors typically overpay on entry by <strong className="text-shell-fg/90">
                 6–10%</strong> versus independent analysts who enter before the crowd
                 identifies the opportunity. NeuFin detects herding by comparing your entry
                 timing for each position against the 90-day volume surge pattern.
@@ -269,15 +269,15 @@ export default function Article1() {
             </div>
 
             {/* Bias 6 */}
-            <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+            <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
               <h3 className="font-bold text-cyan-400 mb-2">6. Status Quo Bias</h3>
-              <p className="text-gray-400 leading-relaxed mb-3">
+              <p className="text-shell-muted leading-relaxed mb-3">
                 Status Quo Bias — the tendency to prefer the current state of affairs —
                 leads investors to avoid rebalancing their portfolios even when their
                 original investment thesis has been invalidated or their target allocation
                 has drifted significantly.
               </p>
-              <p className="text-gray-400 leading-relaxed">
+              <p className="text-shell-muted leading-relaxed">
                 An SME treasury originally allocated 60% equity / 40% fixed income will
                 drift to 80% / 20% equity after a two-year bull market — dramatically
                 increasing risk without a deliberate decision. NeuFin monitors portfolio
@@ -291,7 +291,7 @@ export default function Article1() {
         {/* Section: How NeuFin helps */}
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">How NeuFin Helps Singapore SMEs Detect These Biases</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             NeuFin, built specifically for Singapore and Southeast Asian businesses, connects
             to your existing investment accounts via the Plaid API — the same read-only,
             encrypted connection trusted by major banks worldwide. It then runs multi-model
@@ -299,7 +299,7 @@ export default function Article1() {
             transaction history to generate a behavioral DNA Score: a 0–100 rating across
             all six bias dimensions.
           </p>
-          <p className="text-gray-400 leading-relaxed mb-6">
+          <p className="text-shell-muted leading-relaxed mb-6">
             Unlike generic robo-advisors that focus on portfolio allocation, NeuFin identifies
             the psychological patterns behind your financial decisions. The average Singapore
             SME scores 58/100 on their first DNA analysis, with Recency Bias and Disposition
@@ -315,16 +315,16 @@ export default function Article1() {
           </div>
         </section>
 
-        <hr className="border-gray-800 my-10" />
+        <hr className="border-shell-border my-10" />
 
         {/* FAQ section */}
         <section>
           <h2 className="text-xl font-bold mb-6">Frequently Asked Questions</h2>
           <div className="space-y-6">
             {faqSchema.mainEntity.map(({ name, acceptedAnswer }) => (
-              <div key={name} className="border-b border-gray-800 pb-5">
-                <h3 className="font-semibold text-gray-200 mb-2">{name}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{acceptedAnswer.text}</p>
+              <div key={name} className="border-b border-shell-border pb-5">
+                <h3 className="font-semibold text-shell-fg mb-2">{name}</h3>
+                <p className="text-sm text-shell-muted leading-relaxed">{acceptedAnswer.text}</p>
               </div>
             ))}
           </div>
@@ -333,7 +333,7 @@ export default function Article1() {
         {/* CTA */}
         <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
           <h2 className="text-xl font-bold mb-2">Find Your Behavioral Biases Now</h2>
-          <p className="text-gray-400 text-sm mb-5">
+          <p className="text-shell-muted text-sm mb-5">
             Upload your portfolio CSV and NeuFin will score your behavioral biases in under
             10 seconds. Free. No account required.
           </p>

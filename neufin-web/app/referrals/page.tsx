@@ -117,8 +117,8 @@ export default function ReferralsPage() {
   // ── No DNA result yet ───────────────────────────────────────────────────────
   if (shareToken === null && typeof window !== 'undefined' && !localStorage.getItem('dnaResult')) {
     return (
-      <div className="min-h-screen flex flex-col bg-gray-950">
-        <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="min-h-screen flex flex-col bg-shell-deep">
+        <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           </div>
@@ -126,7 +126,7 @@ export default function ReferralsPage() {
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
           <p className="text-4xl">🧬</p>
           <h1 className="text-xl font-bold text-white">Run your DNA analysis first</h1>
-          <p className="text-gray-500 text-sm max-w-xs">
+          <p className="text-shell-subtle text-sm max-w-xs">
             Your unique referral link is generated after your first portfolio scan.
           </p>
           <Link href="/upload" className="btn-primary mt-2">Analyze My Portfolio →</Link>
@@ -136,11 +136,11 @@ export default function ReferralsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-shell-deep">
       {/* Nav */}
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/results" className="text-gray-400 hover:text-white text-sm transition-colors">
+          <Link href="/results" className="text-shell-muted hover:text-white text-sm transition-colors">
             ← Results
           </Link>
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
@@ -152,7 +152,7 @@ export default function ReferralsPage() {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-10">
+      <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-section">
         <motion.div
           variants={stagger}
           initial="hidden"
@@ -162,14 +162,14 @@ export default function ReferralsPage() {
           {/* ── Header ────────────────────────────────────────────────── */}
           <motion.div variants={fadeUp} className="text-center space-y-2 mb-6">
             <h1 className="text-3xl font-bold text-white">🎁 Your Referral Hub</h1>
-            <p className="text-gray-400 text-sm">
+            <p className="text-shell-muted text-sm">
               Share your link. Friends get 20% off. You unlock rewards.
             </p>
           </motion.div>
 
           {/* ── Referral link card ────────────────────────────────────── */}
           <motion.div variants={fadeUp} className="card">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
+            <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-3">
               Your Referral Link
             </h2>
 
@@ -179,7 +179,7 @@ export default function ReferralsPage() {
                   <input
                     readOnly
                     value={referralUrl}
-                    className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-xs text-gray-300 font-mono truncate"
+                    className="flex-1 bg-shell border border-shell-border rounded-lg px-3 py-2.5 text-xs text-shell-fg/90 font-mono truncate"
                   />
                   <button
                     onClick={copyLink}
@@ -221,7 +221,7 @@ export default function ReferralsPage() {
                   </a>
                 </div>
 
-                <p className="text-xs text-gray-600 mt-3 text-center">
+                <p className="text-xs text-shell-subtle mt-3 text-center">
                   Anyone who uses your link gets 20% off their first report automatically
                 </p>
               </>
@@ -235,14 +235,14 @@ export default function ReferralsPage() {
           {/* ── Progress toward rewards ───────────────────────────────── */}
           <motion.div variants={fadeUp} className="card">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+              <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide">
                 Your Progress
               </h2>
-              <span className="text-xs text-gray-500">{shareCount} / {MAX_MILESTONE} shares</span>
+              <span className="text-xs text-shell-subtle">{shareCount} / {MAX_MILESTONE} shares</span>
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden mb-4">
+            <div className="w-full h-2.5 bg-shell-raised rounded-full overflow-hidden mb-4">
               <motion.div
                 className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-amber-500 rounded-full"
                 initial={{ width: '0%' }}
@@ -260,19 +260,19 @@ export default function ReferralsPage() {
                   <div
                     key={m.count}
                     className={`flex items-center gap-3 p-3 rounded-xl border transition-all
-                      ${unlocked ? `${colors.bg} ${colors.ring} ring-1` : 'border-gray-800'}`}
+                      ${unlocked ? `${colors.bg} ${colors.ring} ring-1` : 'border-shell-border'}`}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0
-                        ${unlocked ? colors.bg : 'bg-gray-800'}`}
+                        ${unlocked ? colors.bg : 'bg-shell-raised'}`}
                     >
                       {unlocked ? '✓' : m.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${unlocked ? colors.text : 'text-gray-400'}`}>
+                      <p className={`text-sm font-semibold ${unlocked ? colors.text : 'text-shell-muted'}`}>
                         {m.reward}
                       </p>
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs text-shell-subtle">
                         {unlocked ? 'Unlocked!' : `Share with ${m.count} friend${m.count > 1 ? 's' : ''}`}
                       </p>
                     </div>
@@ -293,16 +293,16 @@ export default function ReferralsPage() {
             </div>
 
             {nextMilestone && (
-              <p className="text-center text-xs text-gray-600 mt-4">
+              <p className="text-center text-xs text-shell-subtle mt-4">
                 {nextMilestone.count - shareCount} more share{nextMilestone.count - shareCount > 1 ? 's' : ''} to unlock:&nbsp;
-                <span className="text-gray-400 font-medium">{nextMilestone.reward}</span>
+                <span className="text-shell-muted font-medium">{nextMilestone.reward}</span>
               </p>
             )}
           </motion.div>
 
           {/* ── How it works ──────────────────────────────────────────── */}
           <motion.div variants={fadeUp} className="card">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
+            <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">
               How It Works
             </h2>
             <div className="space-y-4">
@@ -317,8 +317,8 @@ export default function ReferralsPage() {
                     {step}
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-200">{title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{body}</p>
+                    <p className="text-sm font-semibold text-shell-fg">{title}</p>
+                    <p className="text-xs text-shell-subtle mt-0.5">{body}</p>
                   </div>
                 </div>
               ))}
@@ -335,8 +335,8 @@ export default function ReferralsPage() {
               <p className="text-sm font-bold text-green-300">
                 You&apos;ve unlocked: {activeMilestone.reward}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Email us at <span className="text-gray-400">support@neufin.app</span> to claim your reward.
+              <p className="text-xs text-shell-subtle mt-1">
+                Email us at <span className="text-shell-muted">support@neufin.app</span> to claim your reward.
               </p>
             </motion.div>
           )}

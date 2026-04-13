@@ -60,9 +60,9 @@ function initials(fullName: string): string {
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <section className="bg-background pb-16 pt-24 text-center">
+      <section className="bg-background py-section-hero text-center">
         <div className="mx-auto max-w-5xl px-6">
-          <p className="font-mono text-[11px] uppercase tracking-widest text-primary">ABOUT NEUFIN</p>
+          <p className="font-mono text-sm uppercase tracking-widest text-primary">ABOUT NEUFIN</p>
           <h1 className="mt-4 text-4xl font-bold leading-tight sm:text-5xl">
             <span className="block">Built by people who&apos;ve seen</span>
             <span className="block">what broken finance costs.</span>
@@ -71,13 +71,13 @@ export default function AboutPage() {
             We founded NeuFin because institutional-grade intelligence shouldn&apos;t require expensive data terminals.
             Every investor deserves the same analytical edge as a hedge fund.
           </p>
-          <p className="mt-6 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+          <p className="mt-6 font-mono text-sm uppercase tracking-wider text-muted-foreground">
             Founded 2025 · Estonia HQ · 9-person team · 5 launch markets
           </p>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-4xl gap-12 px-6 py-16 md:grid-cols-2">
+      <section className="mx-auto grid max-w-4xl gap-12 px-6 py-section md:grid-cols-2">
         <div>
           <h3 className="text-2xl font-bold text-foreground">Traditional platforms describe markets.</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -119,10 +119,10 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="border-y border-border/40 bg-surface/30 py-20">
+      <section className="border-y border-border/40 bg-surface/30 py-section">
         <div className="mx-auto max-w-6xl px-6">
           <div className="mb-10 text-center">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-primary">MEET THE FOUNDERS</p>
+            <p className="font-mono text-sm uppercase tracking-widest text-primary">MEET THE FOUNDERS</p>
             <h2 className="mt-2 text-3xl font-bold text-foreground">Experienced across AI, banking, and operations</h2>
           </div>
           <div className="grid gap-6 md:grid-cols-3">
@@ -140,11 +140,11 @@ export default function AboutPage() {
                     )}
                   </div>
                   <h3 className="text-xl font-bold text-foreground">{f.name}</h3>
-                  <p className="mb-3 mt-0.5 font-mono text-[11px] uppercase tracking-widest text-primary">{f.title}</p>
+                  <p className="mb-3 mt-0.5 font-mono text-sm uppercase tracking-widest text-primary">{f.title}</p>
                   <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">{f.bio}</p>
                   <div className="flex flex-wrap justify-center gap-1.5">
                     {f.tags.map((tag) => (
-                      <span key={tag} className="rounded bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <span key={tag} className="rounded bg-surface-2 px-2 py-0.5 font-mono text-sm text-muted-foreground">
                         {tag}
                       </span>
                     ))}
@@ -156,14 +156,14 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-6 py-16">
+      <section className="mx-auto max-w-4xl px-6 py-section">
         <h2 className="text-3xl font-bold text-foreground">A global company, built for global markets</h2>
         <p className="mt-3 text-sm text-muted-foreground">
           NeuFin is registered and operating across multiple jurisdictions to serve investors wherever they are.
         </p>
         <div className="mt-8 grid gap-5 md:grid-cols-2">
           <div className="rounded-xl border border-border bg-surface p-5">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">REGISTERED ENTITIES</p>
+            <p className="mb-3 font-mono text-sm uppercase tracking-wider text-muted-foreground">REGISTERED ENTITIES</p>
             <div className="space-y-3">
               <div>
                 <p className="font-semibold text-foreground">🇪🇪 Neufin OÜ</p>
@@ -182,14 +182,14 @@ export default function AboutPage() {
             </p>
           </div>
           <div className="rounded-xl border border-border bg-surface p-5">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">ACTIVE & UPCOMING MARKETS</p>
+            <p className="mb-3 font-mono text-sm uppercase tracking-wider text-muted-foreground">ACTIVE & UPCOMING MARKETS</p>
             <div className="space-y-2.5">
               {markets.map((m) => (
                 <div key={m.name} className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-foreground">
                     {m.flag} {m.name}
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 font-mono text-[10px] ${m.cls}`}>{m.status}</span>
+                  <span className={`rounded-full px-2 py-0.5 font-mono text-sm ${m.cls}`}>{m.status}</span>
                 </div>
               ))}
             </div>
@@ -197,7 +197,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="bg-surface/20 py-16">
+      <section className="bg-surface/20 py-section">
         <div className="mx-auto max-w-6xl px-6">
           <h2 className="mb-10 text-center text-3xl font-bold text-foreground">How we build</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

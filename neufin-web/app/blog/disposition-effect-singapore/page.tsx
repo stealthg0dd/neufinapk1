@@ -118,13 +118,13 @@ export default function DispositionEffectArticle() {
         <div className="mb-8">
           <div className="flex flex-wrap gap-2 mb-4">
             {['Disposition Effect', 'Singapore', 'Behavioral Finance'].map((t) => (
-              <span key={t} className="badge bg-gray-800 text-gray-400 text-[10px] px-2 py-0.5">{t}</span>
+              <span key={t} className="badge bg-shell-raised text-shell-muted text-sm px-2 py-0.5">{t}</span>
             ))}
           </div>
           <h1 className="text-3xl font-extrabold leading-tight mb-4">
             The Disposition Effect Is Costing Singapore Investors — Here&apos;s the Data
           </h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500 mb-6">
+          <div className="flex items-center gap-3 text-sm text-shell-subtle mb-6">
             <span>NeuFin Research</span>
             <span>·</span>
             <time dateTime="2025-01-22">22 January 2025</time>
@@ -134,7 +134,7 @@ export default function DispositionEffectArticle() {
         </div>
 
         {/* Intro — answer in first 100 words */}
-        <p className="text-lg text-gray-300 leading-relaxed mb-6 font-medium">
+        <p className="text-lg text-shell-fg/90 leading-relaxed mb-6 font-medium">
           Singapore investors hold losing positions an average of 2.3× longer than winning
           ones — a pattern called the Disposition Effect that costs affected portfolios
           an estimated 1.5–3% in annual returns. First documented by economists Shefrin
@@ -145,18 +145,18 @@ export default function DispositionEffectArticle() {
           and how to break the pattern.
         </p>
 
-        <hr className="border-gray-800 my-8" />
+        <hr className="border-shell-border my-8" />
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">What Is the Disposition Effect?</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             The term was coined by Hersh Shefrin and Meir Statman in their landmark 1985
             paper, &quot;The Disposition to Sell Winners Too Early and Ride Losers Too Long:
             Theory and Evidence.&quot; They observed that investors are systematically disposed
             to realise gains quickly while deferring the realisation of losses — the
             opposite of what tax-efficient, return-maximising investing recommends.
           </p>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-shell-muted leading-relaxed">
             The psychological mechanism is Prospect Theory (Kahneman &amp; Tversky, 1979):
             losses are felt approximately twice as intensely as equivalent gains. Holding
             a losing position allows the investor to avoid the emotional pain of
@@ -168,7 +168,7 @@ export default function DispositionEffectArticle() {
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">The Singapore Data</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             NeuFin&apos;s analysis of anonymised Singapore investor portfolios (January–December
             2024) finds:
           </p>
@@ -179,13 +179,13 @@ export default function DispositionEffectArticle() {
               'Cost estimate: affected investors generated 2.1% lower annual returns vs. a matched control group with lower Disposition Effect scores',
               'Worst affected sector: Singapore REITs — investors held declining REIT positions an average of 11.4 months vs. 4.1 months for profitable REIT exits',
             ].map((item) => (
-              <li key={item} className="flex items-start gap-2 text-gray-400 text-sm">
+              <li key={item} className="flex items-start gap-2 text-shell-muted text-sm">
                 <span className="text-blue-400 mt-1 flex-shrink-0">→</span>
                 {item}
               </li>
             ))}
           </ul>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-shell-muted leading-relaxed">
             The REIT finding is notable: Singapore REITs are often characterised as
             &quot;safe, income-generating assets,&quot; which reduces psychological permission
             to cut losses — a narrative-driven amplifier of the Disposition Effect.
@@ -194,28 +194,28 @@ export default function DispositionEffectArticle() {
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">How to Detect the Disposition Effect in Your Portfolio</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             The quantitative measure used in academic research is the PGR/PLR ratio
             (Odean, 1998): Proportion of Gains Realised divided by Proportion of Losses
             Realised. A ratio significantly above 1.0 indicates Disposition Effect.
           </p>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             Without a tool like NeuFin, you can estimate it manually: look at your last
             20 closed positions. Count how many were sold at a gain within 6 months
             (PGR) vs. how many losing positions you still hold after 12 months (PLR).
             If your winners clear faster than your losers, Disposition Effect is present.
           </p>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-shell-muted leading-relaxed">
             NeuFin automates this calculation across your full portfolio history via
             Plaid API — producing a Disposition Effect sub-score within your overall
-            <strong className="text-gray-300"> Investor DNA Score</strong>, with
+            <strong className="text-shell-fg/90"> Investor DNA Score</strong>, with
             position-level breakdown showing exactly which holdings are most affected.
           </p>
         </section>
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">How to Correct the Disposition Effect</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             Research consistently shows that behavioral awareness reduces the Disposition
             Effect by 25–40%. Beyond awareness, three evidence-based strategies work:
           </p>
@@ -234,9 +234,9 @@ export default function DispositionEffectArticle() {
                 desc: 'NeuFin generates a Disposition Effect report each time it runs — showing your PGR/PLR ratio trend over time. Users who receive monthly behavioral reports show 31% improvement in their Disposition Effect score over 6 months, per NeuFin\'s 2024 user cohort analysis.',
               },
             ].map(({ title, desc }) => (
-              <div key={title} className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-                <h3 className="font-semibold text-gray-200 mb-1">{title}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
+              <div key={title} className="rounded-lg border border-shell-border bg-shell/50 p-4">
+                <h3 className="font-semibold text-shell-fg mb-1">{title}</h3>
+                <p className="text-sm text-shell-muted leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -251,15 +251,15 @@ export default function DispositionEffectArticle() {
           </Link>
         </div>
 
-        <hr className="border-gray-800 my-10" />
+        <hr className="border-shell-border my-10" />
 
         <section>
           <h2 className="text-xl font-bold mb-6">Frequently Asked Questions</h2>
           <div className="space-y-6">
             {faqSchema.mainEntity.map(({ name, acceptedAnswer }) => (
-              <div key={name} className="border-b border-gray-800 pb-5">
-                <h3 className="font-semibold text-gray-200 mb-2">{name}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{acceptedAnswer.text}</p>
+              <div key={name} className="border-b border-shell-border pb-5">
+                <h3 className="font-semibold text-shell-fg mb-2">{name}</h3>
+                <p className="text-sm text-shell-muted leading-relaxed">{acceptedAnswer.text}</p>
               </div>
             ))}
           </div>
@@ -267,7 +267,7 @@ export default function DispositionEffectArticle() {
 
         <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
           <h2 className="text-xl font-bold mb-2">Measure Your Disposition Effect Score</h2>
-          <p className="text-gray-400 text-sm mb-5">
+          <p className="text-shell-muted text-sm mb-5">
             NeuFin calculates your PGR/PLR ratio and Disposition Effect score from your
             actual portfolio data. Free. No account required.
           </p>

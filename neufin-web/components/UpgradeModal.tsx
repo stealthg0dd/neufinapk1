@@ -73,25 +73,27 @@ export default function UpgradeModal() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-      <div className="glass-card rounded-2xl w-full max-w-md border border-blue-500/20 shadow-2xl shadow-blue-500/10">
+    <div className="animate-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div className="glass-card animate-modal-panel w-full max-w-md overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-800/60">
+        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 p-5">
           <div>
-            <h2 className="text-lg font-bold text-white">Upgrade Your Plan</h2>
-            <p className="text-sm text-gray-400 mt-0.5">You&apos;ve reached your monthly limit</p>
+            <h2 className="text-lg font-bold text-slate-900">Upgrade your plan</h2>
+            <p className="mt-0.5 text-sm text-slate-600">You&apos;ve reached your monthly limit</p>
           </div>
           <button
+            type="button"
             onClick={() => setOpen(false)}
-            className="text-gray-500 hover:text-gray-300 transition-colors text-xl leading-none"
+            className="text-xl leading-none text-slate-400 transition-colors hover:text-slate-700"
+            aria-label="Close"
           >
             ×
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-5 space-y-4">
-          <p className="text-sm text-gray-400">
+        <div className="space-y-4 p-5">
+          <p className="text-sm text-slate-600">
             Choose a plan to continue with unlimited analyses and advanced features:
           </p>
 
@@ -101,27 +103,27 @@ export default function UpgradeModal() {
               <button
                 key={plan.id}
                 onClick={() => setSelectedPlan(plan.id)}
-                className={`w-full text-left p-4 rounded-xl border transition-all duration-150 ${
+                className={`w-full rounded-xl border p-4 text-left transition-all duration-150 ${
                   selectedPlan === plan.id
-                    ? 'border-blue-500/60 bg-blue-500/10'
-                    : 'border-gray-700/60 hover:border-gray-600'
-                } ${plan.highlight ? 'ring-1 ring-purple-500/20' : ''}`}
+                    ? 'border-[#1EB8CC] bg-[#1EB8CC]/8'
+                    : 'border-gray-200 hover:border-gray-300'
+                } ${plan.highlight ? 'ring-1 ring-[#1EB8CC]/25' : ''}`}
               >
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-white">{plan.name}</span>
+                      <span className="text-sm font-semibold text-slate-900">{plan.name}</span>
                       {plan.highlight && (
-                        <span className="bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                        <span className="rounded-full bg-[#1EB8CC] px-2 py-0.5 text-xs font-semibold text-white">
                           Popular
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{plan.description}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{plan.description}</p>
                   </div>
-                  <div className="text-right shrink-0 ml-4">
-                    <span className="text-lg font-bold text-white">${plan.price}</span>
-                    <span className="text-gray-500 text-xs">{plan.period}</span>
+                  <div className="ml-4 shrink-0 text-right">
+                    <span className="text-lg font-bold text-slate-900">${plan.price}</span>
+                    <span className="block text-xs text-slate-500">{plan.period}</span>
                   </div>
                 </div>
               </button>
@@ -144,20 +146,22 @@ export default function UpgradeModal() {
             )}
           </button>
 
-          <p className="text-xs text-gray-600 text-center">
+          <p className="text-center text-xs text-slate-500">
             Secured by Stripe · Cancel anytime · Instant access
           </p>
 
           <div className="flex items-center justify-between pt-1">
             <button
+              type="button"
               onClick={() => { setOpen(false); window.location.href = '/pricing' }}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-xs font-medium text-[#1EB8CC] transition-colors hover:text-[#189fb2]"
             >
               See all plans →
             </button>
             <button
+              type="button"
               onClick={() => setOpen(false)}
-              className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+              className="text-xs text-slate-500 transition-colors hover:text-slate-700"
             >
               Maybe later
             </button>

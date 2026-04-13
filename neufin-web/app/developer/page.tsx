@@ -69,7 +69,7 @@ export default function DeveloperPage() {
         </div>
       </nav>
 
-      <div className="mx-auto max-w-5xl space-y-20 px-6 py-16">
+      <div className="mx-auto max-w-5xl space-y-20 px-6 py-section">
         <div className="space-y-6 text-center">
           <span className="inline-block rounded-full border border-primary/25 bg-primary-light px-4 py-1 text-sm font-medium text-primary-dark">
             Enterprise API

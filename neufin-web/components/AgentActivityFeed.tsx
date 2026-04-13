@@ -28,7 +28,7 @@ const VENTURE_DOT: Record<string, string> = {
   neumas:          "bg-purple-400",
   apex_golf:       "bg-amber-400",
   defquant:        "bg-rose-400",
-  ctech_corporate: "bg-gray-400",
+  ctech_corporate: "bg-shell-muted",
 }
 
 function formatTime(iso: string): string {
@@ -62,12 +62,12 @@ function FeedSkeleton() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-lg bg-gray-800/40 px-3 py-2.5 animate-pulse">
-          <div className="h-2 w-2 rounded-full bg-gray-700 flex-shrink-0" />
-          <div className="h-3 w-12 rounded bg-gray-700" />
-          <div className="h-3 w-16 rounded bg-gray-700" />
-          <div className="h-3 flex-1 rounded bg-gray-700" />
-          <div className="h-3 w-12 rounded bg-gray-700" />
+        <div key={i} className="flex items-center gap-3 rounded-lg bg-shell-raised/40 px-3 py-2.5 animate-pulse">
+          <div className="h-2 w-2 rounded-full bg-shell-raised flex-shrink-0" />
+          <div className="h-3 w-12 rounded bg-shell-raised" />
+          <div className="h-3 w-16 rounded bg-shell-raised" />
+          <div className="h-3 flex-1 rounded bg-shell-raised" />
+          <div className="h-3 w-12 rounded bg-shell-raised" />
         </div>
       ))}
     </div>
@@ -86,8 +86,8 @@ export default function AgentActivityFeed({ logs, loading }: AgentActivityFeedPr
 
   if (logs.length === 0) {
     return (
-      <div className="flex items-center justify-center h-24 rounded-xl border border-gray-800 bg-gray-900/40">
-        <p className="text-sm text-gray-500">No agent activity in the last 2 hours.</p>
+      <div className="flex items-center justify-center h-24 rounded-xl border border-shell-border bg-shell/40">
+        <p className="text-sm text-shell-subtle">No agent activity in the last 2 hours.</p>
       </div>
     )
   }
@@ -101,7 +101,7 @@ export default function AgentActivityFeed({ logs, loading }: AgentActivityFeedPr
   return (
     <div className="space-y-1">
       {visible.map((log, i) => {
-        const dot = VENTURE_DOT[log.company] ?? "bg-gray-500"
+        const dot = VENTURE_DOT[log.company] ?? "bg-shell-subtle"
         const venture = VENTURE_LABELS[log.company] ?? log.company
         const bh = BH_NAMES[log.company] ?? ""
         const provider = providerShort(log.provider_used)
@@ -115,30 +115,30 @@ export default function AgentActivityFeed({ logs, loading }: AgentActivityFeedPr
               log.success === false
                 ? "bg-red-500/5 border border-red-500/15 hover:bg-red-500/10"
                 : log.success === true
-                ? "bg-gray-900/50 border border-gray-800/50 hover:bg-gray-800/50"
-                : "bg-gray-800/20 border border-gray-800/30"
+                ? "bg-shell/50 border border-shell-border/50 hover:bg-shell-raised/50"
+                : "bg-shell-raised/20 border border-shell-border/30"
             }`}
           >
             {/* Status dot */}
             <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-              log.success === false ? "bg-red-400" : log.success === true ? "bg-emerald-400" : "bg-gray-500"
+              log.success === false ? "bg-red-400" : log.success === true ? "bg-emerald-400" : "bg-shell-subtle"
             }`} />
 
             {/* Time */}
-            <span className="text-gray-500 tabular-nums flex-shrink-0 w-16">
+            <span className="text-shell-subtle tabular-nums flex-shrink-0 w-16">
               {formatTime(log.timestamp)}
             </span>
 
             {/* Venture + BH */}
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${dot}`} />
-              <span className="text-gray-300 font-medium">{venture}</span>
-              {bh && <span className="text-gray-600">·</span>}
-              {bh && <span className="text-gray-400">{bh}</span>}
+              <span className="text-shell-fg/90 font-medium">{venture}</span>
+              {bh && <span className="text-shell-subtle">·</span>}
+              {bh && <span className="text-shell-muted">{bh}</span>}
             </div>
 
             {/* Role */}
-            <span className="text-gray-500 flex-shrink-0 hidden sm:block">
+            <span className="text-shell-subtle flex-shrink-0 hidden sm:block">
               {roleLabel(log.agent_role)}
             </span>
 
@@ -146,16 +146,16 @@ export default function AgentActivityFeed({ logs, loading }: AgentActivityFeedPr
             <span className="flex-1" />
 
             {/* Cost */}
-            <span className="text-gray-500 tabular-nums flex-shrink-0">{cost}</span>
+            <span className="text-shell-subtle tabular-nums flex-shrink-0">{cost}</span>
 
             {/* Latency */}
             {latency && (
-              <span className="text-gray-600 tabular-nums flex-shrink-0 hidden md:block">{latency}</span>
+              <span className="text-shell-subtle tabular-nums flex-shrink-0 hidden md:block">{latency}</span>
             )}
 
             {/* Provider */}
-            <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium ${
-              log.success === false ? "bg-red-500/20 text-red-400" : "bg-gray-800 text-gray-400"
+            <span className={`flex-shrink-0 rounded px-1.5 py-0.5 text-sm font-medium ${
+              log.success === false ? "bg-red-500/20 text-red-400" : "bg-shell-raised text-shell-muted"
             }`}>
               {provider}
             </span>
@@ -164,8 +164,8 @@ export default function AgentActivityFeed({ logs, loading }: AgentActivityFeedPr
       })}
 
       {visible.length === 0 && (
-        <div className="flex items-center justify-center h-16 rounded-lg border border-gray-800 bg-gray-900/30">
-          <p className="text-xs text-gray-500">No calls in the last 2 hours.</p>
+        <div className="flex items-center justify-center h-16 rounded-lg border border-shell-border bg-shell/30">
+          <p className="text-xs text-shell-subtle">No calls in the last 2 hours.</p>
         </div>
       )}
     </div>

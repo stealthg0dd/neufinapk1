@@ -101,14 +101,14 @@ export default function SwarmHeroTerminal() {
         <span className="h-2.5 w-2.5 rounded-full bg-risk/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-positive/70" />
-        <span className="ml-2 font-mono text-[10px] text-slate-500">NEUFIN SWARM TERMINAL</span>
+        <span className="ml-2 font-mono text-sm text-slate-500">NEUFIN SWARM TERMINAL</span>
         <span className="ml-auto inline-flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-positive" style={{ animation: 'pulse-dot 1.2s ease-in-out infinite' }} />
-          <span className="font-mono text-[10px] text-positive">LIVE</span>
+          <span className="font-mono text-sm text-positive">LIVE</span>
         </span>
       </div>
 
-      <div className="p-4 font-mono text-[11px]">
+      <div className="p-4 font-mono text-sm">
         {entries.map((a, idx) => {
           const isVisible = idx < visible
           const status: AgentStatus = isVisible ? a.status : 'pending'
@@ -121,20 +121,20 @@ export default function SwarmHeroTerminal() {
               } transition-opacity`}
             >
               <StatusIcon status={status} />
-              <span className="w-28 shrink-0 text-[10px] font-bold uppercase text-primary">{a.name}</span>
-              <span className="text-[11px] leading-snug text-slate-400">{shown}</span>
+              <span className="w-28 shrink-0 text-sm font-bold uppercase text-primary">{a.name}</span>
+              <span className="text-sm leading-snug text-slate-400">{shown}</span>
             </div>
           )
         })}
 
         {showResult ? (
           <div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3">
-            <p className="mb-1 font-mono text-[9px] uppercase tracking-widest text-primary">IC BRIEFING GENERATED</p>
+            <p className="mb-1 font-mono text-sm uppercase tracking-widest text-primary">IC BRIEFING GENERATED</p>
             <p className="text-sm font-semibold text-slate-100">
               DNA Score <span className="font-mono tabular-nums text-primary">78</span> · Investor Type{' '}
               <span className="text-slate-100">Defensive Allocator</span>
             </p>
-            <p className="mt-1 text-[11px] text-warning">Overconfidence bias detected in 3 positions</p>
+            <p className="mt-1 text-sm text-warning">Overconfidence bias detected in 3 positions</p>
           </div>
         ) : null}
       </div>

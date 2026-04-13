@@ -58,7 +58,7 @@ function severityClass(sev: ScanFinding["severity"]): string {
     case "CRITICAL": return "bg-red-500/15 text-red-400 border border-red-500/30"
     case "HIGH":     return "bg-orange-500/15 text-orange-400 border border-orange-500/30"
     case "MEDIUM":   return "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30"
-    case "LOW":      return "bg-gray-700 text-gray-400"
+    case "LOW":      return "bg-shell-raised text-shell-muted"
   }
 }
 
@@ -81,7 +81,7 @@ function RepoHealthCard({
 
   return (
     <div className={`rounded-xl border p-4 space-y-3 ${
-      repo.status === "live"    ? "border-gray-800 bg-gray-900" :
+      repo.status === "live"    ? "border-shell-border bg-shell" :
       repo.status === "stale"  ? "border-yellow-500/20 bg-yellow-500/5" :
                                   "border-red-500/20 bg-red-500/5"
     }`}>
@@ -89,9 +89,9 @@ function RepoHealthCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`h-2 w-2 rounded-full flex-shrink-0 ${statusDotClass(repo.status)}`} />
-          <span className="font-semibold text-sm text-gray-200">{label}</span>
+          <span className="font-semibold text-sm text-shell-fg">{label}</span>
         </div>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusBadgeClass(repo.status)}`}>
+        <span className={`rounded-full px-2 py-0.5 text-sm font-medium ${statusBadgeClass(repo.status)}`}>
           {repo.status.toUpperCase()}
         </span>
       </div>
@@ -99,25 +99,25 @@ function RepoHealthCard({
       {/* Last seen */}
       <div className="space-y-1">
         {repo.last_seen && (
-          <p className="text-[11px] text-gray-500">
-            Last seen: <span className="text-gray-400">{relativeTime(repo.last_seen)}</span>
+          <p className="text-sm text-shell-subtle">
+            Last seen: <span className="text-shell-muted">{relativeTime(repo.last_seen)}</span>
           </p>
         )}
         {repo.version && (
-          <p className="text-[11px] text-gray-500">
-            Version: <span className="text-gray-400 font-mono">{repo.version}</span>
+          <p className="text-sm text-shell-subtle">
+            Version: <span className="text-shell-muted font-mono">{repo.version}</span>
           </p>
         )}
         {deployment?.deployed_at && (
-          <p className="text-[11px] text-gray-500">
-            Deployed: <span className="text-gray-400">{relativeTime(deployment.deployed_at)}</span>
+          <p className="text-sm text-shell-subtle">
+            Deployed: <span className="text-shell-muted">{relativeTime(deployment.deployed_at)}</span>
             {deployment.commit_sha && (
-              <span className="ml-1 font-mono text-gray-600">{deployment.commit_sha.slice(0, 7)}</span>
+              <span className="ml-1 font-mono text-shell-subtle">{deployment.commit_sha.slice(0, 7)}</span>
             )}
           </p>
         )}
         {deployment?.commit_msg && (
-          <p className="text-[11px] text-gray-600 truncate" title={deployment.commit_msg}>
+          <p className="text-sm text-shell-subtle truncate" title={deployment.commit_msg}>
             {deployment.commit_msg}
           </p>
         )}
@@ -128,7 +128,7 @@ function RepoHealthCard({
         <button
           onClick={onRunScan}
           disabled={scanning}
-          className="w-full rounded-lg border border-blue-500/30 py-1.5 text-[11px] font-medium text-blue-400 hover:bg-blue-500/10 disabled:opacity-50 transition-colors"
+          className="w-full rounded-lg border border-blue-500/30 py-1.5 text-sm font-medium text-blue-400 hover:bg-blue-500/10 disabled:opacity-50 transition-colors"
         >
           {scanning ? "Scanning…" : "▶ Run Scan"}
         </button>
@@ -150,44 +150,44 @@ function ScanFindingsSection({
 }) {
   if (findings.length === 0 && errorRate.unresolved_critical === 0 && errorRate.unresolved_high === 0) {
     return (
-      <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
+      <div className="rounded-xl border border-shell-border bg-shell p-5">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
-          <span className="text-sm text-gray-300">All clear — no open findings</span>
+          <span className="text-sm text-shell-fg/90">All clear — no open findings</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 p-5 space-y-3">
+    <div className="rounded-xl border border-shell-border bg-shell p-5 space-y-3">
       {/* Error rate pills */}
       {(errorRate.unresolved_critical > 0 || errorRate.unresolved_high > 0) && (
         <div className="flex items-center gap-2 flex-wrap">
           {errorRate.unresolved_critical > 0 && (
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
+            <span className="rounded-full px-2.5 py-0.5 text-sm font-semibold bg-red-500/15 text-red-400 border border-red-500/30">
               {errorRate.unresolved_critical} CRITICAL
             </span>
           )}
           {errorRate.unresolved_high > 0 && (
-            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/30">
+            <span className="rounded-full px-2.5 py-0.5 text-sm font-semibold bg-orange-500/15 text-orange-400 border border-orange-500/30">
               {errorRate.unresolved_high} HIGH
             </span>
           )}
-          <span className="text-[11px] text-gray-500">unresolved</span>
+          <span className="text-sm text-shell-subtle">unresolved</span>
         </div>
       )}
 
       {/* Findings list */}
-      <div className="divide-y divide-gray-800/60">
+      <div className="divide-y divide-shell-border/60">
         {findings.map((f) => (
           <div key={f.id} className="py-2.5 flex items-start gap-3">
-            <span className={`mt-0.5 flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${severityClass(f.severity)}`}>
+            <span className={`mt-0.5 flex-shrink-0 rounded-full px-2 py-0.5 text-sm font-semibold ${severityClass(f.severity)}`}>
               {f.severity}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-300 leading-snug">{f.message}</p>
-              <p className="text-[10px] text-gray-600 mt-0.5">
+              <p className="text-xs text-shell-fg/90 leading-snug">{f.message}</p>
+              <p className="text-sm text-shell-subtle mt-0.5">
                 {f.category} · {f.repo_id} · {relativeTime(f.detected_at)}
               </p>
             </div>
@@ -324,21 +324,21 @@ function BudgetRow({ budget }: { budget: BudgetReport }) {
   const monPct = pct(budget.monthly_spend ?? 0, budget.monthly_cap ?? 400)
 
   return (
-    <div className="rounded-2xl border border-gray-800 bg-gray-900 p-5">
+    <div className="rounded-2xl border border-shell-border bg-shell p-5">
       {/* Today */}
       <div className="flex items-baseline justify-between mb-2">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-semibold text-gray-200">Today</span>
+          <span className="text-sm font-semibold text-shell-fg">Today</span>
           <span className={`text-lg font-bold tabular-nums ${budgetTextClass(dayPct)}`}>
             ${(budget.daily_spend ?? 0).toFixed(2)}
           </span>
-          <span className="text-sm text-gray-500">/ ${(budget.daily_cap ?? 15).toFixed(2)}</span>
+          <span className="text-sm text-shell-subtle">/ ${(budget.daily_cap ?? 15).toFixed(2)}</span>
         </div>
         <span className={`text-xs font-medium tabular-nums ${budgetTextClass(dayPct)}`}>
           {dayPct}%
         </span>
       </div>
-      <div className="h-3 w-full rounded-full bg-gray-800 overflow-hidden mb-4">
+      <div className="h-3 w-full rounded-full bg-shell-raised overflow-hidden mb-4">
         <div
           className={`h-3 rounded-full transition-all duration-700 ${budgetBarClass(dayPct)}`}
           style={{ width: `${dayPct}%` }}
@@ -348,15 +348,15 @@ function BudgetRow({ budget }: { budget: BudgetReport }) {
       {/* Monthly */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-xs text-gray-400">Monthly</span>
+          <span className="text-xs text-shell-muted">Monthly</span>
           <span className={`text-xs font-semibold tabular-nums ${budgetTextClass(monPct)}`}>
             ${(budget.monthly_spend ?? 0).toFixed(2)}
           </span>
-          <span className="text-xs text-gray-600">/ ${(budget.monthly_cap ?? 400).toFixed(2)}</span>
+          <span className="text-xs text-shell-subtle">/ ${(budget.monthly_cap ?? 400).toFixed(2)}</span>
         </div>
         <span className={`text-xs tabular-nums ${budgetTextClass(monPct)}`}>{monPct}%</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-gray-800 overflow-hidden">
+      <div className="h-1.5 w-full rounded-full bg-shell-raised overflow-hidden">
         <div
           className={`h-1.5 rounded-full transition-all duration-700 ${budgetBarClass(monPct)}`}
           style={{ width: `${monPct}%` }}
@@ -386,7 +386,7 @@ function ProviderCard({
     <div
       className={`rounded-xl border p-3 space-y-2.5 ${
         stats.healthy && !stats.in_cooldown
-          ? "border-gray-800 bg-gray-900"
+          ? "border-shell-border bg-shell"
           : stats.in_cooldown
           ? "border-yellow-500/30 bg-yellow-500/5"
           : "border-red-500/30 bg-red-500/5"
@@ -395,20 +395,20 @@ function ProviderCard({
       {/* Name + status dot */}
       <div className="flex items-start gap-2">
         <span className={`mt-0.5 h-2 w-2 flex-shrink-0 rounded-full ${providerDotClass(stats)}`} />
-        <span className="text-[11px] font-medium text-gray-300 leading-tight">
+        <span className="text-sm font-medium text-shell-fg/90 leading-tight">
           {providerLabel(name)}
         </span>
       </div>
 
       {/* RPM gauge */}
       <div>
-        <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+        <div className="flex justify-between text-sm text-shell-subtle mb-1">
           <span>RPM</span>
           <span className="tabular-nums">
             {stats.rpm_current}/{stats.rpm_limit}
           </span>
         </div>
-        <div className="h-1 w-full rounded-full bg-gray-800">
+        <div className="h-1 w-full rounded-full bg-shell-raised">
           <div
             className={`h-1 rounded-full transition-all ${
               rpmPct > 80 ? "bg-red-500" : rpmPct > 50 ? "bg-yellow-400" : "bg-sky-500"
@@ -419,15 +419,15 @@ function ProviderCard({
       </div>
 
       {/* Latency + cost */}
-      <div className="flex justify-between text-[10px]">
-        <span className="text-gray-400">
+      <div className="flex justify-between text-sm">
+        <span className="text-shell-muted">
           {stats.avg_latency_ms > 0 ? `${Math.round(stats.avg_latency_ms)}ms` : "—"}
         </span>
-        <span className="text-gray-400 tabular-nums">${costToday.toFixed(4)}</span>
+        <span className="text-shell-muted tabular-nums">${costToday.toFixed(4)}</span>
       </div>
 
       {stats.in_cooldown && stats.cooldown_remaining_s > 0 && (
-        <p className="text-[10px] text-yellow-400">
+        <p className="text-sm text-yellow-400">
           cooldown {Math.round(stats.cooldown_remaining_s)}s
         </p>
       )}
@@ -445,13 +445,13 @@ const COMPANY_COLORS: Record<string, string> = {
   neumas:          "from-purple-600/20 to-purple-800/10 border-purple-700/30",
   apex_golf:       "from-amber-600/20 to-amber-800/10 border-amber-700/30",
   defquant:        "from-rose-600/20 to-rose-800/10 border-rose-700/30",
-  ctech_corporate: "from-gray-600/20 to-gray-800/10 border-gray-600/30",
+  ctech_corporate: "from-shell-border/20 to-shell/10 border-shell-border/30",
 }
 
 function companyColor(company: string): string {
   const color = Object.entries(COMPANY_COLORS).find(([key]) => key === company)?.[1]
   if (color) return color
-  return "from-gray-600/20 to-gray-800/10 border-gray-600/30"
+  return "from-shell-border/20 to-shell/10 border-shell-border/30"
 }
 
 function providerRateLimit(
@@ -494,9 +494,9 @@ function CompanyStatusCard({
     >
       {/* Company name + expand chevron */}
       <div className="flex items-center justify-between mb-3">
-        <span className="font-semibold text-gray-100">{displayName(company)}</span>
+        <span className="font-semibold text-shell-fg">{displayName(company)}</span>
         <svg
-          className={`h-4 w-4 text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-shell-muted transition-transform ${isExpanded ? "rotate-180" : ""}`}
           viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
         >
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -506,19 +506,19 @@ function CompanyStatusCard({
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <p className="text-[10px] text-gray-500 mb-0.5">Agents</p>
-          <p className="text-lg font-bold text-gray-200 leading-none tabular-nums">{agentCount}</p>
+          <p className="text-sm text-shell-subtle mb-0.5">Agents</p>
+          <p className="text-lg font-bold text-shell-fg leading-none tabular-nums">{agentCount}</p>
         </div>
         <div>
-          <p className="text-[10px] text-gray-500 mb-0.5">Brief</p>
-          <p className="text-xs font-medium text-gray-300 leading-none">
+          <p className="text-sm text-shell-subtle mb-0.5">Brief</p>
+          <p className="text-xs font-medium text-shell-fg/90 leading-none">
             {hasBrief ? relativeTime(brief!.created_at) : "none"}
           </p>
         </div>
         <div>
-          <p className="text-[10px] text-gray-500 mb-0.5">Status</p>
+          <p className="text-sm text-shell-subtle mb-0.5">Status</p>
           <span
-            className={`inline-block h-2 w-2 rounded-full ${hasBrief ? "bg-emerald-400" : "bg-gray-600"}`}
+            className={`inline-block h-2 w-2 rounded-full ${hasBrief ? "bg-emerald-400" : "bg-shell-muted"}`}
           />
         </div>
       </div>
@@ -530,13 +530,13 @@ function CompanyStatusCard({
           .map((role) => (
             <span
               key={role}
-              className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-gray-400"
+              className="rounded-full bg-white/5 px-2 py-0.5 text-sm text-shell-muted"
             >
               {role}
             </span>
           ))}
         {agentCount > 4 && (
-          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[9px] text-gray-500">
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-sm text-shell-subtle">
             +{agentCount - 4}
           </span>
         )}
@@ -563,29 +563,29 @@ function BriefAccordion({
   const contentRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900 overflow-hidden">
+    <div className="rounded-xl border border-shell-border bg-shell overflow-hidden">
       {/* Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-800/50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-shell-raised/50 transition-colors"
       >
         <div className="flex items-center gap-3">
           <span
             className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
-              brief ? "bg-emerald-400" : "bg-gray-600"
+              brief ? "bg-emerald-400" : "bg-shell-muted"
             }`}
           />
-          <span className="font-medium text-gray-200">{displayName(company)}</span>
+          <span className="font-medium text-shell-fg">{displayName(company)}</span>
           {brief && (
-            <span className="text-xs text-gray-500">{relativeTime(brief.created_at)}</span>
+            <span className="text-xs text-shell-subtle">{relativeTime(brief.created_at)}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {!brief && (
-            <span className="text-xs text-gray-600">no brief today</span>
+            <span className="text-xs text-shell-subtle">no brief today</span>
           )}
           <svg
-            className={`h-4 w-4 text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
+            className={`h-4 w-4 text-shell-subtle transition-transform ${open ? "rotate-180" : ""}`}
             viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
           >
             <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -598,13 +598,13 @@ function BriefAccordion({
         ref={contentRef}
         className={`transition-all duration-300 overflow-hidden ${open ? "max-h-[600px]" : "max-h-0"}`}
       >
-        <div className="border-t border-gray-800 px-5 py-4">
+        <div className="border-t border-shell-border px-5 py-4">
           {brief ? (
-            <pre className="whitespace-pre-wrap font-mono text-xs text-gray-400 leading-relaxed overflow-y-auto max-h-[500px]">
+            <pre className="whitespace-pre-wrap font-mono text-xs text-shell-muted leading-relaxed overflow-y-auto max-h-[500px]">
               {brief.content}
             </pre>
           ) : (
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-shell-subtle">
               No brief generated yet today. Morning Engine runs at 07:00 SGT.
             </p>
           )}
@@ -621,7 +621,7 @@ function BriefAccordion({
 function Skeleton({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse rounded-lg bg-gray-800 ${className}`}
+      className={`animate-pulse rounded-lg bg-shell-raised ${className}`}
     />
   )
 }
@@ -741,7 +741,7 @@ export default function AgentOSDashboard() {
         <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
           <p className="font-semibold text-red-400">Agent OS unreachable</p>
           <p className="mt-1 text-sm text-red-400/70">{fetchError}</p>
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-shell-subtle">
             Check AGENT_OS_URL and AGENT_OS_API_KEY in Vercel environment variables.
           </p>
           <button
@@ -756,7 +756,7 @@ export default function AgentOSDashboard() {
   }
 
   // Section-label Tailwind classes (replaces styled-jsx)
-  const SL = "text-[11px] font-semibold uppercase tracking-widest text-gray-500 mb-2.5 block"
+  const SL = "text-sm font-semibold uppercase tracking-widest text-shell-subtle mb-2.5 block"
 
   const {
     providers   = {},
@@ -785,14 +785,14 @@ export default function AgentOSDashboard() {
   const healthyCount = sortedProviders.filter(([, v]) => v.healthy && !v.in_cooldown).length
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
+    <div className="min-h-screen bg-shell-deep text-shell-fg">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Agent OS</h1>
-            <p className="text-sm text-gray-400 mt-0.5">
+            <p className="text-sm text-shell-muted mt-0.5">
               CTech venture intelligence platform · {companies.filter(c => c !== "ctech_corporate").length} ventures · {
                 Object.values(agents).reduce((n, roles) => n + Object.keys(roles).length, 0)
               } agents
@@ -816,13 +816,13 @@ export default function AgentOSDashboard() {
                 />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-shell-subtle">
                 {timestamp ? relativeTime(timestamp) : "—"}
               </span>
             </div>
             <button
               onClick={refresh}
-              className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500 hover:text-gray-100 transition-colors"
+              className="rounded-lg border border-shell-border px-3 py-1.5 text-xs text-shell-fg/90 hover:border-shell-muted hover:text-shell-fg transition-colors"
             >
               Refresh
             </button>
@@ -835,19 +835,19 @@ export default function AgentOSDashboard() {
             <h2 className={SL}>
               NeuFin Infra
               {neufinHealth && (
-                <span className="ml-2 normal-case font-normal text-gray-500">
+                <span className="ml-2 normal-case font-normal text-shell-subtle">
                   {neufinHealth.repos.filter(r => r.status === "live").length}/
                   {neufinHealth.repos.length} live
                 </span>
               )}
             </h2>
-            {scanError && <span className="text-[11px] text-red-400">{scanError}</span>}
+            {scanError && <span className="text-sm text-red-400">{scanError}</span>}
           </div>
 
           {!neufinHealth ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-gray-800 bg-gray-900 h-28 animate-pulse" />
+                <div key={i} className="rounded-xl border border-shell-border bg-shell h-28 animate-pulse" />
               ))}
             </div>
           ) : (
@@ -867,7 +867,7 @@ export default function AgentOSDashboard() {
           {/* Top findings */}
           {neufinHealth && (neufinHealth.top_findings.length > 0 || neufinHealth.error_rate.unresolved_critical > 0 || neufinHealth.error_rate.unresolved_high > 0) && (
             <div className="mt-3">
-              <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-600 mb-2">
+              <h3 className="text-sm font-semibold uppercase tracking-widest text-shell-subtle mb-2">
                 Open Findings
               </h3>
               <ScanFindingsSection
@@ -888,7 +888,7 @@ export default function AgentOSDashboard() {
         <section>
           <h2 className={SL}>
             Providers
-            <span className="ml-2 text-gray-500 normal-case font-normal">
+            <span className="ml-2 text-shell-subtle normal-case font-normal">
               {healthyCount}/{sortedProviders.length} healthy
             </span>
           </h2>
@@ -902,7 +902,7 @@ export default function AgentOSDashboard() {
               />
             ))}
             {sortedProviders.length === 0 && (
-              <p className="col-span-full text-sm text-gray-500">No providers registered.</p>
+              <p className="col-span-full text-sm text-shell-subtle">No providers registered.</p>
             )}
           </div>
         </section>
@@ -946,7 +946,7 @@ export default function AgentOSDashboard() {
                 if (allOpen) setOpenBriefs(new Set())
                 else setOpenBriefs(new Set(companies))
               }}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              className="text-xs text-shell-subtle hover:text-shell-fg/90 transition-colors"
             >
               {companies.every((c) => openBriefs.has(c)) ? "Collapse all" : "Expand all"}
             </button>

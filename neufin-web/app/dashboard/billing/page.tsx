@@ -42,7 +42,7 @@ function getPlanColor(status: 'trial' | 'active' | 'expired'): string {
     case 'expired':
       return PLAN_COLORS.expired
     default:
-      return 'text-gray-400'
+      return 'text-shell-muted'
   }
 }
 
@@ -99,27 +99,27 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6">
+    <div className="max-w-2xl mx-auto px-4 py-section flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Subscription & Billing</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your Neufin plan</p>
+        <p className="text-sm text-shell-subtle mt-1">Manage your Neufin plan</p>
       </div>
 
       {/* Current plan */}
       <div className="glass-card-dark rounded-xl p-6">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Current Plan</h2>
+        <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">Current Plan</h2>
         <div className="flex items-center justify-between">
           <div>
             <p className={`text-xl font-bold ${getPlanColor(status)}`}>{getPlanLabel(status)}</p>
             {status === 'trial' && daysRemaining !== undefined && (
-              <p className="text-sm text-gray-400 mt-0.5">
+              <p className="text-sm text-shell-muted mt-0.5">
                 {daysRemaining > 0
                   ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`
                   : 'Trial has ended'}
               </p>
             )}
             {status === 'active' && (
-              <p className="text-sm text-gray-400 mt-0.5">$99 / month · billed via Stripe</p>
+              <p className="text-sm text-shell-muted mt-0.5">$99 / month · billed via Stripe</p>
             )}
           </div>
 
@@ -135,7 +135,7 @@ export default function BillingPage() {
 
         {/* Pro features list */}
         {status === 'active' && (
-          <ul className="mt-4 space-y-1.5 text-sm text-gray-400">
+          <ul className="mt-4 space-y-1.5 text-sm text-shell-muted">
             {[
               'Unlimited advisor reports',
               'White-label branding',
@@ -154,8 +154,8 @@ export default function BillingPage() {
       {/* Manage billing (Stripe portal) */}
       {status === 'active' && (
         <div className="glass-card-dark rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Manage Billing</h2>
-          <p className="text-sm text-gray-400 mb-4">
+          <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">Manage Billing</h2>
+          <p className="text-sm text-shell-muted mb-4">
             Update your payment method, download invoices, or cancel your subscription via the Stripe Customer Portal.
           </p>
           {portalError && <p className="text-xs text-red-400 mb-3">{portalError}</p>}
@@ -180,19 +180,19 @@ export default function BillingPage() {
       {/* DNA Score history (invoice-like record) */}
       {history.length > 0 && (
         <div className="glass-card-dark rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
+          <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">
             Analysis History
           </h2>
-          <div className="divide-y divide-gray-800">
+          <div className="divide-y divide-shell-border">
             {history.map((record) => (
               <div key={record.id} className="py-3 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-200">{record.investor_type}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{fmtDate(record.created_at)}</p>
+                  <p className="text-sm font-medium text-shell-fg">{record.investor_type}</p>
+                  <p className="text-xs text-shell-subtle mt-0.5">{fmtDate(record.created_at)}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-semibold text-blue-400">Score {record.dna_score}</p>
-                  <p className="text-xs text-gray-500">{fmtCurrency.format(record.total_value)}</p>
+                  <p className="text-xs text-shell-subtle">{fmtCurrency.format(record.total_value)}</p>
                 </div>
               </div>
             ))}
@@ -203,15 +203,15 @@ export default function BillingPage() {
       {/* Cancel confirmation modal */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
+          <div className="bg-shell border border-shell-border rounded-xl p-6 w-full max-w-sm shadow-xl">
             <h3 className="text-lg font-bold text-white mb-2">Cancel Subscription?</h3>
-            <p className="text-sm text-gray-400 mb-5">
+            <p className="text-sm text-shell-muted mb-5">
               Your plan will remain active until the end of the billing period. You can re-subscribe at any time.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="flex-1 py-2 rounded-lg border border-gray-700 text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+                className="flex-1 py-2 rounded-lg border border-shell-border text-sm text-shell-muted hover:bg-shell-raised transition-colors"
               >
                 Keep Plan
               </button>

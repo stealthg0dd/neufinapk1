@@ -48,7 +48,7 @@ function MetricCard({
         <p className="text-3xl font-semibold tabular-nums text-white">{card.value.toLocaleString()}</p>
         <Sparkline values={card.sparkline} color={color} />
       </div>
-      {card.subtitle && <p className="text-[11px] text-zinc-500">{card.subtitle}</p>}
+      {card.subtitle && <p className="text-sm text-zinc-500">{card.subtitle}</p>}
       <p className="text-xs text-zinc-400">
         {d === null || d === undefined ? 'Δ vs prior window: —' : `Δ vs prior window: ${d > 0 ? '+' : ''}${d}%`}
       </p>

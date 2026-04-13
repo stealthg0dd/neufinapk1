@@ -136,7 +136,7 @@ export default function GlobalChatWidget() {
               <span className="text-lg">{currentAgent.emoji}</span>
               <div>
                 <p className="text-white text-[13px] font-semibold leading-tight">Neufin Market Intel</p>
-                <p className={`text-[10px] tracking-widest uppercase ${currentAgent.color}`}>
+                <p className={`text-sm tracking-widest uppercase ${currentAgent.color}`}>
                   {currentAgent.fullLabel}
                 </p>
               </div>
@@ -156,7 +156,7 @@ export default function GlobalChatWidget() {
                 key={a.value}
                 onClick={() => setAgent(a.value)}
                 className={`
-                  flex-1 text-[10px] font-medium py-1.5 rounded-md transition-all
+                  flex-1 text-sm font-medium py-1.5 rounded-md transition-all
                   ${agent === a.value
                     ? `bg-white/10 ${a.color} border ${a.accent}`
                     : 'text-white/30 hover:text-white/60 border border-transparent'
@@ -179,7 +179,7 @@ export default function GlobalChatWidget() {
                     key={i}
                     onClick={() => send(s)}
                     className={`
-                      text-[10px] text-white/40 px-2.5 py-1 rounded-full
+                      text-sm text-white/40 px-2.5 py-1 rounded-full
                       border border-white/10 bg-white/[0.03]
                       hover:border-white/25 hover:text-white/70
                       transition-all leading-relaxed
@@ -204,16 +204,16 @@ export default function GlobalChatWidget() {
 
                 <div className="max-w-[85%] flex flex-col gap-1.5">
                   {msg.loading ? (
-                    <div className="bg-white/[0.05] border border-white/10 rounded-[4px_12px_12px_12px] px-3 py-2 text-white/40 text-[11px]">
+                    <div className="bg-white/[0.05] border border-white/10 rounded-[4px_12px_12px_12px] px-3 py-2 text-white/40 text-sm">
                       <span className="animate-pulse inline-block">●</span>{' '}Thinking…
                     </div>
                   ) : msg.role === 'user' ? (
-                    <div className="bg-gradient-to-br from-blue-600/30 to-purple-600/20 border border-white/10 rounded-[12px_4px_12px_12px] px-3 py-2 text-[#e0e0e0] text-[12px] leading-relaxed">
+                    <div className="bg-gradient-to-br from-blue-600/30 to-purple-600/20 border border-white/10 rounded-[12px_4px_12px_12px] px-3 py-2 text-[#e0e0e0] text-sm leading-relaxed">
                       {msg.text}
                     </div>
                   ) : (
                     <>
-                      <div className="bg-white/[0.04] border border-white/[0.08] rounded-[4px_12px_12px_12px] px-3 py-2 text-white/85 text-[12px] leading-[1.7]">
+                      <div className="bg-white/[0.04] border border-white/[0.08] rounded-[4px_12px_12px_12px] px-3 py-2 text-white/85 text-sm leading-[1.7]">
                         {msg.text}
                       </div>
 
@@ -222,8 +222,8 @@ export default function GlobalChatWidget() {
                         <div className="bg-black/30 border border-white/[0.07] rounded-lg px-3 py-2 flex flex-wrap gap-x-4 gap-y-1">
                           {Object.entries(msg.keyNumbers).map(([k, v]) => (
                             <div key={k} className="flex items-center gap-1.5">
-                              <span className="text-white/30 text-[9px] uppercase tracking-widest">{k}:</span>
-                              <span className={`text-[11px] font-bold ${currentAgent.color}`}>{String(v)}</span>
+                              <span className="text-white/30 text-sm uppercase tracking-widest">{k}:</span>
+                              <span className={`text-sm font-bold ${currentAgent.color}`}>{String(v)}</span>
                             </div>
                           ))}
                         </div>
@@ -231,7 +231,7 @@ export default function GlobalChatWidget() {
 
                       {/* Action */}
                       {msg.action && (
-                        <div className={`border-l-2 ${currentAgent.accent} pl-2.5 ${currentAgent.color} text-[10px] leading-relaxed`}>
+                        <div className={`border-l-2 ${currentAgent.accent} pl-2.5 ${currentAgent.color} text-sm leading-relaxed`}>
                           ▶ {msg.action}
                         </div>
                       )}
@@ -253,7 +253,7 @@ export default function GlobalChatWidget() {
               placeholder="Ask about markets, trends, risk…"
               className={`
                 flex-1 bg-white/[0.05] border border-white/10 rounded-lg
-                px-3 py-2 text-[12px] text-white/85 placeholder-white/25
+                px-3 py-2 text-sm text-white/85 placeholder-white/25
                 outline-none transition-all
                 focus:border-white/25 focus:ring-1 ${currentAgent.ring}
                 disabled:opacity-50

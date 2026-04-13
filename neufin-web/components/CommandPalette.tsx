@@ -191,7 +191,7 @@ export default function CommandPalette({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-[#141414] border border-[#2a2a2a] rounded text-[11px] font-mono text-[#888] hover:border-[#FFB900]/50 hover:text-[#FFB900] transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 bg-[#141414] border border-[#2a2a2a] rounded text-sm font-mono text-[#888] hover:border-[#FFB900]/50 hover:text-[#FFB900] transition-colors"
       >
         <span>⌘K</span>
         <span>Ask your portfolio...</span>
@@ -231,20 +231,20 @@ export default function CommandPalette({
             />
             {agentMeta && !loading && (
               <span
-                className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border shrink-0"
+                className="text-sm uppercase tracking-wider px-2 py-0.5 rounded border shrink-0"
                 style={{ color: agentMeta.color, borderColor: `${agentMeta.color}40` }}
               >
                 → {agentMeta.label}
               </span>
             )}
             {loading && (
-              <span className="text-[10px] text-[#FFB900] uppercase tracking-wider shrink-0 animate-pulse">
+              <span className="text-sm text-[#FFB900] uppercase tracking-wider shrink-0 animate-pulse">
                 Thinking...
               </span>
             )}
             <kbd
               onClick={() => setOpen(false)}
-              className="text-[10px] text-[#444] border border-[#333] rounded px-1.5 py-0.5 cursor-pointer hover:text-[#888] shrink-0"
+              className="text-sm text-[#444] border border-[#333] rounded px-1.5 py-0.5 cursor-pointer hover:text-[#888] shrink-0"
             >
               ESC
             </kbd>
@@ -256,7 +256,7 @@ export default function CommandPalette({
               {/* Agent badge */}
               <div className="flex items-center gap-2">
                 <span
-                  className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded border"
+                  className="text-sm uppercase font-bold tracking-widest px-2 py-0.5 rounded border"
                   style={{
                     color:       AGENT_META[result.agent]?.color ?? '#888',
                     borderColor: `${AGENT_META[result.agent]?.color ?? '#888'}40`,
@@ -264,11 +264,11 @@ export default function CommandPalette({
                 >
                   {AGENT_META[result.agent]?.label ?? result.agent}
                 </span>
-                <span className="text-[#444] text-[10px]">responded</span>
+                <span className="text-[#444] text-sm">responded</span>
               </div>
 
               {/* Answer */}
-              <p className="text-[#E0E0E0] text-[12px] leading-relaxed">
+              <p className="text-[#E0E0E0] text-sm leading-relaxed">
                 {result.response?.answer ?? 'Analysis complete.'}
               </p>
 
@@ -276,7 +276,7 @@ export default function CommandPalette({
               {Object.keys(result.response?.key_numbers ?? {}).length > 0 && (
                 <div className="flex flex-wrap gap-3">
                   {Object.entries(result.response?.key_numbers ?? {}).map(([k, v]) => (
-                    <div key={k} className="text-[11px]">
+                    <div key={k} className="text-sm">
                       <span className="text-[#555] uppercase">{k}: </span>
                       <span className="text-[#FFB900] font-bold">{v}</span>
                     </div>
@@ -287,21 +287,21 @@ export default function CommandPalette({
               {/* Action */}
               {result.response.recommended_action && (
                 <div className="flex items-start gap-2 bg-[#00FF00]/5 border border-[#00FF00]/20 rounded px-3 py-2">
-                  <span className="text-[#00FF00] text-[10px] shrink-0 mt-0.5">▶ ACTION</span>
-                  <span className="text-[#aaffaa] text-[11px]">{result.response.recommended_action}</span>
+                  <span className="text-[#00FF00] text-sm shrink-0 mt-0.5">▶ ACTION</span>
+                  <span className="text-[#aaffaa] text-sm">{result.response.recommended_action}</span>
                 </div>
               )}
 
               {/* Thinking trace (collapsed by default) */}
               {result.thinking_steps.length > 0 && (
                 <details className="group">
-                  <summary className="text-[10px] text-[#444] hover:text-[#888] cursor-pointer uppercase tracking-wider list-none flex items-center gap-1.5 select-none">
+                  <summary className="text-sm text-[#444] hover:text-[#888] cursor-pointer uppercase tracking-wider list-none flex items-center gap-1.5 select-none">
                     <span className="group-open:rotate-90 transition-transform inline-block">›</span>
                     Thinking trace ({result.thinking_steps.length} steps)
                   </summary>
                   <div className="cp-scroll mt-2 max-h-32 overflow-y-auto space-y-0.5 pl-3">
                     {result.thinking_steps.map((step, i) => (
-                      <div key={i} className="text-[10px] text-[#555] leading-relaxed">{step}</div>
+                      <div key={i} className="text-sm text-[#555] leading-relaxed">{step}</div>
                     ))}
                   </div>
                 </details>
@@ -311,7 +311,7 @@ export default function CommandPalette({
 
           {/* ── Error ──────────────────────────────────────────────────────── */}
           {error && (
-            <div className="px-4 py-2 border-b border-[#1e1e1e] text-[11px] text-red-400 bg-red-950/20">
+            <div className="px-4 py-2 border-b border-[#1e1e1e] text-sm text-red-400 bg-red-950/20">
               ERROR: {error}
             </div>
           )}
@@ -320,7 +320,7 @@ export default function CommandPalette({
           {!result && !loading && (
             <div className="cp-scroll max-h-72 overflow-y-auto py-1">
               {filtered.length === 0 && (
-                <div className="px-4 py-3 text-[11px] text-[#444]">No matching commands.</div>
+                <div className="px-4 py-3 text-sm text-[#444]">No matching commands.</div>
               )}
               {filtered.map((s, idx) => (
                 <button
@@ -332,9 +332,9 @@ export default function CommandPalette({
                   }`}
                 >
                   <span className="text-[14px] shrink-0 w-5 text-center">{s.icon}</span>
-                  <span className="flex-1 text-[12px] text-[#C8C8C8]">{s.label}</span>
+                  <span className="flex-1 text-sm text-[#C8C8C8]">{s.label}</span>
                   <span
-                    className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0"
+                    className="text-sm uppercase tracking-wider px-1.5 py-0.5 rounded border shrink-0"
                     style={{
                       color:       AGENT_META[s.category.toLowerCase()]?.color ?? '#666',
                       borderColor: `${AGENT_META[s.category.toLowerCase()]?.color ?? '#666'}30`,
@@ -348,7 +348,7 @@ export default function CommandPalette({
           )}
 
           {/* ── Footer ─────────────────────────────────────────────────────── */}
-          <div className="px-4 py-1.5 bg-[#111] border-t border-[#1e1e1e] flex items-center gap-4 text-[10px] text-[#444] select-none">
+          <div className="px-4 py-1.5 bg-[#111] border-t border-[#1e1e1e] flex items-center gap-4 text-sm text-[#444] select-none">
             <span><kbd className="border border-[#333] rounded px-1">↑↓</kbd> navigate</span>
             <span><kbd className="border border-[#333] rounded px-1">⏎</kbd> send</span>
             <span><kbd className="border border-[#333] rounded px-1">ESC</kbd> close</span>

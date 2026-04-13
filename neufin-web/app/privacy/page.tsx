@@ -16,19 +16,19 @@ const COMPANY        = 'Neufin Inc.'
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-shell-deep flex flex-col">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
-          <Link href="/" className="text-gray-400 hover:text-white text-sm transition-colors">← Home</Link>
+          <Link href="/" className="text-shell-muted hover:text-white text-sm transition-colors">← Home</Link>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-3xl mx-auto px-6 py-12 w-full">
+      <main className="flex-1 max-w-3xl mx-auto px-6 py-section w-full">
         <div className="prose prose-invert prose-sm max-w-none">
 
           <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
-          <p className="text-gray-500 text-sm mb-10">
+          <p className="text-shell-subtle text-sm mb-10">
             Effective date: {EFFECTIVE_DATE} · Last updated: {EFFECTIVE_DATE}
           </p>
 
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
           </Section>
 
           <Section title="3. How We Use Your Data">
-            <ul className="space-y-2 text-gray-300">
+            <ul className="space-y-2 text-shell-fg/90">
               <li><strong className="text-white">Providing the Service</strong> — to compute your Investor DNA Score and generate advisor PDF reports.</li>
               <li><strong className="text-white">AI Analysis</strong> — your anonymised portfolio metrics (total value, score, position weights) are sent to AI providers (Anthropic Claude, Google Gemini, OpenAI, Groq) to generate insights. Raw symbol lists are included in AI prompts but are not stored by us after the request.</li>
               <li><strong className="text-white">Market price data</strong> — we query Finnhub and Alpha Vantage with your stock symbols to fetch current prices. These queries are server-side; your symbols are not exposed to other users.</li>
@@ -107,13 +107,13 @@ export default function PrivacyPage() {
             <div className="overflow-x-auto mt-3">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-800">
-                    <th className="text-left py-2 pr-6 text-gray-400 font-medium">Service</th>
-                    <th className="text-left py-2 pr-6 text-gray-400 font-medium">Purpose</th>
-                    <th className="text-left py-2 text-gray-400 font-medium">Data shared</th>
+                  <tr className="border-b border-shell-border">
+                    <th className="text-left py-2 pr-6 text-shell-muted font-medium">Service</th>
+                    <th className="text-left py-2 pr-6 text-shell-muted font-medium">Purpose</th>
+                    <th className="text-left py-2 text-shell-muted font-medium">Data shared</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/60">
+                <tbody className="divide-y divide-shell-border/60">
                   {[
                     ['Supabase', 'Database & authentication', 'Email, DNA score records'],
                     ['Anthropic Claude', 'AI portfolio analysis', 'Portfolio metrics, symbols'],
@@ -128,20 +128,20 @@ export default function PrivacyPage() {
                   ].map(([svc, purpose, data]) => (
                     <tr key={svc}>
                       <td className="py-2.5 pr-6 text-white font-medium">{svc}</td>
-                      <td className="py-2.5 pr-6 text-gray-400">{purpose}</td>
-                      <td className="py-2.5 text-gray-400">{data}</td>
+                      <td className="py-2.5 pr-6 text-shell-muted">{purpose}</td>
+                      <td className="py-2.5 text-shell-muted">{data}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-gray-500 text-xs">
+            <p className="mt-3 text-shell-subtle text-xs">
               All AI providers are bound by data processing agreements and do not use your data to train their models under their API terms.
             </p>
           </Section>
 
           <Section title="5. Data Retention">
-            <ul className="space-y-2 text-gray-300">
+            <ul className="space-y-2 text-shell-fg/90">
               <li><strong className="text-white">Anonymous analyses</strong> (no account) are retained for <strong>90 days</strong>, then automatically deleted.</li>
               <li><strong className="text-white">Account DNA history</strong> is retained as long as your account is active.</li>
               <li><strong className="text-white">PDF reports</strong> stored in Supabase Storage are accessible for <strong>1 year</strong> via signed URL, then archived.</li>
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
             <p>
               You have the right to access, correct, export, or delete your personal data at any time.
             </p>
-            <ul className="space-y-2 text-gray-300 mt-3">
+            <ul className="space-y-2 text-shell-fg/90 mt-3">
               <li>
                 <strong className="text-white">Delete your Vault data</strong> — sign in, go to{' '}
                 <Link href="/vault" className="text-blue-400 hover:text-blue-300">/vault</Link>, and
@@ -187,7 +187,7 @@ export default function PrivacyPage() {
               Neufin does <strong>not</strong> use advertising cookies or cross-site tracking.
               We use browser <code>localStorage</code> for:
             </p>
-            <ul className="space-y-1 text-gray-300 mt-2">
+            <ul className="space-y-1 text-shell-fg/90 mt-2">
               <li><code>dnaResult</code> — your most recent DNA analysis result (cleared when you start over)</li>
               <li><code>ref_token</code> — referral token from a ?ref= URL parameter</li>
               <li><code>pendingReportId</code> — tracks a paid report waiting for PDF generation</li>
@@ -235,28 +235,28 @@ export default function PrivacyPage() {
             </p>
             <div className="card mt-3 space-y-1 text-sm">
               <p className="text-white font-semibold">{COMPANY}</p>
-              <p className="text-gray-400">
+              <p className="text-shell-muted">
                 Email:{' '}
                 <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-400 hover:text-blue-300">
                   {CONTACT_EMAIL}
                 </a>
               </p>
-              <p className="text-gray-400">Response time: within 5 business days</p>
+              <p className="text-shell-muted">Response time: within 5 business days</p>
             </div>
           </Section>
 
         </div>
       </main>
 
-      <footer className="border-t border-gray-800/60 py-6">
-        <div className="max-w-3xl mx-auto px-6 flex items-center justify-between text-xs text-gray-600">
+      <footer className="border-t border-shell-border/60 py-6">
+        <div className="max-w-3xl mx-auto px-6 flex items-center justify-between text-xs text-shell-subtle">
           <div className="flex items-center gap-3">
             <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="h-6 w-auto opacity-80" />
             <span>© {new Date().getFullYear()} {COMPANY}</span>
           </div>
           <div className="flex gap-4">
-            <Link href="/" className="hover:text-gray-400 transition-colors">Home</Link>
-            <Link href="/upload" className="hover:text-gray-400 transition-colors">Analyse Portfolio</Link>
+            <Link href="/" className="hover:text-shell-muted transition-colors">Home</Link>
+            <Link href="/upload" className="hover:text-shell-muted transition-colors">Analyse Portfolio</Link>
           </div>
         </div>
       </footer>
@@ -267,8 +267,8 @@ export default function PrivacyPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-10">
-      <h2 className="text-lg font-bold text-white mb-4 pb-2 border-b border-gray-800/60">{title}</h2>
-      <div className="space-y-3 text-gray-400 text-sm leading-relaxed">{children}</div>
+      <h2 className="text-lg font-bold text-white mb-4 pb-2 border-b border-shell-border/60">{title}</h2>
+      <div className="space-y-3 text-shell-muted text-sm leading-relaxed">{children}</div>
     </section>
   )
 }

@@ -118,13 +118,13 @@ export default function SEAWealthManagementAIArticle() {
         <div className="mb-8">
           <div className="flex flex-wrap gap-2 mb-4">
             {['AI', 'SEA Wealth Management', 'Singapore Fintech'].map((t) => (
-              <span key={t} className="badge bg-gray-800 text-gray-400 text-[10px] px-2 py-0.5">{t}</span>
+              <span key={t} className="badge bg-shell-raised text-shell-muted text-sm px-2 py-0.5">{t}</span>
             ))}
           </div>
           <h1 className="text-3xl font-extrabold leading-tight mb-4">
             How AI Is Changing Wealth Management in Southeast Asia
           </h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500 mb-6">
+          <div className="flex items-center gap-3 text-sm text-shell-subtle mb-6">
             <span>NeuFin Research</span>
             <span>·</span>
             <time dateTime="2025-02-20">20 February 2025</time>
@@ -134,7 +134,7 @@ export default function SEAWealthManagementAIArticle() {
         </div>
 
         {/* Intro — answer in first 100 words */}
-        <p className="text-lg text-gray-300 leading-relaxed mb-6 font-medium">
+        <p className="text-lg text-shell-fg/90 leading-relaxed mb-6 font-medium">
           AI is reshaping wealth management across Southeast Asia faster than any other
           regional financial market. Singapore, home to USD 4.7 trillion in total financial
           assets (MAS, 2024), is the primary adoption hub — with behavioral analytics,
@@ -145,25 +145,25 @@ export default function SEAWealthManagementAIArticle() {
           rather than simply managing allocations. Here&apos;s what is driving the change.
         </p>
 
-        <hr className="border-gray-800 my-8" />
+        <hr className="border-shell-border my-8" />
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">The SEA Wealth Management Market in 2025</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             Southeast Asia&apos;s wealth management market is one of the fastest-growing in the
             world. The region&apos;s high-net-worth individual (HNWI) population grew 8% in 2024,
             reaching approximately 290,000 individuals with combined investable assets of
             USD 1.2 trillion. Total SEA AUM — including retail and institutional — is
             projected to reach USD 2.1 trillion by 2030 (BCG, 2024).
           </p>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             Singapore dominates SEA wealth management with approximately 40% of regional
             AUM. The city-state&apos;s 1,100+ single family offices (as of Q4 2024) represent
             a USD 900 billion asset pool increasingly seeking AI-enhanced analytics.
             Indonesia, Malaysia, and Vietnam are the fastest-growing markets by new
             investor count — creating demand for accessible, mobile-first financial tools.
           </p>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-shell-muted leading-relaxed">
             The key structural driver: SEA&apos;s wealth is increasingly self-directed. Unlike
             the US or Europe where institutional managers dominate, 65% of SEA HNWIs
             self-direct at least a portion of their portfolio — making behavioral analytics
@@ -200,12 +200,12 @@ export default function SEAWealthManagementAIArticle() {
                 content: 'MAS Notice FAA-N16 requires wealth managers to conduct client suitability assessments before recommending investment products. AI tools are replacing paper-based questionnaires with dynamic assessment systems that analyse transaction history, stated preferences, and behavioral scores to produce richer suitability profiles. NeuFin\'s advisor reports are specifically designed to augment this process.',
               },
             ].map(({ num, title, color, content }) => (
-              <div key={num} className="rounded-xl border border-gray-800 bg-gray-900/50 p-5">
+              <div key={num} className="rounded-xl border border-shell-border bg-shell/50 p-5">
                 <div className="flex items-center gap-3 mb-2">
                   <span className={`text-2xl font-black ${color} opacity-60`}>{num}</span>
-                  <h3 className="font-bold text-gray-200">{title}</h3>
+                  <h3 className="font-bold text-shell-fg">{title}</h3>
                 </div>
-                <p className="text-sm text-gray-400 leading-relaxed">{content}</p>
+                <p className="text-sm text-shell-muted leading-relaxed">{content}</p>
               </div>
             ))}
           </div>
@@ -213,7 +213,7 @@ export default function SEAWealthManagementAIArticle() {
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">The Regulatory Environment</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             MAS is the most progressive AI financial regulator in ASEAN. Key frameworks
             shaping AI adoption in Singapore wealth management:
           </p>
@@ -224,13 +224,13 @@ export default function SEAWealthManagementAIArticle() {
               { name: 'FAA Notice FAA-N16', desc: 'Suitability assessment requirements — AI behavioral scoring increasingly accepted as supplementary evidence.' },
               { name: 'MAS AI in Finance framework (2024)', desc: 'Published guidelines requiring auditability and bias testing for AI models in regulated financial contexts.' },
             ].map(({ name, desc }) => (
-              <div key={name} className="rounded-lg bg-gray-800/40 p-3">
-                <p className="font-semibold text-sm text-gray-200 mb-1">{name}</p>
-                <p className="text-xs text-gray-400">{desc}</p>
+              <div key={name} className="rounded-lg bg-shell-raised/40 p-3">
+                <p className="font-semibold text-sm text-shell-fg mb-1">{name}</p>
+                <p className="text-xs text-shell-muted">{desc}</p>
               </div>
             ))}
           </div>
-          <p className="text-gray-400 leading-relaxed">
+          <p className="text-shell-muted leading-relaxed">
             Across the rest of ASEAN, regulatory frameworks are converging toward the MAS
             model — with Indonesia&apos;s OJK, Malaysia&apos;s SC, and Thailand&apos;s SEC all developing
             AI-specific guidance in 2024–2025. This regulatory harmonisation will enable
@@ -241,7 +241,7 @@ export default function SEAWealthManagementAIArticle() {
 
         <section className="mb-8">
           <h2 className="text-xl font-bold mb-3">What&apos;s Coming: 2025–2028 Outlook</h2>
-          <p className="text-gray-400 leading-relaxed mb-4">
+          <p className="text-shell-muted leading-relaxed mb-4">
             Three structural shifts will define SEA wealth management AI over the next
             three years:
           </p>
@@ -251,11 +251,11 @@ export default function SEAWealthManagementAIArticle() {
               ['Embedded finance integration', 'Behavioral analytics will move from standalone platforms into banking apps, brokerage platforms, and corporate ERP systems. NeuFin is building API-first infrastructure for this embedded finance future.'],
               ['Regulatory convergence', 'ASEAN cross-border advisory frameworks will enable Singapore-domiciled AI platforms to serve clients across Malaysia, Indonesia, and Thailand from a single regulatory licence — dramatically expanding the addressable market.'],
             ].map(([title, desc]) => (
-              <div key={title} className="flex items-start gap-3 p-4 rounded-lg border border-gray-800">
+              <div key={title} className="flex items-start gap-3 p-4 rounded-lg border border-shell-border">
                 <span className="text-blue-400 mt-0.5 flex-shrink-0">→</span>
                 <div>
-                  <span className="font-semibold text-sm text-gray-200">{title}: </span>
-                  <span className="text-sm text-gray-400">{desc}</span>
+                  <span className="font-semibold text-sm text-shell-fg">{title}: </span>
+                  <span className="text-sm text-shell-muted">{desc}</span>
                 </div>
               </div>
             ))}
@@ -271,15 +271,15 @@ export default function SEAWealthManagementAIArticle() {
           </Link>
         </div>
 
-        <hr className="border-gray-800 my-10" />
+        <hr className="border-shell-border my-10" />
 
         <section>
           <h2 className="text-xl font-bold mb-6">Frequently Asked Questions</h2>
           <div className="space-y-6">
             {faqSchema.mainEntity.map(({ name, acceptedAnswer }) => (
-              <div key={name} className="border-b border-gray-800 pb-5">
-                <h3 className="font-semibold text-gray-200 mb-2">{name}</h3>
-                <p className="text-sm text-gray-400 leading-relaxed">{acceptedAnswer.text}</p>
+              <div key={name} className="border-b border-shell-border pb-5">
+                <h3 className="font-semibold text-shell-fg mb-2">{name}</h3>
+                <p className="text-sm text-shell-muted leading-relaxed">{acceptedAnswer.text}</p>
               </div>
             ))}
           </div>
@@ -287,7 +287,7 @@ export default function SEAWealthManagementAIArticle() {
 
         <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
           <h2 className="text-xl font-bold mb-2">NeuFin: Singapore&apos;s Behavioral Finance Platform</h2>
-          <p className="text-gray-400 text-sm mb-5">
+          <p className="text-shell-muted text-sm mb-5">
             Founded 2025 in Singapore. Detects cognitive biases in investment portfolios
             using multi-model AI. MAS-compliant. Free to start.
           </p>

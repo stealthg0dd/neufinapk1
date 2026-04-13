@@ -164,7 +164,7 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
             We sent a confirmation link to {email}. Confirm then sign in.
           </p>
           {hasPending && (
-            <p className="text-xs text-[var(--blue)] bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2">
+            <p className="text-xs text-primary bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2">
               Your portfolio analysis will link to your account when you confirm.
             </p>
           )}
@@ -214,10 +214,10 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
             disabled={loading}
             whileHover={{ scale: 0.98 }}
             whileTap={{ scale: 0.96 }}
-            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-lg bg-white text-gray-900 font-semibold text-sm disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-lg bg-white text-navy font-semibold text-sm disabled:opacity-50"
           >
             {loading ? (
-              <span className="w-4 h-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-shell-muted border-t-navy rounded-full animate-spin" />
             ) : (
               <GoogleIcon />
             )}

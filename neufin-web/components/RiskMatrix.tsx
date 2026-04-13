@@ -2,10 +2,11 @@
 
 /**
  * RiskMatrix.tsx — Dual-panel risk visualisation (light institutional theme).
- * Primary #1EB8CC, neutrals slate, risk red-500, positive green-600.
+ * Primary #1EB8CC, neutrals slate, risk red-500, positive green-500.
  */
 
 import React, { useMemo } from 'react'
+import { chartPalette } from '@/lib/chart-palette'
 import {
   ResponsiveContainer,
   ScatterChart, Scatter,
@@ -39,31 +40,21 @@ interface Props {
   stressResults: StressEntry[]
 }
 
-// ── Palette (aligned with design tokens) ────────────────────────────────────
-const PRIMARY = '#1EB8CC'
-const G = '#16a34a'
-const R = '#ef4444'
-const R_DK = '#b91c1c'
-const B = '#64748b'
-const P = '#94a3b8'
-const BG = '#ffffff'
-const SURF = '#f8fafc'
-const GRID = '#e2e8f0'
-const DIM = '#64748b'
-const BODY = '#334155'
+const PRIMARY = chartPalette.primary
+const G = chartPalette.positive
+const R = chartPalette.risk
+const B = chartPalette.neutralMuted
+const P = chartPalette.neutral
+const GRID = chartPalette.grid
+const DIM = chartPalette.axis
+const BODY = chartPalette.body
 const MONO_F = "ui-monospace, 'JetBrains Mono', monospace"
 const MONO = `12px ${MONO_F}`
 
 function Panel({ title, badge, children }: { title: string; badge?: string; children: React.ReactNode }) {
   return (
-    <div
-      className="overflow-hidden rounded-lg border border-border bg-white shadow-sm"
-      style={{ borderColor: GRID }}
-    >
-      <div
-        className="flex items-center gap-2.5 border-b px-3.5 py-2"
-        style={{ background: SURF, borderColor: GRID }}
-      >
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center gap-2.5 border-b border-gray-200 bg-gray-50 px-3.5 py-2.5">
         <span
           style={{
             color: PRIMARY,
@@ -97,7 +88,7 @@ function Panel({ title, badge, children }: { title: string; badge?: string; chil
   )
 }
 
-const axisStyle = { fontFamily: MONO_F, fontSize: 11, fill: DIM }
+const axisStyle = { fontFamily: MONO_F, fontSize: 12, fill: DIM }
 
 // ── Cluster tooltip ───────────────────────────────────────────────────────────
 function ClusterTooltip({ active, payload }: any) {
@@ -107,11 +98,11 @@ function ClusterTooltip({ active, payload }: any) {
   const color  = isHigh ? R : PRIMARY
   return (
     <div style={{
-      background: '#ffffff', border: `1px solid ${GRID}`, padding: '8px 12px',
-      fontFamily: MONO_F, fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+      background: chartPalette.background, border: `1px solid ${GRID}`, padding: '8px 12px',
+      fontFamily: MONO_F, fontSize: 12, boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
     }}>
-      <div style={{ color, fontWeight: 700, letterSpacing: 2, marginBottom: 4 }}>
-        {d.ticker}{isHigh ? ' · HIGH RISK' : ''}
+      <div style={{ color, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
+        {d.ticker}{isHigh ? ' · High risk' : ''}
       </div>
       <div style={{ color: BODY }}>WEIGHT&nbsp; <span style={{ color, fontWeight: 700 }}>{(d.weight * 100).toFixed(1)}%</span></div>
       <div style={{ color: BODY }}>BETA&nbsp;&nbsp;&nbsp; <span style={{ color, fontWeight: 700 }}>{d.beta.toFixed(2)}</span></div>
@@ -131,19 +122,15 @@ function ClusterDot(props: any) {
 
   return (
     <g>
-      {isHigh && (
-        <>
-          <circle cx={cx} cy={cy} r={r + 8} fill="none" stroke={R} strokeWidth={1} strokeOpacity={0.20}
-            style={{ filter: 'blur(2px)' }} />
-          <circle cx={cx} cy={cy} r={r + 3} fill={R} fillOpacity={0.07} stroke="none" />
-        </>
-      )}
-      <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.82} stroke={color} strokeWidth={1} />
+      {isHigh ? (
+        <circle cx={cx} cy={cy} r={r + 2} fill="none" stroke={R} strokeWidth={1} strokeOpacity={0.35} />
+      ) : null}
+      <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.88} stroke={GRID} strokeWidth={0.75} />
       <text
         x={cx} y={cy - r - 4}
         textAnchor="middle"
         fill={color}
-        style={{ font: MONO, fontWeight: 700, letterSpacing: 1 }}
+        style={{ font: MONO, fontWeight: 700, letterSpacing: '0.04em' }}
       >
         {(payload as ClusterEntry).ticker}
       </text>
@@ -159,10 +146,10 @@ function StressTooltip({ active, payload, label }: any) {
   const isFragile = port && port.value <= -20
   return (
     <div style={{
-      background: '#ffffff', border: `1px solid ${isFragile ? R : GRID}`, padding: '8px 12px',
-      fontFamily: MONO_F, fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+      background: chartPalette.background, border: `1px solid ${isFragile ? R : GRID}`, padding: '8px 12px',
+      fontFamily: MONO_F, fontSize: 12, boxShadow: '0 4px 12px rgba(15, 23, 42, 0.06)',
     }}>
-      <div style={{ color: PRIMARY, fontWeight: 700, letterSpacing: 0.04, marginBottom: 6 }}>{label}</div>
+      <div style={{ color: PRIMARY, fontWeight: 700, letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
       {port && (
         <div style={{ color: BODY }}>
           PORTFOLIO&nbsp;
@@ -316,7 +303,7 @@ export default function RiskMatrix({ clusters, stressResults }: Props) {
             padding: '5px 14px', borderBottom: `1px solid ${GRID}`,
             display: 'flex', gap: 14, alignItems: 'center',
           }}>
-            {([['Portfolio', PRIMARY], ['S&P 500', B], ['Nasdaq-100', P], ['Loss > 20%', R_DK]] as const).map(([label, color]) => (
+            {([['Portfolio', PRIMARY], ['S&P 500', B], ['Nasdaq-100', P], ['Loss > 20%', R]] as const).map(([label, color]) => (
               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div style={{ width: 7, height: 7, background: color }} />
                 <span style={{ color: DIM, fontSize: 11, letterSpacing: 0.04 }}>{label}</span>
@@ -358,7 +345,7 @@ export default function RiskMatrix({ clusters, stressResults }: Props) {
                   {stressResults.map((d, i) => (
                     <Cell
                       key={`p${i}`}
-                      fill={d.impact <= -20 ? R_DK : d.impact >= 0 ? G : R}
+                      fill={d.impact <= -20 ? R : d.impact >= 0 ? G : R}
                       fillOpacity={0.9}
                     />
                   ))}
@@ -394,8 +381,8 @@ export default function RiskMatrix({ clusters, stressResults }: Props) {
             borderTop: `1px solid ${GRID}`, padding: '7px 14px',
             display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'center',
           }}>
-            <span style={{ color: DIM, fontSize: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-              Weakest Link:
+            <span style={{ color: DIM, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.06 }}>
+              Weakest link
             </span>
             {stressResults.map((s, i) => (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

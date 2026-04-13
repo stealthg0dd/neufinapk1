@@ -101,7 +101,7 @@ export default async function DashboardResearchPage() {
               {hist.map((h, i) => (
                 <li key={`${h.started_at ?? i}`} className="flex justify-between gap-2 border-b border-border/30 pb-2 last:border-0">
                   <span className="capitalize text-foreground">{regimeLabel(h.regime)}</span>
-                  <span className="shrink-0 font-mono text-[10px]">
+                  <span className="shrink-0 font-mono text-sm">
                     {h.started_at
                       ? new Date(h.started_at).toLocaleDateString('en-SG', { dateStyle: 'medium' })
                       : '—'}
@@ -124,9 +124,9 @@ export default async function DashboardResearchPage() {
               className="rounded-lg border border-border/40 bg-background/40 px-4 py-3"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] font-mono uppercase text-primary">{n.note_type?.replace(/_/g, ' ')}</span>
+                <span className="text-sm font-mono uppercase text-primary">{n.note_type?.replace(/_/g, ' ')}</span>
                 {n.is_public === false && (
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-200">
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-sm text-amber-200">
                     Private — full agent reasoning
                   </span>
                 )}

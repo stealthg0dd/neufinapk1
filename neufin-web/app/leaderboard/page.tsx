@@ -28,15 +28,15 @@ export default async function LeaderboardPage() {
   const entries = await getLeaderboard()
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-shell-deep">
       {/* Nav */}
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           <div className="flex items-center gap-3">
             <Link
               href="/market"
-              className="inline-flex items-center gap-1.5 text-gray-400 transition-colors hover:text-white text-sm"
+              className="inline-flex items-center gap-1.5 text-shell-muted transition-colors hover:text-white text-sm"
             >
               <LineChart className="h-4 w-4 shrink-0" aria-hidden />
               Market DNA
@@ -48,7 +48,7 @@ export default async function LeaderboardPage() {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+      <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-section">
         {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 mb-3">
@@ -62,11 +62,11 @@ export default async function LeaderboardPage() {
               Live
             </span>
           </div>
-          <p className="text-gray-400 text-sm">
+          <p className="text-shell-muted text-sm">
             Top Investor DNA scores — refreshes every 5 minutes.
           </p>
           {entries.length > 0 && (
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-shell-subtle mt-1">
               {entries.length} scores ranked
             </p>
           )}

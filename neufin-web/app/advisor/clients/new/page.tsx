@@ -44,50 +44,50 @@ export default function NewClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 px-4 py-8">
+    <div className="min-h-screen bg-shell-deep text-shell-fg px-4 py-section">
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/advisor/dashboard" className="text-gray-500 hover:text-gray-300 text-sm">
+          <Link href="/advisor/dashboard" className="text-shell-subtle hover:text-shell-fg/90 text-sm">
             ← Back
           </Link>
           <div>
             <h1 className="text-xl font-bold">Add New Client</h1>
-            <p className="text-sm text-gray-400">Create a client portfolio in your dashboard</p>
+            <p className="text-sm text-shell-muted">Create a client portfolio in your dashboard</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-gray-800 bg-gray-900 p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="rounded-2xl border border-shell-border bg-shell p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Client Name *</label>
+            <label className="block text-sm font-medium text-shell-fg/90 mb-1.5">Client Name *</label>
             <input
               type="text"
               required
               value={form.client_name}
               onChange={(e) => handleField('client_name', e.target.value)}
               placeholder="e.g. John Tan"
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Client Email</label>
+            <label className="block text-sm font-medium text-shell-fg/90 mb-1.5">Client Email</label>
             <input
               type="email"
               value={form.client_email}
               onChange={(e) => handleField('client_email', e.target.value)}
               placeholder="client@example.com (optional)"
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">Notes</label>
+            <label className="block text-sm font-medium text-shell-fg/90 mb-1.5">Notes</label>
             <textarea
               rows={3}
               value={form.notes}
               onChange={(e) => handleField('notes', e.target.value)}
               placeholder="Investment objectives, risk tolerance, key concerns..."
-              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2.5 text-sm text-gray-100 placeholder-gray-600 focus:border-blue-500 focus:outline-none resize-none"
+              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none resize-none"
             />
           </div>
 
@@ -106,8 +106,8 @@ export default function NewClientPage() {
           </button>
         </form>
 
-        <div className="rounded-xl border border-gray-800 bg-gray-900/50 p-4">
-          <p className="text-xs text-gray-500">
+        <div className="rounded-xl border border-shell-border bg-shell/50 p-4">
+          <p className="text-xs text-shell-subtle">
             After adding the client, you can upload their portfolio CSV from the advisor dashboard to run a DNA analysis and generate white-label reports.
           </p>
         </div>

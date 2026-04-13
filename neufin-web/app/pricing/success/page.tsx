@@ -58,14 +58,14 @@ export default function PricingSuccessPage() {
   const features = PLAN_FEATURES[tier] || PLAN_FEATURES.retail
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-shell-deep flex flex-col">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
         </div>
       </nav>
 
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
+      <main className="flex-1 flex items-center justify-center px-6 py-section">
         <div className="w-full max-w-md text-center space-y-6">
           {loading ? (
             <div className="flex items-center justify-center gap-3 text-blue-400">
@@ -79,28 +79,28 @@ export default function PricingSuccessPage() {
                 <h1 className="text-3xl font-extrabold text-white mb-2">
                   Welcome to {plan?.plan_name || 'NeuFin'}!
                 </h1>
-                <p className="text-gray-400">Your subscription is now active. Here&apos;s what you can do:</p>
+                <p className="text-shell-muted">Your subscription is now active. Here&apos;s what you can do:</p>
               </div>
 
-              <div className="glass-card rounded-2xl p-6 text-left space-y-3">
+              <div className="glass-card space-y-3 p-6 text-left">
                 {features.map((f) => (
-                  <div key={f} className="flex items-center gap-3 text-sm text-gray-300">
-                    <span className="text-green-400 shrink-0">✓</span>
+                  <div key={f} className="flex items-center gap-3 text-sm text-slate-700">
+                    <span className="shrink-0 text-green-600">✓</span>
                     {f}
                   </div>
                 ))}
               </div>
 
-              <div className="card text-sm text-gray-500 text-center">
+              <div className="card text-center text-sm text-slate-600">
                 Redirecting to your dashboard in{' '}
-                <span className="text-blue-400 font-semibold">{countdown}s</span>…
+                <span className="font-semibold text-[#1EB8CC]">{countdown}s</span>…
               </div>
 
               <div className="flex flex-col gap-2">
                 <Link href="/dashboard" className="btn-primary text-center py-3">
                   Go to Dashboard Now →
                 </Link>
-                <Link href="/pricing" className="text-sm text-gray-500 hover:text-gray-300 transition-colors">
+                <Link href="/pricing" className="text-sm text-shell-subtle hover:text-shell-fg/90 transition-colors">
                   ← Back to Pricing
                 </Link>
               </div>

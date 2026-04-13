@@ -75,7 +75,7 @@ export default function PaywallOverlay({
             )}
           </button>
 
-          <p className="mt-3 text-center text-[11px] text-slate-500">Secured by Stripe</p>
+          <p className="mt-3 text-center text-sm text-slate-500">Secured by Stripe</p>
         </div>
       </div>
     </div>

@@ -1,73 +1,107 @@
 import Link from 'next/link'
 
+const FOOTER_LINKS = {
+  Product: [
+    { href: '/upload', label: 'Analyze' },
+    { href: '/pricing', label: 'Pricing' },
+    { href: '/research', label: 'Research' },
+    { href: '/features', label: 'Features' },
+  ],
+  Developers: [
+    { href: '/partners', label: 'API & partners' },
+    { href: '/developer', label: 'Developer hub' },
+    { href: '/developer/docs', label: 'Docs' },
+  ],
+  Company: [
+    { href: '/about', label: 'About' },
+    { href: '/contact-sales', label: 'Contact sales' },
+    { href: 'mailto:info@neufin.ai', label: 'info@neufin.ai', external: true },
+  ],
+  Legal: [
+    { href: '/terms-and-conditions', label: 'Terms' },
+    { href: '/privacy', label: 'Privacy' },
+    { href: 'https://status.neufin.ai', label: 'Status', external: true },
+  ],
+} as const
+
 export default function Footer() {
   return (
-    <section className="py-20">
-      <div className="mx-auto max-w-3xl px-6 text-center">
-        <p className="text-xl font-semibold text-foreground md:text-2xl">
-          IC-grade portfolio intelligence in 60 seconds. No terminals. No analysts. No waiting.
-        </p>
-        <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link
-            href="/upload"
-            className="rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Analyze My Portfolio Free
-          </Link>
-          <Link
-            href="/contact-sales"
-            className="rounded-lg border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
-          >
-            Book a Demo
-          </Link>
-        </div>
-        <div className="mt-8 border-t border-border/40 pt-6">
-          <div className="grid grid-cols-1 gap-4 text-[11px] text-muted-foreground/60 md:grid-cols-2">
-            <div className="text-left">
-              <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">
-                REGISTERED ENTITIES
-              </p>
-              <p>
-                NeuFin OÜ · Harju maakond, Tallinn, Kesklinna linnaosa, Vesivärva tn 50-201, 10152 · Registered in
-                Estonia (EU)
-              </p>
-              <p>Neufin Inc. — Registered office, United States</p>
-              <p>Singapore · Malaysia · UAE · Thailand · Vietnam (Coming 2026)</p>
-            </div>
-            <div className="text-left md:text-right">
-              <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/40">LEGAL</p>
-              <p>© 2026 Neufin OÜ. All rights reserved.</p>
-              <p>info@neufin.ai · www.neufin.ai</p>
-              <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                <a href="/terms-and-conditions" className="underline hover:text-muted-foreground/80">
-                  Terms of Service
-                </a>
-                <a href="/privacy" className="underline hover:text-muted-foreground/80">
-                  Privacy Policy
-                </a>
-                <a
-                  href="https://status.neufin.ai"
-                  className="underline hover:text-muted-foreground/80"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Status
-                </a>
-                <Link href="/partners" className="underline hover:text-muted-foreground/80">
-                  API Docs
-                </Link>
-              </p>
+    <footer className="border-t border-border/60 bg-surface py-section">
+      <div className="mx-auto max-w-7xl px-6">
+        <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
+          <div className="lg:col-span-2">
+            <p className="text-lg font-semibold text-foreground">NeuFin</p>
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
+              IC-grade portfolio intelligence in about a minute. Built for advisors, wealth platforms, and teams who
+              need committee-ready output without a research bench.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/upload"
+                className="inline-flex justify-center rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Analyze a portfolio
+              </Link>
+              <Link
+                href="/contact-sales"
+                className="inline-flex justify-center rounded-lg border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+              >
+                Book a demo
+              </Link>
             </div>
           </div>
+          {(Object.entries(FOOTER_LINKS) as [keyof typeof FOOTER_LINKS, (typeof FOOTER_LINKS)['Product']][]).map(
+            ([title, links]) => (
+              <div key={title}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
+                <ul className="mt-4 space-y-2.5 text-sm">
+                  {links.map((item) => {
+                    const ext = 'external' in item && item.external
+                    const newTab = ext && item.href.startsWith('http')
+                    return (
+                      <li key={item.label}>
+                        {ext ? (
+                          <a
+                            href={item.href}
+                            className="text-muted-foreground transition-colors hover:text-foreground"
+                            {...(newTab ? { target: '_blank', rel: 'noreferrer' } : {})}
+                          >
+                            {item.label}
+                          </a>
+                        ) : (
+                          <Link href={item.href} className="text-muted-foreground transition-colors hover:text-foreground">
+                            {item.label}
+                          </Link>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            ),
+          )}
+        </div>
 
-          <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground/40">
-            NeuFin provides financial data and portfolio analysis tools for informational purposes only. This is not
-            investment advice, and no output from NeuFin constitutes a recommendation to buy, sell, or hold any
-            security. Past performance does not indicate future results. NeuFin aligns with MAS guidelines on fintech
-            and data services.
+        <div className="mt-12 border-t border-border/40 pt-8">
+          <div className="grid gap-6 text-sm text-muted-foreground md:grid-cols-2">
+            <div>
+              <p className="mb-1 font-mono text-xs uppercase tracking-wider text-muted-foreground/70">Registered</p>
+              <p>
+                NeuFin OÜ · Harju maakond, Tallinn, Kesklinna linnaosa, Vesivärva tn 50-201, 10152 · Estonia (EU)
+              </p>
+              <p className="mt-1">Neufin Inc. — United States registered office</p>
+            </div>
+            <div className="md:text-right">
+              <p>© {new Date().getFullYear()} Neufin OÜ. All rights reserved.</p>
+              <p className="mt-1">www.neufin.ai</p>
+            </div>
+          </div>
+          <p className="mt-6 text-xs leading-relaxed text-muted-foreground/80">
+            NeuFin provides tools for informational purposes only. This is not investment advice. Past performance does
+            not indicate future results.
           </p>
         </div>
       </div>
-    </section>
+    </footer>
   )
 }
