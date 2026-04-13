@@ -58,5 +58,5 @@ cryptography==46.0.5
 
 # Observability
 sentry-sdk[fastapi]==2.57.0
-structlog==25.3.0
-prometheus-fastapi-instrumentator==7.0.0
+structlog==25.5.0
+prometheus-fastapi-instrumentator==7.1.0
