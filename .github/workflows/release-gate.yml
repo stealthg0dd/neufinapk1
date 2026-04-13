@@ -9,7 +9,13 @@ jobs:
     name: Release gate
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_AGENT_TOKEN }}
+
       - name: Gate passed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
         run: |
           echo "Branch: ${{ github.base_ref }}"
           echo "All required checks must pass before merge."

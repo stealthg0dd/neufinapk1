@@ -26,6 +26,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_AGENT_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:

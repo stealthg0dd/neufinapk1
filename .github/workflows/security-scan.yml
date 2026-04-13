@@ -20,6 +20,8 @@ jobs:
       issues: write  # needed to create GitHub Issues
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_AGENT_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:
@@ -198,7 +200,7 @@ jobs:
       - name: Create GitHub Issue for HIGH/CRITICAL findings
         if: steps.check.outputs.has_findings == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_AGENT_TOKEN }}
         run: |
           # Ensure labels exist (idempotent — --force skips error if already present)
           gh label create "security"  --color "#e11d48" --description "Security vulnerability" --force || true
