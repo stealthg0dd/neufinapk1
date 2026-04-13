@@ -1,0 +1,14 @@
+#!/bin/bash
+# Prevent direct commits to protected branches (main).
+# Install via: git config core.hooksPath .githooks
+# Or run: bash scripts/install-hooks.sh
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+
+if [ "$branch" = "main" ]; then
+  echo "❌ Error: Direct commits to 'main' are not allowed."
+  echo "   Switch to 'develop' or a feature branch, then open a PR."
+  exit 1
+fi
+
+exit 0
