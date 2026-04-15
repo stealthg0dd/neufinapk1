@@ -562,9 +562,9 @@ def _merge_quant_model_outputs(
         base_dna_float = None
 
     if base_dna_float is None:
-        dna_quant = int(round(quant_alpha))
+        dna_quant = round(quant_alpha)
     else:
-        dna_quant = int(round(base_dna_float * 0.8 + quant_alpha * 0.2))
+        dna_quant = round(base_dna_float * 0.8 + quant_alpha * 0.2)
     dna_quant = max(0, min(100, dna_quant))
 
     contribution = quant_result.get("model_contribution_breakdown") or {}
