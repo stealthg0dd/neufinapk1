@@ -14,6 +14,8 @@ Endpoints:
 from __future__ import annotations
 
 import json
+import math
+import random
 from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +27,7 @@ from pydantic import BaseModel
 from database import supabase
 from services.auth_dependency import get_current_user, get_subscribed_user
 from services.jwt_auth import JWTUser
+from services.quant_model_engine import analyze_financial_modes
 from services.research.regime_detector import get_current_regime_summary
 from services.research.slug_utils import estimate_read_time_minutes, slugify
 
@@ -85,6 +88,188 @@ def _coerce_pagination(
     return max(minimum, min(maximum, parsed))
 
 
+def _normalize_quant_modes(raw: str | None) -> list[str]:
+    allowed = {
+        "alpha",
+        "risk",
+        "forecast",
+        "macro",
+        "allocation",
+        "trading",
+        "institutional",
+    }
+    if not raw:
+        return ["institutional", "alpha", "risk", "macro", "forecast"]
+    out: list[str] = []
+    seen: set[str] = set()
+    for mode in raw.split(","):
+        key = str(mode or "").strip().lower()
+        if not key or key in seen or key not in allowed:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out or ["institutional", "alpha", "risk", "macro", "forecast"]
+
+
+def _normalize_position_weights(
+    positions: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not positions:
+        return []
+    out = [dict(p) for p in positions]
+    total = sum(float(p.get("weight") or p.get("weight_pct") or 0) for p in out)
+    if total > 0:
+        for p in out:
+            raw = float(p.get("weight") or p.get("weight_pct") or 0)
+            p["weight"] = raw / 100.0 if total > 1.5 else raw
+        return out
+
+    total_value = sum(float(p.get("value") or 0) for p in out)
+    if total_value > 0:
+        for p in out:
+            p["weight"] = float(p.get("value") or 0) / total_value
+        return out
+
+    eq = 1.0 / len(out)
+    for p in out:
+        p["weight"] = eq
+    return out
+
+
+def _parse_alpha_opportunities(raw_alpha: Any) -> list[dict[str, Any]]:
+    if isinstance(raw_alpha, list):
+        return [x for x in raw_alpha if isinstance(x, dict)]
+    if isinstance(raw_alpha, dict):
+        return list(
+            raw_alpha.get("opportunities")
+            or (raw_alpha.get("alpha_opportunities") or {}).get("opportunities")
+            or []
+        )
+    if isinstance(raw_alpha, str) and raw_alpha.strip().startswith("{"):
+        try:
+            payload = json.loads(raw_alpha)
+            return list(
+                payload.get("opportunities")
+                or (payload.get("alpha_opportunities") or {}).get("opportunities")
+                or []
+            )
+        except Exception:
+            return []
+    return []
+
+
+def _factor_decomposition(quant_result: dict[str, Any]) -> list[dict[str, Any]]:
+    breakdown = quant_result.get("model_contribution_breakdown") or {}
+    if not isinstance(breakdown, dict):
+        breakdown = {}
+    out: list[dict[str, Any]] = []
+    for k, v in breakdown.items():
+        try:
+            pct = max(0.0, float(v) * 100.0)
+        except (TypeError, ValueError):
+            continue
+        out.append(
+            {
+                "factor": str(k).replace("_", " ").title(),
+                "weight_pct": round(pct, 2),
+            }
+        )
+    return sorted(out, key=lambda x: x["weight_pct"], reverse=True)
+
+
+def _monte_carlo_paths(
+    portfolio_id: str,
+    alpha_score: float,
+    vol_proxy: float,
+    n_paths: int = 24,
+    horizon_days: int = 60,
+) -> list[dict[str, Any]]:
+    seed = sum(ord(ch) for ch in portfolio_id)
+    rng = random.Random(seed)
+    drift = (alpha_score - 50.0) / 5000.0
+    sigma = max(0.004, min(0.06, vol_proxy / 6.0))
+
+    paths: list[dict[str, Any]] = []
+    for pidx in range(n_paths):
+        level = 100.0
+        points = [{"day": 0, "value": 100.0}]
+        for day in range(1, horizon_days + 1):
+            shock = rng.gauss(drift, sigma)
+            level *= 1.0 + shock
+            level = max(35.0, min(220.0, level))
+            points.append({"day": day, "value": round(level, 2)})
+        paths.append({"path_id": f"path_{pidx + 1}", "points": points})
+    return paths
+
+
+def _var_surface(vol_proxy: float, drawdown_proxy: float) -> list[dict[str, Any]]:
+    levels = [0.90, 0.95, 0.99]
+    horizon = [1, 5, 10, 20]
+    rows: list[dict[str, Any]] = []
+    for conf in levels:
+        z = 1.28 if conf == 0.90 else 1.65 if conf == 0.95 else 2.33
+        for d in horizon:
+            var = z * vol_proxy * math.sqrt(d / 252.0)
+            cvar = var * (1.1 if conf < 0.99 else 1.2) + drawdown_proxy * 0.1
+            rows.append(
+                {
+                    "confidence": conf,
+                    "horizon_days": d,
+                    "var_pct": round(var * 100.0, 2),
+                    "cvar_pct": round(cvar * 100.0, 2),
+                }
+            )
+    return rows
+
+
+def _correlation_network(
+    positions: list[dict[str, Any]],
+    quant_result: dict[str, Any],
+) -> dict[str, Any]:
+    top = sorted(
+        positions,
+        key=lambda p: float(p.get("weight") or 0),
+        reverse=True,
+    )[:8]
+    symbols = [str(p.get("symbol") or "").upper() for p in top if p.get("symbol")]
+    weights = {
+        str(p.get("symbol") or "").upper(): float(p.get("weight") or 0) for p in top
+    }
+
+    corr = (quant_result.get("risk_report") or {}).get("correlation_matrix") or {}
+    if not isinstance(corr, dict):
+        corr = {}
+
+    nodes = [
+        {
+            "id": sym,
+            "label": sym,
+            "weight_pct": round(weights.get(sym, 0.0) * 100.0, 2),
+        }
+        for sym in symbols
+    ]
+    edges: list[dict[str, Any]] = []
+    for i, src in enumerate(symbols):
+        for dst in symbols[i + 1 :]:
+            rho = (corr.get(src) or {}).get(dst)
+            if rho is None:
+                rho = (corr.get(dst) or {}).get(src)
+            try:
+                rho_f = float(rho)
+            except (TypeError, ValueError):
+                rho_f = 0.0
+            if abs(rho_f) < 0.22:
+                continue
+            edges.append(
+                {
+                    "source": src,
+                    "target": dst,
+                    "correlation": round(rho_f, 3),
+                }
+            )
+    return {"nodes": nodes, "edges": edges}
+
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 
 
@@ -142,6 +327,116 @@ async def get_regime():
         "current": regime,
         "recent_history": recent_history,
         "generated_at": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/quant-dashboard")
+async def get_quant_dashboard(
+    modes: str | None = Query(None, description="CSV quant modes"),
+    user: JWTUser = Depends(get_current_user),
+):
+    """
+    Quant dashboard payload for interactive frontend charts.
+    Includes factor decomposition, Monte Carlo paths, VaR/CVaR surface,
+    correlation network, and alpha opportunities derived from quant outputs.
+    """
+    selected_modes = _normalize_quant_modes(modes)
+
+    portfolio_res = (
+        supabase.table("portfolios")
+        .select("id,name,total_value,created_at")
+        .eq("user_id", str(user.id))
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    portfolio = (portfolio_res.data or [None])[0]
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="No portfolio found.")
+
+    pos_res = (
+        supabase.table("portfolio_positions")
+        .select("symbol,weight,weight_pct,value,current_price,last_price")
+        .eq("portfolio_id", portfolio["id"])
+        .execute()
+    )
+    positions = _normalize_position_weights(list(pos_res.data or []))
+    if not positions:
+        raise HTTPException(status_code=404, detail="No portfolio positions found.")
+
+    quant_result = await analyze_financial_modes(
+        portfolio["id"],
+        positions,
+        selected_modes,
+    )
+
+    latest_swarm = (
+        supabase.table("swarm_reports")
+        .select(
+            "id,created_at,regime,alpha_signal,recommendation_summary,"
+            "risk_sentinel,quant_analysis"
+        )
+        .eq("user_id", str(user.id))
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    swarm_row = (latest_swarm.data or [None])[0] or {}
+
+    raw_alpha = swarm_row.get("alpha_signal")
+    alpha_opps = _parse_alpha_opportunities(raw_alpha)
+    if not alpha_opps:
+        alpha_opps = [
+            {
+                "symbol": "PORTFOLIO",
+                "confidence": 0.68,
+                "reason": "Broad portfolio alpha quality from quant model signal layer.",
+            }
+        ]
+
+    risk_metrics = quant_result.get("risk_adjusted_metrics") or {}
+    vol_proxy = float(risk_metrics.get("volatility_annualized_proxy") or 0.18)
+    dd_proxy = float(risk_metrics.get("max_drawdown_proxy") or 0.14)
+    alpha_score = float(quant_result.get("alpha_score") or 50.0)
+
+    return {
+        "portfolio": {
+            "id": portfolio["id"],
+            "name": portfolio.get("name") or "Portfolio",
+            "total_value": float(portfolio.get("total_value") or 0),
+        },
+        "modes": selected_modes,
+        "quant_model": quant_result,
+        "charts": {
+            "factor_decomposition": _factor_decomposition(quant_result),
+            "monte_carlo_paths": _monte_carlo_paths(
+                portfolio["id"],
+                alpha_score,
+                vol_proxy,
+                n_paths=24,
+                horizon_days=60,
+            ),
+            "var_cvar": _var_surface(vol_proxy, dd_proxy),
+            "correlation_network": _correlation_network(positions, quant_result),
+            "alpha_feed": [
+                {
+                    "symbol": str(o.get("symbol") or "").upper() or "UNKNOWN",
+                    "confidence": (
+                        round(float(o.get("confidence") or 0) * 100, 1)
+                        if float(o.get("confidence") or 0) <= 1.0
+                        else round(float(o.get("confidence") or 0), 1)
+                    ),
+                    "reason": str(o.get("reason") or "No rationale available."),
+                }
+                for o in alpha_opps[:12]
+                if isinstance(o, dict)
+            ],
+        },
+        "context": {
+            "regime": swarm_row.get("regime") or quant_result.get("regime_context", {}),
+            "recommendation_summary": swarm_row.get("recommendation_summary") or "",
+            "generated_at": datetime.now(UTC).isoformat(),
+        },
     }
 
 

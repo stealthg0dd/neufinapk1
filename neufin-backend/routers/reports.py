@@ -77,6 +77,7 @@ class ReportRequest(BaseModel):
     inline_pdf: bool = False
     ic_grade_only: bool = False  # True → 422 if report would be draft-quality
     quant_modes: list[str] | None = None
+    report_mode: str = "standard"  # standard | ic_memo | advisor_report
 
 
 def _positions_from_dna_row(dna: dict | None) -> list[dict]:
@@ -522,6 +523,7 @@ async def generate_report(
             ),
             "client_name": body.client_name,
             "report_run_id": run_id,
+            "report_mode": body.report_mode,
         }
 
         # FIX 5: single source of truth for total_value across all PDF sections
@@ -549,6 +551,7 @@ async def generate_report(
                 advisor_config,
                 theme=body.theme,
                 ic_grade_only=body.ic_grade_only,
+                report_mode=body.report_mode,
             )
         except ValueError as verr:
             raise HTTPException(status_code=422, detail=str(verr)) from verr

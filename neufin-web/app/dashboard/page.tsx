@@ -4,9 +4,11 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { usePortfolioData } from "@/hooks/usePortfolioData";
+import { useDashboardPowerMode } from "@/hooks/useDashboardPowerMode";
 import { GraphicPlaceholder } from "@/components/GraphicPlaceholder";
 import type { RegimeData } from "@/hooks/usePortfolioData";
 import { SwarmBriefingPreview } from "@/components/dashboard/SwarmBriefingPreview";
+import DashboardModeControls from "@/components/dashboard/DashboardModeControls";
 import ResearchFeedClient from "@/components/dashboard/ResearchFeedClient";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +58,12 @@ function fmtMetric(v: number | null | undefined, digits = 2): string {
 
 export default function DashboardPage() {
   const {
+    advancedQuantMode,
+    setAdvancedQuantMode,
+    dashboardMode,
+    setDashboardMode,
+  } = useDashboardPowerMode();
+  const {
     portfolios,
     latestPortfolio,
     hasPortfolio,
@@ -92,6 +100,64 @@ export default function DashboardPage() {
     latestDna?.tax_analysis?.positions?.length ??
     null;
 
+  const modeWidgets =
+    dashboardMode === "cio"
+      ? [
+          {
+            label: "Strategic Risk Budget",
+            value:
+              latestDna?.weighted_beta != null
+                ? `${latestDna.weighted_beta.toFixed(2)} beta`
+                : "Awaiting beta",
+            tone: "text-[#0F172A]",
+          },
+          {
+            label: "Regime Priority",
+            value: formatRegimeLabel(regime),
+            tone: "text-[#0B5561]",
+          },
+          {
+            label: "Capital at Review",
+            value: positionsCount != null ? `${positionsCount} positions` : "—",
+            tone: "text-[#0F172A]",
+          },
+        ]
+      : dashboardMode === "trader"
+        ? [
+            {
+              label: "Execution Focus",
+              value: "Intraday volatility and correlation shocks",
+              tone: "text-[#7C2D12]",
+            },
+            {
+              label: "Signal Priority",
+              value: swarmReport?.headline || "Awaiting quant signal",
+              tone: "text-[#0F172A]",
+            },
+            {
+              label: "Quick Action",
+              value: "Open Quant Dashboard for live paths",
+              tone: "text-[#0B5561]",
+            },
+          ]
+        : [
+            {
+              label: "Client Narrative",
+              value: latestDna?.recommendation || "Portfolio recommendation pending",
+              tone: "text-[#0F172A]",
+            },
+            {
+              label: "Advisor Priority",
+              value: "Tax positioning and regime communication",
+              tone: "text-[#0B5561]",
+            },
+            {
+              label: "Memo Readiness",
+              value: swarmReport ? "Swarm insights available" : "Run swarm for memo",
+              tone: "text-[#7C2D12]",
+            },
+          ];
+
   return (
     <div className="grid grid-cols-1 gap-6">
       <div className="section-header">
@@ -100,6 +166,29 @@ export default function DashboardPage() {
           <p>Portfolio intelligence, DNA score, and research in one place.</p>
         </div>
       </div>
+
+      <DashboardModeControls
+        advancedQuantMode={advancedQuantMode}
+        dashboardMode={dashboardMode}
+        onToggleAdvanced={setAdvancedQuantMode}
+        onModeChange={setDashboardMode}
+      />
+
+      {advancedQuantMode && (
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {modeWidgets.map((w) => (
+            <div
+              key={w.label}
+              className="rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-sm"
+            >
+              <p className="text-xs uppercase tracking-wider text-[#64748B]">
+                {w.label}
+              </p>
+              <p className={`mt-1 text-sm font-semibold ${w.tone}`}>{w.value}</p>
+            </div>
+          ))}
+        </section>
+      )}
 
       {!hasPortfolio && (
         <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white">
