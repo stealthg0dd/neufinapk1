@@ -121,7 +121,7 @@ export default function AdvisorDashboardPage() {
     <div className="flex min-h-screen flex-col bg-app text-navy">
       {/* Nav */}
       <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 md:px-6">
           <Link href="/" className="text-xl font-bold text-gradient">
             Neufin
           </Link>
@@ -136,7 +136,7 @@ export default function AdvisorDashboardPage() {
         </div>
       </nav>
 
-      <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-section">
+      <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-section md:px-0">
 
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>

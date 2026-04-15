@@ -243,6 +243,17 @@ async def get_subscribed_user(user: JWTUser = Depends(get_current_user)) -> JWTU
     return require_active_subscription(user)
 
 
+def _truthy_is_admin(val) -> bool:
+    """Treat DB / JSON variants as admin (bool, int, string)."""
+    if val is True:
+        return True
+    if isinstance(val, (int, float)) and val:
+        return True
+    if isinstance(val, str) and val.strip().lower() in ("true", "1", "yes", "t"):
+        return True
+    return False
+
+
 async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
     """
     FastAPI dependency that requires a valid JWT AND is_admin=true in user_profiles.
@@ -256,7 +267,8 @@ async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
             .limit(1)
             .execute()
         )
-        is_admin = result.data[0].get("is_admin", False) if result.data else False
+        raw = result.data[0].get("is_admin") if result.data else None
+        is_admin = _truthy_is_admin(raw)
     except Exception:
         is_admin = False
 
@@ -283,7 +295,8 @@ async def get_ops_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
         row = result.data[0] if result.data else {}
     except Exception:
         row = {}
-    if row.get("is_admin") is True or row.get("role") == "advisor":
+    role = (row.get("role") or "").strip().lower()
+    if _truthy_is_admin(row.get("is_admin")) or role == "advisor":
         return user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

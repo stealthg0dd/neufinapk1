@@ -289,9 +289,8 @@ export default function AdminPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-xl border border-[#E2E8F0] overflow-hidden bg-white">
-          <div className="overflow-x-auto">
-            <table className="table-base">
+        <div className="overflow-x-auto -mx-4 rounded-xl border border-[#E2E8F0] bg-white md:mx-0">
+          <table className="table-base min-w-[640px]">
               <thead>
                 <tr>
                   {["Email", "Plan", "Trial Ends", "Joined", "Last Login", "DNA Scores", "Reports", "Actions"].map((h) => (
@@ -366,7 +365,6 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
-          </div>
         </div>
       </div>
 

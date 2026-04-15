@@ -50,8 +50,8 @@ export default function NewClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-app px-4 py-section text-navy">
-      <div className="mx-auto max-w-lg space-y-6">
+    <div className="min-h-screen bg-app py-section text-navy">
+      <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-0">
         <div className="flex items-center gap-4">
           <Link href="/advisor/dashboard" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
             ← Back
@@ -66,27 +66,29 @@ export default function NewClientPage() {
           onSubmit={handleSubmit}
           className="space-y-5 rounded-2xl border border-primary/30 bg-white p-6 shadow-sm"
         >
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-navy">Client Name *</label>
-            <input
-              type="text"
-              required
-              value={form.client_name}
-              onChange={(e) => handleField('client_name', e.target.value)}
-              placeholder="e.g. John Tan"
-              className="input-base text-sm"
-            />
-          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-navy">Client Name *</label>
+              <input
+                type="text"
+                required
+                value={form.client_name}
+                onChange={(e) => handleField('client_name', e.target.value)}
+                placeholder="e.g. John Tan"
+                className="input-base text-sm"
+              />
+            </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-navy">Client Email</label>
-            <input
-              type="email"
-              value={form.client_email}
-              onChange={(e) => handleField('client_email', e.target.value)}
-              placeholder="client@example.com (optional)"
-              className="input-base text-sm"
-            />
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-navy">Client Email</label>
+              <input
+                type="email"
+                value={form.client_email}
+                onChange={(e) => handleField('client_email', e.target.value)}
+                placeholder="client@example.com (optional)"
+                className="input-base text-sm"
+              />
+            </div>
           </div>
 
           <div>

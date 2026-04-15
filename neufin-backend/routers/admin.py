@@ -607,7 +607,11 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
         )
         keys = keys_res.data or []
     except Exception as exc:
-        raise HTTPException(500, f"Failed to list keys: {exc}") from exc
+        logger.error("admin.partners.keys_failed", error=str(exc))
+        return {
+            "partners": [],
+            "warning": "Could not load api_keys (schema, RLS, or connectivity).",
+        }
 
     user_ids = list({str(k["user_id"]) for k in keys if k.get("user_id")})
     profiles: dict[str, dict] = {}
@@ -842,7 +846,11 @@ async def list_all_api_keys(_admin: JWTUser = Depends(get_admin_user)):
         )
         keys = keys_res.data or []
     except Exception as exc:
-        raise HTTPException(500, f"Failed to list API keys: {exc}") from exc
+        logger.error("admin.api_keys.list_failed", error=str(exc))
+        return {
+            "keys": [],
+            "warning": "Could not load api_keys (schema, RLS, or connectivity).",
+        }
 
     user_ids = list({str(k["user_id"]) for k in keys if k.get("user_id")})
     email_map: dict[str, str] = {}

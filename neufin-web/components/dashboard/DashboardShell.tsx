@@ -60,7 +60,7 @@ export function DashboardShell({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-app text-navy">
+    <div className="flex h-screen min-w-0 overflow-x-hidden overflow-hidden bg-app text-navy">
       {/* Desktop sidebar */}
       <aside className="hidden h-full shrink-0 lg:flex">
         <DashboardSidebar user={user} />
@@ -71,15 +71,19 @@ export function DashboardShell({
         <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
           <button
             type="button"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             aria-label="Close menu"
             onClick={() => setMobileNavOpen(false)}
           />
-          <aside className="relative z-10 flex h-full w-[min(280px,88vw)] max-w-sm flex-col border-r border-[#E5E7EB] bg-white shadow-xl">
-            <div className="flex justify-end border-b border-[#F1F5F9] px-2 py-2">
+          <aside className="relative z-10 flex h-full w-72 max-w-[min(18rem,88vw)] flex-col bg-white shadow-2xl">
+            <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-[#E2E8F0] px-5">
+              <div className="flex items-center gap-2">
+                <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
+                <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+              </div>
               <button
                 type="button"
-                className="rounded-md p-2 text-[#64748B] hover:bg-[#F8FAFC] hover:text-navy"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F8FAFC] hover:text-navy"
                 aria-label="Close menu"
                 onClick={() => setMobileNavOpen(false)}
               >
@@ -87,35 +91,37 @@ export function DashboardShell({
               </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <DashboardSidebar user={user} />
+              <DashboardSidebar user={user} embedded />
             </div>
           </aside>
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex items-center gap-3 border-b border-[#E5E7EB] bg-white px-4 py-3 lg:hidden">
+        <header className="flex h-14 flex-shrink-0 items-center gap-4 border-b border-[#E2E8F0] bg-white px-4 lg:hidden">
           <button
             type="button"
-            className="rounded-md p-2 text-navy hover:bg-[#F8FAFC]"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-[#334155] transition-colors hover:bg-[#F8FAFC]"
             aria-label="Open menu"
             onClick={() => setMobileNavOpen(true)}
           >
             <Menu className="h-5 w-5" strokeWidth={1.5} />
           </button>
           <div className="flex items-center gap-2">
-            <Image src="/logo-icon.png" alt="" width={24} height={24} className="rounded-sm" />
-            <Image src="/logo.png" alt="NeuFin" width={80} height={24} className="h-6 w-auto" />
+            <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
+            <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
           </div>
         </header>
         <CommandBar regimeData={regime} onToggleCopilot={() => setMarketDeskOpen((o) => !o)} />
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <main className="flex-1 overflow-y-auto bg-app px-4 py-6 md:px-7 md:py-6">
-            <Suspense fallback={null}>
-              <CheckoutSessionSuccessFeedback />
-            </Suspense>
-            <TrialStatusBanner />
-            {children}
+          <main className="flex-1 overflow-y-auto bg-app py-4 md:py-6">
+            <div className="page-container">
+              <Suspense fallback={null}>
+                <CheckoutSessionSuccessFeedback />
+              </Suspense>
+              <TrialStatusBanner />
+              {children}
+            </div>
           </main>
         </div>
       </div>

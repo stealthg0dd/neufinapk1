@@ -86,7 +86,7 @@ function NavSection({ label, items, pathname }: { label: string; items: NavItem[
   )
 }
 
-export default function DashboardSidebar({ user }: { user: User }) {
+export default function DashboardSidebar({ user, embedded = false }: { user: User; embedded?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const { isAdmin: isAdminFromHook } = useUser()
@@ -156,14 +156,20 @@ export default function DashboardSidebar({ user }: { user: User }) {
     return 'border border-slate-200 bg-slate-50 text-slate-700'
   })()
 
+  const rootClass = embedded
+    ? 'flex h-full min-h-0 w-full flex-col bg-white'
+    : 'flex h-full w-[220px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white'
+
   return (
-    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white">
-      <div className="border-b border-[#F1F5F9] px-5 pb-4 pt-5">
-        <div className="flex items-center gap-2">
-          <Image src="/logo-icon.png" alt="NeuFin" width={28} height={28} className="rounded-sm" />
-          <Image src="/logo.png" alt="NeuFin" width={80} height={24} className="h-6 w-auto" />
+    <aside className={rootClass} aria-label={embedded ? undefined : 'Main navigation'}>
+      {!embedded && (
+        <div className="border-b border-[#F1F5F9] px-5 pb-4 pt-5">
+          <div className="flex items-center gap-2">
+            <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
+            <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+          </div>
         </div>
-      </div>
+      )}
 
       <nav className="flex flex-1 flex-col overflow-y-auto pb-3 pt-1">
         <NavSection label="Overview" items={NAV_OVERVIEW} pathname={pathname} />

@@ -63,7 +63,7 @@ export default function AdvisorReportsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto min-h-screen max-w-4xl space-y-6 bg-app p-6">
+      <div className="mx-auto min-h-screen w-full max-w-3xl space-y-6 bg-app px-4 py-6 md:px-0">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-16" />
         <div className="space-y-3">
@@ -76,8 +76,8 @@ export default function AdvisorReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-app px-4 py-6 text-navy">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <div className="min-h-screen bg-app py-6 text-navy">
+      <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-0">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
