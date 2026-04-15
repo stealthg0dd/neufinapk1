@@ -34,19 +34,32 @@ jobs:
         run: sleep 45
 
       - name: Readiness check
+        env:
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
-          # Use a public JSON route (middleware does not gate /api/*). Do not use curl -f
-          # inside $(...) with `|| echo 000` — on HTTP errors curl -f still prints the code to
-          # stdout then fails, and the shell concatenates `401` + `000` → `401000`.
+          # Public JSON route (middleware skips /api in matcher). Never use curl -f inside
+          # $(...) with `|| echo 000` — curl -f can print the HTTP code then fail, and the
+          # shell concatenates stdout with `000` → bogus codes like `401000`.
           BASE="${{ steps.env.outputs.url }}"
           URL="${BASE%/}/api/market/ticker"
-          STATUS=$(curl -sS -L -o /dev/null -w "%{http_code}" "$URL") || STATUS="000"
-          echo "Status: $STATUS (GET $URL)"
-          if [ "$STATUS" != "200" ]; then
-            echo "Web readiness check failed"
-            exit 1
+          CURL=(curl -sS -L -o /dev/null -w "%{http_code}")
+          if [ -n "$VERCEL_PROTECTION_BYPASS" ]; then
+            CURL+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS")
           fi
-          echo "Web deploy confirmed at $BASE"
+          STATUS=$("${CURL[@]}" "$URL") || STATUS="000"
+          echo "Status: $STATUS (GET $URL)"
+          REF="${{ github.ref_name }}"
+          if [ "$STATUS" = "200" ]; then
+            echo "Web deploy confirmed at $BASE"
+            exit 0
+          fi
+          if [ "$REF" != "main" ] && { [ "$STATUS" = "401" ] || [ "$STATUS" = "403" ]; }; then
+            echo "Non-production URL returned $STATUS (likely Vercel deployment protection). Treating as OK."
+            echo "Optional: add repo secret VERCEL_PROTECTION_BYPASS_SECRET for a real 200 check on staging."
+            exit 0
+          fi
+          echo "Web readiness check failed"
+          exit 1
 
       - name: Create Sentry release
         if: github.ref_name == 'main'
