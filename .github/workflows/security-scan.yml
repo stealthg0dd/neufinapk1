@@ -1,5 +1,8 @@
 name: Security Scan
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   schedule:
     # Every Sunday at 00:00 UTC

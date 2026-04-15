@@ -2,6 +2,9 @@ name: Promote Develop to Production
 on:
   workflow_dispatch: # Manual trigger
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   promote:
     runs-on: ubuntu-latest
@@ -10,6 +13,7 @@ jobs:
         with:
           ref: main
           token: ${{ secrets.GH_AGENT_TOKEN }}
+          fetch-depth: 0
       - name: Merge Develop
         run: |
           git config user.name "github-actions"
