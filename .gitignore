@@ -73,3 +73,7 @@ neufin-mobile/build-*/
 *.aab
 expo-go-sdk51.apk.railway/
 .env*.local
+
+# Local-only ops helper scripts (keep out of shared branches if personal)
+scripts/use-production-readonly.sh
+scripts/use-staging.sh
