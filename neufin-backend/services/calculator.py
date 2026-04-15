@@ -1085,3 +1085,26 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     if unresolvable:
         result["failed_tickers"] = unresolvable
     return result
+
+
+def canonical_metrics_for_institutional_report(
+    portfolio_data: dict,
+    dna_data: dict | None,
+    thesis: dict | None,
+    positions: list | None,
+) -> dict:
+    """
+    Single entry point for PDF / API: reconciled AUM, beta, Sharpe, HHI.
+
+    Prefer ``portfolio_data['metrics']`` from :func:`calculate_portfolio_metrics`;
+    thesis/DNA are fallbacks only. Implemented in ``report_metrics`` to avoid
+    duplicating reconciliation logic here.
+    """
+    from services.report_metrics import canonical_portfolio_headlines
+
+    return canonical_portfolio_headlines(
+        portfolio_data or {},
+        dna_data or {},
+        thesis or {},
+        positions or [],
+    )

@@ -117,13 +117,13 @@ export default function DashboardCockpitClient({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0 }}
       >
-        <div className="mb-6 border-b border-[hsl(var(--border)/0.5)] pb-4">
-          <p className="mb-2 text-[9px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground)/0.5)]">
+        <div className="mb-6 border-b border-border/50 pb-4">
+          <p className="mb-2 text-sm font-mono uppercase tracking-widest text-muted-foreground/50">
             Since yesterday
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             <span
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-medium ${
                 variant === 'risk'
                   ? 'bg-risk/10 text-risk'
                   : variant === 'positive'
@@ -134,12 +134,12 @@ export default function DashboardCockpitClient({
               Regime → {regimeLabel}
             </span>
             {notes.length > 0 ? (
-              <span className="shrink-0 rounded-full bg-[hsl(var(--primary)/0.1)] px-2.5 py-1 text-[11px] font-medium text-[hsl(var(--primary))]">
+              <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-sm font-medium text-primary">
                 {notes.length} new research notes
               </span>
             ) : null}
             {hasPortfolio ? (
-              <span className="shrink-0 rounded-full bg-positive/10 px-2.5 py-1 text-[11px] font-medium text-positive">
+              <span className="shrink-0 rounded-full bg-positive/10 px-2.5 py-1 text-sm font-medium text-positive">
                 DNA analyzed
               </span>
             ) : null}
@@ -194,24 +194,24 @@ export default function DashboardCockpitClient({
       >
         <div className="min-w-0 flex-1">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+            <h2 className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
               Research intelligence
             </h2>
             <Link
               href="/research"
-              className="text-[11px] text-[hsl(var(--primary))] hover:text-[hsl(var(--primary)/0.8)]"
+              className="text-sm text-primary hover:text-primary/80"
             >
               View all →
             </Link>
           </div>
           <ResearchFeedClient notes={notes.slice(0, 5)} />
 
-          <div className="mt-6 rounded-xl border border-[hsl(var(--border))] bg-surface p-5">
+          <div className="mt-6 rounded-xl border border-border bg-surface p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+              <h3 className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
                 Market overview
               </h3>
-              <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Index tabs (fallback mode)</span>
+              <span className="text-sm text-muted-foreground">Index tabs (fallback mode)</span>
             </div>
             <div className="mb-4 flex flex-wrap gap-2">
               {(['S&P 500', 'NASDAQ', 'STI', 'FTSE'] as const).map((tab) => {
@@ -222,8 +222,8 @@ export default function DashboardCockpitClient({
                     type="button"
                     onClick={() => setMarketTab(tab)}
                     className={[
-                      'rounded px-2 py-1 font-mono text-[11px]',
-                      active ? 'bg-primary/15 text-primary' : 'text-[hsl(var(--muted-foreground))] hover:text-foreground',
+                      'rounded px-2 py-1 font-mono text-sm',
+                      active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground',
                     ].join(' ')}
                     title="Index endpoint unavailable, showing regime-confidence fallback"
                   >
@@ -235,7 +235,7 @@ export default function DashboardCockpitClient({
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">{regimeLabel}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {marketTab} data endpoint unavailable — showing live regime confidence fallback
                 </p>
               </div>
@@ -256,17 +256,17 @@ export default function DashboardCockpitClient({
 
         <aside className="w-full shrink-0 lg:w-80">
           {!hasPortfolio && !dnaLoading ? (
-            <div className="rounded-xl border border-dashed border-[hsl(var(--primary)/0.3)] bg-[hsl(var(--primary)/0.05)] p-6 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[hsl(var(--primary)/0.1)]">
-                <UploadCloud className="h-6 w-6 text-[hsl(var(--primary))]" />
+            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <UploadCloud className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="mb-1 text-sm font-semibold text-[hsl(var(--foreground))]">Analyze Your Portfolio</h3>
-              <p className="mb-4 text-[12px] leading-relaxed text-[hsl(var(--muted-foreground))]">
+              <h3 className="mb-1 text-sm font-semibold text-foreground">Analyze Your Portfolio</h3>
+              <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
                 Upload a CSV of your holdings for institutional-grade DNA scoring and AI-powered risk analysis.
               </p>
               <Link
                 href="/dashboard/portfolio"
-                className="block w-full rounded-lg bg-[hsl(var(--primary))] py-2.5 text-center text-sm font-medium text-[hsl(var(--primary-foreground))]"
+                className="block w-full rounded-lg bg-primary py-2.5 text-center text-sm font-medium text-primary-foreground"
               >
                 Upload Portfolio
               </Link>
@@ -274,17 +274,17 @@ export default function DashboardCockpitClient({
           ) : null}
 
           {hasPortfolio && !dnaLoading ? (
-            <div className="rounded-lg border border-[hsl(var(--border))] bg-surface p-4">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 Portfolio DNA
               </p>
-              <p className="font-finance mt-2 text-3xl font-semibold tabular-nums text-[hsl(var(--foreground))]">
+              <p className="font-finance mt-2 text-3xl font-semibold tabular-nums text-foreground">
                 {typeof score === 'number' ? score : '—'}
               </p>
-              <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">Latest score from your holdings</p>
+              <p className="mt-1 text-sm text-muted-foreground">Latest score from your holdings</p>
               <Link
                 href="/dashboard/portfolio"
-                className="mt-3 inline-block text-[11px] text-[hsl(var(--primary))] hover:underline"
+                className="mt-3 inline-block text-sm text-primary hover:underline"
               >
                 View portfolio →
               </Link>
@@ -292,16 +292,16 @@ export default function DashboardCockpitClient({
           ) : null}
 
           {dnaLoading ? (
-            <div className="animate-pulse rounded-xl border border-[hsl(var(--border))] bg-surface p-6">
-              <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-[hsl(var(--muted-foreground)/0.15)]" />
-              <div className="mx-auto h-4 w-40 rounded bg-[hsl(var(--muted-foreground)/0.15)]" />
+            <div className="animate-pulse rounded-xl border border-border bg-surface p-6">
+              <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-muted-foreground/15" />
+              <div className="mx-auto h-4 w-40 rounded bg-muted-foreground/15" />
             </div>
           ) : null}
 
-          <div className="mt-4 rounded-lg border border-[hsl(var(--border))] bg-surface p-4">
+          <div className="mt-4 rounded-lg border border-border bg-surface p-4">
             <div className="mb-3 flex items-center gap-2">
-              <Brain className="h-[14px] w-[14px] text-[hsl(var(--accent))]" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+              <Brain className="h-[14px] w-[14px] text-accent" />
+              <span className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
                 Behavioral lens
               </span>
             </div>
@@ -309,7 +309,7 @@ export default function DashboardCockpitClient({
               {(signals ?? []).map((s) => (
                 <div
                   key={s.key}
-                  className="flex items-start gap-2.5 border-b border-[hsl(var(--border)/0.4)] py-2 last:border-0"
+                  className="flex items-start gap-2.5 border-b border-border/40 py-2 last:border-0"
                 >
                   {s.positive ? (
                     <TrendingUp className="mt-0.5 h-[13px] w-[13px] shrink-0 text-positive" />
@@ -317,8 +317,8 @@ export default function DashboardCockpitClient({
                     <AlertTriangle className="mt-0.5 h-[13px] w-[13px] shrink-0 text-warning" />
                   )}
                   <div>
-                    <p className="text-[11px] font-medium text-[hsl(var(--foreground))]">{s.bias}</p>
-                    <p className="mt-0.5 text-[11px] leading-snug text-[hsl(var(--muted-foreground))]">{s.evidence}</p>
+                    <p className="text-sm font-medium text-foreground">{s.bias}</p>
+                    <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{s.evidence}</p>
                   </div>
                 </div>
               ))}

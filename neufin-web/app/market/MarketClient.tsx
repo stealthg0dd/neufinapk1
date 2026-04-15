@@ -120,7 +120,7 @@ function ScoreGauge({ score }: { score: number }) {
       </svg>
       <div className="text-center -mt-3">
         <span className="text-4xl font-bold" style={{ color }}>{score}</span>
-        <span className="text-gray-500 text-lg">/100</span>
+        <span className="text-shell-subtle text-lg">/100</span>
       </div>
     </div>
   )
@@ -154,10 +154,10 @@ function ScoreTooltip({ active, payload }: { active?: boolean; payload?: { paylo
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs">
-      <p className="text-gray-400">{d.date}</p>
+    <div className="bg-shell border border-shell-border rounded-lg px-3 py-2 text-xs">
+      <p className="text-shell-muted">{d.date}</p>
       <p className="text-white font-semibold">Avg Score: {d.avg_score}</p>
-      <p className="text-gray-500">{d.count} portfolios</p>
+      <p className="text-shell-subtle">{d.count} portfolios</p>
     </div>
   )
 }
@@ -166,9 +166,9 @@ function DistTooltip({ active, payload }: { active?: boolean; payload?: { payloa
   if (!active || !payload?.length) return null
   const d = payload[0].payload
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs">
+    <div className="bg-shell border border-shell-border rounded-lg px-3 py-2 text-xs">
       <p className="text-white font-semibold">{d.label} ({d.range})</p>
-      <p className="text-gray-400">{d.count} portfolios · {d.pct}%</p>
+      <p className="text-shell-muted">{d.count} portfolios · {d.pct}%</p>
     </div>
   )
 }
@@ -214,7 +214,7 @@ export default function MarketClient({ health, trend }: Props) {
             <div key={stat.label} className="card text-center">
               <div className="text-2xl mb-1">{stat.icon}</div>
               <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{stat.label}</div>
+              <div className="text-xs text-shell-subtle mt-0.5">{stat.label}</div>
             </div>
           ))}
         </motion.div>
@@ -224,18 +224,18 @@ export default function MarketClient({ health, trend }: Props) {
 
           {/* Gauge */}
           <div className="card flex flex-col items-center justify-center gap-2">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider w-full">
+            <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wider w-full">
               Average Investor DNA
             </h2>
             <ScoreGauge score={health.avg_dna_score} />
-            <p className="text-xs text-gray-600 text-center">
+            <p className="text-xs text-shell-subtle text-center">
               Live average across {health.total_portfolios.toLocaleString()} portfolios on Neufin
             </p>
           </div>
 
           {/* Score distribution */}
           <div className="card space-y-3">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wider">
               Score Distribution
             </h2>
             <ResponsiveContainer width="100%" height={180}>
@@ -254,7 +254,7 @@ export default function MarketClient({ health, trend }: Props) {
               {health.score_distribution.map((b, i) => (
                 <div key={b.range} className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: scoreColors.at(i) ?? '#6b7280' }} />
-                  <span className="text-xs text-gray-500">{b.label} <span className="text-gray-600">{b.pct}%</span></span>
+                  <span className="text-xs text-shell-subtle">{b.label} <span className="text-shell-subtle">{b.pct}%</span></span>
                 </div>
               ))}
             </div>
@@ -264,10 +264,10 @@ export default function MarketClient({ health, trend }: Props) {
         {/* ── Strategy mix treemap ──────────────────────────────── */}
         <motion.div variants={fadeUp} className="card space-y-4">
           <div>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wider">
               Strategy Mix Heatmap
             </h2>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-shell-subtle mt-1">
               How Neufin users are positioned — concentration of investment strategies across the platform.
             </p>
           </div>
@@ -285,7 +285,7 @@ export default function MarketClient({ health, trend }: Props) {
               </Treemap>
             </ResponsiveContainer>
           ) : (
-            <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
+            <div className="h-40 flex items-center justify-center text-shell-subtle text-sm">
               Not enough data yet
             </div>
           )}
@@ -294,8 +294,8 @@ export default function MarketClient({ health, trend }: Props) {
             {health.strategy_mix.map(s => (
               <div key={s.type} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-                <span className="text-xs text-gray-400">{s.type}</span>
-                <span className="text-xs text-gray-600">{s.pct}%</span>
+                <span className="text-xs text-shell-muted">{s.type}</span>
+                <span className="text-xs text-shell-subtle">{s.pct}%</span>
               </div>
             ))}
           </div>
@@ -304,10 +304,10 @@ export default function MarketClient({ health, trend }: Props) {
         {/* ── Score trend over time ─────────────────────────────── */}
         <motion.div variants={fadeUp} className="card space-y-4">
           <div>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+            <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wider">
               Platform DNA Score — 30-Day Trend
             </h2>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className="text-xs text-shell-subtle mt-1">
               Daily average DNA score across all portfolio uploads.
             </p>
           </div>
@@ -341,7 +341,7 @@ export default function MarketClient({ health, trend }: Props) {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-40 flex items-center justify-center text-gray-600 text-sm">
+            <div className="h-40 flex items-center justify-center text-shell-subtle text-sm">
               More data needed — trend appears after multiple days of uploads
             </div>
           )}
@@ -350,7 +350,7 @@ export default function MarketClient({ health, trend }: Props) {
         {/* ── CTA ──────────────────────────────────────────────── */}
         <motion.div variants={fadeUp} className="card border-blue-800/30 bg-gradient-to-br from-blue-950/30 to-purple-950/20 text-center space-y-3">
           <p className="text-white font-semibold">Where do you rank?</p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-shell-subtle text-sm">
             Upload your portfolio and see how your DNA Score compares to the platform average of {health.avg_dna_score}.
           </p>
           <div className="flex justify-center gap-3">

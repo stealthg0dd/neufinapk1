@@ -146,14 +146,14 @@ export default function AdminSystemPage() {
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
             <p className="text-xs text-zinc-500">Swarm success (7d, headline+trace)</p>
             <p className="text-xl text-white tabular-nums">{fmtPct(sys?.agent_success_rate_7d)}</p>
-            <p className="text-[11px] text-zinc-500 mt-1">
+            <p className="text-sm text-zinc-500 mt-1">
               n={sys?.agent_success_sample_size_7d ?? '—'} reports
             </p>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 text-sm">
             <p className="text-xs text-zinc-500">Analytics “error” hint (24h)</p>
             <p className="text-xl text-white tabular-nums">{fmtPct(sys?.analytics_error_hint_rate_24h_pct)}</p>
-            <p className="text-[11px] text-zinc-500 mt-1">
+            <p className="text-sm text-zinc-500 mt-1">
               n={sys?.analytics_events_sample_24h ?? '—'} events
             </p>
           </div>

@@ -34,7 +34,7 @@ export function DnaScoreCard({ score, investorType, hasPortfolio }: Props) {
             <span className="text-[42px] font-bold leading-none tabular-nums" style={{ color: col }}>
               {score}
             </span>
-            <span className="text-[11px] font-semibold" style={{ color: col }}>
+            <span className="text-sm font-semibold" style={{ color: col }}>
               {label}
             </span>
           </div>

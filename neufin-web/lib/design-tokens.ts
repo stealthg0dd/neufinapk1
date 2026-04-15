@@ -1,23 +1,34 @@
 /**
- * NeuFin design tokens — mirror of CSS variables in app/globals.css
- * Use for programmatic access (charts, canvas, etc.)
+ * Programmatic tokens — hex values mirror `app/globals.css` :root.
+ * Prefer CSS variables in UI; use this for charts/canvas/PDF only.
  */
 export const designTokens = {
-  canvas: '#080B14',
-  surface1: '#0F1420',
-  surface2: '#161D2E',
-  surface3: '#1E2640',
-  border: 'rgba(255,255,255,0.07)',
-  borderAccent: 'rgba(245,162,35,0.3)',
-  textPrimary: '#F0F4FF',
-  textSecondary: '#8B95B0',
-  textMuted: '#4A5568',
-  amber: '#F5A623',
-  emerald: '#00D97E',
-  red: '#FF4D6A',
-  blue: '#4D9FFF',
-  glassBg: 'rgba(15,20,32,0.7)',
-  glassBorder: 'rgba(255,255,255,0.08)',
+  bg: '#F6F8FB',
+  surface: '#FFFFFF',
+  surface2: '#F8FAFC',
+  surface3: '#F1F5F9',
+  border: '#E2E8F0',
+  borderAccent: 'rgba(30, 184, 204, 0.35)',
+  textPrimary: '#0F172A',
+  textSecondary: '#64748B',
+  /** Strong body copy on light surfaces (legacy “slate”) */
+  textBody: '#334155',
+  primary: '#1EB8CC',
+  primaryDark: '#158A99',
+  primaryLight: '#E0F7FA',
+  accent: '#F5A623',
+  success: '#22C55E',
+  warning: '#F5A623',
+  danger: '#EF4444',
+  glassBg: 'rgba(255, 255, 255, 0.92)',
+  glassBorder: 'rgba(226, 232, 240, 0.95)',
+  shellDeep: '#020617',
+  shell: '#0F172A',
+  shellRaised: '#1E293B',
+  shellBorder: '#334155',
+  shellFg: '#F8FAFC',
+  shellMuted: '#94A3B8',
+  shellSubtle: '#64748B',
 } as const
 
 export type DesignTokenKey = keyof typeof designTokens

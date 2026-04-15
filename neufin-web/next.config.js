@@ -47,6 +47,9 @@ const nextConfig = {
   // IMPORTANT: use `fallback` so /api/stripe/webhook (and every app/api/**/route.ts)
   // is never proxied — `afterFiles`-style rewrites can run before some API matches and
   // break Stripe signature verification (wrong host + wrong STRIPE_WEBHOOK_SECRET).
+  //
+  // Last-resort URL is production only for local builds without env; Vercel Preview and
+  // CI must set RAILWAY_API_URL or NEXT_PUBLIC_API_URL (see docs/deployments.md).
   async rewrites() {
     const railwayBase =
       process.env.RAILWAY_API_URL ||

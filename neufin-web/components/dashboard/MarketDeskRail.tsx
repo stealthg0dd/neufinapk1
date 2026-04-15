@@ -136,13 +136,13 @@ export function MarketDeskRail({
 
   return (
     <aside
-      className={`relative flex h-full shrink-0 flex-col border-l border-[hsl(var(--border)/0.5)] bg-sidebar transition-all duration-200 ${widthClass}`}
+      className={`relative flex h-full shrink-0 flex-col border-l border-border/50 bg-sidebar transition-all duration-200 ${widthClass}`}
       aria-label={title}
     >
       <button
         type="button"
         onClick={onToggle}
-        className="m-2 flex h-8 items-center justify-center rounded-md border border-[hsl(var(--border)/0.6)] text-muted-foreground hover:text-foreground"
+        className="m-2 flex h-8 items-center justify-center rounded-md border border-border/60 text-muted-foreground hover:text-foreground"
         aria-label={title}
       >
         {open ? <ChevronLeft className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -160,28 +160,28 @@ export function MarketDeskRail({
                 key={prompt}
                 type="button"
                 onClick={() => void sendMessage(prompt)}
-                className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] text-primary hover:bg-primary/20"
+                className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-sm text-primary hover:bg-primary/20"
               >
                 {prompt}
               </button>
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-lg border border-[hsl(var(--border)/0.45)] bg-surface/40 p-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-lg border border-border/45 bg-surface/40 p-2">
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`rounded-md px-2.5 py-2 text-xs leading-relaxed ${
+                className={`rounded-md px-2.5 py-2 text-sm leading-relaxed ${
                   m.role === 'assistant'
                     ? 'bg-primary/10 text-foreground'
-                    : 'bg-[hsl(var(--surface-2))] text-foreground'
+                    : 'bg-surface-2 text-foreground'
                 }`}
               >
                 {m.text}
               </div>
             ))}
             {loading ? (
-              <div className="flex items-center gap-2 rounded-md bg-primary/5 px-2.5 py-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 rounded-md bg-primary/5 px-2.5 py-2 text-sm text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Thinking...
               </div>
@@ -199,7 +199,7 @@ export function MarketDeskRail({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask Market Desk..."
-              className="h-9 flex-1 rounded-md border border-[hsl(var(--border)/0.6)] bg-background px-3 text-xs outline-none ring-0 placeholder:text-muted-foreground/70 focus:border-primary/50"
+              className="h-9 flex-1 rounded-md border border-border/60 bg-background px-3 text-sm outline-none ring-0 placeholder:text-muted-foreground/70 focus:border-primary/50"
             />
             <button
               type="submit"

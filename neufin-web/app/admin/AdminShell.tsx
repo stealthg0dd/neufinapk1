@@ -22,7 +22,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
       <aside className="w-56 shrink-0 border-r border-zinc-800/80 p-4 flex flex-col gap-6">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+          <p className="text-sm font-semibold uppercase tracking-widest text-zinc-500">
             NeuFin
           </p>
           <p className="text-sm font-semibold text-zinc-100">Admin</p>

@@ -116,7 +116,7 @@ export default function AdminUsersPage() {
           <tbody className="divide-y divide-zinc-800">
             {loading ? (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-zinc-500">
+                <td colSpan={8} className="px-3 py-6 text-center text-zinc-500">
                   Loading…
                 </td>
               </tr>

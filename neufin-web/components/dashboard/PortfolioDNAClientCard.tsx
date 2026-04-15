@@ -15,10 +15,10 @@ export default function PortfolioDNAClientCard() {
   }
   if (loading) return <p className="text-sm text-[var(--text-2)]">Loading...</p>
   if (typeof score === 'number') {
-    return <p className="font-mono text-4xl text-[var(--amber)]">{score}</p>
+    return <p className="font-mono text-4xl text-primary">{score}</p>
   }
   return (
-    <Link href="/dashboard/portfolio" className="text-sm text-[var(--amber)] hover:underline">
+    <Link href="/dashboard/portfolio" className="text-sm text-primary hover:underline">
       Upload portfolio →
     </Link>
   )

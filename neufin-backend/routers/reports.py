@@ -74,6 +74,7 @@ class ReportRequest(BaseModel):
     white_label: bool = False
     theme: str = "light"  # "light" (default, institutional) | "dark" (fintech)
     inline_pdf: bool = False
+    ic_grade_only: bool = False  # True → 422 if report would be draft-quality
 
 
 def _positions_from_dna_row(dna: dict | None) -> list[dict]:
@@ -518,13 +519,17 @@ async def generate_report(
             "positions_with_basis": positions_raw,
         }
 
-        pdf_bytes = await generate_advisor_report(
-            portfolio_payload,
-            existing_dna or {},
-            swarm_row,
-            advisor_config,
-            theme=body.theme,
-        )
+        try:
+            pdf_bytes = await generate_advisor_report(
+                portfolio_payload,
+                existing_dna or {},
+                swarm_row,
+                advisor_config,
+                theme=body.theme,
+                ic_grade_only=body.ic_grade_only,
+            )
+        except ValueError as verr:
+            raise HTTPException(status_code=422, detail=str(verr)) from verr
 
         filename = f"report-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}.pdf"
         pdf_url = _upload_to_storage(pdf_bytes, filename)

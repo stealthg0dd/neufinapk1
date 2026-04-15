@@ -208,6 +208,46 @@ def _price_on_or_before(s: pd.Series, date_str: str) -> float | None:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Weight validation
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _portfolio_weights_valid(weights: dict[str, float]) -> tuple[bool, str]:
+    """Return (ok, reason). Invalid weights must not produce numeric scenario outputs."""
+    if not weights:
+        return False, "empty"
+    for _sym, w in weights.items():
+        try:
+            wf = float(w)
+        except (TypeError, ValueError):
+            return False, "non_numeric"
+        if wf < -1e-6 or wf > 1.0 + 1e-3:
+            return False, "out_of_range"
+    s = sum(float(w) for w in weights.values())
+    if s < 0.85 or s > 1.15:
+        return False, "sum_not_one"
+    return True, ""
+
+
+def _unavailable_scenario_row(scenario: dict) -> dict:
+    """Single scenario placeholder when stress math cannot run."""
+    return {
+        **scenario,
+        "portfolio_return_pct": None,
+        "outperformance_vs_spy_pct": None,
+        "weakest_link": {},
+        "per_symbol": [],
+        "data_coverage_pct": 0.0,
+        "data_status": "unavailable",
+        "md_narrative": (
+            "Scenario analysis unavailable — portfolio weights are invalid, "
+            "incomplete, or do not sum to 100%. Re-upload positions with correct "
+            "weights before relying on historical stress figures."
+        ),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Core stress-test engine
 # ══════════════════════════════════════════════════════════════════════════════
 def run_stress_tests(
@@ -226,8 +266,13 @@ def run_stress_tests(
       per_symbol: [{symbol, return_pct, weighted_contribution_pct, weight_pct, data_available}],
       data_coverage_pct,
       md_narrative,           # pre-formed string for the IC Briefing MD
+      data_status,           # optional: "unavailable" when weights invalid
     }
     """
+    ok, _reason = _portfolio_weights_valid(weights)
+    if not ok:
+        return [_unavailable_scenario_row(dict(s)) for s in SCENARIOS.values()]
+
     results: list[dict] = []
 
     for scenario in SCENARIOS.values():

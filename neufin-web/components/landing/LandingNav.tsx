@@ -11,7 +11,7 @@ const LINKS = [
   { href: '/research', label: 'Research' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/partners', label: 'Partners' },
-  { href: '#api-platform', label: 'API' },
+  { href: '#api', label: 'API' },
 ] as const
 
 export default function LandingNav() {

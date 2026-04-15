@@ -1,0 +1,194 @@
+/**
+ * Institutional print stylesheet — Paged.js or Print → Save as PDF.
+ * IC-grade: white field, black type, minimal accent, clear section rhythm.
+ */
+
+@page {
+  size: A4;
+  margin: 18mm 16mm 20mm 16mm;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+.neufin-report {
+  font-family: ui-serif, 'Times New Roman', Times, serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  color: #000;
+  background: #fff;
+  max-width: 100%;
+}
+
+/* —— Cover —— */
+.report-cover {
+  padding-bottom: 28pt;
+  break-after: page;
+}
+
+.report-cover-eyebrow {
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 8pt;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #404040;
+  margin: 0 0 16pt;
+}
+
+.report-cover-title {
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 22pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #000;
+  margin: 0 0 14pt;
+  line-height: 1.15;
+}
+
+.report-cover-rule {
+  height: 1px;
+  background: #000;
+  max-width: 200pt;
+  margin-bottom: 20pt;
+}
+
+.report-cover-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14pt 24pt;
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+}
+
+.report-cover-meta dt {
+  font-size: 7.5pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #525252;
+  margin: 0 0 3pt;
+}
+
+.report-cover-meta dd {
+  margin: 0;
+  font-size: 10.5pt;
+  font-weight: 600;
+  color: #000;
+}
+
+.report-cover-status {
+  margin: 22pt 0 0;
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 9pt;
+  color: #404040;
+  max-width: 95%;
+}
+
+/* —— Body sections —— */
+.report-section {
+  margin-bottom: 22pt;
+  break-inside: avoid-page;
+}
+
+.report-section-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12pt;
+  margin-bottom: 0;
+}
+
+.report-section-num {
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 10pt;
+  font-weight: 700;
+  color: #000;
+  min-width: 18pt;
+  line-height: 1.3;
+  padding-top: 1pt;
+}
+
+.report-section-titles h2 {
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 12pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #000;
+  margin: 0 0 4pt;
+  line-height: 1.25;
+}
+
+.report-section-confidence {
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 8.5pt;
+  color: #525252;
+}
+
+.report-section-sep {
+  height: 0;
+  border: 0;
+  border-top: 1px solid #d4d4d4;
+  margin: 10pt 0 12pt;
+}
+
+.report-section-summary {
+  margin: 0 0 10pt;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.report-bullets {
+  margin: 0 0 12pt 1.1em;
+  padding: 0;
+}
+
+.report-bullets li {
+  margin-bottom: 5pt;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 9.5pt;
+  margin: 10pt 0 4pt;
+}
+
+.report-table th,
+.report-table td {
+  border: 1px solid #d4d4d4;
+  padding: 7pt 9pt;
+  text-align: left;
+  vertical-align: top;
+}
+
+.report-table thead th {
+  background: #fafafa;
+  font-weight: 700;
+  color: #000;
+}
+
+.report-table tbody th[scope='row'] {
+  font-weight: 600;
+  background: #fafafa;
+  color: #000;
+  width: 42%;
+}
+
+.report-footer {
+  margin-top: 28pt;
+  padding-top: 12pt;
+  border-top: 1px solid #000;
+  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-size: 8pt;
+  line-height: 1.45;
+  color: #404040;
+}
+
+.pagedjs_page {
+  background: #fff;
+}

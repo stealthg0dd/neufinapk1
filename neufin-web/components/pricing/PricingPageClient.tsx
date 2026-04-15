@@ -102,7 +102,7 @@ export default function PricingPageClient() {
     <div className="flex min-h-screen flex-col bg-[var(--bg-app)]">
       <nav className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/95 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-display text-xl text-primary">
+          <Link href="/" className="font-sans text-xl text-primary">
             NeuFin
           </Link>
           <div className="flex gap-2">
@@ -116,9 +116,9 @@ export default function PricingPageClient() {
         </div>
       </nav>
 
-      <main className="flex-1 px-4 py-16 sm:px-6">
+      <main className="flex-1 px-4 py-section sm:px-6">
         <div className="mx-auto mb-12 max-w-5xl text-center">
-          <h1 className="mb-4 font-display text-4xl text-navy md:text-5xl">Pricing</h1>
+          <h1 className="mb-4 font-sans text-4xl text-navy md:text-5xl">Pricing</h1>
           <p className="mx-auto max-w-xl text-[var(--slate)]">
             Institutional workflows, without the terminal price tag.
           </p>
@@ -158,7 +158,7 @@ export default function PricingPageClient() {
           {/* Free */}
           <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
             <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Free</p>
-            <p className="mb-1 font-display text-5xl font-bold text-navy">$0</p>
+            <p className="mb-1 font-sans text-5xl font-bold text-navy">$0</p>
             <p className="mb-6 text-sm text-[var(--slate)]">per month</p>
             <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
               {['3 DNA analyses', 'Basic behavioral report', 'CSV upload'].map((f) => (
@@ -182,7 +182,7 @@ export default function PricingPageClient() {
               Most Popular
             </span>
             <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Advisor</p>
-            <p className="mb-1 font-display text-5xl font-bold text-primary">${advDisplay}</p>
+            <p className="mb-1 font-sans text-5xl font-bold text-primary">${advDisplay}</p>
             <p className="mb-6 text-sm text-[var(--slate)]">
               per month{annual ? ', billed annually' : ''}
             </p>
@@ -212,7 +212,7 @@ export default function PricingPageClient() {
           {/* Enterprise */}
           <GlassCard className="flex flex-col rounded-xl border border-[var(--border)] bg-white p-7 shadow-[var(--shadow-sm)]">
             <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">Enterprise</p>
-            <p className="mb-1 font-display text-5xl font-bold text-navy">${entDisplay}</p>
+            <p className="mb-1 font-sans text-5xl font-bold text-navy">${entDisplay}</p>
             <p className="mb-2 text-sm text-[var(--slate)]">
               per month{annual ? ', billed annually' : ''}
             </p>
@@ -240,14 +240,14 @@ export default function PricingPageClient() {
         </div>
 
         <div className="max-w-2xl mx-auto mt-16 space-y-3">
-          <h2 className="mb-6 text-center font-display text-2xl text-navy">FAQ</h2>
+          <h2 className="mb-6 text-center font-sans text-2xl text-navy">FAQ</h2>
           {faqs.map((f) => (
             <FAQItem key={f.q} {...f} />
           ))}
         </div>
       </main>
 
-      <section className="border-t border-[var(--border)] py-8 px-4">
+      <section className="border-t border-[var(--border)] py-section px-4">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-sm leading-relaxed text-[var(--muted)]">
             <strong className="text-[var(--slate)]">Regulatory Disclaimer:</strong> NeuFin provides financial

@@ -11,7 +11,7 @@ export default function TrialBanner({ status, daysRemaining }: TrialBannerProps)
   if (status === 'expired') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="max-w-md rounded-xl border border-[var(--border)] bg-white px-8 py-10 text-center shadow-lg">
+        <div className="max-w-md rounded-xl border border-[var(--border)] bg-white px-8 py-8 text-center shadow-lg">
           <h2 className="mb-4 text-2xl font-bold text-navy">Your 14-day trial has ended</h2>
           <p className="mb-6 text-sm leading-relaxed text-[var(--slate)]">
             Upgrade to NeuFin Advisor to keep accessing reports and Swarm analysis.

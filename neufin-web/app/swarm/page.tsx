@@ -40,12 +40,12 @@ function Tip({ content, children }: { content: string; children: React.ReactNode
         <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
         <RadixTooltip.Portal>
           <RadixTooltip.Content
-            className="z-50 rounded px-2 py-1 text-[10px] text-white"
-            style={{ background: '#1a1a1a', border: '1px solid #333', maxWidth: 220, lineHeight: 1.5 }}
+            className="z-50 rounded-md border border-border bg-white px-2 py-1.5 text-xs text-slate2 shadow-md"
+            style={{ maxWidth: 220, lineHeight: 1.5 }}
             sideOffset={5}
           >
             {content}
-            <RadixTooltip.Arrow style={{ fill: '#333' }} />
+            <RadixTooltip.Arrow style={{ fill: '#e2e8f0' }} />
           </RadixTooltip.Content>
         </RadixTooltip.Portal>
       </RadixTooltip.Root>
@@ -130,11 +130,11 @@ function cpiSparkline(yoy: number | null | undefined): { t: string; v: number }[
 
 /** Return background + text color for a correlation value */
 function corrCellStyle(v: number, isDiag: boolean): { bg: string; text: string } {
-  if (isDiag) return { bg: '#111', text: '#555' }
-  if (v >= 0.85) return { bg: 'rgba(239,68,68,0.35)', text: '#fca5a5' }
-  if (v >= 0.70) return { bg: 'rgba(245,158,11,0.30)', text: '#fcd34d' }
-  if (v >= 0.50) return { bg: 'rgba(99,102,241,0.20)', text: '#a5b4fc' }
-  return { bg: 'rgba(34,197,94,0.15)', text: '#86efac' }
+  if (isDiag) return { bg: '#f1f5f9', text: '#64748b' }
+  if (v >= 0.85) return { bg: 'rgba(239,68,68,0.12)', text: '#b91c1c' }
+  if (v >= 0.70) return { bg: 'rgba(245,166,35,0.15)', text: '#b45309' }
+  if (v >= 0.50) return { bg: 'rgba(30,184,204,0.12)', text: '#0e7490' }
+  return { bg: 'rgba(22,163,74,0.12)', text: '#15803d' }
 }
 
 const REGIME_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -175,17 +175,14 @@ function IntelCard({
   children: React.ReactNode
 }) {
   return (
-    <div
-      className="glass-card-dark rounded-md overflow-hidden flex flex-col transition-all duration-300 hover:shadow-lg"
-      style={{ ['--glow' as string]: accent + '22' }}
-    >
-      <div className="bg-[#141414] px-3 py-2 border-b border-[#2a2a2a] flex items-center gap-2 shrink-0">
+    <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-white shadow-sm transition-all duration-300 hover:shadow-md">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border-light bg-surface-2 px-3 py-2">
         <span style={{ color: accent }}>{icon}</span>
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: accent }}>
+        <span className="text-xs font-bold uppercase tracking-wide text-navy" style={{ color: accent }}>
           {title}
         </span>
       </div>
-      <div className="flex-1 px-3 py-3 space-y-2.5 text-[11px]">{children}</div>
+      <div className="flex-1 space-y-2.5 px-3 py-3 text-sm text-slate2">{children}</div>
     </div>
   )
 }
@@ -203,7 +200,7 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
     <IntelCard title="Market Regime" icon={<Globe size={12} />} accent={meta.color}>
       {/* Regime badge */}
       <div
-        className="w-full py-2 px-3 rounded text-center font-bold text-[12px] uppercase tracking-widest"
+        className="w-full py-2 px-3 rounded text-center font-bold text-sm uppercase tracking-widest"
         style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}33` }}
       >
         {meta.label}
@@ -211,8 +208,8 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
 
       {/* CPI sparkline */}
       <div>
-        <div className="flex justify-between text-[10px] mb-1">
-          <span className="text-[#555] uppercase tracking-wide">CPI YoY (12m)</span>
+        <div className="mb-1 flex justify-between text-xs">
+          <span className="uppercase tracking-wide text-muted2">CPI YoY (12m)</span>
           <span style={{ color: meta.color }} className="font-bold">{cpiStr}</span>
         </div>
         <ResponsiveContainer width="100%" height={42}>
@@ -226,10 +223,17 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
               animationDuration={800}
             />
             <Tooltip
-              contentStyle={{ background: '#111', border: `1px solid ${meta.color}44`, fontSize: 10, padding: '2px 6px' }}
+              contentStyle={{
+                background: '#ffffff',
+                border: `1px solid ${meta.color}44`,
+                fontSize: 10,
+                padding: '4px 8px',
+                borderRadius: 6,
+                color: '#0f172a',
+              }}
               formatter={(v: number) => [`${v}%`, 'CPI']}
               labelFormatter={(l) => l}
-              labelStyle={{ color: '#888' }}
+              labelStyle={{ color: '#64748b' }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -237,21 +241,21 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
 
       {/* Confidence + 3m trend */}
       <div className="flex gap-3">
-        <div className="flex-1 bg-[#141414] rounded px-2 py-1.5">
-          <p className="text-[9px] text-[#555] uppercase tracking-wider mb-0.5">Confidence</p>
+        <div className="flex-1 rounded border border-border-light bg-surface-2 px-2 py-1.5">
+          <p className="mb-0.5 text-xs uppercase tracking-wider text-muted2">Confidence</p>
           <p className="font-bold" style={{ color: meta.color }}>{conf}%</p>
         </div>
         {typeof data.cpi_trend_3m === 'number' && (
-          <div className="flex-1 bg-[#141414] rounded px-2 py-1.5">
-            <p className="text-[9px] text-[#555] uppercase tracking-wider mb-0.5">3m Ann.</p>
-            <p className="font-bold text-[#888]">{data.cpi_trend_3m.toFixed(1)}%</p>
+          <div className="flex-1 rounded border border-border-light bg-surface-2 px-2 py-1.5">
+            <p className="mb-0.5 text-xs uppercase tracking-wider text-muted2">3m Ann.</p>
+            <p className="font-bold text-slate2">{data.cpi_trend_3m.toFixed(1)}%</p>
           </div>
         )}
       </div>
 
       {/* Portfolio implication */}
       {data.portfolio_implication && (
-        <p className="text-[#666] leading-relaxed border-t border-[#1e1e1e] pt-2">
+        <p className="border-t border-border-light pt-2 leading-relaxed text-slate2">
           {(data.portfolio_implication as string).slice(0, 140)}
           {(data.portfolio_implication as string).length > 140 ? '…' : ''}
         </p>
@@ -259,11 +263,11 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
 
       {/* Key drivers */}
       {Array.isArray(data.drivers) && data.drivers.length > 0 && (
-        <div className="space-y-1 border-t border-[#1e1e1e] pt-2">
+        <div className="space-y-1 border-t border-border-light pt-2">
           {(data.drivers as string[]).slice(0, 3).map((d, i) => (
             <div key={i} className="flex gap-1.5 items-start">
               <span style={{ color: meta.color }} className="shrink-0 mt-0.5">›</span>
-              <span className="text-[#666]">{d}</span>
+              <span className="text-slate2">{d}</span>
             </div>
           ))}
         </div>
@@ -276,10 +280,10 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
 function StrategistIntelCard({ data }: { data: Record<string, any> }) {
   const sentiment   = (data.sentiment ?? 'constructive') as string
   const sentimentCfg = sentiment === 'cautious'
-    ? { color: '#FFB900', Icon: TrendingDown, label: 'CAUTIOUS' }
+    ? { color: '#b45309', Icon: TrendingDown, label: 'CAUTIOUS' }
     : sentiment === 'bearish'
     ? { color: '#ef4444', Icon: TrendingDown, label: 'BEARISH'  }
-    : { color: '#00FF00', Icon: TrendingUp,   label: 'CONSTRUCTIVE' }
+    : { color: '#15803d', Icon: TrendingUp,   label: 'CONSTRUCTIVE' }
 
   return (
     <IntelCard title="Strategist Intel" icon={<Globe size={12} />} accent="#60a5fa">
@@ -289,14 +293,14 @@ function StrategistIntelCard({ data }: { data: Record<string, any> }) {
         style={{ background: `${sentimentCfg.color}15`, border: `1px solid ${sentimentCfg.color}33` }}
       >
         <sentimentCfg.Icon size={12} style={{ color: sentimentCfg.color }} />
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: sentimentCfg.color }}>
+        <span className="text-sm font-bold uppercase tracking-widest" style={{ color: sentimentCfg.color }}>
           {sentimentCfg.label}
         </span>
       </div>
 
       {/* Narrative */}
       {data.narrative && (
-        <p className="text-[#A8A8A8] leading-relaxed">
+        <p className="leading-relaxed text-slate2">
           {(data.narrative as string).slice(0, 220)}
           {(data.narrative as string).length > 220 ? '…' : ''}
         </p>
@@ -304,12 +308,12 @@ function StrategistIntelCard({ data }: { data: Record<string, any> }) {
 
       {/* Key drivers */}
       {Array.isArray(data.key_drivers) && data.key_drivers.length > 0 && (
-        <div className="border-t border-[#1e1e1e] pt-2 space-y-1">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1.5">Key Drivers</p>
+        <div className="space-y-1 border-t border-border-light pt-2">
+          <p className="mb-1.5 text-xs uppercase tracking-wide text-muted2">Key drivers</p>
           {(data.key_drivers as string[]).slice(0, 3).map((d, i) => (
             <div key={i} className="flex gap-1.5 items-start">
-              <span className="text-[#60a5fa] shrink-0 mt-0.5">›</span>
-              <span className="text-[#777]">{d}</span>
+              <span className="shrink-0 text-primary-dark mt-0.5">›</span>
+              <span className="text-slate2">{d}</span>
             </div>
           ))}
         </div>
@@ -317,12 +321,12 @@ function StrategistIntelCard({ data }: { data: Record<string, any> }) {
 
       {/* News risks */}
       {Array.isArray(data.news_risks) && data.news_risks.length > 0 && (
-        <div className="border-t border-[#1e1e1e] pt-2 space-y-1">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1.5">News Risks</p>
+        <div className="space-y-1 border-t border-border-light pt-2">
+          <p className="mb-1.5 text-xs uppercase tracking-wide text-muted2">News risks</p>
           {(data.news_risks as string[]).slice(0, 2).map((r, i) => (
             <div key={i} className="flex gap-1.5 items-start">
-              <AlertTriangle size={10} className="text-[#FFB900] shrink-0 mt-0.5" />
-              <span className="text-[#666]">{r}</span>
+              <AlertTriangle size={10} className="mt-0.5 shrink-0 text-amber-700" />
+              <span className="text-slate2">{r}</span>
             </div>
           ))}
         </div>
@@ -330,9 +334,9 @@ function StrategistIntelCard({ data }: { data: Record<string, any> }) {
 
       {/* Positioning advice */}
       {data.positioning_advice && (
-        <div className="border-t border-[#1e1e1e] pt-2">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1">MD Directive</p>
-          <p className="text-[#888] italic">{data.positioning_advice as string}</p>
+        <div className="border-t border-border-light pt-2">
+          <p className="mb-1 text-xs uppercase tracking-wide text-muted2">MD directive</p>
+          <p className="italic text-muted2">{data.positioning_advice as string}</p>
         </div>
       )}
     </IntelCard>
@@ -348,9 +352,9 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
   const interp  = data.hhi_interpretation ?? 'High Concentration'
   const sRating = data.sharpe_rating   ?? 'Acceptable'
 
-  const betaColor  = beta  > 1.8 ? '#ef4444' : beta  > 1.4 ? '#FFB900' : '#00FF00'
-  const sharpeColor = sharpe < 0 ? '#ef4444' : sharpe < 0.5 ? '#FFB900' : '#00FF00'
-  const corrColor  = avgCorr > 0.80 ? '#ef4444' : avgCorr > 0.65 ? '#FFB900' : '#00FF00'
+  const betaColor  = beta  > 1.8 ? '#ef4444' : beta  > 1.4 ? '#b45309' : '#15803d'
+  const sharpeColor = sharpe < 0 ? '#ef4444' : sharpe < 0.5 ? '#b45309' : '#15803d'
+  const corrColor  = avgCorr > 0.80 ? '#ef4444' : avgCorr > 0.65 ? '#b45309' : '#15803d'
 
   const cmData   = data.corr_matrix_data as { symbols: string[]; values: number[][] } | undefined
   const hasCm    = cmData && Array.isArray(cmData.symbols) && cmData.symbols.length > 0
@@ -361,12 +365,12 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
       <div className="space-y-2">
         {/* HHI */}
         <div>
-          <div className="flex justify-between mb-0.5">
-            <span className="text-[#555] uppercase tracking-wider text-[9px]">HHI Concentration</span>
-            <span className="text-[#FFB900] font-bold text-[10px]">{hhi}/25 · {interp}</span>
+          <div className="mb-0.5 flex justify-between">
+            <span className="text-xs uppercase tracking-wider text-muted2">HHI concentration</span>
+            <span className="text-xs font-bold text-amber-800">{hhi}/25 · {interp}</span>
           </div>
-          <div className="h-[3px] bg-[#1a1a1a] rounded-full overflow-hidden">
-            <div className="h-full bg-[#FFB900] rounded-full" style={{ width: `${(hhi / 25) * 100}%`, transition: 'width 0.7s' }} />
+          <div className="h-[3px] overflow-hidden rounded-full bg-surface-3">
+            <div className="h-full rounded-full bg-amber-600" style={{ width: `${(hhi / 25) * 100}%`, transition: 'width 0.7s' }} />
           </div>
         </div>
 
@@ -377,8 +381,8 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
             { label: 'Sharpe',    value: sharpe.toFixed(2),  color: sharpeColor },
             { label: 'Avg ρ',     value: avgCorr.toFixed(3), color: corrColor  },
           ].map(({ label, value, color }) => (
-            <div key={label} className="bg-[#141414] rounded px-2 py-1.5 text-center">
-              <p className="text-[9px] text-[#555] uppercase tracking-wider mb-0.5">{label}</p>
+            <div key={label} className="rounded border border-border-light bg-surface-2 px-2 py-1.5 text-center">
+              <p className="mb-0.5 text-xs uppercase tracking-wider text-muted2">{label}</p>
               <p className="font-bold" style={{ color }}>{value}</p>
             </div>
           ))}
@@ -386,25 +390,25 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
 
         {/* Per-symbol betas */}
         {data.beta_map && Object.keys(data.beta_map).length > 0 && (
-          <div className="space-y-1 border-t border-[#1e1e1e] pt-2">
-            <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1">Per-Symbol Beta</p>
+          <div className="space-y-1 border-t border-border-light pt-2">
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Per-symbol beta</p>
             {Object.entries(data.beta_map as Record<string, number>)
               .sort(([, a], [, b]) => b - a)
               .slice(0, 5)
               .map(([sym, b]) => (
                 <div key={sym} className="flex items-center gap-2">
-                  <span className="text-white font-mono w-12 shrink-0 text-[10px]">{sym}</span>
-                  <div className="flex-1 h-[2px] bg-[#1a1a1a] rounded-full overflow-hidden">
+                  <span className="w-12 shrink-0 font-mono text-xs font-semibold text-navy">{sym}</span>
+                  <div className="h-[2px] flex-1 overflow-hidden rounded-full bg-surface-3">
                     <div
                       className="h-full rounded-full"
                       style={{
                         width: `${Math.min((b / 2.5) * 100, 100)}%`,
-                        background: b > 1.8 ? '#ef4444' : b > 1.3 ? '#FFB900' : '#00FF00',
+                        background: b > 1.8 ? '#ef4444' : b > 1.3 ? '#b45309' : '#15803d',
                         transition: 'width 0.7s',
                       }}
                     />
                   </div>
-                  <span className="text-[10px] font-mono w-8 text-right" style={{ color: b > 1.8 ? '#ef4444' : b > 1.3 ? '#FFB900' : '#00FF00' }}>
+                  <span className="w-8 text-right font-mono text-xs" style={{ color: b > 1.8 ? '#ef4444' : b > 1.3 ? '#b45309' : '#15803d' }}>
                     {b.toFixed(2)}
                   </span>
                 </div>
@@ -415,8 +419,8 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
 
       {/* Correlation heatmap */}
       {hasCm && (
-        <div className="border-t border-[#1e1e1e] pt-2">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-2">Correlation Heatmap (top holdings)</p>
+        <div className="border-t border-border-light pt-2">
+          <p className="mb-2 text-xs uppercase tracking-wide text-muted2">Correlation heatmap (top holdings)</p>
           {/* Column labels */}
           <div
             className="grid gap-px"
@@ -424,17 +428,17 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
           >
             <div />
             {cmData.symbols.map((s) => (
-              <div key={s} className="text-center text-[8px] text-[#444] font-mono pb-0.5">{s}</div>
+              <div key={s} className="pb-0.5 text-center font-mono text-sm text-muted2">{s}</div>
             ))}
           </div>
           {/* Rows */}
           {cmData.values.map((row, i) => (
             <div
               key={i}
-              className="grid gap-px mb-px"
+              className="mb-px grid gap-px"
               style={{ gridTemplateColumns: `40px repeat(${cmData.symbols.length}, 1fr)` }}
             >
-              <div className="text-[8px] text-[#444] font-mono flex items-center pr-1 justify-end">
+              <div className="flex items-center justify-end pr-1 font-mono text-sm text-muted2">
                 {cmData.symbols.at(i) ?? ''}
               </div>
               {row.map((v, j) => {
@@ -459,13 +463,16 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
 
       {/* Clusters */}
       {Array.isArray(data.clusters) && data.clusters.length > 0 && (
-        <div className="border-t border-[#1e1e1e] pt-2">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1">Correlation Clusters</p>
+        <div className="border-t border-border-light pt-2">
+          <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Correlation clusters</p>
           {(data.clusters as string[][]).map((cl, i) => (
-            <div key={i} className="flex gap-1 flex-wrap mb-1">
-              <span className="text-[#FFB900] text-[9px]">C{i + 1}:</span>
+            <div key={i} className="mb-1 flex flex-wrap gap-1">
+              <span className="text-xs font-medium text-amber-800">C{i + 1}:</span>
               {cl.map((s) => (
-                <span key={s} className="bg-[#FFB900]/10 text-[#FFB900] border border-[#FFB900]/20 rounded px-1 text-[9px] font-mono">
+                <span
+                  key={s}
+                  className="rounded border border-amber-200 bg-amber-50 px-1 font-mono text-sm text-amber-900"
+                >
                   {s}
                 </span>
               ))}
@@ -486,25 +493,25 @@ function TaxOptimizationCard({ data }: { data: Record<string, any> }) {
   const harvest   = (data.harvest_opportunities ?? []) as any[]
 
   return (
-    <IntelCard title="Tax Optimization" icon={<Receipt size={12} />} accent="#34d399">
+    <IntelCard title="Tax Optimization" icon={<Receipt size={12} />} accent="#16a34a">
       {!available ? (
         /* No cost basis */
         <div className="space-y-2">
-          <div className="bg-[#141414] border border-[#2a2a2a] rounded p-3 text-center space-y-2">
-            <Receipt size={20} className="text-[#333] mx-auto" />
-            <p className="text-[#555] text-[10px] leading-relaxed">{data.narrative as string}</p>
-            <div className="text-[9px] text-[#444] font-mono">
-              Add <span className="text-[#34d399]">cost_basis</span> column to CSV to unlock
+          <div className="space-y-2 rounded border border-border bg-surface-2 p-3 text-center">
+            <Receipt size={20} className="mx-auto text-muted2" />
+            <p className="text-sm leading-relaxed text-slate2">{data.narrative as string}</p>
+            <div className="font-mono text-xs text-muted2">
+              Add <span className="font-semibold text-emerald-700">cost_basis</span> column to CSV to unlock
             </div>
           </div>
           {/* Tax score bar */}
           <div>
-            <div className="flex justify-between mb-0.5">
-              <span className="text-[#555] text-[9px] uppercase tracking-wider">Tax Alpha Score</span>
-              <span className="text-[#34d399] font-bold text-[10px]">{taxPts}/20</span>
+            <div className="mb-0.5 flex justify-between">
+              <span className="text-xs uppercase tracking-wider text-muted2">Tax alpha score</span>
+              <span className="text-xs font-bold text-emerald-800">{taxPts}/20</span>
             </div>
-            <div className="h-[3px] bg-[#1a1a1a] rounded-full overflow-hidden">
-              <div className="h-full bg-[#34d399] rounded-full" style={{ width: `${(taxPts / 20) * 100}%` }} />
+            <div className="h-[3px] overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(taxPts / 20) * 100}%` }} />
             </div>
           </div>
         </div>
@@ -513,15 +520,13 @@ function TaxOptimizationCard({ data }: { data: Record<string, any> }) {
         <div className="space-y-2">
           {/* Summary row */}
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[#141414] rounded px-2 py-1.5">
-              <p className="text-[9px] text-[#555] uppercase tracking-wider mb-0.5">Unrealized Liability</p>
-              <p className="font-bold text-[#ef4444]">
-                ${liability.toLocaleString()}
-              </p>
+            <div className="rounded border border-border-light bg-surface-2 px-2 py-1.5">
+              <p className="mb-0.5 text-xs uppercase tracking-wider text-muted2">Unrealized liability</p>
+              <p className="font-bold text-red-600">${liability.toLocaleString()}</p>
             </div>
-            <div className="bg-[#141414] rounded px-2 py-1.5">
-              <p className="text-[9px] text-[#555] uppercase tracking-wider mb-0.5">Tax Drag</p>
-              <p className="font-bold" style={{ color: taxDrag ? (taxDrag > 3 ? '#ef4444' : '#FFB900') : '#888' }}>
+            <div className="rounded border border-border-light bg-surface-2 px-2 py-1.5">
+              <p className="mb-0.5 text-xs uppercase tracking-wider text-muted2">Tax drag</p>
+              <p className="font-bold" style={{ color: taxDrag ? (taxDrag > 3 ? '#ef4444' : '#b45309') : '#64748b' }}>
                 {taxDrag !== null ? `${taxDrag.toFixed(1)}% / yr` : 'N/A'}
               </p>
             </div>
@@ -529,23 +534,23 @@ function TaxOptimizationCard({ data }: { data: Record<string, any> }) {
 
           {/* Tax score */}
           <div>
-            <div className="flex justify-between mb-0.5">
-              <span className="text-[#555] text-[9px] uppercase">Tax Alpha Score</span>
-              <span className="text-[#34d399] font-bold text-[10px]">{taxPts}/20</span>
+            <div className="mb-0.5 flex justify-between">
+              <span className="text-xs uppercase text-muted2">Tax alpha score</span>
+              <span className="text-xs font-bold text-emerald-800">{taxPts}/20</span>
             </div>
-            <div className="h-[3px] bg-[#1a1a1a] rounded-full overflow-hidden">
-              <div className="h-full bg-[#34d399] rounded-full" style={{ width: `${(taxPts / 20) * 100}%` }} />
+            <div className="h-[3px] overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full rounded-full bg-emerald-600" style={{ width: `${(taxPts / 20) * 100}%` }} />
             </div>
           </div>
 
           {/* Harvest opportunities */}
           {harvest.length > 0 && (
-            <div className="border-t border-[#1e1e1e] pt-2">
-              <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1.5">Harvest Opportunities</p>
+            <div className="border-t border-border-light pt-2">
+              <p className="mb-1.5 text-xs uppercase tracking-wide text-muted2">Harvest opportunities</p>
               {harvest.slice(0, 3).map((h: any, i: number) => (
-                <div key={i} className="flex items-center justify-between mb-1">
-                  <span className="text-white font-mono text-[10px]">{h.symbol}</span>
-                  <span className="text-[#34d399] text-[10px] font-bold">
+                <div key={i} className="mb-1 flex items-center justify-between">
+                  <span className="font-mono text-xs font-semibold text-navy">{h.symbol}</span>
+                  <span className="text-xs font-bold text-emerald-800">
                     +${(h.harvest_credit ?? 0).toLocaleString()} saved
                   </span>
                 </div>
@@ -568,8 +573,8 @@ function RiskWatchdogCard({ data }: { data: Record<string, any> }) {
   const levelCfg = level === 'high'
     ? { color: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'HIGH RISK',   icon: AlertTriangle }
     : level === 'low'
-    ? { color: '#00FF00', bg: 'rgba(0,255,0,0.10)',   label: 'LOW RISK',    icon: CheckCircle   }
-    : { color: '#FFB900', bg: 'rgba(255,185,0,0.15)', label: 'MEDIUM RISK', icon: Minus         }
+    ? { color: '#15803d', bg: 'rgba(22,163,74,0.12)',   label: 'LOW RISK',    icon: CheckCircle   }
+    : { color: '#b45309', bg: 'rgba(245,166,35,0.15)', label: 'MEDIUM RISK', icon: Minus         }
 
   // Gauge data for RadialBar
   const gaugeData = [{ name: 'score', value: Math.round((score / 10) * 100), fill: levelCfg.color }]
@@ -583,7 +588,7 @@ function RiskWatchdogCard({ data }: { data: Record<string, any> }) {
           style={{ background: levelCfg.bg, border: `1px solid ${levelCfg.color}33` }}
         >
           <levelCfg.icon size={13} style={{ color: levelCfg.color }} />
-          <span className="text-[11px] font-bold" style={{ color: levelCfg.color }}>{levelCfg.label}</span>
+          <span className="text-sm font-bold" style={{ color: levelCfg.color }}>{levelCfg.label}</span>
         </div>
         {/* Mini gauge */}
         <div className="relative w-14 h-14 shrink-0">
@@ -596,25 +601,25 @@ function RiskWatchdogCard({ data }: { data: Record<string, any> }) {
             startAngle={90}
             endAngle={-270}
           >
-            <RadialBar dataKey="value" cornerRadius={4} background={{ fill: '#1a1a1a' }}>
+            <RadialBar dataKey="value" cornerRadius={4} background={{ fill: '#e2e8f0' }}>
               <Cell fill={levelCfg.color} />
             </RadialBar>
           </RadialBarChart>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[11px] font-bold" style={{ color: levelCfg.color }}>{score.toFixed(1)}</span>
-            <span className="text-[7px] text-[#555]">/10</span>
+            <span className="text-sm font-bold" style={{ color: levelCfg.color }}>{score.toFixed(1)}</span>
+            <span className="text-sm text-muted2">/10</span>
           </div>
         </div>
       </div>
 
       {/* Risk flags */}
       {risks.length > 0 && (
-        <div className="space-y-1.5 border-t border-[#1e1e1e] pt-2">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1">Risk Flags</p>
+        <div className="space-y-1.5 border-t border-border-light pt-2">
+          <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Risk flags</p>
           {risks.slice(0, 3).map((r, i) => (
             <div key={i} className="flex gap-1.5 items-start">
-              <span style={{ color: levelCfg.color }} className="shrink-0 mt-0.5 text-[10px]">⚠</span>
-              <span className="text-[#777] leading-relaxed">{r}</span>
+              <span style={{ color: levelCfg.color }} className="mt-0.5 shrink-0 text-xs">⚠</span>
+              <span className="leading-relaxed text-slate2">{r}</span>
             </div>
           ))}
         </div>
@@ -622,11 +627,11 @@ function RiskWatchdogCard({ data }: { data: Record<string, any> }) {
 
       {/* Top mitigation */}
       {mits.length > 0 && (
-        <div className="border-t border-[#1e1e1e] pt-2">
-          <p className="text-[9px] text-[#555] uppercase tracking-widest mb-1">Top Mitigation</p>
+        <div className="border-t border-border-light pt-2">
+          <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Top mitigation</p>
           <div className="flex gap-1.5 items-start">
-            <span className="text-[#00FF00] shrink-0 mt-0.5">›</span>
-            <span className="text-[#888]">{mits[0]}</span>
+            <span className="mt-0.5 shrink-0 text-emerald-700">›</span>
+            <span className="text-muted2">{mits[0]}</span>
           </div>
         </div>
       )}
@@ -639,34 +644,32 @@ function AlphaScoutCard({ data }: { data: Record<string, any> }) {
   const opps = (data.opportunities ?? []) as any[]
 
   return (
-    <IntelCard title="Alpha Scout" icon={<Zap size={12} />} accent="#FFB900">
-      <p className="text-[#555] text-[10px] uppercase tracking-widest pb-1">
-        Consider diversifying into:
-      </p>
+    <IntelCard title="Alpha Scout" icon={<Zap size={12} />} accent="#F5A623">
+      <p className="pb-1 text-xs uppercase tracking-wide text-muted2">Consider diversifying into:</p>
       {opps.length === 0 ? (
-        <p className="text-[#444] text-center py-4">No opportunities identified</p>
+        <p className="py-4 text-center text-sm text-muted2">No opportunities identified</p>
       ) : (
         <div className="space-y-3">
           {opps.slice(0, 3).map((o: any, i: number) => {
             const conf = Math.round((o.confidence ?? 0.65) * 100)
-            const confColor = conf >= 75 ? '#00FF00' : conf >= 60 ? '#FFB900' : '#6b7280'
+            const confColor = conf >= 75 ? '#15803d' : conf >= 60 ? '#b45309' : '#64748b'
             return (
-              <div key={i} className="border border-[#1e1e1e] rounded p-2 space-y-1.5">
+              <div key={i} className="space-y-1.5 rounded border border-border-light bg-surface-2/50 p-2">
                 {/* Symbol + confidence */}
                 <div className="flex items-center justify-between">
-                  <span className="font-mono font-bold text-white text-[13px]">{o.symbol}</span>
+                  <span className="font-mono text-sm font-bold text-navy">{o.symbol}</span>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-16 h-[3px] bg-[#1a1a1a] rounded-full overflow-hidden">
+                    <div className="h-[3px] w-16 overflow-hidden rounded-full bg-surface-3">
                       <div
                         className="h-full rounded-full"
                         style={{ width: `${conf}%`, background: confColor, transition: 'width 0.7s' }}
                       />
                     </div>
-                    <span className="text-[10px] font-bold" style={{ color: confColor }}>{conf}%</span>
+                    <span className="text-xs font-bold" style={{ color: confColor }}>{conf}%</span>
                   </div>
                 </div>
                 {/* Reason */}
-                <p className="text-[#666] leading-relaxed">
+                <p className="leading-relaxed text-slate2">
                   {(o.reason as string).slice(0, 160)}
                   {(o.reason as string).length > 160 ? '…' : ''}
                 </p>
@@ -677,7 +680,7 @@ function AlphaScoutCard({ data }: { data: Record<string, any> }) {
       )}
 
       {/* Spacer note */}
-      <p className="text-[#333] text-[9px] text-center border-t border-[#1e1e1e] pt-2 uppercase tracking-widest">
+      <p className="border-t border-border-light pt-2 text-center text-sm uppercase tracking-wide text-muted2">
         Alpha Scout · {opps.length} opportunity(ies) identified
       </p>
     </IntelCard>
@@ -691,7 +694,7 @@ function renderBoldInline(text: string, key: string) {
     <span key={key}>
       {parts.map((p, i) =>
         p.startsWith('**') && p.endsWith('**')
-          ? <strong key={i} className="text-white font-bold">{p.slice(2, -2)}</strong>
+          ? <strong key={i} className="font-bold text-navy">{p.slice(2, -2)}</strong>
           : <span key={i}>{p}</span>
       )}
     </span>
@@ -701,12 +704,12 @@ function renderBoldInline(text: string, key: string) {
 function ICBriefing({ markdown }: { markdown: string }) {
   const lines = markdown.split('\n')
   return (
-    <div className="space-y-[3px] text-[11px] leading-relaxed">
+    <div className="space-y-1 text-sm leading-relaxed text-slate2">
       {lines.map((line, idx) => {
         if (/^## /.test(line)) {
           return (
             <div key={idx} className="pt-4 first:pt-0">
-              <div className="text-[#FFB900] font-bold text-[12px] uppercase tracking-widest border-b border-[#FFB900]/20 pb-1 mb-2">
+              <div className="mb-2 border-b border-primary/20 pb-1 text-xs font-bold uppercase tracking-wide text-primary-dark">
                 {line.replace(/^##\s*/, '')}
               </div>
             </div>
@@ -714,7 +717,7 @@ function ICBriefing({ markdown }: { markdown: string }) {
         }
         if (/^### /.test(line)) {
           return (
-            <div key={idx} className="text-[#aaa] font-bold uppercase tracking-wider text-[10px] mt-2">
+            <div key={idx} className="mt-2 text-xs font-bold uppercase tracking-wide text-muted2">
               {line.replace(/^###\s*/, '')}
             </div>
           )
@@ -723,8 +726,8 @@ function ICBriefing({ markdown }: { markdown: string }) {
           const content = line.replace(/^[-*]\s/, '')
           return (
             <div key={idx} className="flex items-start gap-2 pl-2">
-              <span className="text-[#00FF00] shrink-0 mt-0.5">›</span>
-              <span className="text-[#C8C8C8]">{renderBoldInline(content, `b${idx}`)}</span>
+              <span className="mt-0.5 shrink-0 text-primary">›</span>
+              <span>{renderBoldInline(content, `b${idx}`)}</span>
             </div>
           )
         }
@@ -733,19 +736,19 @@ function ICBriefing({ markdown }: { markdown: string }) {
           const content = line.replace(/^\d+\.\s/, '')
           return (
             <div key={idx} className="flex items-start gap-2 pl-2">
-              <span className="text-[#FFB900] shrink-0 font-bold w-4">{num}.</span>
-              <span className="text-[#C8C8C8]">{renderBoldInline(content, `n${idx}`)}</span>
+              <span className="w-4 shrink-0 font-bold text-primary-dark">{num}.</span>
+              <span>{renderBoldInline(content, `n${idx}`)}</span>
             </div>
           )
         }
         if (/^---+$/.test(line.trim())) {
-          return <div key={idx} className="border-t border-[#2a2a2a] my-2" />
+          return <div key={idx} className="my-2 border-t border-border" />
         }
         if (!line.trim()) {
           return <div key={idx} className="h-1" />
         }
         return (
-          <p key={idx} className="text-[#A8A8A8]">
+          <p key={idx}>
             {renderBoldInline(line, `p${idx}`)}
           </p>
         )
@@ -758,11 +761,11 @@ function ScorePill({ label, value, max, color }: { label: string; value: number;
   const pct = Math.round((value / max) * 100)
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex justify-between text-[9px] uppercase tracking-wider">
-        <span className="text-[#555]">{label}</span>
+      <div className="flex justify-between text-xs uppercase tracking-wide text-muted2">
+        <span>{label}</span>
         <span style={{ color }}>{value}/{max}</span>
       </div>
-      <div className="h-[3px] bg-[#1a1a1a] rounded-full overflow-hidden">
+      <div className="h-[3px] overflow-hidden rounded-full bg-surface-3">
         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
@@ -1059,42 +1062,34 @@ export default function SwarmPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-green-500/40 border-t-green-500 rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-app">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
       </div>
     )
   }
 
   return (
-    <div
-      className="min-h-screen bg-[#080808] text-white"
-      style={{ fontFamily: "'JetBrains Mono', 'Fira Code', 'Courier New', monospace" }}
-    >
+    <div className="min-h-screen bg-app font-sans text-navy">
       <AppHeader />
-      {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', top: 56, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 9999, background: '#0D0D0D', border: '1px solid #FFB900',
-          color: '#FFB900', fontFamily: "'Fira Code','Courier New',monospace",
-          fontSize: 11, letterSpacing: 2, padding: '10px 24px',
-          textTransform: 'uppercase', whiteSpace: 'nowrap',
-          boxShadow: '0 0 24px #FFB90033',
-          animation: 'fadeInDown 0.2s ease',
-        }}>
-          ◈ {toast}
+        <div
+          className="fixed left-1/2 z-[9999] -translate-x-1/2 rounded-lg border border-primary/30 bg-white px-6 py-2.5 text-sm font-medium text-primary-dark shadow-md"
+          style={{ top: 56, animation: 'fadeInDown 0.2s ease' }}
+        >
+          {toast}
           <style>{`@keyframes fadeInDown { from { opacity:0;transform:translateX(-50%) translateY(-8px); } to { opacity:1;transform:translateX(-50%) translateY(0); } }`}</style>
         </div>
       )}
 
-      {/* Nav */}
-      <nav className="border-b border-[#1e1e1e] bg-[#0d0d0d] px-6 h-12 flex items-center justify-between sticky top-0 z-10">
+      <nav className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-border bg-white/95 px-6 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <a href="/dashboard" className="text-[#FFB900] font-bold text-[13px] tracking-widest hover:text-[#FFD040] transition-colors">NEUFIN</a>
-          <span className="text-[#333] text-[11px]">/</span>
-          <span className="text-[#555] text-[11px] uppercase tracking-widest">Investment Committee</span>
+          <a href="/dashboard" className="text-sm font-bold tracking-wide text-primary transition-colors hover:text-primary-dark">
+            NEUFIN
+          </a>
+          <span className="text-sm text-border">/</span>
+          <span className="text-xs font-medium uppercase tracking-wide text-muted2">Investment Committee</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Suspense fallback={null}>
             <CommandPalette
               positions={positions}
@@ -1115,51 +1110,50 @@ export default function SwarmPage() {
               type="button"
               onClick={() => void exportSwarmPdf()}
               disabled={exportingPdf}
-              className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest border transition-all disabled:opacity-40"
-              style={{
-                background: 'transparent',
-                color:       '#94a3b8',
-                borderColor: '#334155',
-              }}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted2 transition-colors hover:border-primary hover:text-primary-dark disabled:opacity-40"
             >
-              {exportingPdf ? 'Exporting...' : 'Export PDF'}
+              {exportingPdf ? 'Exporting…' : 'Export PDF'}
             </button>
           )}
           {thesis && (
             <button
+              type="button"
               onClick={() => setChatOpen(o => !o)}
-              className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest border transition-all"
-              style={{
-                background:  chatOpen ? '#FFB90022' : 'transparent',
-                color:       '#FFB900',
-                borderColor: '#FFB90066',
-              }}
+              className={`rounded-md border px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                chatOpen
+                  ? 'border-primary bg-primary-light text-primary-dark'
+                  : 'border-border text-slate2 hover:border-primary/50 hover:text-primary-dark'
+              }`}
             >
-              {chatOpen ? '✕ CLOSE MD' : '◈ ASK MD'}
+              {chatOpen ? 'Close MD' : 'Ask MD'}
             </button>
           )}
           <button
+            type="button"
             onClick={startSwarm}
             disabled={isRunning || positions.length === 0}
             title={positions.length === 0 ? 'Upload a portfolio on neufin.app first' : undefined}
-            className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest rounded border transition-all disabled:opacity-40"
+            className="rounded-md border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition-all disabled:opacity-40"
             style={{
-              background: jobStatus === 'failed' ? '#7f1d1d' : isRunning ? 'transparent' : '#06b6d4',
-              color: isRunning ? '#FFB900' : jobStatus === 'failed' ? '#fecaca' : '#000',
-              borderColor: isRunning ? '#FFB900' : jobStatus === 'failed' ? '#ef4444' : '#06b6d4',
+              background:
+                jobStatus === 'failed' ? '#fef2f2' : isRunning ? 'transparent' : 'var(--primary, #1EB8CC)',
+              color:
+                jobStatus === 'failed' ? '#b91c1c' : isRunning ? '#b45309' : '#ffffff',
+              borderColor:
+                jobStatus === 'failed' ? '#fecaca' : isRunning ? '#fbbf24' : 'var(--primary, #1EB8CC)',
             }}
           >
             {positions.length === 0
-              ? '▶ NO PORTFOLIO'
+              ? 'No portfolio'
               : jobStatus === 'queued'
-                ? 'Queuing...'
+                ? 'Queuing…'
                 : jobStatus === 'running'
-                  ? `Agents running... ${agentTrace.filter((t) => t.status === 'complete').length}/7`
+                  ? `Agents running… ${agentTrace.filter((t) => t.status === 'complete').length}/7`
                   : jobStatus === 'complete'
-                    ? '▶ Run New Analysis'
+                    ? 'Run new analysis'
                     : jobStatus === 'failed'
-                      ? '▶ Retry Analysis'
-                      : '▶ Run IC Analysis'}
+                      ? 'Retry analysis'
+                      : 'Run IC analysis'}
           </button>
         </div>
       </nav>
@@ -1172,22 +1166,16 @@ export default function SwarmPage() {
           <SwarmTerminal status={jobStatus} trace={agentTrace} onRetry={startSwarm} />
           {/* Result unavailable error state — analysis done but result fetch failed */}
           {jobStatus === 'result_unavailable' && resultError && (
-            <div style={{
-              marginTop: 12, padding: '12px 16px',
-              background: '#201A08', border: '1px solid #F5A623',
-              borderRadius: 8, color: '#F5A623', fontSize: 13,
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ flex: 1 }}>{resultError}</span>
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <span className="min-w-0 flex-1">{resultError}</span>
               {jobId && (
                 <button
-                  onClick={() => { setJobStatus('complete'); void pollStatus(jobId) }}
-                  style={{
-                    padding: '4px 12px',
-                    background: '#F5A623', color: '#0B0F14',
-                    border: 'none', borderRadius: 4, fontSize: 12,
-                    cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap',
+                  type="button"
+                  onClick={() => {
+                    setJobStatus('complete')
+                    void pollStatus(jobId)
                   }}
+                  className="shrink-0 whitespace-nowrap rounded-md bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-dark"
                 >
                   Retry
                 </button>
@@ -1198,129 +1186,123 @@ export default function SwarmPage() {
 
         {/* IC Briefing */}
         <div className="xl:col-span-5">
-          <div className="bg-[#0D0D0D] border border-[#2a2a2a] rounded-md overflow-hidden flex flex-col h-full min-h-[420px]">
-            <div className="bg-[#141414] px-4 py-2 border-b border-[#2a2a2a] flex items-center justify-between shrink-0">
+          <div className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+            <div className="flex shrink-0 items-center justify-between border-b border-border-light bg-surface-2 px-4 py-2">
               <div className="flex items-center gap-3">
-                <span className="text-[#00FF00] text-[11px] font-bold uppercase tracking-widest">IC BRIEFING</span>
-                <span className="text-[#333] text-[10px]">|</span>
-                <span className="text-[#555] text-[10px] uppercase">PE Managing Director</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">IC briefing</span>
+                <span className="text-xs text-border">|</span>
+                <span className="text-xs font-medium uppercase text-muted2">PE Managing Director</span>
               </div>
               {thesis?.dna_score && (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[#555] uppercase">DNA</span>
+                  <span className="text-xs uppercase text-muted2">DNA</span>
                   <span
-                    className="text-[13px] font-bold"
-                    style={{ color: thesis.dna_score >= 70 ? '#00FF00' : thesis.dna_score >= 45 ? '#FFB900' : '#ff4444' }}
+                    className="text-sm font-bold"
+                    style={{
+                      color:
+                        thesis.dna_score >= 70 ? '#15803d' : thesis.dna_score >= 45 ? '#b45309' : '#dc2626',
+                    }}
                   >
-                    {thesis.dna_score}<span className="text-[#555] text-[10px]">/100</span>
+                    {thesis.dna_score}
+                    <span className="text-xs font-normal text-muted2">/100</span>
                   </span>
                 </div>
               )}
             </div>
-            <div
-              className="flex-1 overflow-y-auto px-5 py-4"
-              style={{ scrollbarWidth: 'thin', scrollbarColor: '#2a2a2a #0d0d0d' }}
-            >
+            <div className="flex-1 overflow-y-auto px-5 py-4" style={{ scrollbarWidth: 'thin' }}>
               {!thesis && !isRunning && (
-                <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
-                  <div className="text-[#222] text-[40px]">◈</div>
-                  <p className="text-[#333] text-[11px] uppercase tracking-widest">
-                    IC Briefing awaiting swarm execution
-                  </p>
-                  <p className="text-[#222] text-[10px]">
-                    Click ▶ RUN SWARM to generate the Investment Committee report
-                  </p>
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                  <p className="text-sm font-medium uppercase tracking-wide text-muted2">IC briefing awaiting swarm execution</p>
+                  <p className="text-sm text-slate2">Run IC analysis to generate the Investment Committee report.</p>
                 </div>
               )}
               {isRunning && !thesis && (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-[#FFB900] text-[11px] animate-pulse uppercase tracking-widest">
-                    ● MD is reviewing analyst outputs...
+                <div className="flex h-full items-center justify-center">
+                  <div className="animate-pulse text-sm font-medium uppercase tracking-wide text-primary-dark">
+                    MD is reviewing analyst outputs…
                   </div>
                 </div>
               )}
               {thesis?.briefing && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.4 }}
-                >
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
                   <ICBriefing markdown={thesis.briefing} />
                 </motion.div>
               )}
             </div>
             {thesis && (
-              <div className="bg-[#111] border-t border-[#1e1e1e] px-4 py-2 flex gap-3 flex-wrap shrink-0">
-                <MetaItem label="REGIME"  value={thesis.regime    ?? 'N/A'} color="blue" />
-                <MetaItem label="β"       value={thesis.weighted_beta?.toFixed(2)  ?? '—'} color="amber" />
-                <MetaItem label="SHARPE"  value={thesis.sharpe_ratio?.toFixed(2)   ?? '—'} color={
-                  (thesis.sharpe_ratio ?? 0) > 1 ? 'green' : (thesis.sharpe_ratio ?? 0) > 0 ? 'amber' : 'red'
-                } />
-                <MetaItem label="ρ avg"   value={thesis.avg_correlation?.toFixed(3) ?? '—'} color="amber" />
+              <div className="flex shrink-0 flex-wrap gap-3 border-t border-border-light bg-surface-2 px-4 py-2">
+                <MetaItem label="REGIME" value={thesis.regime ?? 'N/A'} color="blue" />
+                <MetaItem label="β" value={thesis.weighted_beta?.toFixed(2) ?? '—'} color="amber" />
+                <MetaItem
+                  label="SHARPE"
+                  value={thesis.sharpe_ratio?.toFixed(2) ?? '—'}
+                  color={(thesis.sharpe_ratio ?? 0) > 1 ? 'green' : (thesis.sharpe_ratio ?? 0) > 0 ? 'amber' : 'red'}
+                />
+                <MetaItem label="ρ avg" value={thesis.avg_correlation?.toFixed(3) ?? '—'} color="amber" />
               </div>
             )}
           </div>
         </div>
 
         {/* Right sidebar */}
-        <div className="xl:col-span-2 space-y-3">
-          <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-md overflow-hidden">
-            <div className="bg-[#141414] px-3 py-1.5 border-b border-[#2a2a2a]">
-              <span className="text-[10px] text-[#FFB900] font-bold uppercase tracking-widest">Holdings</span>
+        <div className="space-y-3 xl:col-span-2">
+          <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+            <div className="border-b border-border-light bg-surface-2 px-3 py-1.5">
+              <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">Holdings</span>
             </div>
-            <div className="px-3 py-2 space-y-2">
+            <div className="space-y-2 px-3 py-2">
               {positions.length === 0 ? (
-                <div className="text-[10px] text-[#444] py-2 text-center">
-                  Upload portfolio on neufin.app to populate
-                </div>
-              ) : positions.map(p => (
-                <div key={p.symbol} className="space-y-0.5">
-                  <div className="flex justify-between text-[10px]">
-                    <span className="text-white font-bold">{p.symbol}</span>
-                    <span className="text-[#666]">{Math.round(p.weight * 100)}%</span>
+                <div className="py-2 text-center text-sm text-muted2">Upload portfolio on neufin.app to populate</div>
+              ) : (
+                positions.map((p) => (
+                  <div key={p.symbol} className="space-y-0.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="font-bold text-navy">{p.symbol}</span>
+                      <span className="text-muted2">{Math.round(p.weight * 100)}%</span>
+                    </div>
+                    <div className="h-[2px] overflow-hidden rounded-full bg-surface-3">
+                      <div
+                        className="h-full rounded-full bg-primary/70"
+                        style={{ width: `${Math.round(p.weight * 100)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-[2px] bg-[#1a1a1a] rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#FFB900]/70 rounded-full"
-                      style={{ width: `${Math.round(p.weight * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
               {positions.length > 0 && (
-                <div className="pt-1.5 border-t border-[#1e1e1e] flex justify-between text-[10px]">
-                  <span className="text-[#444]">AUM</span>
-                  <span className="text-[#00FF00] font-bold">${totalValue.toLocaleString()}</span>
+                <div className="flex justify-between border-t border-border-light pt-1.5 text-xs">
+                  <span className="text-muted2">AUM</span>
+                  <span className="font-bold text-navy">${totalValue.toLocaleString()}</span>
                 </div>
               )}
             </div>
           </div>
 
           {thesis && Object.keys(sb).length > 0 && (
-            <div className="bg-[#0d0d0d] border border-[#2a2a2a] rounded-md overflow-hidden">
-              <div className="bg-[#141414] px-3 py-1.5 border-b border-[#2a2a2a]">
-                <span className="text-[10px] text-[#00FF00] font-bold uppercase tracking-widest">Score</span>
+            <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+              <div className="border-b border-border-light bg-surface-2 px-3 py-1.5">
+                <span className="text-xs font-bold uppercase tracking-wide text-emerald-800">Score</span>
               </div>
-              <div className="px-3 py-3 space-y-2.5">
-                <ScorePill label="HHI"   value={sb.hhi_concentration ?? 0} max={25}  color="#FFB900" />
-                <ScorePill label="Beta"  value={sb.beta_risk         ?? 0} max={25}  color="#60a5fa" />
-                <ScorePill label="Tax α" value={sb.tax_alpha         ?? 0} max={20}  color="#34d399" />
-                <ScorePill label="Corr"  value={sb.correlation       ?? 0} max={30}  color="#c084fc" />
-                <div className="border-t border-[#1e1e1e] pt-2 flex justify-between text-[10px]">
-                  <span className="text-[#555] uppercase tracking-wider">DNA</span>
-                  <span className="text-white font-bold">{thesis.dna_score}/100</span>
+              <div className="space-y-2.5 px-3 py-3">
+                <ScorePill label="HHI" value={sb.hhi_concentration ?? 0} max={25} color="#F5A623" />
+                <ScorePill label="Beta" value={sb.beta_risk ?? 0} max={25} color="#64748b" />
+                <ScorePill label="Tax α" value={sb.tax_alpha ?? 0} max={20} color="#16a34a" />
+                <ScorePill label="Corr" value={sb.correlation ?? 0} max={30} color="#1EB8CC" />
+                <div className="flex justify-between border-t border-border-light pt-2 text-xs">
+                  <span className="uppercase tracking-wide text-muted2">DNA</span>
+                  <span className="font-bold text-navy">{thesis.dna_score}/100</span>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="text-center space-y-1 py-2">
-            <div className="text-[10px] text-[#333]">
-              Press <kbd className="border border-[#2a2a2a] rounded px-1 py-0.5 text-[#444]">⌘K</kbd> to query agents
+          <div className="space-y-1 py-2 text-center">
+            <div className="text-xs text-muted2">
+              Press{' '}
+              <kbd className="rounded border border-border bg-surface-2 px-1 py-0.5 font-mono text-muted2">⌘K</kbd>{' '}
+              to query agents
             </div>
-            <div className="text-[9px] text-[#222] uppercase tracking-widest">
-              Powered by LangGraph
-            </div>
+            <div className="text-sm uppercase tracking-wide text-muted2">Powered by LangGraph</div>
           </div>
         </div>
 
@@ -1343,11 +1325,13 @@ export default function SwarmPage() {
             alpha_gap_narrative: s.alpha_gap_narrative ?? undefined,
           }))
           return (
-            <div className="xl:col-span-12 mt-1">
+            <div className="mt-1 xl:col-span-12">
               <div className="mb-2 flex items-center gap-3">
-                <span className="text-[#FFB900] font-bold text-[11px] tracking-widest uppercase">RISK MATRIX</span>
-                <span className="text-[#333] text-[10px]">|</span>
-                <span className="text-[#555] text-[10px] uppercase tracking-widest">Cluster Map · Historical Regime Stress</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">Risk matrix</span>
+                <span className="text-xs text-border">|</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-muted2">
+                  Cluster map · historical regime stress
+                </span>
               </div>
               <PaywallOverlay locked={!isUnlocked} onUnlock={startCheckout} loading={checkoutLoading}>
                 <RiskMatrix clusters={clusters} stressResults={stressResults} />
@@ -1360,41 +1344,41 @@ export default function SwarmPage() {
 
       {/* ── Research Intelligence Grid ────────────────────────────────────────── */}
       {thesis && (
-        <div className="max-w-[1600px] mx-auto px-4 pb-6">
-          <div className="mb-4 grid gap-3 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] p-4 md:grid-cols-4">
+        <div className="mx-auto max-w-[1600px] px-4 pb-6">
+          <div className="mb-4 grid gap-3 rounded-lg border border-border bg-white p-4 shadow-sm md:grid-cols-4">
             <div className="flex items-center gap-3">
               <svg viewBox="0 0 120 120" className="h-16 w-16">
-                <circle cx="60" cy="60" r="52" stroke="#1f2937" strokeWidth="10" fill="none" />
+                <circle cx="60" cy="60" r="52" stroke="#e2e8f0" strokeWidth="10" fill="none" />
                 <circle
                   cx="60"
                   cy="60"
                   r="52"
-                  stroke="#22d3ee"
+                  stroke="#1EB8CC"
                   strokeWidth="10"
                   fill="none"
                   strokeDasharray={`${Math.max(0, Math.min(100, Number(thesis?.dna_score ?? 0))) * 3.27} 999`}
                   transform="rotate(-90 60 60)"
                 />
-                <text x="60" y="65" textAnchor="middle" className="fill-white text-xl font-bold">
+                <text x="60" y="65" textAnchor="middle" className="fill-navy text-xl font-bold">
                   {Number(thesis?.dna_score ?? 0)}
                 </text>
               </svg>
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-[#666]">DNA Score</p>
-                <p className="text-xs text-[#9ca3af]">Institutional fit signal</p>
+                <p className="text-xs uppercase tracking-wide text-muted2">DNA score</p>
+                <p className="text-sm text-slate2">Institutional fit signal</p>
               </div>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-[#666]">Investor Archetype</p>
-              <p className="mt-1 text-sm text-white">{thesis?.investor_type ?? 'Advisor'}</p>
+              <p className="text-xs uppercase tracking-wide text-muted2">Investor archetype</p>
+              <p className="mt-1 text-sm font-medium text-navy">{thesis?.investor_type ?? 'Advisor'}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-[#666]">Market Regime</p>
-              <p className="mt-1 text-sm text-cyan-300">{thesis?.regime ?? 'N/A'}</p>
+              <p className="text-xs uppercase tracking-wide text-muted2">Market regime</p>
+              <p className="mt-1 text-sm font-medium text-primary-dark">{thesis?.regime ?? 'N/A'}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-[#666]">Elapsed</p>
-              <p className="mt-1 text-sm text-white">
+              <p className="text-xs uppercase tracking-wide text-muted2">Elapsed</p>
+              <p className="mt-1 text-sm font-medium text-navy">
                 {startedAtMs ? Math.max(1, Math.round((Date.now() - startedAtMs) / 1000)) : 0}s
               </p>
             </div>
@@ -1412,23 +1396,24 @@ export default function SwarmPage() {
       ) : null}
 
       {thesis && (
-        <div className="max-w-[1600px] mx-auto px-4 pb-8">
-          <div className="border-t border-[#1e1e1e] pt-5 mb-4 flex items-center gap-3">
-            <span className="text-[#FFB900] font-bold text-[11px] tracking-widest uppercase">
-              Research Intelligence
-            </span>
-            <span className="text-[#333] text-[10px]">|</span>
-            <span className="text-[#555] text-[10px] uppercase tracking-widest">
-              7-Agent Deep Analysis · {thesis.regime ?? 'N/A'} Regime
+        <div className="mx-auto max-w-[1600px] px-4 pb-section">
+          <div className="mb-4 flex items-center gap-3 border-t border-border-light pt-5">
+            <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">Research intelligence</span>
+            <span className="text-xs text-border">|</span>
+            <span className="text-xs font-medium uppercase tracking-wide text-muted2">
+              7-agent deep analysis · {thesis.regime ?? 'N/A'} regime
             </span>
             {thesis.dna_score && (
               <>
-                <span className="text-[#333] text-[10px]">|</span>
-                <span className="text-[#555] text-[10px] uppercase">
+                <span className="text-xs text-border">|</span>
+                <span className="text-xs uppercase text-muted2">
                   DNA{' '}
                   <span
                     className="font-bold"
-                    style={{ color: thesis.dna_score >= 70 ? '#00FF00' : thesis.dna_score >= 45 ? '#FFB900' : '#ef4444' }}
+                    style={{
+                      color:
+                        thesis.dna_score >= 70 ? '#15803d' : thesis.dna_score >= 45 ? '#b45309' : '#ef4444',
+                    }}
                   >
                     {thesis.dna_score}/100
                   </span>
@@ -1487,7 +1472,6 @@ export default function SwarmPage() {
         thesisContext={thesis ?? undefined}
         positions={positions}
         totalValue={totalValue}
-        apiBase={API_BASE}
       />
     </div>
   )
@@ -1516,15 +1500,20 @@ function metaTip(label: string): string | undefined {
 }
 
 function MetaItem({ label, value, color }: { label: string; value: string; color: string }) {
-  const cls = color === 'green' ? 'text-[#00FF00]'
-            : color === 'amber' ? 'text-[#FFB900]'
-            : color === 'blue'  ? 'text-blue-400'
-            : color === 'red'   ? 'text-red-400'
-            : 'text-[#888]'
+  const cls =
+    color === 'green'
+      ? 'text-emerald-800'
+      : color === 'amber'
+        ? 'text-amber-800'
+        : color === 'blue'
+          ? 'text-sky-700'
+          : color === 'red'
+            ? 'text-red-600'
+            : 'text-slate2'
   const tip = metaTip(label)
   const inner = (
-    <div className="flex items-center gap-1 text-[10px] cursor-help">
-      <span className="text-[#444] uppercase border-b border-dotted border-[#333]">{label}:</span>
+    <div className="flex cursor-help items-center gap-1 text-xs">
+      <span className="border-b border-dotted border-border uppercase text-muted2">{label}:</span>
       <span className={`font-bold ${cls}`}>{value}</span>
     </div>
   )

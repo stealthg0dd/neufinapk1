@@ -3,22 +3,15 @@
 import { motion, type HTMLMotionProps } from 'framer-motion'
 import clsx from 'clsx'
 
+/** Solid surface card (no glass blur). Hover: lift + shadow. */
+const surfaceCard =
+  'rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow transition-transform duration-200 hover:shadow-md hover:-translate-y-0.5'
+
 type GlassCardProps = HTMLMotionProps<'div'>
 
 export function GlassCard({ className, children, ...props }: GlassCardProps) {
   return (
-    <motion.div
-      whileHover={{
-        transition: { duration: 0.25 },
-      }}
-      className={clsx(
-        'rounded-2xl border border-[var(--border)] bg-white/95 shadow-sm backdrop-blur-md',
-        'transition-all duration-300',
-        'hover:border-primary hover:shadow-md',
-        className,
-      )}
-      {...props}
-    >
+    <motion.div className={clsx(surfaceCard, className)} {...props}>
       {children}
     </motion.div>
   )

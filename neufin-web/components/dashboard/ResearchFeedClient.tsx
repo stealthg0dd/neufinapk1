@@ -16,9 +16,9 @@ export type ResearchFeedNote = {
 function stripeClass(noteType?: string) {
   const u = (noteType ?? '').toUpperCase()
   if (u.includes('MACRO')) return 'bg-warning'
-  if (u.includes('SECTOR')) return 'bg-[hsl(var(--primary))]'
+  if (u.includes('SECTOR')) return 'bg-primary'
   if (u.includes('REGIME')) return 'bg-risk'
-  return 'bg-[hsl(var(--accent))]'
+  return 'bg-accent'
 }
 
 /** Self-fetching research feed. Accepts an optional `notes` prop for SSR
@@ -81,15 +81,15 @@ export default function ResearchFeedClient({
   if (error || notes.length === 0) {
     return (
       <div
-        className="flex flex-col items-center justify-center rounded-lg border border-[hsl(var(--border))] bg-surface py-10"
+        className="flex flex-col items-center justify-center rounded-lg border border-border bg-surface py-section"
       >
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+        <p className="text-sm text-muted-foreground">
           {error
             ? 'Research feed temporarily unavailable.'
             : 'Research notes are published daily at 06:00 SGT.'}
         </p>
         {error && (
-          <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground)/0.6)]">
+          <p className="mt-1 text-sm text-muted-foreground/60">
             Check back shortly — our research agents publish multiple times a day.
           </p>
         )}
@@ -105,28 +105,28 @@ export default function ResearchFeedClient({
         return (
           <div
             key={note.id}
-            className="relative overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-surface p-4 pl-5 transition-colors hover:border-[hsl(var(--primary)/0.2)]"
+            className="relative overflow-hidden rounded-lg border border-border bg-surface p-4 pl-5 transition-colors hover:border-primary/20"
           >
             <div
               className={`absolute bottom-3 left-0 top-3 w-0.5 rounded-full ${stripe}`}
               aria-hidden
             />
             <div className="flex items-start justify-between gap-2">
-              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider text-[hsl(var(--muted-foreground))]">
+              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-sm font-mono uppercase tracking-wider text-muted-foreground">
                 {(note.note_type ?? 'note').replace(/_/g, ' ')}
               </span>
-              <span className="shrink-0 text-[10px] font-mono text-[hsl(var(--muted-foreground))]">
+              <span className="shrink-0 text-sm font-mono text-muted-foreground">
                 {conf}% conf
               </span>
             </div>
-            <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-[hsl(var(--foreground))]">
+            <h3 className="mb-1 mt-1.5 text-sm font-medium leading-snug text-foreground">
               {note.title}
             </h3>
-            <p className="line-clamp-2 text-[12px] leading-relaxed text-[hsl(var(--muted-foreground))]">
+            <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
               {note.executive_summary}
             </p>
             <div className="mt-2.5 flex items-center justify-between">
-              <span className="text-[10px] font-mono text-[hsl(var(--muted-foreground)/0.6)]">
+              <span className="text-sm font-mono text-muted-foreground/60">
                 {new Date(note.generated_at).toLocaleString('en-SG', {
                   dateStyle: 'short',
                   timeStyle: 'short',
@@ -134,7 +134,7 @@ export default function ResearchFeedClient({
               </span>
               <Link
                 href={`/research/${note.id}`}
-                className="cursor-pointer text-[11px] text-[hsl(var(--primary))]"
+                className="cursor-pointer text-sm text-primary"
               >
                 Read →
               </Link>

@@ -49,7 +49,7 @@ function statusBadge(
         ? 'border-red-200 bg-red-50 text-red-800'
         : 'border-slate-200 bg-slate-50 text-slate-600'
   return {
-    node: <span className="text-[10px] font-semibold">{label}</span>,
+    node: <span className="text-xs font-semibold">{label}</span>,
     className: `rounded border px-2 py-0.5 ${badgeClass}`,
   }
 }
@@ -85,7 +85,7 @@ export default function SwarmTerminal({
           <span
             className={`h-1.5 w-1.5 rounded-full ${status === 'running' ? 'animate-pulse bg-[#15803D]' : 'bg-slate-300'}`}
           />
-          <span className="rounded border border-[#BBF7D0] bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#15803D]">
+          <span className="rounded border border-[#BBF7D0] bg-[#DCFCE7] px-1.5 py-0.5 text-xs font-bold text-[#15803D]">
             LIVE
           </span>
         </div>
@@ -113,26 +113,26 @@ export default function SwarmTerminal({
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="agent-badge shrink-0">{cfg.mono}</span>
-                  <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-slate-800">
+                  <span className="truncate text-sm font-semibold uppercase tracking-wide text-slate-800">
                     {cfg.label}
                   </span>
                 </div>
                 <div className={wrapClass}>{node}</div>
               </div>
-              {current?.summary ? <p className="mt-1.5 text-[11px] leading-snug text-slate-600">{current.summary}</p> : null}
+              {current?.summary ? <p className="mt-1.5 text-sm leading-snug text-slate-600">{current.summary}</p> : null}
             </div>
           )
         })}
       </div>
 
       <div className="border-t border-[#E5E7EB] bg-white px-3 py-2">
-        <div className="mb-1 flex items-center justify-between text-[10px] font-medium uppercase tracking-wide text-slate-500">
+        <div className="mb-1 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-500">
           <span>Progress</span>
           <span>{completeCount}/7 agents complete</span>
         </div>
         <div className="h-[3px] overflow-hidden rounded-sm bg-[#E5E7EB]">
           <div
-            className="h-full rounded-sm bg-[#1D4ED8] transition-all duration-500"
+            className="h-full rounded-sm bg-primary transition-all duration-500"
             style={{ width: `${(completeCount / 7) * 100}%` }}
           />
         </div>
@@ -147,11 +147,11 @@ export default function SwarmTerminal({
       {status === 'failed' ? (
         <div className="border-t border-red-200 bg-red-50 px-3 py-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-red-800">Swarm failed before completion.</span>
+            <span className="text-sm text-red-800">Swarm failed before completion.</span>
             <button
               type="button"
               onClick={onRetry}
-              className="shrink-0 rounded-md border border-red-300 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-red-800 hover:bg-red-100"
+              className="shrink-0 rounded-md border border-red-300 bg-white px-2 py-1 text-xs font-semibold uppercase tracking-wide text-red-800 hover:bg-red-100"
             >
               Retry
             </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { CandleData } from '@/lib/api'
+import { chartPalette } from '@/lib/chart-palette'
 
 export type ChartMarker = {
   time: string
@@ -35,25 +36,29 @@ export default function CandlestickChart({ data, symbol, height = 300, markers =
         width: containerRef.current.clientWidth,
         height,
         layout: {
-          background: { type: ColorType.Solid, color: '#0B0F14' },
-          textColor: '#8b949e',
+          background: { type: ColorType.Solid, color: chartPalette.background },
+          textColor: chartPalette.axis,
         },
         grid: {
-          vertLines: { color: '#1b222c' },
-          horzLines: { color: '#1b222c' },
+          vertLines: { color: chartPalette.grid, style: 1 },
+          horzLines: { color: chartPalette.grid, style: 1 },
         },
-        crosshair: { mode: 1 },
-        timeScale: { borderColor: '#2a3441', timeVisible: true },
-        rightPriceScale: { borderColor: '#2a3441' },
+        crosshair: {
+          mode: 1,
+          vertLine: { color: chartPalette.neutral, width: 1, style: 2, labelBackgroundColor: chartPalette.neutralMuted },
+          horzLine: { color: chartPalette.neutral, width: 1, style: 2, labelBackgroundColor: chartPalette.neutralMuted },
+        },
+        timeScale: { borderColor: chartPalette.grid, timeVisible: true },
+        rightPriceScale: { borderColor: chartPalette.grid },
       })
 
       const candleSeries = chart.addCandlestickSeries({
-        upColor: '#22d3ee',
-        downColor: '#ef4444',
-        borderUpColor: '#22d3ee',
-        borderDownColor: '#ef4444',
-        wickUpColor: '#22d3ee',
-        wickDownColor: '#ef4444',
+        upColor: chartPalette.primary,
+        downColor: chartPalette.risk,
+        borderUpColor: chartPalette.primary,
+        borderDownColor: chartPalette.risk,
+        wickUpColor: chartPalette.primary,
+        wickDownColor: chartPalette.risk,
       })
       const volumeSeries = chart.addHistogramSeries({
         priceFormat: { type: 'volume' },
@@ -81,7 +86,7 @@ export default function CandlestickChart({ data, symbol, height = 300, markers =
         data.map((d) => ({
           time: d.time as import('lightweight-charts').Time,
           value: d.volume,
-          color: d.close >= d.open ? 'rgba(34, 211, 238, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+          color: d.close >= d.open ? `${chartPalette.positive}47` : `${chartPalette.risk}47`,
         })),
       )
       if (markers.length > 0) {
@@ -118,7 +123,7 @@ export default function CandlestickChart({ data, symbol, height = 300, markers =
     return (
       <div
         style={{ height }}
-        className="flex items-center justify-center text-gray-600 text-sm"
+        className="flex items-center justify-center text-sm text-muted2"
       >
         No data for {symbol}
       </div>

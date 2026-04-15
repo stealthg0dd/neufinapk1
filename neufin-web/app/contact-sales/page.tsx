@@ -56,17 +56,17 @@ export default function ContactSalesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      <nav className="border-b border-gray-800/60 backdrop-blur-sm sticky top-0 z-10 bg-gray-950/80">
+    <div className="min-h-screen bg-shell-deep flex flex-col">
+      <nav className="border-b border-shell-border/60 backdrop-blur-sm sticky top-0 z-10 bg-shell-deep/80">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
-          <Link href="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">
+          <Link href="/pricing" className="text-shell-muted hover:text-white text-sm transition-colors">
             ← See Pricing
           </Link>
         </div>
       </nav>
 
-      <main className="flex-1 px-6 py-20">
+      <main className="flex-1 px-6 py-section">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
@@ -77,17 +77,17 @@ export default function ContactSalesPage() {
               Let&apos;s build something{' '}
               <span className="text-gradient">together</span>
             </h1>
-            <p className="text-gray-400 leading-relaxed">
+            <p className="text-shell-muted leading-relaxed">
               Tell us about your firm and we&apos;ll tailor a solution for you. We typically respond within 24 hours.
             </p>
           </div>
 
           {status === 'success' ? (
-            <div className="glass-card rounded-2xl p-10 text-center space-y-4 border border-green-500/20">
+            <div className="glass-card space-y-4 p-10 text-center">
               <div className="text-5xl">✅</div>
-              <h2 className="text-2xl font-bold text-white">Message received!</h2>
-              <p className="text-gray-400">
-                We&apos;ll be in touch within <strong className="text-white">24 hours</strong>.
+              <h2 className="text-2xl font-bold text-slate-900">Message received!</h2>
+              <p className="text-slate-600">
+                We&apos;ll be in touch within <strong className="text-slate-900">24 hours</strong>.
                 Our team is based in Singapore and covers all of Southeast Asia.
               </p>
               <Link href="/pricing" className="btn-primary inline-block mt-2">
@@ -97,12 +97,12 @@ export default function ContactSalesPage() {
           ) : (
             <form
               onSubmit={handleSubmit}
-              className="glass-card rounded-2xl p-8 space-y-5 border border-gray-700/40"
+              className="glass-card space-y-5 p-8"
             >
               {/* Name + Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name *</label>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Full Name *</label>
                   <input
                     type="text"
                     name="name"
@@ -110,11 +110,11 @@ export default function ContactSalesPage() {
                     value={form.name}
                     onChange={handleChange}
                     placeholder="Jane Tan"
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#1EB8CC] focus:outline-none focus:ring-1 focus:ring-[#1EB8CC]/30"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1.5">Work Email *</label>
+                  <label className="mb-1.5 block text-sm font-medium text-slate-700">Work Email *</label>
                   <input
                     type="email"
                     name="email"
@@ -122,14 +122,14 @@ export default function ContactSalesPage() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="jane@firm.com.sg"
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
+                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#1EB8CC] focus:outline-none focus:ring-1 focus:ring-[#1EB8CC]/30"
                   />
                 </div>
               </div>
 
               {/* Company */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Company / Firm *</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Company / Firm *</label>
                 <input
                   type="text"
                   name="company"
@@ -137,19 +137,19 @@ export default function ContactSalesPage() {
                   value={form.company}
                   onChange={handleChange}
                   placeholder="ABC Wealth Management Pte Ltd"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#1EB8CC] focus:outline-none focus:ring-1 focus:ring-[#1EB8CC]/30"
                 />
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Your Role *</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Your Role *</label>
                 <select
                   name="role"
                   required
                   value={form.role}
                   onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-900 transition-all focus:border-[#1EB8CC] focus:outline-none focus:ring-1 focus:ring-[#1EB8CC]/30"
                 >
                   <option value="" disabled>Select your role</option>
                   {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -158,12 +158,12 @@ export default function ContactSalesPage() {
 
               {/* AUM range */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">Assets Under Management (AUM)</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">Assets Under Management (AUM)</label>
                 <select
                   name="aum_range"
                   value={form.aum_range}
                   onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
+                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-900 transition-all focus:border-[#1EB8CC] focus:outline-none focus:ring-1 focus:ring-[#1EB8CC]/30"
                 >
                   <option value="">Prefer not to say</option>
                   {AUM_RANGES.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -172,19 +172,19 @@ export default function ContactSalesPage() {
 
               {/* Message */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">What are you looking to achieve?</label>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">What are you looking to achieve?</label>
                 <textarea
                   name="message"
                   rows={4}
                   value={form.message}
                   onChange={handleChange}
                   placeholder="Tell us about your firm, your clients, and what you'd like NeuFin to do for you…"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all resize-none"
+                  className="w-full resize-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#1EB8CC] focus:outline-none focus:ring-1 focus:ring-[#1EB8CC]/30"
                 />
               </div>
 
               {status === 'error' && (
-                <p className="text-red-400 text-sm text-center">
+                <p className="text-center text-sm text-red-600">
                   Something went wrong. Please try again or email us at hello@neufin.com
                 </p>
               )}
@@ -204,7 +204,7 @@ export default function ContactSalesPage() {
                 )}
               </button>
 
-              <p className="text-xs text-gray-600 text-center">
+              <p className="text-center text-xs text-slate-500">
                 We&apos;ll contact you within 24 hours · No spam, ever
               </p>
             </form>
@@ -212,7 +212,7 @@ export default function ContactSalesPage() {
         </div>
       </main>
 
-      <footer className="border-t border-gray-800/60 py-6 text-center text-sm text-gray-600">
+      <footer className="border-t border-shell-border/60 py-6 text-center text-sm text-shell-subtle">
         <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
           <Image src="/logo.png" alt="NeuFin" width={90} height={26} className="mb-3 h-6 w-auto opacity-80" />
           <span>NeuFin © {new Date().getFullYear()} · Singapore · MAS-compliant</span>
