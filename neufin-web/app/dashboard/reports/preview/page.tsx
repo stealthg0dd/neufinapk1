@@ -1,9 +1,12 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { ReportDocument, sampleInstitutionalReportModel } from '@/lib/report-template'
-import { FadeIn } from '@/components/ui/FadeIn'
-import '@/lib/report-print.css'
+import Link from "next/link";
+import {
+  ReportDocument,
+  sampleInstitutionalReportModel,
+} from "@/lib/report-template";
+import { FadeIn } from "@/components/ui/FadeIn";
+import "@/lib/report-print.css";
 
 /**
  * Institutional HTML report preview (print CSS).
@@ -16,9 +19,12 @@ export default function ReportPreviewPage() {
         <FadeIn>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-page-title font-semibold tracking-tight">Report preview</h1>
+              <h1 className="text-page-title font-semibold tracking-tight">
+                Report preview
+              </h1>
               <p className="mt-1 text-sm text-muted2">
-                Institutional layout — use print to validate typography. Optional Paged.js for page breaks.
+                Institutional layout — use print to validate typography.
+                Optional Paged.js for page breaks.
               </p>
             </div>
             <div className="flex gap-2">
@@ -46,5 +52,5 @@ export default function ReportPreviewPage() {
         </FadeIn>
       </div>
     </div>
-  )
+  );
 }

@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 /**
  * GlobalChatWidget.tsx — Floating market-intelligence chatbot for the landing page.
@@ -10,117 +10,178 @@
  * Style: Tailwind CSS glassmorphism dark theme.
  */
 
-import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import React, { useState, useRef, useEffect, KeyboardEvent } from "react";
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
 const AGENTS = [
-  { value: 'general',   label: 'General',    fullLabel: 'General Agent',        emoji: '🤖', color: 'text-primary',   accent: 'border-primary/50',  ring: 'ring-primary/30'  },
-  { value: 'quant',     label: 'Quant',      fullLabel: 'Quant Agent',           emoji: '📊', color: 'text-amber-400',  accent: 'border-amber-400/60', ring: 'ring-amber-400/30' },
-  { value: 'macro',     label: 'Macro',      fullLabel: 'Macro Strategist',      emoji: '🌐', color: 'text-emerald-400',accent: 'border-emerald-400/60',ring: 'ring-emerald-400/30'},
-  { value: 'technical', label: 'Technical',  fullLabel: 'Technical Analyst',     emoji: '📈', color: 'text-purple-400', accent: 'border-purple-400/60', ring: 'ring-purple-400/30'},
-] as const
+  {
+    value: "general",
+    label: "General",
+    fullLabel: "General Agent",
+    emoji: "🤖",
+    color: "text-primary",
+    accent: "border-primary/50",
+    ring: "ring-primary/30",
+  },
+  {
+    value: "quant",
+    label: "Quant",
+    fullLabel: "Quant Agent",
+    emoji: "📊",
+    color: "text-amber-400",
+    accent: "border-amber-400/60",
+    ring: "ring-amber-400/30",
+  },
+  {
+    value: "macro",
+    label: "Macro",
+    fullLabel: "Macro Strategist",
+    emoji: "🌐",
+    color: "text-emerald-400",
+    accent: "border-emerald-400/60",
+    ring: "ring-emerald-400/30",
+  },
+  {
+    value: "technical",
+    label: "Technical",
+    fullLabel: "Technical Analyst",
+    emoji: "📈",
+    color: "text-purple-400",
+    accent: "border-purple-400/60",
+    ring: "ring-purple-400/30",
+  },
+] as const;
 
-type AgentValue = typeof AGENTS[number]['value']
+type AgentValue = (typeof AGENTS)[number]["value"];
 
 // ── Suggested starters per agent ─────────────────────────────────────────────
 const STARTERS: Record<AgentValue, string[]> = {
-  general:   ['What is the best-performing sector this year?', 'How do I hedge against inflation?'],
-  quant:     ['What is the Sharpe ratio of SPY vs QQQ?', 'Explain the VIX and how to use it'],
-  macro:     ['How does the Fed rate affect tech stocks?', 'What does an inverted yield curve mean?'],
-  technical: ['What are key support levels for SPY?', 'How do I identify a breakout pattern?'],
-}
+  general: [
+    "What is the best-performing sector this year?",
+    "How do I hedge against inflation?",
+  ],
+  quant: [
+    "What is the Sharpe ratio of SPY vs QQQ?",
+    "Explain the VIX and how to use it",
+  ],
+  macro: [
+    "How does the Fed rate affect tech stocks?",
+    "What does an inverted yield curve mean?",
+  ],
+  technical: [
+    "What are key support levels for SPY?",
+    "How do I identify a breakout pattern?",
+  ],
+};
 
 function startersForAgent(agent: AgentValue): string[] {
   switch (agent) {
-    case 'general':
-      return STARTERS.general
-    case 'quant':
-      return STARTERS.quant
-    case 'macro':
-      return STARTERS.macro
-    case 'technical':
-      return STARTERS.technical
+    case "general":
+      return STARTERS.general;
+    case "quant":
+      return STARTERS.quant;
+    case "macro":
+      return STARTERS.macro;
+    case "technical":
+      return STARTERS.technical;
     default:
-      return []
+      return [];
   }
 }
 
 interface Message {
-  role:        'user' | 'assistant'
-  text:        string
-  keyNumbers?: Record<string, string>
-  action?:     string
-  agent?:      string
-  loading?:    boolean
+  role: "user" | "assistant";
+  text: string;
+  keyNumbers?: Record<string, string>;
+  action?: string;
+  agent?: string;
+  loading?: boolean;
 }
 
 export default function GlobalChatWidget() {
-  const [open,     setOpen]     = useState(false)
-  const [agent,    setAgent]    = useState<AgentValue>('general')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input,    setInput]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false);
+  const [agent, setAgent] = useState<AgentValue>("general");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const currentAgent = AGENTS.find(a => a.value === agent) ?? AGENTS[0]
+  const currentAgent = AGENTS.find((a) => a.value === agent) ?? AGENTS[0];
 
   // Greeting on first open
   useEffect(() => {
     if (open && messages.length === 0) {
-      setMessages([{
-        role:  'assistant',
-        text:  'Ask me anything about markets, trends, or portfolio strategy — no portfolio upload needed.',
-        agent: 'general',
-      }])
+      setMessages([
+        {
+          role: "assistant",
+          text: "Ask me anything about markets, trends, or portfolio strategy — no portfolio upload needed.",
+          agent: "general",
+        },
+      ]);
     }
-  }, [open, messages.length])
+  }, [open, messages.length]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const send = async (question: string) => {
-    if (!question.trim() || loading) return
-    const q = question.trim()
-    setInput('')
-    setMessages(prev => [...prev, { role: 'user', text: q }])
-    setLoading(true)
-    setMessages(prev => [...prev, { role: 'assistant', text: '', agent, loading: true }])
+    if (!question.trim() || loading) return;
+    const q = question.trim();
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", text: q }]);
+    setLoading(true);
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", text: "", agent, loading: true },
+    ]);
 
     try {
-      const res = await fetch('/api/swarm/global-chat', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: q, agent_type: agent }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
+      const res = await fetch("/api/swarm/global-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: q, agent_type: agent }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
 
-      const reply      = data.reply ?? data.response?.answer ?? 'Analysis complete.'
-      const keyNumbers = data.key_numbers ?? data.response?.key_numbers ?? {}
-      const action     = data.action ?? data.response?.recommended_action ?? ''
+      const reply = data.reply ?? data.response?.answer ?? "Analysis complete.";
+      const keyNumbers = data.key_numbers ?? data.response?.key_numbers ?? {};
+      const action = data.action ?? data.response?.recommended_action ?? "";
 
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: 'assistant', agent: data.agent ?? agent, text: reply, keyNumbers, action },
-      ])
+        {
+          role: "assistant",
+          agent: data.agent ?? agent,
+          text: reply,
+          keyNumbers,
+          action,
+        },
+      ]);
     } catch (e: any) {
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: 'assistant', agent, text: `Connection error — please try again. (${e.message})` },
-      ])
+        {
+          role: "assistant",
+          agent,
+          text: `Connection error — please try again. (${e.message})`,
+        },
+      ]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) }
-  }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send(input);
+    }
+  };
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 font-sans">
-
       {/* ── Chat panel ──────────────────────────────────────────────────────── */}
       {open && (
         <div
@@ -135,8 +196,12 @@ export default function GlobalChatWidget() {
             <div className="flex items-center gap-2.5">
               <span className="text-lg">{currentAgent.emoji}</span>
               <div>
-                <p className="text-white text-sm font-semibold leading-tight">Neufin Market Intel</p>
-                <p className={`text-sm tracking-widest uppercase ${currentAgent.color}`}>
+                <p className="text-white text-sm font-semibold leading-tight">
+                  Neufin Market Intel
+                </p>
+                <p
+                  className={`text-sm tracking-widest uppercase ${currentAgent.color}`}
+                >
                   {currentAgent.fullLabel}
                 </p>
               </div>
@@ -151,15 +216,16 @@ export default function GlobalChatWidget() {
 
           {/* Agent tabs */}
           <div className="flex gap-1 px-3 py-2 bg-black/20 border-b border-white/[0.05]">
-            {AGENTS.map(a => (
+            {AGENTS.map((a) => (
               <button
                 key={a.value}
                 onClick={() => setAgent(a.value)}
                 className={`
                   flex-1 text-sm font-medium py-1.5 rounded-md transition-all
-                  ${agent === a.value
-                    ? `bg-white/10 ${a.color} border ${a.accent}`
-                    : 'text-white/30 hover:text-white/60 border border-transparent'
+                  ${
+                    agent === a.value
+                      ? `bg-white/10 ${a.color} border ${a.accent}`
+                      : "text-white/30 hover:text-white/60 border border-transparent"
                   }
                 `}
               >
@@ -170,7 +236,6 @@ export default function GlobalChatWidget() {
 
           {/* Message thread */}
           <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-white/10">
-
             {/* Suggested starters — only shown on greeting */}
             {messages.length === 1 && (
               <div className="flex flex-wrap gap-1.5 mb-1">
@@ -194,20 +259,21 @@ export default function GlobalChatWidget() {
             {messages.map((msg, idx) => (
               <div
                 key={idx}
-                className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {msg.role === 'assistant' && !msg.loading && (
+                {msg.role === "assistant" && !msg.loading && (
                   <span className="text-base shrink-0 mt-0.5 leading-none">
-                    {AGENTS.find(a => a.value === msg.agent)?.emoji ?? '🤖'}
+                    {AGENTS.find((a) => a.value === msg.agent)?.emoji ?? "🤖"}
                   </span>
                 )}
 
                 <div className="max-w-[85%] flex flex-col gap-1.5">
                   {msg.loading ? (
                     <div className="bg-white/[0.05] border border-white/10 rounded-[4px_12px_12px_12px] px-3 py-2 text-white/40 text-sm">
-                      <span className="animate-pulse inline-block">●</span>{' '}Thinking…
+                      <span className="animate-pulse inline-block">●</span>{" "}
+                      Thinking…
                     </div>
-                  ) : msg.role === 'user' ? (
+                  ) : msg.role === "user" ? (
                     <div className="rounded-[12px_4px_12px_12px] border border-white/10 bg-gradient-to-br from-primary/35 to-violet-600/20 px-3 py-2 text-sm leading-relaxed text-[#e0e0e0]">
                       {msg.text}
                     </div>
@@ -218,20 +284,32 @@ export default function GlobalChatWidget() {
                       </div>
 
                       {/* Key numbers */}
-                      {msg.keyNumbers && Object.keys(msg.keyNumbers).length > 0 && (
-                        <div className="bg-black/30 border border-white/[0.07] rounded-lg px-3 py-2 flex flex-wrap gap-x-4 gap-y-1">
-                          {Object.entries(msg.keyNumbers).map(([k, v]) => (
-                            <div key={k} className="flex items-center gap-1.5">
-                              <span className="text-white/30 text-sm uppercase tracking-widest">{k}:</span>
-                              <span className={`text-sm font-bold ${currentAgent.color}`}>{String(v)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {msg.keyNumbers &&
+                        Object.keys(msg.keyNumbers).length > 0 && (
+                          <div className="bg-black/30 border border-white/[0.07] rounded-lg px-3 py-2 flex flex-wrap gap-x-4 gap-y-1">
+                            {Object.entries(msg.keyNumbers).map(([k, v]) => (
+                              <div
+                                key={k}
+                                className="flex items-center gap-1.5"
+                              >
+                                <span className="text-white/30 text-sm uppercase tracking-widest">
+                                  {k}:
+                                </span>
+                                <span
+                                  className={`text-sm font-bold ${currentAgent.color}`}
+                                >
+                                  {String(v)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                       {/* Action */}
                       {msg.action && (
-                        <div className={`border-l-2 ${currentAgent.accent} pl-2.5 ${currentAgent.color} text-sm leading-relaxed`}>
+                        <div
+                          className={`border-l-2 ${currentAgent.accent} pl-2.5 ${currentAgent.color} text-sm leading-relaxed`}
+                        >
                           ▶ {msg.action}
                         </div>
                       )}
@@ -247,7 +325,7 @@ export default function GlobalChatWidget() {
           <div className="flex gap-2 items-center px-3 py-3 bg-black/40 border-t border-white/[0.06]">
             <input
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKey}
               disabled={loading}
               placeholder="Ask about markets, trends, risk…"
@@ -265,13 +343,14 @@ export default function GlobalChatWidget() {
               className={`
                 shrink-0 w-8 h-8 rounded-lg text-sm font-bold
                 flex items-center justify-center transition-all
-                ${input.trim() && !loading
-                  ? `bg-white/10 border ${currentAgent.accent} ${currentAgent.color} hover:bg-white/15`
-                  : 'bg-transparent border border-white/10 text-white/20 cursor-default'
+                ${
+                  input.trim() && !loading
+                    ? `bg-white/10 border ${currentAgent.accent} ${currentAgent.color} hover:bg-white/15`
+                    : "bg-transparent border border-white/10 text-white/20 cursor-default"
                 }
               `}
             >
-              {loading ? '…' : '↑'}
+              {loading ? "…" : "↑"}
             </button>
           </div>
         </div>
@@ -279,8 +358,8 @@ export default function GlobalChatWidget() {
 
       {/* ── Toggle button ──────────────────────────────────────────────────── */}
       <button
-        onClick={() => setOpen(v => !v)}
-        aria-label={open ? 'Close market chat' : 'Open market chat'}
+        onClick={() => setOpen((v) => !v)}
+        aria-label={open ? "Close market chat" : "Open market chat"}
         className="
           w-[52px] h-[52px] rounded-full
           bg-gradient-to-br from-primary to-violet-600
@@ -292,7 +371,7 @@ export default function GlobalChatWidget() {
           transition-transform duration-150
         "
       >
-        {open ? '✕' : '💬'}
+        {open ? "✕" : "💬"}
       </button>
 
       <style>{`
@@ -302,5 +381,5 @@ export default function GlobalChatWidget() {
         }
       `}</style>
     </div>
-  )
+  );
 }

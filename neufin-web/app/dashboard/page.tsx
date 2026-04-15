@@ -1,51 +1,69 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { Loader2 } from 'lucide-react'
-import { usePortfolioData } from '@/hooks/usePortfolioData'
-import { GraphicPlaceholder } from '@/components/GraphicPlaceholder'
-import type { RegimeData } from '@/hooks/usePortfolioData'
-import { SwarmBriefingPreview } from '@/components/dashboard/SwarmBriefingPreview'
-import ResearchFeedClient from '@/components/dashboard/ResearchFeedClient'
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
+import { usePortfolioData } from "@/hooks/usePortfolioData";
+import { GraphicPlaceholder } from "@/components/GraphicPlaceholder";
+import type { RegimeData } from "@/hooks/usePortfolioData";
+import { SwarmBriefingPreview } from "@/components/dashboard/SwarmBriefingPreview";
+import ResearchFeedClient from "@/components/dashboard/ResearchFeedClient";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 function formatRegimeLabel(regime: RegimeData | null): string {
-  const raw = regime?.regime ?? regime?.label
-  if (!raw || raw === 'unknown') return 'Macro regime pending'
+  const raw = regime?.regime ?? regime?.label;
+  if (!raw || raw === "unknown") return "Macro regime pending";
   return String(raw)
-    .replace(/_/g, ' ')
-    .replace(/-/g, '-')
-    .split(' ')
+    .replace(/_/g, " ")
+    .replace(/-/g, "-")
+    .split(" ")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
+    .join(" ");
 }
 
 function regimePillClass(regime: RegimeData | null): string {
-  const u = (regime?.regime ?? regime?.label ?? '').toLowerCase()
-  if (u.includes('inflation')) {
-    return 'inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold text-red-800'
+  const u = (regime?.regime ?? regime?.label ?? "").toLowerCase();
+  if (u.includes("inflation")) {
+    return "inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold text-red-800";
   }
-  if (u.includes('stagflation')) {
-    return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
+  if (u.includes("stagflation")) {
+    return "inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900";
   }
-  if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession') || u.includes('crisis')) {
-    return 'inline-block rounded-md border border-primary/25 bg-primary-light px-2 py-0.5 text-sm font-semibold text-primary-dark'
+  if (
+    u.includes("risk_off") ||
+    u.includes("risk-off") ||
+    u.includes("recession") ||
+    u.includes("crisis")
+  ) {
+    return "inline-block rounded-md border border-primary/25 bg-primary-light px-2 py-0.5 text-sm font-semibold text-primary-dark";
   }
-  if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery') || u.includes('growth')) {
-    return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-semibold text-emerald-900'
+  if (
+    u.includes("risk_on") ||
+    u.includes("risk-on") ||
+    u.includes("recovery") ||
+    u.includes("growth")
+  ) {
+    return "inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-semibold text-emerald-900";
   }
-  return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
+  return "inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900";
 }
 
 function fmtMetric(v: number | null | undefined, digits = 2): string {
-  if (v == null || Number.isNaN(v)) return '—'
-  return Number(v).toFixed(digits)
+  if (v == null || Number.isNaN(v)) return "—";
+  return Number(v).toFixed(digits);
 }
 
 export default function DashboardPage() {
-  const { portfolios, latestPortfolio, hasPortfolio, latestDna, swarmReport, regime, loading } = usePortfolioData()
+  const {
+    portfolios,
+    latestPortfolio,
+    hasPortfolio,
+    latestDna,
+    swarmReport,
+    regime,
+    loading,
+  } = usePortfolioData();
 
   if (loading) {
     return (
@@ -53,26 +71,26 @@ export default function DashboardPage() {
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading your portfolio intelligence…
       </div>
-    )
+    );
   }
 
   const lastAnalyzed =
     latestPortfolio?.analyzed_at ??
     latestPortfolio?.updated_at ??
     latestPortfolio?.created_at ??
-    null
+    null;
 
   const portfolioTitle =
     latestPortfolio?.portfolio_name ??
     latestPortfolio?.name ??
-    (hasPortfolio ? 'Primary portfolio' : 'No portfolio uploaded')
+    (hasPortfolio ? "Primary portfolio" : "No portfolio uploaded");
 
-  const dnaScore = latestDna?.dna_score ?? latestPortfolio?.dna_score ?? null
+  const dnaScore = latestDna?.dna_score ?? latestPortfolio?.dna_score ?? null;
 
   const positionsCount =
     (latestPortfolio as { positions_count?: number } | null)?.positions_count ??
     latestDna?.tax_analysis?.positions?.length ??
-    null
+    null;
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -92,10 +110,13 @@ export default function DashboardPage() {
                 Analyze your first portfolio
               </h2>
               <p className="mb-6 text-[15px] leading-relaxed text-[#475569]">
-                Upload a CSV with your holdings. Seven AI agents will deliver a complete Investment Committee briefing in
-                under 60 seconds.
+                Upload a CSV with your holdings. Seven AI agents will deliver a
+                complete Investment Committee briefing in under 60 seconds.
               </p>
-              <Link href="/dashboard/portfolio" className="btn-primary self-start">
+              <Link
+                href="/dashboard/portfolio"
+                className="btn-primary self-start"
+              >
                 Upload Portfolio
               </Link>
             </div>
@@ -127,11 +148,11 @@ export default function DashboardPage() {
           <h2 className="text-section-title mt-2">{portfolioTitle}</h2>
           {lastAnalyzed && (
             <p className="mt-1 text-sm text-slate-500">
-              Last analysed{' '}
-              {new Date(lastAnalyzed).toLocaleDateString('en-SG', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
+              Last analysed{" "}
+              {new Date(lastAnalyzed).toLocaleDateString("en-SG", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
               })}
             </p>
           )}
@@ -139,24 +160,33 @@ export default function DashboardPage() {
             {dnaScore != null && hasPortfolio ? (
               <div>
                 <div className="text-metric tabular-nums">{dnaScore}</div>
-                <div className="text-muted-marketing mt-1">Portfolio health score</div>
+                <div className="text-muted-marketing mt-1">
+                  Portfolio health score
+                </div>
               </div>
             ) : (
               <div>
                 <div className="text-metric text-slate-300">—</div>
-                <div className="text-muted-marketing mt-1">Portfolio health score</div>
+                <div className="text-muted-marketing mt-1">
+                  Portfolio health score
+                </div>
               </div>
             )}
             <div className="pb-1">
-              <span className={regimePillClass(regime)}>{formatRegimeLabel(regime)}</span>
+              <span className={regimePillClass(regime)}>
+                {formatRegimeLabel(regime)}
+              </span>
             </div>
           </div>
           {!hasPortfolio && (
             <p className="mt-4 text-sm text-slate-600">
-              Welcome to NeuFin.{' '}
-              <Link href="/dashboard/portfolio" className="font-medium text-primary-dark hover:underline">
+              Welcome to NeuFin.{" "}
+              <Link
+                href="/dashboard/portfolio"
+                className="font-medium text-primary-dark hover:underline"
+              >
                 Upload a portfolio
-              </Link>{' '}
+              </Link>{" "}
               to see your DNA score and regime context.
             </p>
           )}
@@ -172,18 +202,20 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-label">Sharpe</p>
-              <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">—</p>
+              <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">
+                —
+              </p>
             </div>
             <div>
               <p className="text-label">Positions</p>
               <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">
-                {positionsCount != null ? positionsCount : '—'}
+                {positionsCount != null ? positionsCount : "—"}
               </p>
             </div>
           </div>
           <div>
             <Link
-              href={hasPortfolio ? '/swarm' : '/dashboard/portfolio'}
+              href={hasPortfolio ? "/swarm" : "/dashboard/portfolio"}
               className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
             >
               Generate IC report
@@ -197,10 +229,15 @@ export default function DashboardPage() {
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(latestDna.strengths ?? []).length > 0 && (
             <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Top strengths</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">
+                Top strengths
+              </p>
               {latestDna.strengths.slice(0, 2).map((s, i) => (
-                <div key={i} className="mb-2 border-l-2 border-[#16A34A] pl-2.5 last:mb-0">
-                  <p className="text-xs text-slate-800">{s.split('.')[0]}.</p>
+                <div
+                  key={i}
+                  className="mb-2 border-l-2 border-[#16A34A] pl-2.5 last:mb-0"
+                >
+                  <p className="text-xs text-slate-800">{s.split(".")[0]}.</p>
                 </div>
               ))}
             </div>
@@ -208,41 +245,57 @@ export default function DashboardPage() {
 
           {latestDna.recommendation && (
             <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Recommended action</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">
+                Recommended action
+              </p>
               <div className="border-l-2 border-amber-400 pl-2.5">
-                <p className="text-xs text-slate-800">{latestDna.recommendation}</p>
+                <p className="text-xs text-slate-800">
+                  {latestDna.recommendation}
+                </p>
               </div>
             </div>
           )}
 
           {(latestDna.weaknesses ?? []).length > 0 && (
             <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Key risks</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">
+                Key risks
+              </p>
               {latestDna.weaknesses.slice(0, 2).map((w, i) => (
-                <div key={i} className="mb-2 border-l-2 border-[#DC2626] pl-2.5 last:mb-0">
-                  <p className="text-xs text-slate-800">{w.split('.')[0]}.</p>
+                <div
+                  key={i}
+                  className="mb-2 border-l-2 border-[#DC2626] pl-2.5 last:mb-0"
+                >
+                  <p className="text-xs text-slate-800">{w.split(".")[0]}.</p>
                 </div>
               ))}
             </div>
           )}
 
           {latestDna.tax_analysis &&
-            ((latestDna.tax_analysis.total_liability ?? 0) > 0 || (latestDna.tax_analysis.total_harvest_opp ?? 0) > 0) && (
+            ((latestDna.tax_analysis.total_liability ?? 0) > 0 ||
+              (latestDna.tax_analysis.total_harvest_opp ?? 0) > 0) && (
               <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm md:col-span-2 xl:col-span-1">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Tax snapshot</p>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">
+                  Tax snapshot
+                </p>
                 {(latestDna.tax_analysis?.total_liability ?? 0) > 0 && (
                   <div className="mb-2 border-l-2 border-amber-400 pl-2.5">
                     <p className="text-xs text-slate-500">CGT exposure</p>
                     <p className="text-sm font-semibold text-slate-900">
-                      ${(latestDna.tax_analysis!.total_liability!).toLocaleString()}
+                      $
+                      {latestDna.tax_analysis!.total_liability!.toLocaleString()}
                     </p>
                   </div>
                 )}
                 {(latestDna.tax_analysis?.total_harvest_opp ?? 0) > 0 && (
                   <div className="border-l-2 border-[#16A34A] pl-2.5">
-                    <p className="text-xs text-slate-500">Harvest opportunity</p>
+                    <p className="text-xs text-slate-500">
+                      Harvest opportunity
+                    </p>
                     <p className="text-sm font-semibold text-slate-900">
-                      ${(latestDna.tax_analysis!.total_harvest_opp!).toLocaleString()}
+                      $
+                      {latestDna.tax_analysis!.total_harvest_opp!.toLocaleString()}
                     </p>
                   </div>
                 )}
@@ -255,9 +308,12 @@ export default function DashboardPage() {
 
       {hasPortfolio && !swarmReport && (
         <section className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-dark">Swarm IC analysis</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-dark">
+            Swarm IC analysis
+          </p>
           <p className="mb-3 text-xs text-slate-600">
-            Run the 7-agent swarm on your portfolio for regime-adjusted signals, tax context, and an IC-grade memo.
+            Run the 7-agent swarm on your portfolio for regime-adjusted signals,
+            tax context, and an IC-grade memo.
           </p>
           <Link
             href="/dashboard/swarm"
@@ -274,8 +330,12 @@ export default function DashboardPage() {
 
       <section className="flex flex-col flex-wrap justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
         <div>
-          <p className="text-sm font-medium text-slate-900">You&apos;re on NeuFin beta — your feedback shapes what we build.</p>
-          <p className="mt-0.5 text-xs text-slate-600">Takes about five minutes · Read by the founding team</p>
+          <p className="text-sm font-medium text-slate-900">
+            You&apos;re on NeuFin beta — your feedback shapes what we build.
+          </p>
+          <p className="mt-0.5 text-xs text-slate-600">
+            Takes about five minutes · Read by the founding team
+          </p>
         </div>
         <Link href="/feedback" target="_blank" className="shrink-0">
           <button
@@ -287,5 +347,5 @@ export default function DashboardPage() {
         </Link>
       </section>
     </div>
-  )
+  );
 }

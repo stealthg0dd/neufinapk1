@@ -1,42 +1,42 @@
-'use client'
+"use client";
 
 export type SwarmSourceItem = {
-  id: string
-  label: string
-  description: string
-}
+  id: string;
+  label: string;
+  description: string;
+};
 
 export type SwarmSourcesPayload = {
-  items?: SwarmSourceItem[]
-  tickers?: string[]
-  disclaimer?: string
-}
+  items?: SwarmSourceItem[];
+  tickers?: string[];
+  disclaimer?: string;
+};
 
 export type SwarmObsStep = {
-  agent: string
-  status: string
-  summary?: string
-  ts?: string
-  duration_ms?: number
-  meta?: Record<string, unknown>
-}
+  agent: string;
+  status: string;
+  summary?: string;
+  ts?: string;
+  duration_ms?: number;
+  meta?: Record<string, unknown>;
+};
 
 export type SwarmObservabilityPayload = {
-  steps?: SwarmObsStep[]
-  pipeline?: string
-  runtime?: string
-}
+  steps?: SwarmObsStep[];
+  pipeline?: string;
+  runtime?: string;
+};
 
 export function SwarmSourcesPanel({
   sources,
   observability,
 }: {
-  sources?: SwarmSourcesPayload | null
-  observability?: SwarmObservabilityPayload | null
+  sources?: SwarmSourcesPayload | null;
+  observability?: SwarmObservabilityPayload | null;
 }) {
-  const items = sources?.items ?? []
-  const steps = observability?.steps ?? []
-  if (!items.length && !steps.length) return null
+  const items = sources?.items ?? [];
+  const steps = observability?.steps ?? [];
+  if (!items.length && !steps.length) return null;
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 pb-6">
@@ -51,7 +51,9 @@ export function SwarmSourcesPanel({
             </span>
           ) : null}
           {observability?.pipeline ? (
-            <span className="text-sm text-gray-300">· {observability.pipeline}</span>
+            <span className="text-sm text-gray-300">
+              · {observability.pipeline}
+            </span>
           ) : null}
         </div>
 
@@ -69,16 +71,20 @@ export function SwarmSourcesPanel({
 
         {sources?.tickers && sources.tickers.length > 0 ? (
           <p className="mb-4 font-mono text-sm text-gray-400">
-            Tickers in this run:{' '}
-            <span className="text-gray-300">{sources.tickers.join(', ')}</span>
+            Tickers in this run:{" "}
+            <span className="text-gray-300">{sources.tickers.join(", ")}</span>
           </p>
         ) : null}
 
         {steps.length > 0 ? (
           <details className="group">
             <summary className="cursor-pointer list-none text-sm font-bold uppercase tracking-widest text-[#FFB900] hover:text-[#ffc933]">
-              <span className="inline group-open:hidden">Show agent run log ({steps.length} events)</span>
-              <span className="hidden group-open:inline">Hide agent run log</span>
+              <span className="inline group-open:hidden">
+                Show agent run log ({steps.length} events)
+              </span>
+              <span className="hidden group-open:inline">
+                Hide agent run log
+              </span>
             </summary>
             <div className="mt-4 max-h-64 overflow-y-auto rounded border border-[#1e1e1e] bg-[#080808] p-2 font-mono text-sm text-gray-300">
               {steps.map((ev, i) => (
@@ -86,15 +92,28 @@ export function SwarmSourcesPanel({
                   key={`${ev.agent}-${ev.ts}-${i}`}
                   className="border-b border-[#1a1a1a] py-1 last:border-0"
                 >
-                  <span className="text-gray-400">{ev.ts?.slice(11, 23) ?? '—'}</span>{' '}
-                  <span className="text-cyan-400/80">{ev.agent}</span>{' '}
-                  <span className={ev.status === 'complete' ? 'text-green-500/90' : 'text-amber-400/90'}>
+                  <span className="text-gray-400">
+                    {ev.ts?.slice(11, 23) ?? "—"}
+                  </span>{" "}
+                  <span className="text-cyan-400/80">{ev.agent}</span>{" "}
+                  <span
+                    className={
+                      ev.status === "complete"
+                        ? "text-green-500/90"
+                        : "text-amber-400/90"
+                    }
+                  >
                     {ev.status}
                   </span>
-                  {typeof ev.duration_ms === 'number' ? (
-                    <span className="text-gray-400"> · {ev.duration_ms.toFixed(0)}ms</span>
+                  {typeof ev.duration_ms === "number" ? (
+                    <span className="text-gray-400">
+                      {" "}
+                      · {ev.duration_ms.toFixed(0)}ms
+                    </span>
                   ) : null}
-                  {ev.summary ? <span className="text-gray-300"> — {ev.summary}</span> : null}
+                  {ev.summary ? (
+                    <span className="text-gray-300"> — {ev.summary}</span>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -102,9 +121,11 @@ export function SwarmSourcesPanel({
         ) : null}
 
         {sources?.disclaimer ? (
-          <p className="mt-4 text-sm leading-relaxed text-[#555]">{sources.disclaimer}</p>
+          <p className="mt-4 text-sm leading-relaxed text-[#555]">
+            {sources.disclaimer}
+          </p>
         ) : null}
       </div>
     </div>
-  )
+  );
 }

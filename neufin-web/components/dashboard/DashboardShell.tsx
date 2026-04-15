@@ -1,62 +1,62 @@
-'use client'
+"use client";
 
-import { Suspense, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Menu, X } from 'lucide-react'
-import { useAuth } from '@/lib/auth-context'
-import DashboardSidebar from '@/components/DashboardSidebar'
-import { CommandBar } from '@/components/CommandBar'
-import { CheckoutSessionSuccessFeedback } from '@/components/dashboard/CheckoutSessionSuccessFeedback'
-import { TrialStatusBanner } from '@/components/dashboard/TrialStatusBanner'
-import { MarketDeskRail } from '@/components/dashboard/MarketDeskRail'
-import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { Suspense, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Menu, X } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import { CommandBar } from "@/components/CommandBar";
+import { CheckoutSessionSuccessFeedback } from "@/components/dashboard/CheckoutSessionSuccessFeedback";
+import { TrialStatusBanner } from "@/components/dashboard/TrialStatusBanner";
+import { MarketDeskRail } from "@/components/dashboard/MarketDeskRail";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
 
-const RAIL_STORAGE_KEY = 'neufin:dashboard:marketdesk-open'
+const RAIL_STORAGE_KEY = "neufin:dashboard:marketdesk-open";
 
 export function DashboardShell({
   children,
   regime,
 }: {
-  children: React.ReactNode
-  regime: unknown
+  children: React.ReactNode;
+  regime: unknown;
 }) {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
-  const [marketDeskOpen, setMarketDeskOpen] = useState(false)
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [marketDeskOpen, setMarketDeskOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
-    setMobileNavOpen(false)
-  }, [pathname])
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login')
-  }, [loading, user, router])
+    if (!loading && !user) router.replace("/login");
+  }, [loading, user, router]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const raw = window.localStorage.getItem(RAIL_STORAGE_KEY)
-    setMarketDeskOpen(raw === '1')
-  }, [])
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(RAIL_STORAGE_KEY);
+    setMarketDeskOpen(raw === "1");
+  }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    window.localStorage.setItem(RAIL_STORAGE_KEY, marketDeskOpen ? '1' : '0')
-  }, [marketDeskOpen])
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(RAIL_STORAGE_KEY, marketDeskOpen ? "1" : "0");
+  }, [marketDeskOpen]);
 
   useEffect(() => {
-    if (!mobileNavOpen) return
+    if (!mobileNavOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileNavOpen(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [mobileNavOpen])
+      if (e.key === "Escape") setMobileNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileNavOpen]);
 
   if (loading || !user) {
-    return <div className="min-h-screen bg-app" />
+    return <div className="min-h-screen bg-app" />;
   }
 
   return (
@@ -68,7 +68,12 @@ export function DashboardShell({
 
       {/* Mobile drawer */}
       {mobileNavOpen ? (
-        <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+        <div
+          className="fixed inset-0 z-50 flex lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation"
+        >
           <button
             type="button"
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -78,8 +83,20 @@ export function DashboardShell({
           <aside className="relative z-10 flex h-full w-72 max-w-[min(18rem,88vw)] flex-col bg-white shadow-2xl">
             <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-[#E2E8F0] px-5">
               <div className="flex items-center gap-2">
-                <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
-                <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+                <Image
+                  src="/logo-icon.png"
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 rounded-sm"
+                />
+                <Image
+                  src="/logo.png"
+                  alt="NeuFin"
+                  width={120}
+                  height={32}
+                  className="h-8 w-auto"
+                />
               </div>
               <button
                 type="button"
@@ -108,11 +125,26 @@ export function DashboardShell({
             <Menu className="h-5 w-5" strokeWidth={1.5} />
           </button>
           <div className="flex items-center gap-2">
-            <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
-            <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+            <Image
+              src="/logo-icon.png"
+              alt=""
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-sm"
+            />
+            <Image
+              src="/logo.png"
+              alt="NeuFin"
+              width={120}
+              height={32}
+              className="h-8 w-auto"
+            />
           </div>
         </header>
-        <CommandBar regimeData={regime} onToggleCopilot={() => setMarketDeskOpen((o) => !o)} />
+        <CommandBar
+          regimeData={regime}
+          onToggleCopilot={() => setMarketDeskOpen((o) => !o)}
+        />
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <main className="flex-1 overflow-y-auto bg-app py-4 md:py-6">
             <div className="page-container">
@@ -125,7 +157,10 @@ export function DashboardShell({
           </main>
         </div>
       </div>
-      <MarketDeskRail open={marketDeskOpen} onToggle={() => setMarketDeskOpen((o) => !o)} />
+      <MarketDeskRail
+        open={marketDeskOpen}
+        onToggle={() => setMarketDeskOpen((o) => !o)}
+      />
     </div>
-  )
+  );
 }

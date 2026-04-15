@@ -70,11 +70,7 @@ async def create_lead(body: LeadCreate) -> dict:
     # Upsert: if email already exists, update the record rather than error
     try:
         existing = (
-            supabase.table("leads")
-            .select("id, status")
-            .eq("email", email)
-            .limit(1)
-            .execute()
+            supabase.table("leads").select("id, status").eq("email", email).limit(1).execute()
         )
         if existing.data:
             lead_id = existing.data[0]["id"]
@@ -86,9 +82,7 @@ async def create_lead(body: LeadCreate) -> dict:
             if body.interested_plan:
                 update_payload["interested_plan"] = body.interested_plan
             if update_payload:
-                supabase.table("leads").update(update_payload).eq(
-                    "id", lead_id
-                ).execute()
+                supabase.table("leads").update(update_payload).eq("id", lead_id).execute()
         else:
             result = (
                 supabase.table("leads")
@@ -203,9 +197,7 @@ async def list_leads(
 
 
 @router.patch("/api/admin/leads/{lead_id}")
-async def update_lead(
-    lead_id: str, body: LeadUpdate, _admin=Depends(get_admin_user)
-) -> dict:
+async def update_lead(lead_id: str, body: LeadUpdate, _admin=Depends(get_admin_user)) -> dict:
     """Update lead status, notes, or contacted_at. Requires admin."""
     valid_statuses = {
         "new",
@@ -225,9 +217,7 @@ async def update_lead(
 
     # Fetch current lead first
     try:
-        current = (
-            supabase.table("leads").select("*").eq("id", lead_id).limit(1).execute()
-        )
+        current = supabase.table("leads").select("*").eq("id", lead_id).limit(1).execute()
         if not current.data:
             raise HTTPException(status_code=404, detail="Lead not found.")
         lead = current.data[0]
@@ -321,27 +311,17 @@ async def lead_stats(_admin=Depends(get_admin_user)) -> dict:
     # Average days to close (won leads only)
     close_times: list[float] = []
     for lead in leads:
-        if (
-            lead.get("status") == "won"
-            and lead.get("won_at")
-            and lead.get("created_at")
-        ):
+        if lead.get("status") == "won" and lead.get("won_at") and lead.get("created_at"):
             try:
-                created = datetime.fromisoformat(
-                    lead["created_at"].replace("Z", "+00:00")
-                )
+                created = datetime.fromisoformat(lead["created_at"].replace("Z", "+00:00"))
                 closed = datetime.fromisoformat(lead["won_at"].replace("Z", "+00:00"))
                 close_times.append((closed - created).days)
             except Exception as _dt_exc:
                 logger.debug("leads.close_time_parse_failed", error=str(_dt_exc))
-    avg_days_to_close = (
-        round(sum(close_times) / len(close_times), 1) if close_times else None
-    )
+    avg_days_to_close = round(sum(close_times) / len(close_times), 1) if close_times else None
 
     # Most recent lead
-    sorted_leads = sorted(
-        leads, key=lambda row: row.get("created_at", ""), reverse=True
-    )
+    sorted_leads = sorted(leads, key=lambda row: row.get("created_at", ""), reverse=True)
     top_lead = (
         {"name": sorted_leads[0].get("name"), "company": sorted_leads[0].get("company")}
         if sorted_leads

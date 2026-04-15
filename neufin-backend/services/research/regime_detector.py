@@ -51,9 +51,9 @@ def _get_current_regime() -> dict | None:
 def _close_regime(regime_id: str) -> None:
     """Mark an existing regime as ended."""
     try:
-        supabase.table("market_regimes").update(
-            {"ended_at": datetime.now(UTC).isoformat()}
-        ).eq("id", regime_id).execute()
+        supabase.table("market_regimes").update({"ended_at": datetime.now(UTC).isoformat()}).eq(
+            "id", regime_id
+        ).execute()
     except Exception as exc:
         logger.warning("regime_detector.close_failed", error=str(exc))
 
@@ -174,9 +174,7 @@ def _rule_based_regime(signals: list[dict]) -> tuple[str, float, list[dict]]:
     if yield_spread is not None:
         if yield_spread < -0.5:
             scores["recession_risk"] += 0.4
-            supporting.append(
-                {"signal": "10Y2Y_spread", "value": yield_spread, "weight": 0.4}
-            )
+            supporting.append({"signal": "10Y2Y_spread", "value": yield_spread, "weight": 0.4})
         elif yield_spread < 0:
             scores["recession_risk"] += 0.2
         elif yield_spread > 1.0:
@@ -291,9 +289,7 @@ Return ONLY valid JSON:
 
         # Trigger an immediate research note on regime change
         _regime_task = asyncio.create_task(
-            _trigger_regime_change_note(
-                final_regime, current_regime, rationale, signals[:10]
-            )
+            _trigger_regime_change_note(final_regime, current_regime, rationale, signals[:10])
         )
         logger.debug("regime_detector.task_created", task_id=id(_regime_task))
     else:
@@ -304,9 +300,7 @@ Return ONLY valid JSON:
                     {"confidence": final_confidence, "supporting_signals": ai_signals}
                 ).eq("id", current_regime_row["id"]).execute()
             except Exception as _upd_exc:
-                logger.debug(
-                    "regime_detector.update_confidence_failed", error=str(_upd_exc)
-                )
+                logger.debug("regime_detector.update_confidence_failed", error=str(_upd_exc))
 
     return {
         "regime": final_regime,
@@ -340,9 +334,7 @@ async def _trigger_regime_change_note(
                     "rationale": rationale,
                 },
                 "signals": signals,
-                "slug_hint": slugify(
-                    f"Regime change {old_regime or 'unknown'} to {new_regime}"
-                ),
+                "slug_hint": slugify(f"Regime change {old_regime or 'unknown'} to {new_regime}"),
             },
         )
         logger.info("regime_detector.regime_note_generated", regime=new_regime)

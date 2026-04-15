@@ -1,50 +1,83 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import Link from 'next/link'
-import { Dna, Trophy } from 'lucide-react'
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { Dna, Trophy } from "lucide-react";
 
 export interface LeaderboardEntry {
-  dna_score: number
-  investor_type: string
-  share_token: string
-  created_at: string
+  dna_score: number;
+  investor_type: string;
+  share_token: string;
+  created_at: string;
 }
 
 const TYPE_CONFIG: Record<string, { mono: string; color: string }> = {
-  'Diversified Strategist': { mono: 'DS', color: '#1EB8CC' },
-  'Conviction Growth': { mono: 'CG', color: '#8b5cf6' },
-  'Momentum Trader': { mono: 'MT', color: '#f59e0b' },
-  'Defensive Allocator': { mono: 'DA', color: '#16a34a' },
-  'Speculative Investor': { mono: 'SI', color: '#dc2626' },
-}
+  "Diversified Strategist": { mono: "DS", color: "#1EB8CC" },
+  "Conviction Growth": { mono: "CG", color: "#8b5cf6" },
+  "Momentum Trader": { mono: "MT", color: "#f59e0b" },
+  "Defensive Allocator": { mono: "DA", color: "#16a34a" },
+  "Speculative Investor": { mono: "SI", color: "#dc2626" },
+};
 
 const PODIUM_CONFIG = [
-  { rank: 2, label: '2nd', medal: 'Silver', barH: 'h-20', order: 'order-1', offsetY: 'mt-8' },
-  { rank: 1, label: '1st', medal: 'Gold', barH: 'h-32', order: 'order-2', offsetY: 'mt-0' },
-  { rank: 3, label: '3rd', medal: 'Bronze', barH: 'h-14', order: 'order-3', offsetY: 'mt-12' },
-] as const
+  {
+    rank: 2,
+    label: "2nd",
+    medal: "Silver",
+    barH: "h-20",
+    order: "order-1",
+    offsetY: "mt-8",
+  },
+  {
+    rank: 1,
+    label: "1st",
+    medal: "Gold",
+    barH: "h-32",
+    order: "order-2",
+    offsetY: "mt-0",
+  },
+  {
+    rank: 3,
+    label: "3rd",
+    medal: "Bronze",
+    barH: "h-14",
+    order: "order-3",
+    offsetY: "mt-12",
+  },
+] as const;
 
 const PODIUM_COLORS = {
-  Gold:   { border: 'border-yellow-500/50',  bg: 'bg-yellow-500/10', glow: '#eab308' },
-  Silver: { border: 'border-shell-muted/40',    bg: 'bg-shell-muted/5',    glow: '#9ca3af' },
-  Bronze: { border: 'border-orange-600/40',  bg: 'bg-orange-600/5',  glow: '#c2410c' },
-} as const
+  Gold: {
+    border: "border-yellow-500/50",
+    bg: "bg-yellow-500/10",
+    glow: "#eab308",
+  },
+  Silver: {
+    border: "border-shell-muted/40",
+    bg: "bg-shell-muted/5",
+    glow: "#9ca3af",
+  },
+  Bronze: {
+    border: "border-orange-600/40",
+    bg: "bg-orange-600/5",
+    glow: "#c2410c",
+  },
+} as const;
 
 function scoreColor(score: number) {
-  return score >= 70 ? '#16A34A' : score >= 40 ? '#f59e0b' : '#DC2626'
+  return score >= 70 ? "#16A34A" : score >= 40 ? "#f59e0b" : "#DC2626";
 }
 
 const fadeUp = {
-  hidden:  { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
-}
+};
 
 const rowVariant = {
-  hidden:  { opacity: 0, x: -12 },
+  hidden: { opacity: 0, x: -12 },
   visible: { opacity: 1, x: 0 },
-}
+};
 
 // ── Podium card ────────────────────────────────────────────────────────────────
 function PodiumCard({
@@ -52,13 +85,16 @@ function PodiumCard({
   config,
   isMe,
 }: {
-  entry: LeaderboardEntry
-  config: typeof PODIUM_CONFIG[number]
-  isMe: boolean
+  entry: LeaderboardEntry;
+  config: (typeof PODIUM_CONFIG)[number];
+  isMe: boolean;
 }) {
-  const cfg = TYPE_CONFIG[entry.investor_type] ?? { mono: 'NA', color: '#6b7280' }
-  const pCfg = PODIUM_COLORS[config.medal]
-  const sc = scoreColor(entry.dna_score)
+  const cfg = TYPE_CONFIG[entry.investor_type] ?? {
+    mono: "NA",
+    color: "#6b7280",
+  };
+  const pCfg = PODIUM_COLORS[config.medal];
+  const sc = scoreColor(entry.dna_score);
 
   return (
     <motion.div
@@ -71,8 +107,8 @@ function PodiumCard({
         href={`/share/${entry.share_token}`}
         className={`w-full rounded-xl border p-4 text-center transition-all hover:scale-105 relative overflow-hidden
           ${pCfg.border} ${pCfg.bg}
-          ${isMe ? 'ring-2 ring-primary/60' : ''}`}
-        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
+          ${isMe ? "ring-2 ring-primary/60" : ""}`}
+        style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }}
       >
         {isMe && (
           <span className="absolute top-1.5 right-1.5 text-sm font-bold text-primary bg-primary/20 border border-primary/40 rounded-full px-1.5 py-0.5 leading-none">
@@ -84,7 +120,10 @@ function PodiumCard({
           {entry.dna_score}
         </div>
         <div className="text-sm text-shell-subtle leading-none mb-1">/100</div>
-        <div className="text-xs font-medium truncate" style={{ color: cfg.color }}>
+        <div
+          className="text-xs font-medium truncate"
+          style={{ color: cfg.color }}
+        >
           {entry.investor_type}
         </div>
       </Link>
@@ -92,33 +131,44 @@ function PodiumCard({
       {/* Podium bar */}
       <div
         className={`w-full ${config.barH} rounded-t-lg flex items-center justify-center`}
-        style={{ background: `${pCfg.glow}22`, borderTop: `2px solid ${pCfg.glow}44` }}
+        style={{
+          background: `${pCfg.glow}22`,
+          borderTop: `2px solid ${pCfg.glow}44`,
+        }}
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-shell-fg">{config.label}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-shell-fg">
+          {config.label}
+        </span>
       </div>
     </motion.div>
-  )
+  );
 }
 
 // ── Main client component ──────────────────────────────────────────────────────
-export default function LeaderboardClient({ entries }: { entries: LeaderboardEntry[] }) {
-  const [myToken, setMyToken] = useState<string | null>(null)
+export default function LeaderboardClient({
+  entries,
+}: {
+  entries: LeaderboardEntry[];
+}) {
+  const [myToken, setMyToken] = useState<string | null>(null);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('dnaResult')
+      const stored = localStorage.getItem("dnaResult");
       if (stored) {
-        const parsed = JSON.parse(stored)
-        if (parsed?.share_token) setMyToken(parsed.share_token)
+        const parsed = JSON.parse(stored);
+        if (parsed?.share_token) setMyToken(parsed.share_token);
       }
     } catch {
       // localStorage unavailable or malformed
     }
-  }, [])
+  }, []);
 
-  const top3 = entries.slice(0, 3)
-  const rest = entries.slice(3)
-  const myRank = myToken ? entries.findIndex((e) => e.share_token === myToken) + 1 : 0
+  const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
+  const myRank = myToken
+    ? entries.findIndex((e) => e.share_token === myToken) + 1
+    : 0;
 
   if (entries.length === 0) {
     return (
@@ -128,14 +178,19 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
         transition={{ duration: 0.4 }}
         className="card text-center py-section"
       >
-        <Trophy className="mx-auto mb-4 h-14 w-14 text-amber-500/80" aria-hidden />
+        <Trophy
+          className="mx-auto mb-4 h-14 w-14 text-amber-500/80"
+          aria-hidden
+        />
         <p className="mb-1 font-semibold text-navy">The leaderboard is empty</p>
-        <p className="mb-6 text-sm text-muted2">Be the first investor to claim the top spot.</p>
+        <p className="mb-6 text-sm text-muted2">
+          Be the first investor to claim the top spot.
+        </p>
         <Link href="/upload" className="btn-primary inline-block">
           Analyze My Portfolio →
         </Link>
       </motion.div>
-    )
+    );
   }
 
   return (
@@ -154,8 +209,12 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
           <div className="flex items-center gap-3">
             <Dna className="h-8 w-8 shrink-0 text-primary" aria-hidden />
             <div>
-              <p className="text-sm font-semibold text-primary">Your current rank</p>
-              <p className="text-xs text-shell-subtle">Based on your last analysis</p>
+              <p className="text-sm font-semibold text-primary">
+                Your current rank
+              </p>
+              <p className="text-xs text-shell-subtle">
+                Based on your last analysis
+              </p>
             </div>
           </div>
           <div className="text-right shrink-0">
@@ -169,18 +228,23 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
       {top3.length >= 1 && (
         <motion.div variants={fadeUp} className="w-full">
           <div className="flex items-end gap-3 justify-center">
-            {PODIUM_CONFIG.filter((c) => c.rank <= top3.length).map((config) => {
-              const entry = top3[config.rank - 1]
-              return (
-                <div key={config.rank} className={`flex-1 max-w-[140px] ${config.order}`}>
-                  <PodiumCard
-                    entry={entry}
-                    config={config}
-                    isMe={entry.share_token === myToken}
-                  />
-                </div>
-              )
-            })}
+            {PODIUM_CONFIG.filter((c) => c.rank <= top3.length).map(
+              (config) => {
+                const entry = top3[config.rank - 1];
+                return (
+                  <div
+                    key={config.rank}
+                    className={`flex-1 max-w-[140px] ${config.order}`}
+                  >
+                    <PodiumCard
+                      entry={entry}
+                      config={config}
+                      isMe={entry.share_token === myToken}
+                    />
+                  </div>
+                );
+              },
+            )}
           </div>
         </motion.div>
       )}
@@ -195,10 +259,13 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
           </div>
           <ul className="divide-y divide-shell-border/50">
             {rest.map((entry, i) => {
-              const rank   = i + 4
-              const cfg = TYPE_CONFIG[entry.investor_type] ?? { mono: 'NA', color: '#6b7280' }
-              const sc     = scoreColor(entry.dna_score)
-              const isMe   = entry.share_token === myToken
+              const rank = i + 4;
+              const cfg = TYPE_CONFIG[entry.investor_type] ?? {
+                mono: "NA",
+                color: "#6b7280",
+              };
+              const sc = scoreColor(entry.dna_score);
+              const isMe = entry.share_token === myToken;
 
               return (
                 <motion.li
@@ -209,7 +276,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                   <Link
                     href={`/share/${entry.share_token}`}
                     className={`flex items-center gap-4 px-5 py-3.5 hover:bg-shell-raised/30 transition-colors group relative
-                      ${isMe ? 'border-l-2 border-l-primary bg-primary-light/50' : ''}`}
+                      ${isMe ? "border-l-2 border-l-primary bg-primary-light/50" : ""}`}
                   >
                     {/* Rank */}
                     <span className="w-8 text-center text-sm font-bold text-shell-subtle shrink-0">
@@ -217,15 +284,25 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                     </span>
 
                     {/* Type */}
-                    <span className="agent-badge shrink-0 text-sm">{cfg.mono}</span>
+                    <span className="agent-badge shrink-0 text-sm">
+                      {cfg.mono}
+                    </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color: cfg.color }}>
+                      <p
+                        className="text-sm font-semibold truncate"
+                        style={{ color: cfg.color }}
+                      >
                         {entry.investor_type}
                       </p>
                       <p className="text-xs text-shell-subtle hidden sm:block">
-                        {new Date(entry.created_at).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric',
-                        })}
+                        {new Date(entry.created_at).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          },
+                        )}
                       </p>
                     </div>
 
@@ -238,7 +315,10 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
 
                     {/* Score */}
                     <div className="text-right shrink-0">
-                      <span className="text-xl font-extrabold" style={{ color: sc }}>
+                      <span
+                        className="text-xl font-extrabold"
+                        style={{ color: sc }}
+                      >
                         {entry.dna_score}
                       </span>
                       <span className="text-xs text-shell-subtle">/100</span>
@@ -249,7 +329,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                     </span>
                   </Link>
                 </motion.li>
-              )
+              );
             })}
           </ul>
         </motion.div>
@@ -260,7 +340,9 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
         variants={fadeUp}
         className="card border-primary/20 bg-gradient-to-br from-primary-light/80 to-surface-2 pb-6 text-center"
       >
-        <p className="mb-1 font-semibold text-navy">Think you can beat the top score?</p>
+        <p className="mb-1 font-semibold text-navy">
+          Think you can beat the top score?
+        </p>
         <p className="mb-4 text-sm text-muted2">
           Upload your portfolio CSV and get your Investor DNA Score in seconds.
         </p>
@@ -269,5 +351,5 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
         </Link>
       </motion.div>
     </motion.div>
-  )
+  );
 }

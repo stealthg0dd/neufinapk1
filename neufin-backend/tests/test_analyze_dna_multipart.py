@@ -45,9 +45,7 @@ def client():
         # Supabase insert returns a minimal result
         insert_result = MagicMock()
         insert_result.data = [{"id": "test-id-123"}]
-        mock_supabase.table.return_value.insert.return_value.execute.return_value = (
-            insert_result
-        )
+        mock_supabase.table.return_value.insert.return_value.execute.return_value = insert_result
         mock_supabase.auth.get_user.side_effect = Exception("no token")
 
         from main import app
@@ -62,9 +60,7 @@ def test_any_field_name_accepted(client, field_name):
         "/api/analyze-dna",
         files={field_name: ("portfolio.csv", io.BytesIO(SAMPLE_CSV), "text/csv")},
     )
-    assert (
-        response.status_code != 422
-    ), f"Field name '{field_name}' returned 422: {response.text}"
+    assert response.status_code != 422, f"Field name '{field_name}' returned 422: {response.text}"
 
 
 def test_no_file_returns_422(client):

@@ -1,47 +1,95 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import type { VentureCard as VentureCardData, TaskRecord, GitCommit } from "@/lib/dashboard-types"
+import { useState } from "react";
+import type {
+  VentureCard as VentureCardData,
+  TaskRecord,
+  GitCommit,
+} from "@/lib/dashboard-types";
 
 // ── Color config per venture ───────────────────────────────────────────────────
 
-const VENTURE_COLORS: Record<string, {
-  border: string; glow: string; badge: string; dot: string
-}> = {
-  neufin:    { border: "border-primary-dark/40",    glow: "hover:border-primary/60",   badge: "bg-primary/15 text-primary",    dot: "bg-primary" },
-  arisole:   { border: "border-emerald-700/40", glow: "hover:border-emerald-500/60",badge: "bg-emerald-500/15 text-emerald-300",dot: "bg-emerald-400" },
-  neumas:    { border: "border-purple-700/40",  glow: "hover:border-purple-500/60", badge: "bg-purple-500/15 text-purple-300", dot: "bg-purple-400" },
-  apex_golf: { border: "border-amber-700/40",   glow: "hover:border-amber-500/60",  badge: "bg-amber-500/15 text-amber-300",  dot: "bg-amber-400" },
-  defquant:  { border: "border-rose-700/40",    glow: "hover:border-rose-500/60",   badge: "bg-rose-500/15 text-rose-300",    dot: "bg-rose-400" },
-}
+const VENTURE_COLORS: Record<
+  string,
+  {
+    border: string;
+    glow: string;
+    badge: string;
+    dot: string;
+  }
+> = {
+  neufin: {
+    border: "border-primary-dark/40",
+    glow: "hover:border-primary/60",
+    badge: "bg-primary/15 text-primary",
+    dot: "bg-primary",
+  },
+  arisole: {
+    border: "border-emerald-700/40",
+    glow: "hover:border-emerald-500/60",
+    badge: "bg-emerald-500/15 text-emerald-300",
+    dot: "bg-emerald-400",
+  },
+  neumas: {
+    border: "border-purple-700/40",
+    glow: "hover:border-purple-500/60",
+    badge: "bg-purple-500/15 text-purple-300",
+    dot: "bg-purple-400",
+  },
+  apex_golf: {
+    border: "border-amber-700/40",
+    glow: "hover:border-amber-500/60",
+    badge: "bg-amber-500/15 text-amber-300",
+    dot: "bg-amber-400",
+  },
+  defquant: {
+    border: "border-rose-700/40",
+    glow: "hover:border-rose-500/60",
+    badge: "bg-rose-500/15 text-rose-300",
+    dot: "bg-rose-400",
+  },
+};
 
-const DEFAULT_COLOR = { border: "border-shell-border/40", glow: "hover:border-shell-muted/60", badge: "bg-shell-subtle/15 text-shell-fg/90", dot: "bg-shell-muted" }
+const DEFAULT_COLOR = {
+  border: "border-shell-border/40",
+  glow: "hover:border-shell-muted/60",
+  badge: "bg-shell-subtle/15 text-shell-fg/90",
+  dot: "bg-shell-muted",
+};
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: VentureCardData["status"] }) {
-  let cfg = "bg-shell-subtle/15 text-shell-muted border-shell-border/30"
+  let cfg = "bg-shell-subtle/15 text-shell-muted border-shell-border/30";
   switch (status) {
     case "active":
-      cfg = "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-      break
+      cfg = "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+      break;
     case "maintenance":
-      cfg = "bg-yellow-500/15 text-yellow-300 border-yellow-500/30"
-      break
+      cfg = "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
+      break;
     case "dormant":
-      cfg = "bg-shell-subtle/15 text-shell-muted border-shell-border/30"
-      break
+      cfg = "bg-shell-subtle/15 text-shell-muted border-shell-border/30";
+      break;
     default:
-      break
+      break;
   }
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-semibold uppercase tracking-wide ${cfg}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${
-        status === "active" ? "bg-emerald-400" : status === "maintenance" ? "bg-yellow-400" : "bg-shell-subtle"
-      }`} />
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm font-semibold uppercase tracking-wide ${cfg}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          status === "active"
+            ? "bg-emerald-400"
+            : status === "maintenance"
+              ? "bg-yellow-400"
+              : "bg-shell-subtle"
+        }`}
+      />
       {status}
     </span>
-  )
+  );
 }
 
 // ── Expanded panel ─────────────────────────────────────────────────────────────
@@ -53,14 +101,14 @@ function ExpandedPanel({
   onActionComplete,
   onClose,
 }: {
-  venture: VentureCardData
-  tasks: TaskRecord[]
-  completedActions: Set<string>
-  onActionComplete: (action: string) => void
-  onClose: () => void
+  venture: VentureCardData;
+  tasks: TaskRecord[];
+  completedActions: Set<string>;
+  onActionComplete: (action: string) => void;
+  onClose: () => void;
 }) {
-  const blocked = tasks.filter((t) => t.status === "blocked")
-  const pending = tasks.filter((t) => t.status === "pending")
+  const blocked = tasks.filter((t) => t.status === "blocked");
+  const pending = tasks.filter((t) => t.status === "pending");
 
   return (
     <div className="mt-3 rounded-xl border border-shell-border/50 bg-shell/80 p-4 space-y-4">
@@ -83,7 +131,9 @@ function ExpandedPanel({
           {venture.briefFull}
         </pre>
       ) : (
-        <p className="text-xs text-shell-subtle">No brief available — Morning Engine runs at 07:00 SGT.</p>
+        <p className="text-xs text-shell-subtle">
+          No brief available — Morning Engine runs at 07:00 SGT.
+        </p>
       )}
 
       {/* Actions required */}
@@ -93,8 +143,8 @@ function ExpandedPanel({
             Actions Required
           </p>
           {venture.actionsRequired.map((action, i) => {
-            const key = `${venture.id}::${action}`
-            const done = completedActions.has(key)
+            const key = `${venture.id}::${action}`;
+            const done = completedActions.has(key);
             return (
               <label
                 key={i}
@@ -110,11 +160,13 @@ function ExpandedPanel({
                   onChange={() => !done && onActionComplete(key)}
                   className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 accent-amber-400 cursor-pointer"
                 />
-                <span className={`text-xs leading-snug ${done ? "line-through text-shell-subtle" : "text-amber-200/80"}`}>
+                <span
+                  className={`text-xs leading-snug ${done ? "line-through text-shell-subtle" : "text-amber-200/80"}`}
+                >
                   {action}
                 </span>
               </label>
-            )
+            );
           })}
         </div>
       )}
@@ -135,20 +187,30 @@ function ExpandedPanel({
                     : "bg-shell-raised/50 border border-shell-border/30"
                 }`}
               >
-                <span className={`mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${
-                  task.status === "blocked" ? "bg-red-400" : "bg-shell-subtle"
-                }`} />
+                <span
+                  className={`mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                    task.status === "blocked" ? "bg-red-400" : "bg-shell-subtle"
+                  }`}
+                />
                 <div className="min-w-0">
-                  <p className={`truncate ${task.status === "blocked" ? "text-red-300" : "text-shell-fg/90"}`}>
+                  <p
+                    className={`truncate ${task.status === "blocked" ? "text-red-300" : "text-shell-fg/90"}`}
+                  >
                     {task.title ?? task.input.slice(0, 80)}
                   </p>
                   {task.error_message && (
-                    <p className="text-red-400/60 text-sm mt-0.5 truncate">{task.error_message}</p>
+                    <p className="text-red-400/60 text-sm mt-0.5 truncate">
+                      {task.error_message}
+                    </p>
                   )}
                 </div>
-                <span className={`ml-auto flex-shrink-0 rounded px-1.5 py-0.5 text-sm font-medium ${
-                  task.status === "blocked" ? "bg-red-500/20 text-red-300" : "bg-shell-raised text-shell-muted"
-                }`}>
+                <span
+                  className={`ml-auto flex-shrink-0 rounded px-1.5 py-0.5 text-sm font-medium ${
+                    task.status === "blocked"
+                      ? "bg-red-500/20 text-red-300"
+                      : "bg-shell-raised text-shell-muted"
+                  }`}
+                >
                   {task.priority}
                 </span>
               </div>
@@ -157,19 +219,19 @@ function ExpandedPanel({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ── Main VentureCard ───────────────────────────────────────────────────────────
 
 interface VentureCardProps {
-  venture: VentureCardData
-  tasks: TaskRecord[]
-  commits: GitCommit[]
-  expanded: boolean
-  completedActions: Set<string>
-  onToggle: () => void
-  onActionComplete: (actionKey: string) => void
+  venture: VentureCardData;
+  tasks: TaskRecord[];
+  commits: GitCommit[];
+  expanded: boolean;
+  completedActions: Set<string>;
+  onToggle: () => void;
+  onActionComplete: (actionKey: string) => void;
 }
 
 export default function VentureCard({
@@ -181,9 +243,9 @@ export default function VentureCard({
   onToggle,
   onActionComplete,
 }: VentureCardProps) {
-  const colors = VENTURE_COLORS[venture.id] ?? DEFAULT_COLOR
-  const lastCommit = commits[0] ?? null
-  const hasBlocked = venture.taskCounts.blocked > 0
+  const colors = VENTURE_COLORS[venture.id] ?? DEFAULT_COLOR;
+  const lastCommit = commits[0] ?? null;
+  const hasBlocked = venture.taskCounts.blocked > 0;
 
   return (
     <div className="flex-shrink-0 w-64 sm:w-auto sm:flex-1 min-w-56">
@@ -197,15 +259,22 @@ export default function VentureCard({
         {/* Top row: venture name + status badge */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 min-w-0">
-            <span className={`h-2 w-2 flex-shrink-0 rounded-full ${colors.dot}`} />
-            <span className="font-semibold text-shell-fg text-sm truncate">{venture.name}</span>
+            <span
+              className={`h-2 w-2 flex-shrink-0 rounded-full ${colors.dot}`}
+            />
+            <span className="font-semibold text-shell-fg text-sm truncate">
+              {venture.name}
+            </span>
           </div>
           <StatusBadge status={venture.status} />
         </div>
 
         {/* Business Head */}
         <p className="text-sm text-shell-subtle mb-2.5">
-          BH: <span className="text-shell-fg/90 font-medium">{venture.businessHead}</span>
+          BH:{" "}
+          <span className="text-shell-fg/90 font-medium">
+            {venture.businessHead}
+          </span>
         </p>
 
         {/* Brief excerpt */}
@@ -219,12 +288,20 @@ export default function VentureCard({
         {lastCommit ? (
           <div className="rounded-md bg-shell-raised/60 px-2.5 py-1.5 mb-3">
             <div className="flex items-center gap-1.5 mb-0.5">
-              <svg className="h-3 w-3 text-shell-subtle flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <svg
+                className="h-3 w-3 text-shell-subtle flex-shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
                 <circle cx="12" cy="12" r="3" />
                 <line x1="3" y1="12" x2="9" y2="12" />
                 <line x1="15" y1="12" x2="21" y2="12" />
               </svg>
-              <span className="text-sm text-shell-subtle truncate flex-1">{lastCommit.message}</span>
+              <span className="text-sm text-shell-subtle truncate flex-1">
+                {lastCommit.message}
+              </span>
             </div>
             <p className="text-sm text-shell-subtle pl-4.5">
               {lastCommit.author} · {lastCommit.date}
@@ -232,7 +309,9 @@ export default function VentureCard({
           </div>
         ) : (
           <div className="rounded-md bg-shell-raised/30 px-2.5 py-1.5 mb-3">
-            <p className="text-sm text-shell-subtle italic">No repo connected</p>
+            <p className="text-sm text-shell-subtle italic">
+              No repo connected
+            </p>
           </div>
         )}
 
@@ -254,9 +333,16 @@ export default function VentureCard({
           {/* Expand chevron */}
           <svg
             className={`ml-auto h-3.5 w-3.5 text-shell-subtle transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
           >
-            <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M6 9l6 6 6-6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
       </button>
@@ -272,5 +358,5 @@ export default function VentureCard({
         />
       )}
     </div>
-  )
+  );
 }

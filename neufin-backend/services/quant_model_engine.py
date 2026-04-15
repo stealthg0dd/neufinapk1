@@ -25,6 +25,7 @@ MODE_INTERNAL_MODELS: dict[str, list[str]] = {
     "institutional": ["hybrid_ensemble", "policy_optimizer"],
 }
 
+
 def _portfolio_dataframe(positions: list[dict[str, Any]]) -> pd.DataFrame | None:
     rows: list[dict[str, Any]] = []
     for p in positions:
@@ -104,9 +105,7 @@ def run_models(
     pf_df = _portfolio_dataframe(positions)
     symbols = pf_df["ticker"].tolist() if pf_df is not None else []
     weights = (
-        {r["ticker"]: float(r["weight"]) for _, r in pf_df.iterrows()}
-        if pf_df is not None
-        else {}
+        {r["ticker"]: float(r["weight"]) for _, r in pf_df.iterrows()} if pf_df is not None else {}
     )
 
     parts: dict[str, Any] = {
@@ -129,7 +128,9 @@ def run_models(
         parts["regime"] = _safe_regime()
 
     # Risk engine — may touch AV; run with short window already in build_risk_report
-    if len(symbols) >= 2 and any(x in modes_norm for x in ("risk", "alpha", "institutional", "trading")):
+    if len(symbols) >= 2 and any(
+        x in modes_norm for x in ("risk", "alpha", "institutional", "trading")
+    ):
         parts["risk_report"] = _safe_build_risk_report(symbols, weights)
 
     if any(x in modes_norm for x in ("alpha", "institutional", "allocation")):
@@ -150,7 +151,9 @@ async def analyze_financial_modes(
     return await combine_outputs(parts, pf_df)
 
 
-async def combine_outputs(parts: dict[str, Any], portfolio_df: pd.DataFrame | None) -> dict[str, Any]:
+async def combine_outputs(
+    parts: dict[str, Any], portfolio_df: pd.DataFrame | None
+) -> dict[str, Any]:
     """Merge partial outputs into API response shape."""
     modes: list[str] = parts.get("modes_requested") or []
     risk_report: dict[str, Any] | None = parts.get("risk_report")
@@ -174,7 +177,9 @@ async def combine_outputs(parts: dict[str, Any], portfolio_df: pd.DataFrame | No
 
     vol_proxy = round(0.12 + avg_corr * 0.18, 4)
     sharpe_proxy = round(0.25 + (alpha_score / 100.0) * 0.9 - vol_proxy * 0.8, 3)
-    max_dd_proxy = round(0.08 + avg_corr * 0.12 + (1.0 - min(diversification_index / 10.0, 1.0)) * 0.05, 4)
+    max_dd_proxy = round(
+        0.08 + avg_corr * 0.12 + (1.0 - min(diversification_index / 10.0, 1.0)) * 0.05, 4
+    )
 
     forecast_horizon_days = 20 if "forecast" in modes or "trading" in modes else 60
     vol_shift_pct = round(-8.0 if "risk" in modes else (5.0 if "alpha" in modes else 0.0), 1)
@@ -195,7 +200,10 @@ async def combine_outputs(parts: dict[str, Any], portfolio_df: pd.DataFrame | No
                     weakest_impacts.append(
                         {"scenario": key, "impact_pct": round(float(scen["impact_pct"]), 2)}
                     )
-            stress_summary = {"scenarios_sampled": len(stress_raw), "weakest_impacts": weakest_impacts}
+            stress_summary = {
+                "scenarios_sampled": len(stress_raw),
+                "weakest_impacts": weakest_impacts,
+            }
 
     # Abstract contribution breakdown (sums to ~1.0) — mode-weighted layers, not model names.
     layer_weights: dict[str, float] = {

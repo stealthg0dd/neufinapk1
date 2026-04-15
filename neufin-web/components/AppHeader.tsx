@@ -1,15 +1,21 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import Image from 'next/image'
-import { useRouter, usePathname } from 'next/navigation'
-import { useAuth } from '@/lib/auth-context'
-import { getSubscriptionStatus } from '@/lib/api'
+import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { getSubscriptionStatus } from "@/lib/api";
 
-function TrialBadge({ status, daysRemaining }: { status: 'trial' | 'active' | 'expired'; daysRemaining?: number }) {
-  if (status === 'active') return null
-  if (status === 'expired') {
+function TrialBadge({
+  status,
+  daysRemaining,
+}: {
+  status: "trial" | "active" | "expired";
+  daysRemaining?: number;
+}) {
+  if (status === "active") return null;
+  if (status === "expired") {
     return (
       <Link
         href="/upgrade"
@@ -17,7 +23,7 @@ function TrialBadge({ status, daysRemaining }: { status: 'trial' | 'active' | 'e
       >
         Expired
       </Link>
-    )
+    );
   }
   if (daysRemaining !== undefined && daysRemaining <= 7) {
     return (
@@ -27,84 +33,105 @@ function TrialBadge({ status, daysRemaining }: { status: 'trial' | 'active' | 'e
       >
         {daysRemaining}d trial
       </Link>
-    )
+    );
   }
   return (
     <span className="rounded border border-border bg-surface-2 px-2 py-0.5 text-sm font-semibold text-muted2">
       Trial
     </span>
-  )
+  );
 }
 
 const NAV_ITEMS = [
-  { label: 'Portfolio', href: '/dashboard' },
-  { label: 'Swarm', href: '/swarm' },
-  { label: 'Vault', href: '/vault' },
-  { label: 'Reports', href: '/reports/success' },
-  { label: 'Partners', href: '/partners' },
-] as const
+  { label: "Portfolio", href: "/dashboard" },
+  { label: "Swarm", href: "/swarm" },
+  { label: "Vault", href: "/vault" },
+  { label: "Reports", href: "/reports/success" },
+  { label: "Partners", href: "/partners" },
+] as const;
 
 export default function AppHeader() {
-  const { user, token, signOut } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [subscriptionStatus, setSubscriptionStatus] = useState<'trial' | 'active' | 'expired'>('trial')
-  const [daysRemaining, setDaysRemaining] = useState<number | undefined>(undefined)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const { user, token, signOut } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<
+    "trial" | "active" | "expired"
+  >("trial");
+  const [daysRemaining, setDaysRemaining] = useState<number | undefined>(
+    undefined,
+  );
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!token) return
+    if (!token) return;
     getSubscriptionStatus(token)
       .then((data) => {
-        setSubscriptionStatus(data.status)
-        setDaysRemaining(data.days_remaining)
+        setSubscriptionStatus(data.status);
+        setDaysRemaining(data.days_remaining);
       })
-      .catch(() => {/* non-critical */})
-  }, [token])
+      .catch(() => {
+        /* non-critical */
+      });
+  }, [token]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false)
+        setMenuOpen(false);
       }
     }
-    if (menuOpen) document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOpen])
+    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   const initials = user?.user_metadata?.full_name
-    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : user?.email?.[0]?.toUpperCase() ?? '?'
+    ? user.user_metadata.full_name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : (user?.email?.[0]?.toUpperCase() ?? "?");
 
-  const displayName = user?.user_metadata?.full_name || user?.email || ''
+  const displayName = user?.user_metadata?.full_name || user?.email || "";
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between gap-4 px-4">
-        <Link href="/dashboard" className="shrink-0 text-xl font-semibold tracking-tight text-navy">
+        <Link
+          href="/dashboard"
+          className="shrink-0 text-xl font-semibold tracking-tight text-navy"
+        >
           NeuFin
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
           {NAV_ITEMS.map(({ label, href }) => {
-            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
+            const active =
+              pathname === href ||
+              (href !== "/dashboard" && pathname.startsWith(href));
             return (
               <Link
                 key={href}
                 href={href}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active ? 'bg-primary-light text-primary-dark' : 'text-slate2 hover:bg-surface-2 hover:text-navy'
+                  active
+                    ? "bg-primary-light text-primary-dark"
+                    : "text-slate2 hover:bg-surface-2 hover:text-navy"
                 }`}
               >
                 {label}
               </Link>
-            )
+            );
           })}
         </nav>
 
         <div className="flex shrink-0 items-center gap-3">
-          <TrialBadge status={subscriptionStatus} daysRemaining={daysRemaining} />
+          <TrialBadge
+            status={subscriptionStatus}
+            daysRemaining={daysRemaining}
+          />
 
           {user ? (
             <div className="relative" ref={menuRef}>
@@ -126,14 +153,21 @@ export default function AppHeader() {
                     {initials}
                   </div>
                 )}
-                <span className="hidden max-w-[140px] truncate text-sm text-slate2 sm:block">{displayName}</span>
+                <span className="hidden max-w-[140px] truncate text-sm text-slate2 sm:block">
+                  {displayName}
+                </span>
                 <svg
-                  className={`h-3 w-3 text-muted2 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
+                  className={`h-3 w-3 text-muted2 transition-transform ${menuOpen ? "rotate-180" : ""}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </button>
 
@@ -146,8 +180,8 @@ export default function AppHeader() {
                     type="button"
                     className="w-full px-3 py-2 text-left text-sm text-slate2 transition-colors hover:bg-surface-2 hover:text-navy"
                     onClick={() => {
-                      setMenuOpen(false)
-                      router.push('/dashboard/settings')
+                      setMenuOpen(false);
+                      router.push("/dashboard/settings");
                     }}
                   >
                     Account Settings
@@ -156,8 +190,8 @@ export default function AppHeader() {
                     type="button"
                     className="w-full px-3 py-2 text-left text-sm text-slate2 transition-colors hover:bg-surface-2 hover:text-navy"
                     onClick={() => {
-                      setMenuOpen(false)
-                      router.push('/dashboard/billing')
+                      setMenuOpen(false);
+                      router.push("/dashboard/billing");
                     }}
                   >
                     Subscription
@@ -167,9 +201,9 @@ export default function AppHeader() {
                       type="button"
                       className="w-full px-3 py-2 text-left text-sm text-danger2 transition-colors hover:bg-red-50"
                       onClick={async () => {
-                        setMenuOpen(false)
-                        await signOut()
-                        router.push('/')
+                        setMenuOpen(false);
+                        await signOut();
+                        router.push("/");
                       }}
                     >
                       Sign Out
@@ -189,5 +223,5 @@ export default function AppHeader() {
         </div>
       </div>
     </header>
-  )
+  );
 }

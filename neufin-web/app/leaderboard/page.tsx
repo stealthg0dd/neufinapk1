@@ -1,38 +1,41 @@
-import type { Metadata } from 'next'
-import Link from 'next/link'
-import { LineChart } from 'lucide-react'
-import LeaderboardClient from './LeaderboardClient'
-import type { LeaderboardEntry } from './LeaderboardClient'
+import type { Metadata } from "next";
+import Link from "next/link";
+import { LineChart } from "lucide-react";
+import LeaderboardClient from "./LeaderboardClient";
+import type { LeaderboardEntry } from "./LeaderboardClient";
 
 export const metadata: Metadata = {
-  title: 'Leaderboard — Top Investor DNA Scores | Neufin',
-  description: 'See the highest-scoring investor portfolios on Neufin. Where do you rank?',
-}
+  title: "Leaderboard — Top Investor DNA Scores | Neufin",
+  description:
+    "See the highest-scoring investor portfolios on Neufin. Where do you rank?",
+};
 
-const API = process.env.NEXT_PUBLIC_API_URL || ''
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   try {
     const res = await fetch(`${API}/api/dna/leaderboard?limit=25`, {
       next: { revalidate: 300 },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.leaderboard ?? []
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.leaderboard ?? [];
   } catch {
-    return []
+    return [];
   }
 }
 
 export default async function LeaderboardPage() {
-  const entries = await getLeaderboard()
+  const entries = await getLeaderboard();
 
   return (
     <div className="flex min-h-screen flex-col bg-shell-deep text-zinc-100">
       {/* Nav */}
       <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
+          <Link href="/" className="text-xl font-bold text-gradient">
+            Neufin
+          </Link>
           <div className="flex items-center gap-3">
             <Link
               href="/market"
@@ -52,7 +55,9 @@ export default async function LeaderboardPage() {
         {/* Header */}
         <div className="text-center mb-10">
           <div className="mb-3 inline-flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-zinc-50">Global Leaderboard</h1>
+            <h1 className="text-3xl font-bold text-zinc-50">
+              Global Leaderboard
+            </h1>
             {/* Live pulse */}
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-400 bg-green-400/10 border border-green-400/25 rounded-full px-2.5 py-1">
               <span className="relative flex h-1.5 w-1.5">
@@ -75,5 +80,5 @@ export default async function LeaderboardPage() {
         <LeaderboardClient entries={entries} />
       </main>
     </div>
-  )
+  );
 }

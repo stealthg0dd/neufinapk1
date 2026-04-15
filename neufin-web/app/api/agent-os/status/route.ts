@@ -7,22 +7,22 @@
  *   AGENT_OS_API_KEY=<value of AGENT_OS_API_KEY in Railway>
  */
 
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/server";
 
-const BASE = (process.env.AGENT_OS_URL ?? "").replace(/\/$/, "")
-const KEY  = process.env.AGENT_OS_API_KEY ?? ""
+const BASE = (process.env.AGENT_OS_URL ?? "").replace(/\/$/, "");
+const KEY = process.env.AGENT_OS_API_KEY ?? "";
 
 async function get<T>(path: string, fallback: T): Promise<T> {
-  if (!BASE || !KEY) return fallback
+  if (!BASE || !KEY) return fallback;
   try {
     const res = await fetch(`${BASE}${path}`, {
       headers: { "x-api-key": KEY, Authorization: `Bearer ${KEY}` },
       cache: "no-store",
-    })
-    if (!res.ok) return fallback
-    return res.json() as Promise<T>
+    });
+    if (!res.ok) return fallback;
+    return res.json() as Promise<T>;
   } catch {
-    return fallback
+    return fallback;
   }
 }
 
@@ -30,25 +30,33 @@ export async function GET() {
   if (!BASE || !KEY) {
     return NextResponse.json({
       timestamp: new Date().toISOString(),
-      providers: {}, budget: {}, briefs: [], agents: {}, rateLimits: {},
-      _warning: "AGENT_OS_URL and AGENT_OS_API_KEY must both be set — data unavailable",
-    })
+      providers: {},
+      budget: {},
+      briefs: [],
+      agents: {},
+      rateLimits: {},
+      _warning:
+        "AGENT_OS_URL and AGENT_OS_API_KEY must both be set — data unavailable",
+    });
   }
 
   const [routerStatus, budget, briefs, agents, rateLimits] = await Promise.all([
-    get<{ providers: Record<string, unknown>; budget: unknown }>("/router/status",         { providers: {}, budget: {} }),
-    get<Record<string, unknown>>                               ("/infra/budget",            {}),
-    get<{ briefs: unknown[] }>                                 ("/morning-engine/latest",   { briefs: [] }),
-    get<Record<string, unknown>>                               ("/agents/list",             {}),
-    get<Record<string, unknown>>                               ("/router/rate-limits",      {}),
-  ])
+    get<{ providers: Record<string, unknown>; budget: unknown }>(
+      "/router/status",
+      { providers: {}, budget: {} },
+    ),
+    get<Record<string, unknown>>("/infra/budget", {}),
+    get<{ briefs: unknown[] }>("/morning-engine/latest", { briefs: [] }),
+    get<Record<string, unknown>>("/agents/list", {}),
+    get<Record<string, unknown>>("/router/rate-limits", {}),
+  ]);
 
   return NextResponse.json({
-    timestamp:   new Date().toISOString(),
-    providers:   routerStatus.providers ?? {},
-    budget:      budget,
-    briefs:      briefs.briefs ?? [],
-    agents:      agents,
-    rateLimits:  rateLimits,
-  })
+    timestamp: new Date().toISOString(),
+    providers: routerStatus.providers ?? {},
+    budget: budget,
+    briefs: briefs.briefs ?? [],
+    agents: agents,
+    rateLimits: rateLimits,
+  });
 }

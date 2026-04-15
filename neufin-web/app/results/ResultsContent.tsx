@@ -1,67 +1,83 @@
-'use client'
+"use client";
 
-import { useEffect, useState, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import nextDynamic from 'next/dynamic'
-import { motion } from 'framer-motion'
-import confetti from 'canvas-confetti'
-import { fulfillReport, createCheckoutSession } from '@/lib/api'
-import { getSubscriptionStatus } from '@/lib/api'
-import SocialProof from '@/components/SocialProof'
-import AdvisorCTA from '@/components/AdvisorCTA'
-import { trackEvent, EVENTS } from '@/components/Analytics'
-import { useAuth } from '@/lib/auth-context'
-import { useAnalytics } from '@/lib/posthog'
-import { useNeufinAnalytics } from '@/lib/analytics'
-import type { DNAAnalysisResponse } from '@/lib/api'
-import PaywallOverlay from '@/components/PaywallOverlay'
+import { useEffect, useState, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import nextDynamic from "next/dynamic";
+import { motion } from "framer-motion";
+import confetti from "canvas-confetti";
+import { fulfillReport, createCheckoutSession } from "@/lib/api";
+import { getSubscriptionStatus } from "@/lib/api";
+import SocialProof from "@/components/SocialProof";
+import AdvisorCTA from "@/components/AdvisorCTA";
+import { trackEvent, EVENTS } from "@/components/Analytics";
+import { useAuth } from "@/lib/auth-context";
+import { useAnalytics } from "@/lib/posthog";
+import { useNeufinAnalytics } from "@/lib/analytics";
+import type { DNAAnalysisResponse } from "@/lib/api";
+import PaywallOverlay from "@/components/PaywallOverlay";
 
-const PortfolioPie = nextDynamic(() => import('@/components/PortfolioPie'), { ssr: false })
-const REF_STORAGE_KEY = 'ref_token'
-
+const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
+  ssr: false,
+});
+const REF_STORAGE_KEY = "ref_token";
 
 const TYPE_COLORS: Record<string, string> = {
-  'Diversified Strategist': 'bg-primary/15 text-primary border-primary/30',
-  'Conviction Growth':      'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  'Momentum Trader':        'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
-  'Defensive Allocator':    'bg-green-500/15 text-green-300 border-green-500/30',
-  'Speculative Investor':   'bg-red-500/15 text-red-300 border-red-500/30',
-}
+  "Diversified Strategist": "bg-primary/15 text-primary border-primary/30",
+  "Conviction Growth": "bg-purple-500/15 text-purple-300 border-purple-500/30",
+  "Momentum Trader": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
+  "Defensive Allocator": "bg-green-500/15 text-green-300 border-green-500/30",
+  "Speculative Investor": "bg-red-500/15 text-red-300 border-red-500/30",
+};
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const usd = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 
 const pct = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n / 100)
+  new Intl.NumberFormat("en-US", {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(n / 100);
 
 const usdFull = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n)
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+    n,
+  );
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0 },
-}
+};
 
 const stagger = {
   visible: { transition: { staggerChildren: 0.08 } },
-}
+};
 
 // ── Score circle ──────────────────────────────────────────────────────────────
 function ScoreCircle({ score }: { score: number }) {
-  const radius = 70
-  const circ   = 2 * Math.PI * radius
-  const [offset, setOffset] = useState(circ)
+  const radius = 70;
+  const circ = 2 * Math.PI * radius;
+  const [offset, setOffset] = useState(circ);
 
   useEffect(() => {
-    const t = setTimeout(() => setOffset(circ - (score / 100) * circ), 200)
-    return () => clearTimeout(t)
-  }, [score, circ])
+    const t = setTimeout(() => setOffset(circ - (score / 100) * circ), 200);
+    return () => clearTimeout(t);
+  }, [score, circ]);
 
-  const color    = score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : '#ef4444'
-  const glowRgba = score >= 70 ? 'rgba(34,197,94,0.18)' : score >= 40 ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.18)'
+  const color = score >= 70 ? "#22c55e" : score >= 40 ? "#f59e0b" : "#ef4444";
+  const glowRgba =
+    score >= 70
+      ? "rgba(34,197,94,0.18)"
+      : score >= 40
+        ? "rgba(245,158,11,0.18)"
+        : "rgba(239,68,68,0.18)";
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -69,204 +85,280 @@ function ScoreCircle({ score }: { score: number }) {
       <div
         className="absolute rounded-full"
         style={{
-          width: 200, height: 200,
+          width: 200,
+          height: 200,
           background: `radial-gradient(circle, ${glowRgba} 0%, transparent 70%)`,
-          pointerEvents: 'none',
+          pointerEvents: "none",
         }}
       />
       <svg width="180" height="180" className="-rotate-90">
-        <circle cx="90" cy="90" r={radius} fill="none" stroke="#1f2937" strokeWidth="12" />
         <circle
-          cx="90" cy="90" r={radius} fill="none"
-          stroke={color} strokeWidth="12" strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)', filter: `drop-shadow(0 0 6px ${color}88)` }}
+          cx="90"
+          cy="90"
+          r={radius}
+          fill="none"
+          stroke="#1f2937"
+          strokeWidth="12"
+        />
+        <circle
+          cx="90"
+          cy="90"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="12"
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+          style={{
+            transition: "stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)",
+            filter: `drop-shadow(0 0 6px ${color}88)`,
+          }}
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-4xl font-extrabold" style={{ color }}>{score}</span>
-        <span className="text-xs uppercase tracking-widest text-muted2">DNA Score</span>
+        <span className="text-4xl font-extrabold" style={{ color }}>
+          {score}
+        </span>
+        <span className="text-xs uppercase tracking-widest text-muted2">
+          DNA Score
+        </span>
       </div>
     </div>
-  )
+  );
 }
 
 // ── Score label ───────────────────────────────────────────────────────────────
 function ScoreLabel({ score }: { score: number }) {
-  if (score >= 70) return <span className="text-xs text-green-400 font-semibold">Strong portfolio</span>
-  if (score >= 40) return <span className="text-xs text-yellow-400 font-semibold">Room to improve</span>
-  return <span className="text-xs text-red-400 font-semibold">High concentration risk</span>
+  if (score >= 70)
+    return (
+      <span className="text-xs text-green-400 font-semibold">
+        Strong portfolio
+      </span>
+    );
+  if (score >= 40)
+    return (
+      <span className="text-xs text-yellow-400 font-semibold">
+        Room to improve
+      </span>
+    );
+  return (
+    <span className="text-xs text-red-400 font-semibold">
+      High concentration risk
+    </span>
+  );
 }
 
 // ── Results content (client component) ────────────────────────────────────────
 export default function ResultsContent() {
-  const [subscriptionStatus, setSubscriptionStatus] = useState<'trial' | 'active' | 'expired'>('active')
-  const router       = useRouter()
-  const searchParams = useSearchParams()
-  const { user, token } = useAuth()
-  const { track }    = useAnalytics()
-  const { capture }  = useNeufinAnalytics()
+  const [subscriptionStatus, setSubscriptionStatus] = useState<
+    "trial" | "active" | "expired"
+  >("active");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user, token } = useAuth();
+  const { track } = useAnalytics();
+  const { capture } = useNeufinAnalytics();
 
-  const [result, setResult]               = useState<DNAAnalysisResponse | null>(null)
-  const [copied, setCopied]               = useState(false)
-  const [pdfUrl, setPdfUrl]               = useState<string | null>(null)
-  const [fulfillLoading, setFulfillLoading] = useState(false)
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
-  const [checkoutError, setCheckoutError] = useState<string | null>(null)
-  const [refToken, setRefToken]           = useState<string | null>(null)
-  const [refDiscount, setRefDiscount]     = useState(false)
-  const [daysRemaining, setDaysRemaining] = useState<number | undefined>()
+  const [result, setResult] = useState<DNAAnalysisResponse | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [fulfillLoading, setFulfillLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [refToken, setRefToken] = useState<string | null>(null);
+  const [refDiscount, setRefDiscount] = useState(false);
+  const [daysRemaining, setDaysRemaining] = useState<number | undefined>();
 
   useEffect(() => {
-    const stored = localStorage.getItem('dnaResult')
-    if (!stored) { router.replace('/upload'); return }
-
-    let parsed: DNAAnalysisResponse
-    try {
-      parsed = JSON.parse(stored)
-      if (typeof parsed.dna_score !== 'number') throw new Error('malformed')
-    } catch {
-      router.replace('/upload')
-      return
+    const stored = localStorage.getItem("dnaResult");
+    if (!stored) {
+      router.replace("/upload");
+      return;
     }
 
-    setResult(parsed)
-    track('results_viewed', { dna_score: parsed.dna_score, investor_type: parsed.investor_type })
-    trackEvent(EVENTS.UPLOAD_COMPLETE, { dna_score: parsed.dna_score, investor_type: parsed.investor_type })
+    let parsed: DNAAnalysisResponse;
+    try {
+      parsed = JSON.parse(stored);
+      if (typeof parsed.dna_score !== "number") throw new Error("malformed");
+    } catch {
+      router.replace("/upload");
+      return;
+    }
+
+    setResult(parsed);
+    track("results_viewed", {
+      dna_score: parsed.dna_score,
+      investor_type: parsed.investor_type,
+    });
+    trackEvent(EVENTS.UPLOAD_COMPLETE, {
+      dna_score: parsed.dna_score,
+      investor_type: parsed.investor_type,
+    });
 
     // Referral token from URL or storage
-    const ref = searchParams.get('ref') || localStorage.getItem(REF_STORAGE_KEY)
+    const ref =
+      searchParams.get("ref") || localStorage.getItem(REF_STORAGE_KEY);
     if (ref) {
-      setRefToken(ref)
-      localStorage.setItem(REF_STORAGE_KEY, ref)
+      setRefToken(ref);
+      localStorage.setItem(REF_STORAGE_KEY, ref);
       fetch(`/api/referrals/validate/${ref}`)
-        .then(r => r.json())
-        .then(d => setRefDiscount(d.valid))
-        .catch(() => {})
+        .then((r) => r.json())
+        .then((d) => setRefDiscount(d.valid))
+        .catch(() => {});
     }
 
     // Post-checkout fulfillment
-    const checkoutSuccess   = searchParams.get('checkout_success')
-    const storedReportId    = localStorage.getItem('pendingReportId')
+    const checkoutSuccess = searchParams.get("checkout_success");
+    const storedReportId = localStorage.getItem("pendingReportId");
     if (checkoutSuccess && storedReportId) {
-      setFulfillLoading(true)
+      setFulfillLoading(true);
       fulfillReport(storedReportId, token)
-        .then(r => { setPdfUrl(r.pdf_url); localStorage.removeItem('pendingReportId') })
+        .then((r) => {
+          setPdfUrl(r.pdf_url);
+          localStorage.removeItem("pendingReportId");
+        })
         .catch(() => {})
-        .finally(() => setFulfillLoading(false))
+        .finally(() => setFulfillLoading(false));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, searchParams, token])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, searchParams, token]);
 
   // Fetch subscription status on mount
   useEffect(() => {
-    if (!token) return
+    if (!token) return;
     getSubscriptionStatus(token)
       .then((res) => {
-        setSubscriptionStatus(res.status)
-        setDaysRemaining(res.days_remaining)
+        setSubscriptionStatus(res.status);
+        setDaysRemaining(res.days_remaining);
       })
-      .catch(() => setSubscriptionStatus('active'))
-  }, [token])
+      .catch(() => setSubscriptionStatus("active"));
+  }, [token]);
 
   const shareUrl = result?.share_token
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${result.share_token}`
-    : typeof window !== 'undefined' ? window.location.href : ''
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/${result.share_token}`
+    : typeof window !== "undefined"
+      ? window.location.href
+      : "";
 
   const referralUrl = result?.share_token
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/upload?ref=${result.share_token}`
-    : ''
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/upload?ref=${result.share_token}`
+    : "";
 
   const copyShare = async () => {
-    await navigator.clipboard.writeText(shareUrl)
-    setCopied(true)
-    track('share_link_copied', { share_token: result?.share_token })
-    setTimeout(() => setCopied(false), 2000)
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    track("share_link_copied", { share_token: result?.share_token });
+    setTimeout(() => setCopied(false), 2000);
     // Confetti burst on share
     confetti({
       particleCount: 80,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b'],
-    })
-  }
+      colors: ["#3b82f6", "#8b5cf6", "#22c55e", "#f59e0b"],
+    });
+  };
 
   const shareTwitter = () => {
-    if (!result) return
-    track('share_twitter_clicked')
-    const text = `I just got my Investor DNA Score: ${result.dna_score}/100 🧬\nI'm a "${result.investor_type}"\n\nDiscover yours → `
-    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text + shareUrl)}`, '_blank')
-  }
+    if (!result) return;
+    track("share_twitter_clicked");
+    const text = `I just got my Investor DNA Score: ${result.dna_score}/100 🧬\nI'm a "${result.investor_type}"\n\nDiscover yours → `;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text + shareUrl)}`,
+      "_blank",
+    );
+  };
 
   const startOver = () => {
-    localStorage.removeItem('dnaResult')
-    router.push('/upload')
-  }
+    localStorage.removeItem("dnaResult");
+    router.push("/upload");
+  };
 
   const startCheckout = async () => {
     if (!result?.record_id) {
-      document.getElementById('unlock-report')?.scrollIntoView({ behavior: 'smooth' })
-      return
+      document
+        .getElementById("unlock-report")
+        ?.scrollIntoView({ behavior: "smooth" });
+      return;
     }
-    setCheckoutError(null)
-    setCheckoutLoading(true)
-    track('checkout_started', { record_id: result.record_id })
-    capture('advisor_report_checkout_started', { plan_type: 'advisor_report', price: 29, record_id: result.record_id })
-    trackEvent(EVENTS.CHECKOUT_CLICKED, { record_id: result.record_id })
+    setCheckoutError(null);
+    setCheckoutLoading(true);
+    track("checkout_started", { record_id: result.record_id });
+    capture("advisor_report_checkout_started", {
+      plan_type: "advisor_report",
+      price: 29,
+      record_id: result.record_id,
+    });
+    trackEvent(EVENTS.CHECKOUT_CLICKED, { record_id: result.record_id });
     try {
-      await createCheckoutSession(result.record_id, token)
+      await createCheckoutSession(result.record_id, token);
       // createCheckoutSession redirects — execution stops here on success
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Checkout failed. Please try again.'
-      track('checkout_error', { error: msg })
-      setCheckoutError(msg)
-      setCheckoutLoading(false)
+      const msg =
+        e instanceof Error ? e.message : "Checkout failed. Please try again.";
+      track("checkout_error", { error: msg });
+      setCheckoutError(msg);
+      setCheckoutLoading(false);
     }
-  }
+  };
 
   if (!result) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
-    )
+    );
   }
 
-  const typeClass = TYPE_COLORS[result.investor_type] || 'border-border bg-surface-2 text-navy'
+  const typeClass =
+    TYPE_COLORS[result.investor_type] || "border-border bg-surface-2 text-navy";
 
   // Price warnings from backend (stale/alias/unresolvable tickers)
-  const priceWarnings: string[] = result.warnings ?? []
-  const failedTickers: string[] = result.failed_tickers ?? []
+  const priceWarnings: string[] = result.warnings ?? [];
+  const failedTickers: string[] = result.failed_tickers ?? [];
 
   return (
     <>
       <SocialProof />
       <div className="flex min-h-screen flex-col bg-app text-navy">
-
         {/* Ticker warning banner — non-blocking, shown above results */}
         {(priceWarnings.length > 0 || failedTickers.length > 0) && (
           <div className="bg-yellow-950/60 border-b border-yellow-700/40">
             <div className="max-w-4xl mx-auto px-6 py-3 flex items-start gap-3">
-              <span className="text-yellow-400 text-lg leading-none mt-0.5" aria-hidden>⚠</span>
+              <span
+                className="text-yellow-400 text-lg leading-none mt-0.5"
+                aria-hidden
+              >
+                ⚠
+              </span>
               <div className="text-sm text-yellow-200">
                 {failedTickers.length > 0 && (
                   <p className="font-medium mb-1">
-                    Some tickers were excluded:{' '}
+                    Some tickers were excluded:{" "}
                     {failedTickers.map((t, i) => (
                       <span key={t}>
-                        <code className="bg-yellow-900/60 px-1 rounded text-yellow-300">{t}</code>
-                        {i < failedTickers.length - 1 ? ', ' : ''}
+                        <code className="bg-yellow-900/60 px-1 rounded text-yellow-300">
+                          {t}
+                        </code>
+                        {i < failedTickers.length - 1 ? ", " : ""}
                       </span>
-                    ))}
-                    {' '}(price unavailable). Analysis is based on your remaining holdings.
+                    ))}{" "}
+                    (price unavailable). Analysis is based on your remaining
+                    holdings.
                   </p>
                 )}
                 {priceWarnings
-                  .filter(w => !failedTickers.some(t => w.startsWith(t + ' could not')))
+                  .filter(
+                    (w) =>
+                      !failedTickers.some((t) =>
+                        w.startsWith(t + " could not"),
+                      ),
+                  )
                   .map((w, i) => (
-                    <p key={i} className="text-yellow-300/80">{w}</p>
-                  ))
-                }
+                    <p key={i} className="text-yellow-300/80">
+                      {w}
+                    </p>
+                  ))}
               </div>
             </div>
           </div>
@@ -285,9 +377,13 @@ export default function ResultsContent() {
             <span className="text-xl font-bold text-gradient">Neufin</span>
             <div className="flex items-center gap-3">
               {user ? (
-                <Link href="/dashboard" className="btn-primary py-2 text-sm">Dashboard →</Link>
+                <Link href="/dashboard" className="btn-primary py-2 text-sm">
+                  Dashboard →
+                </Link>
               ) : (
-                <Link href="/auth" className="btn-outline py-2 text-sm">Sign in</Link>
+                <Link href="/auth" className="btn-outline py-2 text-sm">
+                  Sign in
+                </Link>
               )}
             </div>
           </div>
@@ -299,7 +395,8 @@ export default function ResultsContent() {
             <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center gap-2">
               <span className="text-green-400 text-sm">🎉</span>
               <p className="text-xs text-green-300 font-medium">
-                You were referred — get <strong>20% off</strong> your first report automatically at checkout
+                You were referred — get <strong>20% off</strong> your first
+                report automatically at checkout
               </p>
             </div>
           </div>
@@ -309,8 +406,13 @@ export default function ResultsContent() {
         {!user && (
           <div className="border-b border-primary/20 bg-primary-light/80">
             <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-2.5">
-              <p className="text-xs text-primary-dark">Sign in to save your DNA score across devices</p>
-              <Link href="/auth" className="whitespace-nowrap text-xs font-semibold text-primary-dark hover:text-primary">
+              <p className="text-xs text-primary-dark">
+                Sign in to save your DNA score across devices
+              </p>
+              <Link
+                href="/auth"
+                className="whitespace-nowrap text-xs font-semibold text-primary-dark hover:text-primary"
+              >
                 Sign in to save →
               </Link>
             </div>
@@ -324,7 +426,6 @@ export default function ResultsContent() {
             animate="visible"
             className="space-y-4"
           >
-
             {/* ── Hero: Score + Type ─────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="card text-center">
               <ScoreCircle score={result.dna_score} />
@@ -332,37 +433,52 @@ export default function ResultsContent() {
                 <ScoreLabel score={result.dna_score} />
               </div>
               <div className="mt-2">
-                <span className={`badge border ${typeClass} text-sm px-4 py-1.5`}>
+                <span
+                  className={`badge border ${typeClass} text-sm px-4 py-1.5`}
+                >
                   {result.investor_type}
                 </span>
               </div>
               <p className="mt-3 text-sm text-slate2">
                 Portfolio value:&nbsp;
-                <span className="font-semibold text-navy">{usd(result.total_value)}</span>
+                <span className="font-semibold text-navy">
+                  {usd(result.total_value)}
+                </span>
                 &nbsp;·&nbsp;
-                {result.num_positions} positions
-                &nbsp;·&nbsp;
-                Max position:&nbsp;
-                <span className="font-semibold text-navy">{pct(result.max_position_pct)}</span>
+                {result.num_positions} positions &nbsp;·&nbsp; Max
+                position:&nbsp;
+                <span className="font-semibold text-navy">
+                  {pct(result.max_position_pct)}
+                </span>
               </p>
             </motion.div>
 
             {/* ── Overview cards ─────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="grid grid-cols-2 gap-4">
               <div className="card text-center">
-                <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Total Value</p>
-                <p className="text-2xl font-bold text-navy">{usd(result.total_value)}</p>
+                <p className="mb-1 text-xs uppercase tracking-wide text-muted2">
+                  Total Value
+                </p>
+                <p className="text-2xl font-bold text-navy">
+                  {usd(result.total_value)}
+                </p>
               </div>
               <div className="card text-center">
-                <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Positions</p>
-                <p className="text-2xl font-bold text-navy">{result.num_positions}</p>
+                <p className="mb-1 text-xs uppercase tracking-wide text-muted2">
+                  Positions
+                </p>
+                <p className="text-2xl font-bold text-navy">
+                  {result.num_positions}
+                </p>
               </div>
             </motion.div>
 
             {/* ── AI Analysis ────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="grid md:grid-cols-2 gap-4">
               <div className="glass-card rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-3">💪 Strengths</h3>
+                <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wide mb-3">
+                  💪 Strengths
+                </h3>
                 <ul className="space-y-2">
                   {result.strengths.map((s, i) => (
                     <motion.li
@@ -372,13 +488,16 @@ export default function ResultsContent() {
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
                       className="flex gap-2 text-sm text-slate2"
                     >
-                      <span className="text-green-500 mt-0.5 shrink-0">✓</span>{s}
+                      <span className="text-green-500 mt-0.5 shrink-0">✓</span>
+                      {s}
                     </motion.li>
                   ))}
                 </ul>
               </div>
               <div className="glass-card rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">⚠️ Watch out</h3>
+                <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">
+                  ⚠️ Watch out
+                </h3>
                 <ul className="space-y-2">
                   {result.weaknesses.map((w, i) => (
                     <motion.li
@@ -388,7 +507,8 @@ export default function ResultsContent() {
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
                       className="flex gap-2 text-sm text-slate2"
                     >
-                      <span className="text-red-500 mt-0.5 shrink-0">!</span>{w}
+                      <span className="text-red-500 mt-0.5 shrink-0">!</span>
+                      {w}
                     </motion.li>
                   ))}
                 </ul>
@@ -396,15 +516,24 @@ export default function ResultsContent() {
             </motion.div>
 
             {/* ── Action plan ────────────────────────────────────────────── */}
-            <motion.div variants={fadeUp} className="card border-primary/25 bg-primary/5">
-              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
-              <p className="leading-relaxed text-slate2">{result.recommendation}</p>
+            <motion.div
+              variants={fadeUp}
+              className="card border-primary/25 bg-primary/5"
+            >
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">
+                🎯 Your Neufin Action Plan
+              </h3>
+              <p className="leading-relaxed text-slate2">
+                {result.recommendation}
+              </p>
             </motion.div>
 
             {/* ── Holdings table ─────────────────────────────────────────── */}
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted2">Holdings</h3>
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted2">
+                  Holdings
+                </h3>
 
                 {/* Desktop table */}
                 <div className="hidden sm:block overflow-x-auto">
@@ -420,19 +549,30 @@ export default function ResultsContent() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       {result.positions.map((p) => (
-                        <tr key={p.symbol} className="transition-colors hover:bg-surface-2">
-                          <td className="py-2.5 pr-4 font-mono font-bold text-navy">{p.symbol}</td>
-                          <td className="py-2.5 px-4 text-right text-slate2">
-                            {new Intl.NumberFormat('en-US').format(p.shares)}
+                        <tr
+                          key={p.symbol}
+                          className="transition-colors hover:bg-surface-2"
+                        >
+                          <td className="py-2.5 pr-4 font-mono font-bold text-navy">
+                            {p.symbol}
                           </td>
-                          <td className="py-2.5 px-4 text-right text-slate2">{usdFull(p.price)}</td>
-                          <td className="py-2.5 px-4 text-right font-medium text-navy">{usd(p.value)}</td>
+                          <td className="py-2.5 px-4 text-right text-slate2">
+                            {new Intl.NumberFormat("en-US").format(p.shares)}
+                          </td>
+                          <td className="py-2.5 px-4 text-right text-slate2">
+                            {usdFull(p.price)}
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-medium text-navy">
+                            {usd(p.value)}
+                          </td>
                           <td className="py-2.5 pl-4">
                             <div className="flex items-center gap-2">
                               <div className="h-1.5 min-w-[64px] flex-1 overflow-hidden rounded-full bg-surface-3">
                                 <div
                                   className="h-full bg-primary rounded-full"
-                                  style={{ width: `${Math.min(p.weight, 100)}%` }}
+                                  style={{
+                                    width: `${Math.min(p.weight, 100)}%`,
+                                  }}
                                 />
                               </div>
                               <span className="w-10 shrink-0 text-right text-xs text-muted2">
@@ -454,18 +594,26 @@ export default function ResultsContent() {
                       className="flex items-center justify-between border-b border-border py-2 last:border-0"
                     >
                       <div>
-                        <p className="font-mono font-bold text-navy">{p.symbol}</p>
+                        <p className="font-mono font-bold text-navy">
+                          {p.symbol}
+                        </p>
                         <p className="mt-0.5 text-xs text-muted2">
-                          {new Intl.NumberFormat('en-US').format(p.shares)} shares · {usdFull(p.price)}
+                          {new Intl.NumberFormat("en-US").format(p.shares)}{" "}
+                          shares · {usdFull(p.price)}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-navy">{usd(p.value)}</p>
                         <div className="mt-1 flex items-center justify-end gap-1.5">
                           <div className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-3">
-                            <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
+                            <div
+                              className="h-full bg-primary rounded-full"
+                              style={{ width: `${Math.min(p.weight, 100)}%` }}
+                            />
                           </div>
-                          <span className="text-xs text-muted2">{pct(p.weight)}</span>
+                          <span className="text-xs text-muted2">
+                            {pct(p.weight)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -478,7 +626,9 @@ export default function ResultsContent() {
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted2">Allocation Overview</h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted2">
+                    Allocation Overview
+                  </h3>
                   {result.max_position_pct > 40 && (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-full px-2.5 py-1">
                       ⚠ High concentration
@@ -496,7 +646,9 @@ export default function ResultsContent() {
                 href={result.share_url || shareUrl}
                 target="_blank"
                 rel="noreferrer"
-                onClick={() => track('share_dna_opened', { share_token: result.share_token })}
+                onClick={() =>
+                  track("share_dna_opened", { share_token: result.share_token })
+                }
                 className="btn-primary flex items-center justify-center gap-2 py-3 text-sm"
               >
                 🧬 Share My DNA
@@ -504,10 +656,12 @@ export default function ResultsContent() {
 
               {/* PDF — opens download if ready, otherwise starts checkout */}
               <button
-                onClick={pdfUrl ? () => window.open(pdfUrl, '_blank') : startCheckout}
+                onClick={
+                  pdfUrl ? () => window.open(pdfUrl, "_blank") : startCheckout
+                }
                 disabled={checkoutLoading}
                 className={`btn-primary flex items-center justify-center gap-2 py-3 text-sm
-                  ${checkoutLoading ? 'opacity-70 cursor-wait' : ''}`}
+                  ${checkoutLoading ? "opacity-70 cursor-wait" : ""}`}
               >
                 {checkoutLoading ? (
                   <>
@@ -515,9 +669,9 @@ export default function ResultsContent() {
                     Redirecting…
                   </>
                 ) : pdfUrl ? (
-                  '⬇ Download Report'
+                  "⬇ Download Report"
                 ) : (
-                  '📄 Unlock Full Report'
+                  "📄 Unlock Full Report"
                 )}
               </button>
 
@@ -532,13 +686,15 @@ export default function ResultsContent() {
 
             {/* ── Share panel ─────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="card">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted2">Share your result</h3>
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted2">
+                Share your result
+              </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   onClick={copyShare}
                   className="btn-outline text-xs py-2.5 flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
                 >
-                  {copied ? '✓ Copied!' : '🔗 Copy link'}
+                  {copied ? "✓ Copied!" : "🔗 Copy link"}
                 </button>
                 <button
                   onClick={shareTwitter}
@@ -548,16 +704,18 @@ export default function ResultsContent() {
                 </button>
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(`I got ${result.dna_score}/100 on my Investor DNA Score 🧬 I'm a "${result.investor_type}" — see yours free → ${shareUrl}`)}`}
-                  target="_blank" rel="noreferrer"
-                  onClick={() => track('share_whatsapp_clicked')}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => track("share_whatsapp_clicked")}
                   className="bg-[#25D366]/80 hover:bg-[#25D366] text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                 >
                   WhatsApp
                 </a>
                 <a
                   href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(`My Investor DNA Score: ${result.dna_score}/100 — I'm a "${result.investor_type}"`)}`}
-                  target="_blank" rel="noreferrer"
-                  onClick={() => track('share_telegram_clicked')}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => track("share_telegram_clicked")}
                   className="bg-[#2AABEE]/80 hover:bg-[#2AABEE] text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
                 >
                   Telegram
@@ -567,18 +725,28 @@ export default function ResultsContent() {
 
             {/* ── Referral link ───────────────────────────────────────────── */}
             {referralUrl && (
-              <motion.div variants={fadeUp} className="card border border-primary/20 bg-primary-light/50">
-                <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-primary-dark">🎁 Your referral link</h3>
+              <motion.div
+                variants={fadeUp}
+                className="card border border-primary/20 bg-primary-light/50"
+              >
+                <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-primary-dark">
+                  🎁 Your referral link
+                </h3>
                 <p className="mb-3 text-xs text-muted2">
-                  Share this link — friends get 20% off their first report, and you build your Neufin reputation.
+                  Share this link — friends get 20% off their first report, and
+                  you build your Neufin reputation.
                 </p>
                 <div className="flex gap-2">
                   <input
-                    readOnly value={referralUrl}
+                    readOnly
+                    value={referralUrl}
                     className="input-base flex-1 rounded-lg px-3 py-2 font-mono text-xs"
                   />
                   <button
-                    onClick={() => { navigator.clipboard.writeText(referralUrl); track('referral_link_copied') }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(referralUrl);
+                      track("referral_link_copied");
+                    }}
                     className="btn-primary text-xs py-2 px-4 shrink-0"
                   >
                     Copy
@@ -592,10 +760,16 @@ export default function ResultsContent() {
               {/* PDF ready — download banner */}
               {pdfUrl ? (
                 <a
-                  href={pdfUrl} target="_blank" rel="noreferrer"
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
                   onClick={() => {
-                    trackEvent(EVENTS.PDF_DOWNLOADED, { source: 'results_page' })
-                    capture('advisor_report_downloaded', { report_id: result?.record_id })
+                    trackEvent(EVENTS.PDF_DOWNLOADED, {
+                      source: "results_page",
+                    });
+                    capture("advisor_report_downloaded", {
+                      report_id: result?.record_id,
+                    });
                   }}
                   className="w-full btn-primary flex items-center justify-center gap-2 py-4 text-base"
                 >
@@ -605,8 +779,12 @@ export default function ResultsContent() {
                 <div className="card border border-primary/25 bg-gradient-to-br from-primary-light/90 to-surface-2">
                   <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
-                      <h2 className="text-lg font-bold text-navy">Unlock Your Full Report</h2>
-                      <p className="mt-0.5 text-xs text-muted2">AI-generated · 10-page PDF · one-time $29</p>
+                      <h2 className="text-lg font-bold text-navy">
+                        Unlock Your Full Report
+                      </h2>
+                      <p className="mt-0.5 text-xs text-muted2">
+                        AI-generated · 10-page PDF · one-time $29
+                      </p>
                     </div>
                     <span className="text-2xl shrink-0">📄</span>
                   </div>
@@ -614,15 +792,35 @@ export default function ResultsContent() {
                   {/* What's inside */}
                   <ul className="space-y-2 mb-5">
                     {[
-                      { icon: '📊', label: 'Detailed Sector Exposure', sub: 'Breakdown by industry, geography & asset class' },
-                      { icon: '📉', label: 'Annualized Volatility & Risk Metrics', sub: 'Sharpe ratio, max drawdown, beta vs S&P 500' },
-                      { icon: '🎯', label: 'Actionable Buy / Sell Signals', sub: 'AI-ranked rebalancing moves with rationale' },
-                      { icon: '🏦', label: 'Advisor-Ready White-label Formatting', sub: 'Clean PDF you can share with your financial advisor' },
+                      {
+                        icon: "📊",
+                        label: "Detailed Sector Exposure",
+                        sub: "Breakdown by industry, geography & asset class",
+                      },
+                      {
+                        icon: "📉",
+                        label: "Annualized Volatility & Risk Metrics",
+                        sub: "Sharpe ratio, max drawdown, beta vs S&P 500",
+                      },
+                      {
+                        icon: "🎯",
+                        label: "Actionable Buy / Sell Signals",
+                        sub: "AI-ranked rebalancing moves with rationale",
+                      },
+                      {
+                        icon: "🏦",
+                        label: "Advisor-Ready White-label Formatting",
+                        sub: "Clean PDF you can share with your financial advisor",
+                      },
                     ].map(({ icon, label, sub }) => (
                       <li key={label} className="flex items-start gap-3">
-                        <span className="text-base shrink-0 mt-0.5">{icon}</span>
+                        <span className="text-base shrink-0 mt-0.5">
+                          {icon}
+                        </span>
                         <div>
-                          <p className="text-sm font-semibold text-navy">{label}</p>
+                          <p className="text-sm font-semibold text-navy">
+                            {label}
+                          </p>
                           <p className="text-xs text-muted2">{sub}</p>
                         </div>
                       </li>
@@ -639,7 +837,7 @@ export default function ResultsContent() {
                       onClick={startCheckout}
                       disabled={checkoutLoading}
                       className={`w-full btn-primary py-3.5 text-base flex items-center justify-center gap-2
-                        ${checkoutLoading ? 'opacity-70 cursor-wait' : ''}`}
+                        ${checkoutLoading ? "opacity-70 cursor-wait" : ""}`}
                     >
                       {checkoutLoading ? (
                         <>
@@ -647,7 +845,7 @@ export default function ResultsContent() {
                           Redirecting to checkout…
                         </>
                       ) : (
-                        'Unlock Professional Report · $29 →'
+                        "Unlock Professional Report · $29 →"
                       )}
                     </button>
                   )}
@@ -684,14 +882,16 @@ export default function ResultsContent() {
 
             {/* ── Dashboard CTA ───────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="text-center pb-6">
-              <Link href="/dashboard" className="btn-primary inline-block px-10 py-3">
+              <Link
+                href="/dashboard"
+                className="btn-primary inline-block px-10 py-3"
+              >
                 Open Full Dashboard →
               </Link>
             </motion.div>
-
           </motion.div>
         </main>
       </div>
     </>
-  )
+  );
 }

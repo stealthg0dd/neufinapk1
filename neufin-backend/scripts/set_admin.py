@@ -35,9 +35,7 @@ def set_admin(email: str, *, is_admin: bool = True) -> None:
             print(f"✅ Done — is_admin={is_admin} for {email}")
         else:
             # user_profiles may not store email; try via auth lookup
-            print(
-                "No row found by email in user_profiles — trying auth.users lookup..."
-            )
+            print("No row found by email in user_profiles — trying auth.users lookup...")
             auth_result = supabase.auth.admin.list_users()
             user = next((u for u in auth_result if u.email == email), None)
             if not user:
@@ -65,9 +63,7 @@ def set_admin(email: str, *, is_admin: bool = True) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Grant or revoke NeuFin admin access")
     parser.add_argument("--email", required=True, help="User email address")
-    parser.add_argument(
-        "--revoke", action="store_true", help="Revoke admin (default: grant)"
-    )
+    parser.add_argument("--revoke", action="store_true", help="Revoke admin (default: grant)")
     args = parser.parse_args()
 
     set_admin(args.email, is_admin=not args.revoke)

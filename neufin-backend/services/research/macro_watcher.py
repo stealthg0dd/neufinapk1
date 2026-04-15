@@ -56,9 +56,7 @@ def _get_embedding_sync(text: str) -> list[float] | None:
         from openai import OpenAI
 
         client = OpenAI(api_key=settings.OPENAI_KEY)
-        resp = client.embeddings.create(
-            model="text-embedding-3-small", input=text[:8000]
-        )
+        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:8000])
         return resp.data[0].embedding
     except Exception as exc:
         logger.warning("macro_watcher.embedding_failed", error=str(exc))
@@ -101,9 +99,7 @@ def _upsert_signal(
         change_pct = round((value - previous_value) / abs(previous_value) * 100, 4)
 
     # Generate embedding text
-    embed_text = (
-        f"{title}: {value} ({region}, {signal_date}). Significance: {significance}."
-    )
+    embed_text = f"{title}: {value} ({region}, {signal_date}). Significance: {significance}."
 
     payload: dict[str, Any] = {
         "signal_type": signal_type,
@@ -177,9 +173,7 @@ async def fetch_fred_series(series_id: str, limit: int = 14) -> list[dict]:
                 if o.get("value") not in (".", None, "")
             ]
     except Exception as exc:
-        logger.warning(
-            "macro_watcher.fred_fetch_failed", series=series_id, error=str(exc)
-        )
+        logger.warning("macro_watcher.fred_fetch_failed", series=series_id, error=str(exc))
         return []
 
 
@@ -312,9 +306,7 @@ async def ingest_worldbank() -> int:
                 if inserted:
                     new_count += 1
         except Exception as exc:
-            logger.warning(
-                "macro_watcher.worldbank_failed", indicator=indicator, error=str(exc)
-            )
+            logger.warning("macro_watcher.worldbank_failed", indicator=indicator, error=str(exc))
 
     logger.info("macro_watcher.worldbank_done", new_signals=new_count)
     return new_count

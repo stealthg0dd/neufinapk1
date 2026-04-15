@@ -17,7 +17,7 @@
 }
 
 .neufin-report {
-  font-family: ui-serif, 'Times New Roman', Times, serif;
+  font-family: ui-serif, "Times New Roman", Times, serif;
   font-size: 11pt;
   line-height: 1.5;
   color: #000;
@@ -32,7 +32,7 @@
 }
 
 .report-cover-eyebrow {
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 8pt;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -41,7 +41,7 @@
 }
 
 .report-cover-title {
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 22pt;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -62,7 +62,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 14pt 24pt;
   margin: 0;
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
 }
 
 .report-cover-meta dt {
@@ -82,7 +82,7 @@
 
 .report-cover-status {
   margin: 22pt 0 0;
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 9pt;
   color: #404040;
   max-width: 95%;
@@ -102,7 +102,7 @@
 }
 
 .report-section-num {
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 10pt;
   font-weight: 700;
   color: #000;
@@ -112,7 +112,7 @@
 }
 
 .report-section-titles h2 {
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 12pt;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -123,7 +123,7 @@
 }
 
 .report-section-confidence {
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 8.5pt;
   color: #525252;
 }
@@ -153,7 +153,7 @@
 .report-table {
   width: 100%;
   border-collapse: collapse;
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 9.5pt;
   margin: 10pt 0 4pt;
 }
@@ -172,7 +172,7 @@
   color: #000;
 }
 
-.report-table tbody th[scope='row'] {
+.report-table tbody th[scope="row"] {
   font-weight: 600;
   background: #fafafa;
   color: #000;
@@ -183,7 +183,7 @@
   margin-top: 28pt;
   padding-top: 12pt;
   border-top: 1px solid #000;
-  font-family: ui-sans-serif, system-ui, 'Inter', sans-serif;
+  font-family: ui-sans-serif, system-ui, "Inter", sans-serif;
   font-size: 8pt;
   line-height: 1.45;
   color: #404040;

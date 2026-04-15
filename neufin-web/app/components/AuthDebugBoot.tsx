@@ -1,12 +1,12 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { debugAuth } from '@/lib/auth-debug'
+import { useEffect } from "react";
+import { debugAuth } from "@/lib/auth-debug";
 
 export default function AuthDebugBoot() {
   useEffect(() => {
-    debugAuth('layout.tsx:mount')
-  }, [])
+    debugAuth("layout.tsx:mount");
+  }, []);
 
-  return null
+  return null;
 }

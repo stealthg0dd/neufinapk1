@@ -5,6 +5,7 @@
 ## High severity
 
 1. Middleware token source does not match Supabase persistence model
+
 - Evidence:
   - `lib/supabase.ts` stores session in localStorage (`storageKey: 'neufin-auth'`), not cookies.
   - `middleware.ts` reads only cookies (`neufin-auth`, `sb-access-token`) or Authorization header.
@@ -16,6 +17,7 @@
   the access token to the `neufin-auth` cookie so middleware can read it.
 
 2. Middleware treats cookie value as bearer token without structural validation
+
 - Evidence:
   - `middleware.ts` forwards cookie value directly in `Authorization: Bearer ...`.
 - Impact:
@@ -26,6 +28,7 @@
 ## Medium severity
 
 3. Duplicate auth enforcement on several routes (middleware + client guards)
+
 - Routes: `/dashboard`, `/vault`, `/onboarding`, `/advisor/*`
 - Evidence:
   - Middleware matcher protects prefixes.
@@ -34,6 +37,7 @@
   - Possible flicker/race and harder debugging of redirect source.
 
 4. Mixed auth route naming (`/login` vs `/auth`) existed in advisor pages
+
 - Evidence:
   - Advisor pages used `/login` while canonical route is `/auth`.
 - Impact:
@@ -43,6 +47,7 @@
 ## Low severity / design risks
 
 5. Callback default destination `/vault` can still be bounced by middleware if token is not cookie-visible
+
 - Evidence:
   - `app/auth/callback/page.tsx` defaults `next` to `/dashboard` (updated from `/vault`).
 - Impact:
@@ -51,6 +56,7 @@
   then `window.location.href = next` triggers a full navigation with the cookie already set.
 
 6. Middleware allows protected routes when auth probe is unreachable
+
 - Evidence:
   - `middleware.ts` `hasValidSupabaseSession` catch block previously fell through.
 - Impact:

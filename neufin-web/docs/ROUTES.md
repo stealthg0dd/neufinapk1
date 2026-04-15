@@ -8,11 +8,11 @@
 
 ## Access Tiers
 
-| Tier | Description | Enforced by |
-|---|---|---|
-| **Public** | No authentication required | `PUBLIC_PREFIXES` in `middleware.ts` |
-| **Authenticated** | Valid Supabase JWT required (cookie or Bearer) | `middleware.ts` + per-endpoint `get_current_user` |
-| **Advisor-only** | Valid JWT **and** `user_profiles.role = "advisor"` | `ADVISOR_ONLY_PREFIXES` in `middleware.ts` |
+| Tier              | Description                                        | Enforced by                                       |
+| ----------------- | -------------------------------------------------- | ------------------------------------------------- |
+| **Public**        | No authentication required                         | `PUBLIC_PREFIXES` in `middleware.ts`              |
+| **Authenticated** | Valid Supabase JWT required (cookie or Bearer)     | `middleware.ts` + per-endpoint `get_current_user` |
+| **Advisor-only**  | Valid JWT **and** `user_profiles.role = "advisor"` | `ADVISOR_ONLY_PREFIXES` in `middleware.ts`        |
 
 ---
 
@@ -20,47 +20,47 @@
 
 ### Public pages (no auth required)
 
-| Route | Description |
-|---|---|
-| `/` | Landing page |
-| `/upload` | CSV portfolio upload + guest DNA analysis |
-| `/results` | DNA score results |
-| `/results/[id]` | Shareable result page |
-| `/features` | Feature showcase |
-| `/blog` | Blog listing |
-| `/blog/[slug]` | Blog post |
-| `/market` | Public market data |
-| `/leaderboard` | Public DNA score leaderboard |
-| `/research` | Research articles |
-| `/privacy` | Privacy policy |
-| `/share/[id]` | Shared portfolio page |
-| `/referrals/[code]` | Referral landing page |
-| `/reports/checkout` | Stripe checkout initiation |
-| `/reports/fulfill` | Report download after payment |
-| `/auth` | Login / sign-up |
-| `/auth/callback` | OAuth / magic-link PKCE callback |
+| Route               | Description                               |
+| ------------------- | ----------------------------------------- |
+| `/`                 | Landing page                              |
+| `/upload`           | CSV portfolio upload + guest DNA analysis |
+| `/results`          | DNA score results                         |
+| `/results/[id]`     | Shareable result page                     |
+| `/features`         | Feature showcase                          |
+| `/blog`             | Blog listing                              |
+| `/blog/[slug]`      | Blog post                                 |
+| `/market`           | Public market data                        |
+| `/leaderboard`      | Public DNA score leaderboard              |
+| `/research`         | Research articles                         |
+| `/privacy`          | Privacy policy                            |
+| `/share/[id]`       | Shared portfolio page                     |
+| `/referrals/[code]` | Referral landing page                     |
+| `/reports/checkout` | Stripe checkout initiation                |
+| `/reports/fulfill`  | Report download after payment             |
+| `/auth`             | Login / sign-up                           |
+| `/auth/callback`    | OAuth / magic-link PKCE callback          |
 
 ### Authenticated pages (any valid session)
 
-| Route | Description |
-|---|---|
-| `/dashboard` | Main portfolio dashboard |
-| `/dashboard/billing` | Subscription + billing management |
-| `/dashboard/cos` | CTech Chief of Staff command centre |
-| `/dashboard/settings` | User account settings |
+| Route                 | Description                                |
+| --------------------- | ------------------------------------------ |
+| `/dashboard`          | Main portfolio dashboard                   |
+| `/dashboard/billing`  | Subscription + billing management          |
+| `/dashboard/cos`      | CTech Chief of Staff command centre        |
+| `/dashboard/settings` | User account settings                      |
 | `/dashboard/agent-os` | Agent OS monitoring dashboard (infra view) |
-| `/onboarding` | Post-signup onboarding flow |
-| `/swarm` | Swarm analysis page |
-| `/reports/success` | Post-purchase success / report download |
+| `/onboarding`         | Post-signup onboarding flow                |
+| `/swarm`              | Swarm analysis page                        |
+| `/reports/success`    | Post-purchase success / report download    |
 
 ### Advisor-only pages (role = "advisor" required)
 
 > Non-advisor users are redirected to `/dashboard`. Not linked from public navigation.
 
-| Route | Description |
-|---|---|
-| `/dashboard/admin` | Internal user admin panel — manage users, extend trials, resend emails |
-| `/dashboard/revenue` | Revenue dashboard — Stripe stats, funnel, recent purchases |
+| Route                | Description                                                            |
+| -------------------- | ---------------------------------------------------------------------- |
+| `/dashboard/admin`   | Internal user admin panel — manage users, extend trials, resend emails |
+| `/dashboard/revenue` | Revenue dashboard — Stripe stats, funnel, recent purchases             |
 
 ---
 
@@ -70,44 +70,44 @@
 
 All `/api/*` routes bypass middleware — they manage their own auth.
 
-| Route | Method | Description |
-|---|---|---|
-| `/api/analyze-dna` | POST | Guest DNA analysis (rate-limited: 3/IP/24h for unauthenticated) |
-| `/api/dna/share/[id]` | GET | Shareable DNA score |
-| `/api/dna/leaderboard` | GET | Public leaderboard |
-| `/api/reports/checkout` | POST | Initiate Stripe checkout |
-| `/api/reports/fulfill` | GET | Download a paid PDF report |
-| `/api/stripe/webhook` | POST | Stripe webhook (signature-validated) |
-| `/api/payments/plans` | GET | List public pricing plans |
-| `/api/portfolio/chart/[…]` | GET | Public portfolio chart data |
-| `/api/referrals/[…]` | GET | Referral tracking |
-| `/api/emails/[…]` | POST | Email capture / waitlist |
-| `/api/advisors/[…]` | GET | Public advisor profiles |
-| `/api/market/[…]` | GET | Market data |
-| `/api/analytics/track` | POST | Client-side PostHog event bridge |
-| `/api/swarm/[…]` | GET | Public swarm analysis results |
-| `/api/auth/status` | GET | Auth status ping (returns null if unauthenticated) |
-| `/api/health` | GET | API health check |
-| `/api/agent-os/[…path]` | GET/POST | Server-side proxy to Agent OS (injects API key) |
-| `/api/neufin/health` | GET | NeuFin infra health from router-system |
+| Route                      | Method   | Description                                                     |
+| -------------------------- | -------- | --------------------------------------------------------------- |
+| `/api/analyze-dna`         | POST     | Guest DNA analysis (rate-limited: 3/IP/24h for unauthenticated) |
+| `/api/dna/share/[id]`      | GET      | Shareable DNA score                                             |
+| `/api/dna/leaderboard`     | GET      | Public leaderboard                                              |
+| `/api/reports/checkout`    | POST     | Initiate Stripe checkout                                        |
+| `/api/reports/fulfill`     | GET      | Download a paid PDF report                                      |
+| `/api/stripe/webhook`      | POST     | Stripe webhook (signature-validated)                            |
+| `/api/payments/plans`      | GET      | List public pricing plans                                       |
+| `/api/portfolio/chart/[…]` | GET      | Public portfolio chart data                                     |
+| `/api/referrals/[…]`       | GET      | Referral tracking                                               |
+| `/api/emails/[…]`          | POST     | Email capture / waitlist                                        |
+| `/api/advisors/[…]`        | GET      | Public advisor profiles                                         |
+| `/api/market/[…]`          | GET      | Market data                                                     |
+| `/api/analytics/track`     | POST     | Client-side PostHog event bridge                                |
+| `/api/swarm/[…]`           | GET      | Public swarm analysis results                                   |
+| `/api/auth/status`         | GET      | Auth status ping (returns null if unauthenticated)              |
+| `/api/health`              | GET      | API health check                                                |
+| `/api/agent-os/[…path]`    | GET/POST | Server-side proxy to Agent OS (injects API key)                 |
+| `/api/neufin/health`       | GET      | NeuFin infra health from router-system                          |
 
 ### Authenticated API routes (Bearer token required)
 
-| Route | Method | Description |
-|---|---|---|
-| `/api/vault/[…]` | GET/POST | Portfolio vault — authenticated user's data |
-| `/api/portfolio/[…]` | GET/POST | Portfolio management |
-| `/api/swarm/start` | POST | Start a swarm analysis run |
-| `/api/reports/[…]` | GET/POST | Report management |
+| Route                | Method   | Description                                 |
+| -------------------- | -------- | ------------------------------------------- |
+| `/api/vault/[…]`     | GET/POST | Portfolio vault — authenticated user's data |
+| `/api/portfolio/[…]` | GET/POST | Portfolio management                        |
+| `/api/swarm/start`   | POST     | Start a swarm analysis run                  |
+| `/api/reports/[…]`   | GET/POST | Report management                           |
 
 ### Advisor-only API routes (role = "advisor" required)
 
-| Route | Method | Description |
-|---|---|---|
-| `/api/admin/users` | GET | List all user profiles with stats |
-| `/api/admin/users/[userId]?extend-trial` | POST | Extend a user's trial |
-| `/api/admin/users/[userId]?resend-onboarding` | POST | Resend onboarding email |
-| `/api/revenue/stats` | GET | Stripe + Supabase revenue dashboard data |
+| Route                                         | Method | Description                              |
+| --------------------------------------------- | ------ | ---------------------------------------- |
+| `/api/admin/users`                            | GET    | List all user profiles with stats        |
+| `/api/admin/users/[userId]?extend-trial`      | POST   | Extend a user's trial                    |
+| `/api/admin/users/[userId]?resend-onboarding` | POST   | Resend onboarding email                  |
+| `/api/revenue/stats`                          | GET    | Stripe + Supabase revenue dashboard data |
 
 ---
 
@@ -131,6 +131,7 @@ Request
 ```
 
 ### ADVISOR_ONLY_PREFIXES (as of Prompt 9)
+
 - `/dashboard/admin`
 - `/dashboard/revenue`
 
@@ -146,14 +147,14 @@ The `neufin-auth` cookie is **intentionally preserved** alongside the `sb-access
 
 ## Required Environment Variables
 
-| Variable | Used by |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase client, middleware |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase client, middleware |
-| `SUPABASE_SERVICE_ROLE_KEY` | Admin API routes, middleware advisor check |
-| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog analytics |
-| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog host |
-| `AGENT_OS_URL` | Agent OS proxy |
-| `AGENT_OS_API_KEY` | Agent OS proxy |
-| `STRIPE_SECRET_KEY` | Revenue stats API route |
-| `NEXT_PUBLIC_APP_URL` | Magic link redirect base URL |
+| Variable                        | Used by                                    |
+| ------------------------------- | ------------------------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`      | Supabase client, middleware                |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase client, middleware                |
+| `SUPABASE_SERVICE_ROLE_KEY`     | Admin API routes, middleware advisor check |
+| `NEXT_PUBLIC_POSTHOG_KEY`       | PostHog analytics                          |
+| `NEXT_PUBLIC_POSTHOG_HOST`      | PostHog host                               |
+| `AGENT_OS_URL`                  | Agent OS proxy                             |
+| `AGENT_OS_API_KEY`              | Agent OS proxy                             |
+| `STRIPE_SECRET_KEY`             | Revenue stats API route                    |
+| `NEXT_PUBLIC_APP_URL`           | Magic link redirect base URL               |

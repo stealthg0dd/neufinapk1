@@ -1,24 +1,24 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import toast from 'react-hot-toast'
-import { Share2 } from 'lucide-react'
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { Share2 } from "lucide-react";
 
 export function ShareResearchUrlButton() {
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(false);
 
   const copy = async () => {
     try {
-      setBusy(true)
-      const url = typeof window !== 'undefined' ? window.location.href : ''
-      await navigator.clipboard.writeText(url)
-      toast.success('Link copied')
+      setBusy(true);
+      const url = typeof window !== "undefined" ? window.location.href : "";
+      await navigator.clipboard.writeText(url);
+      toast.success("Link copied");
     } catch {
-      toast.error('Could not copy')
+      toast.error("Could not copy");
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   return (
     <button
@@ -30,5 +30,5 @@ export function ShareResearchUrlButton() {
       <Share2 className="h-3.5 w-3.5" />
       Share
     </button>
-  )
+  );
 }

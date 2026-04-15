@@ -89,9 +89,7 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
         import datetime as _dt
 
         unix_to = int(_dt.datetime.utcnow().timestamp())
-        unix_from = unix_to - int(
-            days * 1.8 * 86_400
-        )  # generous window to cover weekends
+        unix_from = unix_to - int(days * 1.8 * 86_400)  # generous window to cover weekends
         r = requests.get(
             "https://finnhub.io/api/v1/stock/candle",
             params={
@@ -159,10 +157,7 @@ def _fetch_daily_closes_polygon(sym: str, days: int = 60) -> pd.Series:
         results = data.get("results") or []
         if not results:
             return pd.Series(dtype=float, name=sym_upper)
-        closes = {
-            _dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
-            for bar in results
-        }
+        closes = {_dt.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"] for bar in results}
         series = pd.Series(closes, dtype=float).sort_index().tail(days)
         series.name = sym_upper
         if _MARKET_CACHE_AVAILABLE:
@@ -211,9 +206,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
     # ── Batch blacklist check: skip AV entirely if it was rate-limited earlier ──
     if _is_blacklisted("av"):
         series = _fetch_daily_closes_finnhub(sym_upper, days)
-        return (
-            series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
-        )
+        return series if not series.empty else _fetch_daily_closes_polygon(sym_upper, days)
 
     if not ALPHA_VANTAGE_API_KEY:
         logger.warning(
@@ -242,9 +235,7 @@ def _fetch_daily_closes_av(sym: str, days: int = 60) -> pd.Series:
         # AV returns "Information" for rate-limits / "Note" for premium/quota blocks
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
-            _reason = (
-                "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
-            )
+            _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
             logger.warning(
                 "risk_engine.warn",
                 detail=f"[RiskEngine] AV {_reason} for {sym_upper} — blacklisting AV, trying Finnhub→Polygon",
@@ -417,9 +408,7 @@ def build_risk_report(
         corr_dict[row_sym] = {}
         for col_sym in corr_df.columns:
             val = corr_df.loc[row_sym, col_sym]
-            corr_dict[row_sym][col_sym] = (
-                round(float(val), 4) if not np.isnan(val) else None
-            )
+            corr_dict[row_sym][col_sym] = round(float(val), 4) if not np.isnan(val) else None
 
     # 4. Identify risk clusters: all unique pairs with |rho| > threshold
     risk_clusters: list[dict[str, Any]] = []
