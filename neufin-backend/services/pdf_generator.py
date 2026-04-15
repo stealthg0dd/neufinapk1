@@ -712,6 +712,58 @@ def _regime_display(regime: str | None) -> tuple[str, HexColor]:
     return (regime or "Pending Live Data").upper(), ACCENT_TEAL
 
 
+def _normalize_report_mode(raw_mode: Any) -> str:
+    mode = str(raw_mode or "standard").strip().lower().replace("-", "_")
+    if mode in {"ic memo", "icmemo", "ic"}:
+        return "ic_memo"
+    if mode in {"advisor", "advisor memo", "advisorreport"}:
+        return "advisor_report"
+    if mode not in {"standard", "ic_memo", "advisor_report"}:
+        return "standard"
+    return mode
+
+
+def _report_section_labels(report_mode: str) -> dict[str, str]:
+    if report_mode == "ic_memo":
+        return {
+            "cover_title": "INVESTMENT COMMITTEE MEMO",
+            "cover_subtitle": "Executive  ·  Risk  ·  Regime  ·  Scenarios  ·  Actions",
+            "executive_summary": "EXECUTIVE SUMMARY",
+            "portfolio_diagnosis": "PORTFOLIO DIAGNOSIS",
+            "risk_analysis": "RISK ANALYSIS",
+            "regime_context": "Regime context",
+            "scenario_analysis": "SCENARIO ANALYSIS",
+            "quant_model_outputs": "QUANT MODEL OUTPUTS",
+            "alpha_opportunities": "Alpha opportunities",
+            "recommended_actions": "RECOMMENDED ACTIONS",
+        }
+    if report_mode == "advisor_report":
+        return {
+            "cover_title": "ADVISOR PORTFOLIO REPORT",
+            "cover_subtitle": "Client-ready narrative with institutional diagnostics",
+            "executive_summary": "EXECUTIVE SUMMARY",
+            "portfolio_diagnosis": "PORTFOLIO DIAGNOSIS",
+            "risk_analysis": "RISK ANALYSIS",
+            "regime_context": "Regime context",
+            "scenario_analysis": "SCENARIO ANALYSIS",
+            "quant_model_outputs": "QUANT MODEL OUTPUTS",
+            "alpha_opportunities": "Alpha opportunities",
+            "recommended_actions": "RECOMMENDED ACTIONS",
+        }
+    return {
+        "cover_title": "PORTFOLIO INTELLIGENCE REPORT",
+        "cover_subtitle": "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations",
+        "executive_summary": "EXECUTIVE SUMMARY",
+        "portfolio_diagnosis": "PORTFOLIO DIAGNOSIS",
+        "risk_analysis": "RISK ANALYSIS",
+        "regime_context": "Regime context",
+        "scenario_analysis": "SCENARIO ANALYSIS",
+        "quant_model_outputs": "QUANT MODEL OUTPUTS",
+        "alpha_opportunities": "Alpha opportunities",
+        "recommended_actions": "RECOMMENDED ACTIONS",
+    }
+
+
 def _build_report_context(
     portfolio_data: dict,
     dna_data: dict,
@@ -723,6 +775,8 @@ def _build_report_context(
     d = dna_data if isinstance(dna_data, dict) else {}
     p = portfolio_data if isinstance(portfolio_data, dict) else {}
     m = p.get("metrics") or {}
+    report_mode = _normalize_report_mode((advisor_config or {}).get("report_mode"))
+    section_labels = _report_section_labels(report_mode)
 
     thesis_obj = s.get("investment_thesis") or {}
     if not isinstance(thesis_obj, dict):
@@ -1174,6 +1228,8 @@ def _build_report_context(
         "verdict_desc": verdict_desc,
         "recommendations": recs,
         "alpha_opps": alpha_opps,
+        "report_mode": report_mode,
+        "section_labels": section_labels,
         # Trace
         "agent_trace": s.get("agent_trace") or [],
         "swarm_available": bool(
@@ -1400,6 +1456,12 @@ def _make_cover_callback(
     sr = ctx.get("sharpe_ratio")
     sharpe_str = _fnum(sr) if sr is not None else "—"
     report_state = str(ctx.get("report_state") or REPORT_DRAFT)
+    labels = ctx.get("section_labels") or {}
+    cover_title = str(labels.get("cover_title") or "PORTFOLIO INTELLIGENCE REPORT")
+    cover_subtitle = str(
+        labels.get("cover_subtitle")
+        or "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations"
+    )
 
     def callback(canvas, doc):
         canvas.saveState()
@@ -1451,15 +1513,13 @@ def _make_cover_callback(
         _light_cover = pal["theme"] in ("light", "white")
         canvas.setFont("Helvetica-Bold", 24)
         canvas.setFillColor(pal["text_pri"] if _light_cover else ACCENT_TEAL)
-        canvas.drawCentredString(
-            A4_W / 2, A4_H / 2 + 70, "PORTFOLIO INTELLIGENCE REPORT"
-        )
+        canvas.drawCentredString(A4_W / 2, A4_H / 2 + 70, cover_title)
         canvas.setFont("Helvetica", 12)
         canvas.setFillColor(pal["text_mut"])
         canvas.drawCentredString(
             A4_W / 2,
             A4_H / 2 + 46,
-            "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations",
+            cover_subtitle,
         )
 
         # ── Horizontal rule ─────────────────────────────────────────────────
@@ -1651,8 +1711,17 @@ def _page_executive_memo(
 ) -> list:
     items: list = []
     warnings: list[str] = extra.get("warnings") or []
-
-    items.extend(_ic_body_section_header("2", "EXECUTIVE SUMMARY", None, pal, st, cw))
+    labels = ctx.get("section_labels") or {}
+    items.extend(
+        _ic_body_section_header(
+            "2",
+            str(labels.get("executive_summary") or "EXECUTIVE SUMMARY"),
+            None,
+            pal,
+            st,
+            cw,
+        )
+    )
 
     rs = str(ctx.get("report_state") or REPORT_DRAFT).upper()
     if (ctx.get("report_state") or REPORT_DRAFT) != REPORT_FINAL:
@@ -1880,8 +1949,18 @@ def _page_portfolio_snapshot(
     items: list = []
     metrics = extra.get("metrics") or {}
     pos_sorted = extra.get("pos_sorted") or []
+    labels = ctx.get("section_labels") or {}
 
-    items.extend(_ic_body_section_header("3", "PORTFOLIO SNAPSHOT", None, pal, st, cw))
+    items.extend(
+        _ic_body_section_header(
+            "3",
+            str(labels.get("portfolio_diagnosis") or "PORTFOLIO DIAGNOSIS"),
+            None,
+            pal,
+            st,
+            cw,
+        )
+    )
 
     positions = list(ctx.get("positions") or [])
     total_weight = sum(float(p.get("weight_pct") or 0) for p in positions)
@@ -2310,8 +2389,16 @@ def _page_behavioral_dna(
 
 def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
+    labels = ctx.get("section_labels") or {}
     items.extend(
-        _ic_body_section_header("4", "RISK ANALYSIS", "Macro & regime", pal, st, cw)
+        _ic_body_section_header(
+            "4",
+            str(labels.get("risk_analysis") or "RISK ANALYSIS"),
+            str(labels.get("regime_context") or "Regime context"),
+            pal,
+            st,
+            cw,
+        )
     )
 
     regime = ctx["regime_label"] or "Pending IC Analysis"
@@ -2720,7 +2807,17 @@ def _page_stress_testing(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
-    items.extend(_ic_body_section_header("6", "SCENARIO ANALYSIS", None, pal, st, cw))
+    labels = ctx.get("section_labels") or {}
+    items.extend(
+        _ic_body_section_header(
+            "6",
+            str(labels.get("scenario_analysis") or "SCENARIO ANALYSIS"),
+            None,
+            pal,
+            st,
+            cw,
+        )
+    )
 
     thesis = extra.get("thesis") or {}
     swarm_norm = extra.get("swarm_norm") or {}
@@ -2993,9 +3090,15 @@ def _page_alpha_opportunities(
     ctx: dict, extra: dict, pal: dict, st: dict, cw: float
 ) -> list:
     items: list = []
+    labels = ctx.get("section_labels") or {}
     items.extend(
         _ic_body_section_header(
-            "7", "RECOMMENDATIONS", "Alpha & opportunities", pal, st, cw
+            "7",
+            str(labels.get("recommended_actions") or "RECOMMENDATIONS"),
+            str(labels.get("alpha_opportunities") or "Alpha opportunities"),
+            pal,
+            st,
+            cw,
         )
     )
 
@@ -3157,9 +3260,15 @@ def _page_alpha_opportunities(
 
 def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
+    labels = ctx.get("section_labels") or {}
     items.extend(
         _ic_body_section_header(
-            "7", "RECOMMENDATIONS", "Strategic directives (90 days)", pal, st, cw
+            "7",
+            str(labels.get("recommended_actions") or "RECOMMENDATIONS"),
+            "Strategic directives (90 days)",
+            pal,
+            st,
+            cw,
         )
     )
 
@@ -3325,7 +3434,13 @@ def _page_agent_attribution(
     items.append(Spacer(1, 10))
 
     # Quant model I/O section
-    items.append(Paragraph("QUANT MODEL INPUTS & OUTPUTS", st["h3"]))
+    labels = ctx.get("section_labels") or {}
+    items.append(
+        Paragraph(
+            str(labels.get("quant_model_outputs") or "QUANT MODEL OUTPUTS"),
+            st["h3"],
+        )
+    )
     q_modes = ctx.get("quant_modes_selected") or []
     q_contrib = ctx.get("quant_model_contribution_summary") or {}
     q_tradeoffs = ctx.get("quant_alpha_risk_tradeoffs") or {}
@@ -3464,13 +3579,16 @@ def _build_pdf_sync(
     swarm_data_present: bool,
     theme: str = "light",
     ic_grade_only: bool = False,
+    report_mode: str = "standard",
 ) -> bytes:
     pal = _palette(theme)
     st = _styles(pal)
     cw = CONTENT_W
 
     # Build unified context
-    ctx = _build_report_context(portfolio_data, dna_data, swarm_norm, advisor_config)
+    advisor_cfg = dict(advisor_config or {})
+    advisor_cfg["report_mode"] = _normalize_report_mode(report_mode)
+    ctx = _build_report_context(portfolio_data, dna_data, swarm_norm, advisor_cfg)
     ctx["swarm_available"] = swarm_data_present
     ctx["report_state"] = assess_report_state(ctx)
     ctx["section_confidence"] = build_section_confidence(ctx)
@@ -3518,7 +3636,7 @@ def _build_pdf_sync(
         "swarm_data_present": swarm_data_present,
         "warnings": warnings,
         "logo_bytes": logo_bytes,
-        "advisor_config": advisor_config,
+        "advisor_config": advisor_cfg,
     }
 
     now = datetime.datetime.now()
@@ -3610,6 +3728,7 @@ async def generate_advisor_report(
     advisor_config: dict,
     theme: str = "light",
     ic_grade_only: bool = False,
+    report_mode: str = "standard",
 ) -> bytes:
     """
     Async orchestrator: fetch logo → normalize swarm → synchronous PDF build.
@@ -3640,6 +3759,7 @@ async def generate_advisor_report(
             swarm_present,
             theme=theme,
             ic_grade_only=ic_grade_only,
+            report_mode=report_mode,
         )
     except ValueError:
         # Intentional gate (e.g. ic_grade_only + draft state) — never mask as emergency PDF

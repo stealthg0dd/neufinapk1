@@ -21,10 +21,13 @@ interface ReportRecord {
   dna_score?: number | null;
 }
 
+type ReportMode = "standard" | "ic_memo" | "advisor_report";
+
 export default function DashboardReportsPage() {
   const [reports, setReports] = useState<ReportRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [reportMode, setReportMode] = useState<ReportMode>("standard");
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     void loadReports();
@@ -100,6 +103,7 @@ export default function DashboardReportsPage() {
           portfolio_id: report.portfolio_id,
           inline_pdf: false,
           theme: resolvedTheme,
+          report_mode: reportMode,
         }),
       });
 
@@ -156,7 +160,19 @@ export default function DashboardReportsPage() {
               Generate and manage institutional-grade portfolio reports.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-slate-700">
+              <span className="font-medium">Report Mode</span>
+              <select
+                value={reportMode}
+                onChange={(e) => setReportMode(e.target.value as ReportMode)}
+                className="bg-transparent text-xs outline-none"
+              >
+                <option value="standard">Standard</option>
+                <option value="ic_memo">IC Memo</option>
+                <option value="advisor_report">Advisor Report</option>
+              </select>
+            </label>
             <Link
               href="/dashboard/reports/preview"
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition duration-200 ease-out hover:border-gray-400 hover:bg-gray-50 active:scale-[0.99]"

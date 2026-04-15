@@ -31,6 +31,7 @@ const NAV_OVERVIEW: NavItem[] = [
 
 const NAV_INSIGHTS: NavItem[] = [
   { href: "/dashboard/research", label: "Research", icon: BookOpen },
+  { href: "/dashboard/quant", label: "Quant", icon: Code2 },
   { href: "/dashboard/reports", label: "Reports", icon: FileText },
 ];
 
