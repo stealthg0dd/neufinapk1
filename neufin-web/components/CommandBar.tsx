@@ -1,42 +1,48 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, Sparkles } from 'lucide-react'
-import { apiFetch } from '@/lib/api-client'
-import Image from 'next/image'
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Bell, Sparkles } from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
+import Image from "next/image";
 
-export type RegimeVariant = 'risk-on' | 'risk-off' | 'neutral'
+export type RegimeVariant = "risk-on" | "risk-off" | "neutral";
 
-function parseRegimeData(raw: unknown): { display: string; variant: RegimeVariant } {
-  if (raw == null || typeof raw !== 'object') {
-    return { display: 'UNKNOWN', variant: 'neutral' }
+function parseRegimeData(raw: unknown): {
+  display: string;
+  variant: RegimeVariant;
+} {
+  if (raw == null || typeof raw !== "object") {
+    return { display: "UNKNOWN", variant: "neutral" };
   }
-  const o = raw as Record<string, unknown>
-  let slug = 'unknown'
-  if (o.current && typeof o.current === 'object') {
-    const c = o.current as Record<string, unknown>
-    slug = String(c.regime ?? 'unknown')
-  } else if (typeof o.regime === 'string') {
-    slug = o.regime
+  const o = raw as Record<string, unknown>;
+  let slug = "unknown";
+  if (o.current && typeof o.current === "object") {
+    const c = o.current as Record<string, unknown>;
+    slug = String(c.regime ?? "unknown");
+  } else if (typeof o.regime === "string") {
+    slug = o.regime;
   }
-  const u = slug.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_')
-  let variant: RegimeVariant = 'neutral'
-  if (u.includes('risk_off') || u.includes('recession') || u === 'riskoff') variant = 'risk-off'
-  else if (u.includes('risk_on') || u === 'recovery' || u.includes('growth')) variant = 'risk-on'
-  else if (u.includes('stagflation') || u.includes('neutral')) variant = 'neutral'
+  const u = slug.toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  let variant: RegimeVariant = "neutral";
+  if (u.includes("risk_off") || u.includes("recession") || u === "riskoff")
+    variant = "risk-off";
+  else if (u.includes("risk_on") || u === "recovery" || u.includes("growth"))
+    variant = "risk-on";
+  else if (u.includes("stagflation") || u.includes("neutral"))
+    variant = "neutral";
 
-  const display = slug.replace(/_/g, '-').toUpperCase()
-  return { display, variant }
+  const display = slug.replace(/_/g, "-").toUpperCase();
+  return { display, variant };
 }
 
 function regimeBadgeClasses(variant: RegimeVariant): string {
   switch (variant) {
-    case 'risk-off':
-      return 'text-risk bg-risk/10'
-    case 'risk-on':
-      return 'text-positive bg-positive/10'
+    case "risk-off":
+      return "text-risk bg-risk/10";
+    case "risk-on":
+      return "text-positive bg-positive/10";
     default:
-      return 'text-warning bg-warning/10'
+      return "text-warning bg-warning/10";
   }
 }
 
@@ -44,74 +50,83 @@ export function CommandBar({
   regimeData,
   onToggleCopilot,
 }: {
-  regimeData: unknown
-  onToggleCopilot?: () => void
+  regimeData: unknown;
+  onToggleCopilot?: () => void;
 }) {
-  const [paletteOpen, setPaletteOpen] = useState(false)
-  const [clock, setClock] = useState('')
-  const [hasAlertSignal, setHasAlertSignal] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [clock, setClock] = useState("");
+  const [hasAlertSignal, setHasAlertSignal] = useState(false);
 
-  const regime = useMemo(() => parseRegimeData(regimeData), [regimeData])
+  const regime = useMemo(() => parseRegimeData(regimeData), [regimeData]);
 
   useEffect(() => {
     const tick = () => {
-      const now = new Date()
-      const d = now.toLocaleDateString('en-GB', {
-        timeZone: 'Asia/Singapore',
-        day: '2-digit',
-        month: 'short',
-      })
-      const t = now.toLocaleTimeString('en-GB', {
-        timeZone: 'Asia/Singapore',
-        hour: '2-digit',
-        minute: '2-digit',
+      const now = new Date();
+      const d = now.toLocaleDateString("en-GB", {
+        timeZone: "Asia/Singapore",
+        day: "2-digit",
+        month: "short",
+      });
+      const t = now.toLocaleTimeString("en-GB", {
+        timeZone: "Asia/Singapore",
+        hour: "2-digit",
+        minute: "2-digit",
         hour12: false,
-      })
-      setClock(`${d} · ${t} SGT`)
-    }
-    tick()
-    const id = window.setInterval(tick, 1000)
-    return () => window.clearInterval(id)
-  }, [])
+      });
+      setClock(`${d} · ${t} SGT`);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setPaletteOpen((o) => !o)
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
       }
-      if (e.key === 'Escape') setPaletteOpen(false)
-    }
-    document.addEventListener('keydown', down)
-    return () => document.removeEventListener('keydown', down)
-  }, [])
+      if (e.key === "Escape") setPaletteOpen(false);
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
     void (async () => {
       try {
-        const res = await apiFetch('/api/research/signals')
-        if (!res.ok) return
-        const data = (await res.json()) as { signals?: unknown[] }
-        const n = Array.isArray(data.signals) ? data.signals.length : 0
-        if (!cancelled) setHasAlertSignal(n > 0)
+        const res = await apiFetch("/api/research/signals");
+        if (!res.ok) return;
+        const data = (await res.json()) as { signals?: unknown[] };
+        const n = Array.isArray(data.signals) ? data.signals.length : 0;
+        if (!cancelled) setHasAlertSignal(n > 0);
       } catch {
-        if (!cancelled) setHasAlertSignal(false)
+        if (!cancelled) setHasAlertSignal(false);
       }
-    })()
+    })();
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
-  const onSearchClick = useCallback(() => setPaletteOpen(true), [])
+  const onSearchClick = useCallback(() => setPaletteOpen(true), []);
 
   return (
     <>
       <header className="grid h-11 w-full shrink-0 grid-cols-1 items-center gap-2 border-b border-border bg-white px-4 sm:grid-cols-[1fr_minmax(0,28rem)_1fr] sm:gap-0">
         <div className="flex min-w-0 items-center gap-3">
-          <Image src="/logo.png" alt="NeuFin" width={120} height={40} className="hidden h-8 w-auto md:block" />
-          <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
+          <Image
+            src="/logo.png"
+            alt="NeuFin"
+            width={120}
+            height={40}
+            className="hidden h-8 w-auto md:block"
+          />
+          <span
+            className="hidden h-4 w-px shrink-0 bg-border sm:block"
+            aria-hidden
+          />
           <span
             className={`truncate rounded px-2 py-0.5 font-mono text-sm font-medium tracking-wide ${regimeBadgeClasses(regime.variant)}`}
           >
@@ -131,7 +146,9 @@ export function CommandBar({
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <span className="hidden font-mono text-sm text-muted2 lg:inline">{clock}</span>
+          <span className="hidden font-mono text-sm text-muted2 lg:inline">
+            {clock}
+          </span>
           <button
             type="button"
             className="relative rounded p-1 text-muted2 transition-colors hover:text-navy"
@@ -177,11 +194,12 @@ export function CommandBar({
               </kbd>
             </div>
             <p className="px-4 py-3 text-sm text-muted2">
-              Command palette: navigation and search integrations ship in the next release.
+              Command palette: navigation and search integrations ship in the
+              next release.
             </p>
           </div>
         </div>
       ) : null}
     </>
-  )
+  );
 }

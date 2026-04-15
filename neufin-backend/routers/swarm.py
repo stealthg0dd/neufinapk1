@@ -66,6 +66,7 @@ from services.market_cache import (  # noqa: E402
     update_swarm_job,
 )
 from services.pdf_generator import build_swarm_ic_export_pdf  # noqa: E402
+from services.quant_model_engine import analyze_financial_modes  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
@@ -87,6 +88,7 @@ class SwarmAnalyzeRequest(BaseModel):
     total_value: float
     user_id: str | None = None
     session_id: str | None = None
+    quant_modes: list[str] | None = None
 
 
 class ChatRequest(BaseModel):
@@ -339,6 +341,8 @@ async def _start_swarm_job(
         positions=[p.model_dump() for p in payload.positions],
         total_value=payload.total_value,
         user_id=user_id,
+        session_id=session_id,
+        quant_modes=payload.quant_modes,
     )
 
     return {
@@ -354,6 +358,8 @@ async def _run_swarm_background(
     positions: list[dict],
     total_value: float,
     user_id: str | None,
+    session_id: str,
+    quant_modes: list[str] | None,
 ):
     """Runs in background after response is sent."""
     try:
@@ -368,6 +374,11 @@ async def _run_swarm_background(
             total_value=total_value,
             job_id=job_id,
         )
+
+        modes = _normalize_quant_modes(quant_modes)
+        if modes:
+            quant_result = await analyze_financial_modes(session_id, positions, modes)
+            result = _merge_quant_model_outputs(result, quant_result, modes)
 
         # Persist to Supabase (existing _persist_swarm_result)
         report_id = await _persist_swarm_result(str(uuid.uuid4()), user_id, result)
@@ -493,6 +504,12 @@ async def analyze_with_swarm_sync(
 
     ticker_data = [p.model_dump() for p in body.positions]
     result = await run_swarm(ticker_data=ticker_data, total_value=body.total_value)
+    modes = _normalize_quant_modes(body.quant_modes)
+    if modes:
+        quant_result = await analyze_financial_modes(
+            body.session_id or str(uuid.uuid4()), ticker_data, modes
+        )
+        result = _merge_quant_model_outputs(result, quant_result, modes)
     report_id = await _persist_swarm_result(str(uuid.uuid4()), body.user_id, result)
     thesis = result.get("investment_thesis", {})
     if isinstance(thesis, dict):
@@ -513,6 +530,106 @@ async def analyze_with_swarm_sync(
             "regime": str(thesis.get("regime") or ""),
         },
     }
+
+
+def _normalize_quant_modes(raw: list[str] | None) -> list[str]:
+    allowed = {
+        "alpha",
+        "risk",
+        "forecast",
+        "macro",
+        "allocation",
+        "trading",
+        "institutional",
+    }
+    if not raw:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for mode in raw:
+        key = str(mode or "").strip().lower()
+        if not key or key not in allowed or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _merge_quant_model_outputs(
+    result: dict,
+    quant_result: dict,
+    quant_modes: list[str],
+) -> dict:
+    merged = dict(result or {})
+    thesis = merged.get("investment_thesis")
+    if not isinstance(thesis, dict):
+        thesis = {}
+
+    risk_metrics = merged.get("risk_metrics")
+    if not isinstance(risk_metrics, dict):
+        risk_metrics = {}
+
+    quant_alpha = float(quant_result.get("alpha_score") or 0.0)
+    base_dna = thesis.get("dna_score") or thesis.get("health_score")
+    try:
+        base_dna_float = float(base_dna) if base_dna is not None else None
+    except (TypeError, ValueError):
+        base_dna_float = None
+
+    if base_dna_float is None:
+        dna_quant = round(quant_alpha)
+    else:
+        dna_quant = round(base_dna_float * 0.8 + quant_alpha * 0.2)
+    dna_quant = max(0, min(100, dna_quant))
+
+    contribution = quant_result.get("model_contribution_breakdown") or {}
+    tradeoffs = quant_result.get("risk_adjusted_metrics") or {}
+    forecast = quant_result.get("forecast") or {}
+    stress = quant_result.get("stress") or {}
+    regime_ctx = quant_result.get("regime_context") or {}
+
+    thesis["dna_score"] = dna_quant
+    thesis["quant_analysis"] = {
+        **(thesis.get("quant_analysis") or {}),
+        "quant_model": quant_result,
+        "quant_modes": quant_modes,
+        "model_contribution_summary": contribution,
+        "alpha_risk_tradeoffs": tradeoffs,
+        "scenario_implications": {
+            "forecast": forecast,
+            "stress": stress,
+            "regime_context": regime_ctx,
+        },
+    }
+    reasoning_line = (
+        f"Quant model overlay ({', '.join(quant_modes)}): alpha proxy {quant_alpha:.1f}, "
+        f"sharpe proxy {tradeoffs.get('sharpe_proxy', 'n/a')}, "
+        f"vol proxy {tradeoffs.get('volatility_annualized_proxy', 'n/a')}."
+    )
+    briefing = str(thesis.get("briefing") or "").strip()
+    thesis["briefing"] = f"{briefing}\n\n{reasoning_line}".strip()
+
+    rec_summary = str(thesis.get("recommendation_summary") or "").strip()
+    forecast_days = forecast.get("horizon_days")
+    vol_shift = forecast.get("volatility_shift_pct_vs_baseline")
+    quant_action = (
+        f"Quant overlay suggests prioritizing {', '.join(quant_modes)} objectives "
+        f"over the next {forecast_days or 'n/a'} days "
+        f"(vol shift vs baseline: {vol_shift if vol_shift is not None else 'n/a'}%)."
+    )
+    thesis["recommendation_summary"] = (
+        f"{rec_summary}\n{quant_action}".strip() if rec_summary else quant_action
+    )
+    thesis["quant_recommendations"] = [quant_action]
+
+    risk_metrics["quant_model_risk"] = tradeoffs
+    if "sharpe_ratio" not in risk_metrics and tradeoffs.get("sharpe_proxy") is not None:
+        risk_metrics["sharpe_ratio"] = tradeoffs.get("sharpe_proxy")
+
+    merged["investment_thesis"] = thesis
+    merged["risk_metrics"] = risk_metrics
+    merged["quant_model"] = quant_result
+    return merged
 
 
 @router.get("/report/latest")

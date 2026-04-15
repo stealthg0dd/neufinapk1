@@ -1,15 +1,17 @@
 import io
+import json
 import time
 import uuid
 
 import pandas as pd
 import structlog
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from config import APP_BASE_URL
 from database import supabase
 from services.ai_router import get_ai_analysis
 from services.calculator import calculate_portfolio_metrics
+from services.quant_model_engine import analyze_financial_modes
 
 logger = structlog.get_logger(__name__)
 
@@ -21,7 +23,10 @@ _LB_TTL = 300
 
 
 @router.post("/generate")
-async def generate_dna_score(file: UploadFile = File(...)):
+async def generate_dna_score(
+    file: UploadFile = File(...),
+    quant_modes: str | None = Form(None),
+):
     """
     Upload a CSV with columns: symbol, shares[, cost_basis]
     Returns an AI-generated Investor DNA Score + shareable URL.
@@ -44,10 +49,34 @@ async def generate_dna_score(file: UploadFile = File(...)):
     except (ValueError, RuntimeError) as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
 
+    modes = _parse_quant_modes(quant_modes)
+    quant_result: dict | None = None
+    if modes:
+        quant_positions = _to_quant_positions(positions, metrics)
+        if quant_positions:
+            quant_result = await analyze_financial_modes(
+                portfolio_id=f"dna-{uuid.uuid4().hex[:10]}",
+                positions=quant_positions,
+                modes=modes,
+            )
+
+    quant_block = ""
+    if quant_result:
+        quant_block = (
+            "\n\nQuant model overlay (requested modes):\n"
+            f"modes: {quant_result.get('modes_requested') or modes}\n"
+            f"alpha_score: {quant_result.get('alpha_score')}\n"
+            f"risk_adjusted_metrics: {quant_result.get('risk_adjusted_metrics')}\n"
+            f"forecast: {quant_result.get('forecast')}\n"
+            f"regime_context: {quant_result.get('regime_context')}\n"
+            "Blend this into DNA scoring and recommendations."
+        )
+
     prompt = f"""You are a behavioral finance expert analyzing an investor's portfolio.
 
 Portfolio metrics:
 {metrics}
+{quant_block}
 
 Return ONLY valid JSON (no markdown, no code fences):
 {{
@@ -95,7 +124,69 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
         "share_token": share_token,
         "share_url": f"{APP_BASE_URL}/share/{share_token}",
         "metrics": metrics,
+        "quant_analysis": quant_result,
+        "quant_modes": modes,
     }
+
+
+def _parse_quant_modes(raw: str | None) -> list[str]:
+    if not raw or not raw.strip():
+        return []
+
+    allowed = {
+        "alpha",
+        "risk",
+        "forecast",
+        "macro",
+        "allocation",
+        "trading",
+        "institutional",
+    }
+
+    values: list[str]
+    text = raw.strip()
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                values = [str(x) for x in parsed]
+            else:
+                values = [text]
+        except Exception:
+            values = [text]
+    else:
+        values = [v.strip() for v in text.split(",")]
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for mode in values:
+        key = mode.lower().strip()
+        if not key or key not in allowed or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _to_quant_positions(positions: list[dict], metrics: dict) -> list[dict]:
+    total_value = float(metrics.get("total_value") or 0)
+    out: list[dict] = []
+    for p in positions:
+        sym = str(p.get("symbol") or "").strip().upper()
+        if not sym:
+            continue
+        weight_raw = p.get("weight")
+        if weight_raw is None and total_value > 0:
+            try:
+                weight_raw = float(p.get("value") or 0) / total_value * 100
+            except (TypeError, ValueError):
+                weight_raw = 0.0
+        try:
+            w = float(weight_raw or 0)
+        except (TypeError, ValueError):
+            w = 0.0
+        out.append({"symbol": sym, "weight_pct": w})
+    return out
 
 
 @router.get("/share/{token}")

@@ -6,11 +6,12 @@ import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-  tracesSampleRate: parseFloat(
-    process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"
-  ),
+  tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
   environment: process.env.APP_ENV ?? "production",
-  release: process.env.SENTRY_RELEASE ?? process.env.VERCEL_GIT_COMMIT_SHA ?? "unknown",
+  release:
+    process.env.SENTRY_RELEASE ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    "unknown",
   enabled: Boolean(process.env.SENTRY_DSN),
 });
 

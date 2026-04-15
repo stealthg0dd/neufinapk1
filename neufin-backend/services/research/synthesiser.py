@@ -161,12 +161,12 @@ async def generate_research_note(
     if override_context:
         override_text = f"\nADDITIONAL CONTEXT:\n{json.dumps(override_context, indent=2, default=str)}\n"
 
-    prompt = f"""Using the data below, produce a {note_type.replace('_', ' ')} research note.
+    prompt = f"""Using the data below, produce a {note_type.replace("_", " ")} research note.
 
 {instruction}
 
-CURRENT MARKET REGIME: {regime_summary['regime']} (confidence: {regime_summary['confidence']:.0%})
-{f"Regime started: {regime_summary['started_at']}" if regime_summary.get('started_at') else ""}
+CURRENT MARKET REGIME: {regime_summary["regime"]} (confidence: {regime_summary["confidence"]:.0%})
+{f"Regime started: {regime_summary['started_at']}" if regime_summary.get("started_at") else ""}
 {override_text}
 MACRO SIGNALS (last {context_days} days):
 {_build_signals_text(signals)}
@@ -193,7 +193,7 @@ Return ONLY valid JSON — no markdown, no preamble:
   ],
   "risk_factors": ["<risk 1>", "<risk 2>", "<risk 3>"],
   "affected_tickers": ["<ticker1>", "<ticker2>"],
-  "regime": "{regime_summary['regime']}",
+  "regime": "{regime_summary["regime"]}",
   "confidence_score": <0.0-1.0>,
   "time_horizon": "immediate|1_week|1_month|1_quarter"
 }}"""

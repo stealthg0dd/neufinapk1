@@ -25,4 +25,3 @@ export async function onRequestError(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   captureRequestError(err, request, context as any);
 }
-

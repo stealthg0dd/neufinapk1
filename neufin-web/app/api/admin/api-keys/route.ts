@@ -1,8 +1,8 @@
-import { NextRequest } from 'next/server'
-import { proxyBackendJson } from '@/lib/admin-backend-proxy'
+import { NextRequest } from "next/server";
+import { proxyBackendJson } from "@/lib/admin-backend-proxy";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  return proxyBackendJson(req, '/api/admin/api-keys', { method: 'GET' })
+  return proxyBackendJson(req, "/api/admin/api-keys", { method: "GET" });
 }

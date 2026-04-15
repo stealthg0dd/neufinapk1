@@ -14,6 +14,7 @@ Endpoints:
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
 
@@ -140,6 +141,161 @@ async def get_regime():
     return {
         "current": regime,
         "recent_history": recent_history,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/global-map")
+async def get_global_macro_map(days: int = Query(30, ge=7, le=180)):
+    """
+    Region-level macro map for frontend choropleth overlays.
+    Color dimensions: sentiment, volatility, and current regime.
+    """
+    from datetime import timedelta
+
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    rows: list[dict[str, Any]] = []
+    try:
+        res = (
+            supabase.table("macro_signals")
+            .select(
+                "region,signal_type,change_pct,significance,signal_date,title,value"
+            )
+            .gte("signal_date", cutoff)
+            .order("signal_date", desc=True)
+            .limit(600)
+            .execute()
+        )
+        rows = list(res.data or [])
+    except Exception as exc:
+        logger.warning("research.global_map_fetch_failed", error=str(exc))
+
+    regime = get_current_regime_summary() or {}
+    current_regime = str(regime.get("regime") or "neutral")
+
+    by_region: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        r = str(row.get("region") or "GLOBAL").upper().strip()
+        by_region[r].append(row)
+
+    points: list[dict[str, Any]] = []
+    for region, items in by_region.items():
+        if not items:
+            continue
+        sentiment_score = 0.0
+        volatility_score = 0.0
+        weight_total = 0.0
+        latest = items[0]
+        for it in items:
+            sig = str(it.get("significance") or "medium").lower()
+            w = (
+                1.6
+                if sig == "critical"
+                else 1.2 if sig == "high" else 0.8 if sig == "medium" else 0.4
+            )
+            c = float(it.get("change_pct") or 0.0)
+            st = str(it.get("signal_type") or "").lower()
+            sentiment_score += c * w
+            if st in ("volatility", "yield_curve", "interest_rate"):
+                volatility_score += abs(c) * w
+            weight_total += w
+
+        if weight_total > 0:
+            sentiment_score = sentiment_score / weight_total
+            volatility_score = volatility_score / weight_total
+
+        points.append(
+            {
+                "region": region,
+                "sentiment": round(sentiment_score, 3),
+                "volatility": round(volatility_score, 3),
+                "regime": current_regime,
+                "latest_signal": {
+                    "title": latest.get("title"),
+                    "signal_type": latest.get("signal_type"),
+                    "value": latest.get("value"),
+                    "date": latest.get("signal_date"),
+                },
+            }
+        )
+
+    points.sort(key=lambda p: p["region"])
+    return {
+        "regime": current_regime,
+        "regions": points,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/regime-heatmap")
+async def get_regime_heatmap(days: int = Query(60, ge=14, le=365)):
+    """
+    Time x region heatmap payload for regime state intensity.
+    """
+    from datetime import timedelta
+
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    rows: list[dict[str, Any]] = []
+    try:
+        res = (
+            supabase.table("macro_signals")
+            .select("region,signal_type,significance,change_pct,signal_date")
+            .gte("signal_date", cutoff)
+            .order("signal_date", asc=True)
+            .limit(1600)
+            .execute()
+        )
+        rows = list(res.data or [])
+    except Exception as exc:
+        logger.warning("research.regime_heatmap_fetch_failed", error=str(exc))
+
+    regime = get_current_regime_summary() or {}
+    regime_label = str(regime.get("regime") or "neutral")
+
+    buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
+    for row in rows:
+        dt = str(row.get("signal_date") or "")[:10]
+        region = str(row.get("region") or "GLOBAL").upper().strip()
+        if not dt:
+            continue
+        sig = str(row.get("significance") or "medium").lower()
+        sig_weight = (
+            1.8
+            if sig == "critical"
+            else 1.3 if sig == "high" else 1.0 if sig == "medium" else 0.6
+        )
+        delta = abs(float(row.get("change_pct") or 0.0))
+        buckets[(dt, region)].append(delta * sig_weight)
+
+    points: list[dict[str, Any]] = []
+    for (dt, region), vals in buckets.items():
+        intensity = sum(vals) / len(vals) if vals else 0.0
+        if intensity >= 8:
+            regime_state = "risk_off"
+        elif intensity >= 4:
+            regime_state = "transition"
+        elif intensity > 0:
+            regime_state = "risk_on"
+        else:
+            regime_state = "neutral"
+        points.append(
+            {
+                "time": dt,
+                "region": region,
+                "regime_state": regime_state,
+                "intensity": round(intensity, 3),
+                "global_regime": regime_label,
+            }
+        )
+
+    points.sort(key=lambda x: (x["time"], x["region"]))
+    regions = sorted({p["region"] for p in points})
+    timeline = sorted({p["time"] for p in points})
+    return {
+        "regime": regime_label,
+        "regions": regions,
+        "timeline": timeline,
+        "cells": points,
         "generated_at": datetime.now(UTC).isoformat(),
     }
 

@@ -759,6 +759,35 @@ def _build_report_context(
         )
         hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
 
+    quant_blob = s.get("quant_analysis") or {}
+    if not isinstance(quant_blob, dict):
+        quant_blob = {}
+    quant_model_blob = quant_blob.get("quant_model") or {}
+    if not isinstance(quant_model_blob, dict):
+        quant_model_blob = {}
+    quant_modes_selected = quant_blob.get("quant_modes") or quant_model_blob.get(
+        "modes_requested"
+    )
+    if not isinstance(quant_modes_selected, list):
+        quant_modes_selected = []
+    quant_model_contrib = quant_blob.get(
+        "model_contribution_summary"
+    ) or quant_model_blob.get("model_contribution_breakdown")
+    if not isinstance(quant_model_contrib, dict):
+        quant_model_contrib = {}
+    quant_alpha_risk = quant_blob.get("alpha_risk_tradeoffs") or quant_model_blob.get(
+        "risk_adjusted_metrics"
+    )
+    if not isinstance(quant_alpha_risk, dict):
+        quant_alpha_risk = {}
+    quant_scenarios = quant_blob.get("scenario_implications") or {
+        "forecast": quant_model_blob.get("forecast") or {},
+        "stress": quant_model_blob.get("stress") or {},
+        "regime_context": quant_model_blob.get("regime_context") or {},
+    }
+    if not isinstance(quant_scenarios, dict):
+        quant_scenarios = {}
+
     # ── Tax from DNA ───────────────────────────────────────────────────────────
     tax_positions: list[dict] = tax_analysis.get("positions") or []
     total_tax_liability: float = float(tax_analysis.get("total_liability") or 0)
@@ -1124,6 +1153,10 @@ def _build_report_context(
         "sharpe_ratio": sharpe_ratio,
         "avg_corr": avg_corr,
         "hhi": hhi,
+        "quant_modes_selected": quant_modes_selected,
+        "quant_model_contribution_summary": quant_model_contrib,
+        "quant_alpha_risk_tradeoffs": quant_alpha_risk,
+        "quant_scenario_implications": quant_scenarios,
         "report_metrics_note": report_metrics_note,
         # Tax
         "tax_positions": tax_positions,
@@ -2785,8 +2818,7 @@ def _page_stress_testing(
             [
                 "2024 AI Rotation",
                 "S&P -8.5%",
-                f"Est. -{max(4, tech_w * 0.3):.0f}% to "
-                f"-{max(8, tech_w * 0.45):.0f}%",
+                f"Est. -{max(4, tech_w * 0.3):.0f}% to -{max(8, tech_w * 0.45):.0f}%",
                 "Tech cluster amplifies rotation",
             ],
         ]
@@ -3290,6 +3322,74 @@ def _page_agent_attribution(
             ]
         )
     items.append(Table(agent_rows, colWidths=[90, 95, 110, 160], style=_tbl_std(pal)))
+    items.append(Spacer(1, 10))
+
+    # Quant model I/O section
+    items.append(Paragraph("QUANT MODEL INPUTS & OUTPUTS", st["h3"]))
+    q_modes = ctx.get("quant_modes_selected") or []
+    q_contrib = ctx.get("quant_model_contribution_summary") or {}
+    q_tradeoffs = ctx.get("quant_alpha_risk_tradeoffs") or {}
+    q_scen = ctx.get("quant_scenario_implications") or {}
+
+    modes_text = (
+        ", ".join(str(m).upper() for m in q_modes)
+        if q_modes
+        else "Default (none selected)"
+    )
+    if q_contrib:
+        contrib_parts: list[str] = []
+        for k, v in q_contrib.items():
+            try:
+                contrib_parts.append(f"{k}: {round(float(v) * 100)}%")
+            except (TypeError, ValueError):
+                contrib_parts.append(f"{k}: {v}")
+        contrib_text = ", ".join(contrib_parts)
+    else:
+        contrib_text = "No quant contribution overlay was applied for this run."
+    alpha_val = q_tradeoffs.get("sharpe_proxy")
+    vol_val = q_tradeoffs.get("volatility_annualized_proxy")
+    dd_val = q_tradeoffs.get("max_drawdown_proxy")
+    tradeoff_text = (
+        f"Sharpe proxy: {alpha_val if alpha_val is not None else 'n/a'} | "
+        f"Volatility proxy: {vol_val if vol_val is not None else 'n/a'} | "
+        f"Drawdown proxy: {dd_val if dd_val is not None else 'n/a'}"
+    )
+
+    forecast = (
+        q_scen.get("forecast") if isinstance(q_scen.get("forecast"), dict) else {}
+    )
+    stress = q_scen.get("stress") if isinstance(q_scen.get("stress"), dict) else {}
+    regime_context = (
+        q_scen.get("regime_context")
+        if isinstance(q_scen.get("regime_context"), dict)
+        else {}
+    )
+    scenario_text = (
+        f"Forecast horizon: {forecast.get('horizon_days', 'n/a')} days; "
+        f"Vol shift vs baseline: {forecast.get('volatility_shift_pct_vs_baseline', 'n/a')}%. "
+        f"Stress scenarios sampled: {stress.get('scenarios_sampled', 'n/a')}. "
+        f"Regime context: {regime_context.get('label', 'n/a')}"
+    )
+
+    quant_rows = [
+        [
+            Paragraph("Selected modes", st["label"]),
+            Paragraph(_xml(modes_text), st["body_sm"]),
+        ],
+        [
+            Paragraph("Model contribution summary", st["label"]),
+            Paragraph(_xml(contrib_text), st["body_sm"]),
+        ],
+        [
+            Paragraph("Alpha vs risk tradeoffs", st["label"]),
+            Paragraph(_xml(tradeoff_text), st["body_sm"]),
+        ],
+        [
+            Paragraph("Scenario implications", st["label"]),
+            Paragraph(_xml(scenario_text), st["body_sm"]),
+        ],
+    ]
+    items.append(Table(quant_rows, colWidths=[130, cw - 130], style=_tbl_std(pal)))
     items.append(Spacer(1, 10))
 
     # Data sources

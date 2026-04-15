@@ -1,13 +1,13 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
-import { getAdvisorProfile, type AdvisorProfile } from '@/lib/api'
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import { getAdvisorProfile, type AdvisorProfile } from "@/lib/api";
 
 interface Props {
   /** ref_token from ?ref= URL param — used to look up the advisor who shared this link */
-  refToken: string
+  refToken: string;
 }
 
 /**
@@ -16,11 +16,11 @@ interface Props {
  * Renders nothing if no advisor is found or the fetch fails.
  */
 export default function AdvisorCTA({ refToken }: Props) {
-  const [profile,  setProfile]  = useState<AdvisorProfile | null>(null)
-  const [visible,  setVisible]  = useState(false)
+  const [profile, setProfile] = useState<AdvisorProfile | null>(null);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!refToken) return
+    if (!refToken) return;
 
     // The ref_token is a share_token (8-char hex) — we need to find the advisor_id.
     // For now, we try to load a user_profile where a dna_scores.share_token matches.
@@ -31,17 +31,17 @@ export default function AdvisorCTA({ refToken }: Props) {
     // Strategy: validate via /api/referrals/validate/{ref_token}, then
     // attempt GET /api/advisors/{ref_token} as a best-effort lookup
     // (backend can handle missing gracefully with 404).
-    const API = process.env.NEXT_PUBLIC_API_URL || ''
+    const API = process.env.NEXT_PUBLIC_API_URL || "";
     fetch(`${API}/api/advisors/by-token/${refToken}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((advisorData: AdvisorProfile) => {
         if (advisorData.advisor_name) {
-          setProfile(advisorData)
-          setTimeout(() => setVisible(true), 800)
+          setProfile(advisorData);
+          setTimeout(() => setVisible(true), 800);
         }
       })
-      .catch(() => {})
-  }, [refToken])
+      .catch(() => {});
+  }, [refToken]);
 
   return (
     <AnimatePresence>
@@ -50,11 +50,11 @@ export default function AdvisorCTA({ refToken }: Props) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          transition={{ duration: 0.4, ease: 'easeOut' }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
           className="rounded-2xl border p-5 space-y-4"
           style={{
-            borderColor: `${profile.brand_color || '#1A56DB'}40`,
-            background:  `${profile.brand_color || '#1A56DB'}08`,
+            borderColor: `${profile.brand_color || "#1A56DB"}40`,
+            background: `${profile.brand_color || "#1A56DB"}08`,
           }}
         >
           {/* Header */}
@@ -71,21 +71,31 @@ export default function AdvisorCTA({ refToken }: Props) {
             ) : (
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-base shrink-0"
-                style={{ backgroundColor: profile.brand_color || '#1A56DB' }}
+                style={{ backgroundColor: profile.brand_color || "#1A56DB" }}
               >
-                {(profile.firm_name || profile.advisor_name).charAt(0).toUpperCase()}
+                {(profile.firm_name || profile.advisor_name)
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-white font-semibold text-sm truncate">{profile.advisor_name}</p>
-              <p className="text-shell-muted text-xs truncate">{profile.firm_name}</p>
+              <p className="text-white font-semibold text-sm truncate">
+                {profile.advisor_name}
+              </p>
+              <p className="text-shell-muted text-xs truncate">
+                {profile.firm_name}
+              </p>
             </div>
           </div>
 
           {/* Value prop */}
           <p className="text-shell-muted text-sm leading-relaxed">
-            You were referred by <span className="text-white font-medium">{profile.advisor_name}</span>.
-            Want a professional advisor to walk you through your results and build a personalised investment plan?
+            You were referred by{" "}
+            <span className="text-white font-medium">
+              {profile.advisor_name}
+            </span>
+            . Want a professional advisor to walk you through your results and
+            build a personalised investment plan?
           </p>
 
           {/* CTA */}
@@ -95,24 +105,24 @@ export default function AdvisorCTA({ refToken }: Props) {
               target="_blank"
               rel="noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ backgroundColor: profile.brand_color || '#1A56DB' }}
+              style={{ backgroundColor: profile.brand_color || "#1A56DB" }}
             >
               📅 Book a Free Consultation
             </a>
           ) : (
             <div
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-white text-sm font-semibold opacity-60 cursor-default"
-              style={{ backgroundColor: profile.brand_color || '#1A56DB' }}
+              style={{ backgroundColor: profile.brand_color || "#1A56DB" }}
             >
               📅 Book a Free Consultation
             </div>
           )}
 
           <p className="text-xs text-center text-shell-subtle">
-            No obligation · {profile.firm_name || 'Independent Advisor'}
+            No obligation · {profile.firm_name || "Independent Advisor"}
           </p>
         </motion.div>
       )}
     </AnimatePresence>
-  )
+  );
 }

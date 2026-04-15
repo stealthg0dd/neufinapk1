@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 /**
  * CTech Agent OS — Chief of Staff Command Centre
@@ -13,104 +13,145 @@
  * Tailwind only — no external UI libraries.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react"
-import { apiFetch, apiPost } from "@/lib/api-client"
-import VentureCard from "@/components/VentureCard"
-import AgentActivityFeed from "@/components/AgentActivityFeed"
-import ProviderHealthStrip from "@/components/ProviderHealthStrip"
+import { useState, useEffect, useCallback, useRef } from "react";
+import { apiFetch, apiPost } from "@/lib/api-client";
+import VentureCard from "@/components/VentureCard";
+import AgentActivityFeed from "@/components/AgentActivityFeed";
+import ProviderHealthStrip from "@/components/ProviderHealthStrip";
 import type {
   DashboardData,
   VentureCard as VentureCardData,
   TaskRecord,
   GitCommit,
   AgentCallLog,
-} from "@/lib/dashboard-types"
+} from "@/lib/dashboard-types";
 
 // ── Venture config (static — maps venture id to metadata) ─────────────────────
 
-const VENTURE_ORDER = ["neufin", "arisole", "neumas", "apex_golf", "defquant"] as const
-type VentureId = (typeof VENTURE_ORDER)[number]
+const VENTURE_ORDER = [
+  "neufin",
+  "arisole",
+  "neumas",
+  "apex_golf",
+  "defquant",
+] as const;
+type VentureId = (typeof VENTURE_ORDER)[number];
 
 interface VentureMeta {
-  name: string
-  businessHead: string
-  status: VentureCardData["status"]
-  hasRepo: boolean
+  name: string;
+  businessHead: string;
+  status: VentureCardData["status"];
+  hasRepo: boolean;
 }
 
 const VENTURE_META: Record<VentureId, VentureMeta> = {
-  neufin:    { name: "NeuFin",    businessHead: "TW",       status: "active",   hasRepo: true  },
-  arisole:   { name: "Arisole",   businessHead: "JT",       status: "active",   hasRepo: true  },
-  neumas:    { name: "Neumas",    businessHead: "Brooksie", status: "active",   hasRepo: true  },
-  apex_golf: { name: "Apex Golf", businessHead: "Fred",     status: "dormant",  hasRepo: false },
-  defquant:  { name: "DefQuant",  businessHead: "VS",       status: "active",   hasRepo: false },
-}
+  neufin: {
+    name: "NeuFin",
+    businessHead: "TW",
+    status: "active",
+    hasRepo: true,
+  },
+  arisole: {
+    name: "Arisole",
+    businessHead: "JT",
+    status: "active",
+    hasRepo: true,
+  },
+  neumas: {
+    name: "Neumas",
+    businessHead: "Brooksie",
+    status: "active",
+    hasRepo: true,
+  },
+  apex_golf: {
+    name: "Apex Golf",
+    businessHead: "Fred",
+    status: "dormant",
+    hasRepo: false,
+  },
+  defquant: {
+    name: "DefQuant",
+    businessHead: "VS",
+    status: "active",
+    hasRepo: false,
+  },
+};
 
 // ── Utility helpers ────────────────────────────────────────────────────────────
 
 function sgtNow(): string {
   return new Intl.DateTimeFormat("en-SG", {
     timeZone: "Asia/Singapore",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  }).format(new Date())
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date());
 }
 
 function sgtHour(): number {
   return parseInt(
     new Intl.DateTimeFormat("en-SG", {
-      timeZone: "Asia/Singapore", hour: "numeric", hour12: false,
+      timeZone: "Asia/Singapore",
+      hour: "numeric",
+      hour12: false,
     }).format(new Date()),
-    10
-  )
+    10,
+  );
 }
 
 function greeting(): string {
-  const h = sgtHour()
-  if (h < 12) return "Good morning"
-  if (h < 17) return "Good afternoon"
-  return "Good evening"
+  const h = sgtHour();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 function pct(val: number, cap: number): number {
-  if (!cap) return 0
-  return Math.min(100, Math.round((val / cap) * 100))
+  if (!cap) return 0;
+  return Math.min(100, Math.round((val / cap) * 100));
 }
 
 function budgetBarClass(p: number): string {
-  if (p >= 90) return "bg-red-500"
-  if (p >= 70) return "bg-yellow-400"
-  return "bg-emerald-500"
+  if (p >= 90) return "bg-red-500";
+  if (p >= 70) return "bg-yellow-400";
+  return "bg-emerald-500";
 }
 
 function budgetPillClass(p: number): string {
-  if (p >= 90) return "border-red-500/40 bg-red-500/10 text-red-300"
-  if (p >= 70) return "border-yellow-500/40 bg-yellow-500/10 text-yellow-300"
-  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+  if (p >= 90) return "border-red-500/40 bg-red-500/10 text-red-300";
+  if (p >= 70) return "border-yellow-500/40 bg-yellow-500/10 text-yellow-300";
+  return "border-emerald-500/40 bg-emerald-500/10 text-emerald-300";
 }
 
 function relativeTime(iso: string): string {
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (diff < 60)    return `${diff}s ago`
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 function getVentureMeta(id: string): VentureMeta {
   if (Object.prototype.hasOwnProperty.call(VENTURE_META, id)) {
-    return VENTURE_META[id as VentureId]
+    return VENTURE_META[id as VentureId];
   }
-  return { name: id, businessHead: "-", status: "dormant", hasRepo: false }
+  return { name: id, businessHead: "-", status: "dormant", hasRepo: false };
 }
 
-function getCommitList(commits: Record<string, GitCommit[]>, id: string): GitCommit[] {
-  return Object.entries(commits).find(([key]) => key === id)?.[1] ?? []
+function getCommitList(
+  commits: Record<string, GitCommit[]>,
+  id: string,
+): GitCommit[] {
+  return Object.entries(commits).find(([key]) => key === id)?.[1] ?? [];
 }
 
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 
 function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-[#F8FAFC] ${className}`} />
+  return (
+    <div className={`animate-pulse rounded-lg bg-[#F8FAFC] ${className}`} />
+  );
 }
 
 function PageSkeleton() {
@@ -128,17 +169,21 @@ function PageSkeleton() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
         {/* Venture cards */}
         <div className="flex gap-4 overflow-hidden">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-44 w-64 flex-shrink-0" />)}
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-44 w-64 flex-shrink-0" />
+          ))}
         </div>
         {/* Brief panel */}
         <Skeleton className="h-12 w-full" />
         {/* Activity feed */}
         <div className="space-y-1.5">
-          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full" />
+          ))}
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ── Section 3: Brief Panel ─────────────────────────────────────────────────────
@@ -152,18 +197,20 @@ function BriefPanel({
   onActionComplete,
   onMarkActionWithRor,
 }: {
-  briefs: DashboardData["briefs"]
-  openVentures: Set<string>
-  completedActions: Set<string>
-  onToggleVenture: (id: string) => void
-  onToggleAll: () => void
-  onActionComplete: (key: string, action: string) => void
-  onMarkActionWithRor: (action: string) => void
+  briefs: DashboardData["briefs"];
+  openVentures: Set<string>;
+  completedActions: Set<string>;
+  onToggleVenture: (id: string) => void;
+  onToggleAll: () => void;
+  onActionComplete: (key: string, action: string) => void;
+  onMarkActionWithRor: (action: string) => void;
 }) {
-  const [panelOpen, setPanelOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // Ror's triage preview — first brief's first line
-  const preview = briefs[0]?.content?.split("\n").find((l) => l.trim()) ?? "No brief available yet."
+  const preview =
+    briefs[0]?.content?.split("\n").find((l) => l.trim()) ??
+    "No brief available yet.";
 
   return (
     <section>
@@ -172,18 +219,26 @@ function BriefPanel({
         onClick={() => setPanelOpen((v) => !v)}
         className="w-full flex items-center gap-3 rounded-xl border border-[#E2E8F0] bg-white/60 px-5 py-3.5 hover:bg-white transition-colors"
       >
-        <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${panelOpen ? "bg-primary" : "bg-[#94A3B8]"}`} />
+        <span
+          className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${panelOpen ? "bg-primary" : "bg-[#94A3B8]"}`}
+        />
         <div className="flex-1 text-left">
-          <span className="text-xs font-semibold text-navy/90">Daily Brief — Ror&apos;s Triage</span>
+          <span className="text-xs font-semibold text-navy/90">
+            Daily Brief — Ror&apos;s Triage
+          </span>
           {!panelOpen && (
             <span className="ml-3 text-xs text-[#94A3B8] truncate hidden sm:inline">
-              {preview.slice(0, 120)}{preview.length > 120 ? "…" : ""}
+              {preview.slice(0, 120)}
+              {preview.length > 120 ? "…" : ""}
             </span>
           )}
         </div>
         <svg
           className={`h-4 w-4 text-[#64748B] flex-shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""}`}
-          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
         >
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -198,27 +253,38 @@ function BriefPanel({
               onClick={onToggleAll}
               className="text-xs text-[#94A3B8] hover:text-navy/90 transition-colors"
             >
-              {VENTURE_ORDER.every((v) => openVentures.has(v)) ? "Collapse all" : "Expand all"}
+              {VENTURE_ORDER.every((v) => openVentures.has(v))
+                ? "Collapse all"
+                : "Expand all"}
             </button>
           </div>
 
           {VENTURE_ORDER.map((ventureId) => {
-            const brief   = briefs.find((b) => b.company_id === ventureId)
-            const open    = openVentures.has(ventureId)
-            const meta    = getVentureMeta(ventureId)
-            const actions = brief?.actions_required ?? []
+            const brief = briefs.find((b) => b.company_id === ventureId);
+            const open = openVentures.has(ventureId);
+            const meta = getVentureMeta(ventureId);
+            const actions = brief?.actions_required ?? [];
 
             return (
-              <div key={ventureId} className="rounded-xl border border-[#E2E8F0] bg-white overflow-hidden">
+              <div
+                key={ventureId}
+                className="rounded-xl border border-[#E2E8F0] bg-white overflow-hidden"
+              >
                 {/* Accordion header */}
                 <button
                   onClick={() => onToggleVenture(ventureId)}
                   className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8FAFC]/40 transition-colors"
                 >
-                  <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${brief ? "bg-emerald-400" : "bg-[#94A3B8]"}`} />
-                  <span className="font-medium text-navy text-sm">{meta.name}</span>
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${brief ? "bg-emerald-400" : "bg-[#94A3B8]"}`}
+                  />
+                  <span className="font-medium text-navy text-sm">
+                    {meta.name}
+                  </span>
                   {brief && (
-                    <span className="text-xs text-[#94A3B8]">{relativeTime(brief.created_at)}</span>
+                    <span className="text-xs text-[#94A3B8]">
+                      {relativeTime(brief.created_at)}
+                    </span>
                   )}
                   {actions.length > 0 && (
                     <span className="ml-2 rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-sm text-amber-300">
@@ -227,9 +293,16 @@ function BriefPanel({
                   )}
                   <svg
                     className={`ml-auto h-4 w-4 text-[#94A3B8] transition-transform ${open ? "rotate-180" : ""}`}
-                    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
                   >
-                    <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M6 9l6 6 6-6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </button>
 
@@ -243,7 +316,8 @@ function BriefPanel({
                       </pre>
                     ) : (
                       <p className="text-sm text-[#94A3B8]">
-                        No brief generated yet. Morning Engine runs at 07:00 SGT.
+                        No brief generated yet. Morning Engine runs at 07:00
+                        SGT.
                       </p>
                     )}
 
@@ -254,8 +328,8 @@ function BriefPanel({
                           Actions Required
                         </p>
                         {actions.map((action, i) => {
-                          const key  = `${ventureId}::${action}`
-                          const done = completedActions.has(key)
+                          const key = `${ventureId}::${action}`;
+                          const done = completedActions.has(key);
                           return (
                             <label
                               key={i}
@@ -270,29 +344,33 @@ function BriefPanel({
                                 checked={done}
                                 onChange={() => {
                                   if (!done) {
-                                    onActionComplete(key, action)
-                                    onMarkActionWithRor(`[${meta.name}] ${action}`)
+                                    onActionComplete(key, action);
+                                    onMarkActionWithRor(
+                                      `[${meta.name}] ${action}`,
+                                    );
                                   }
                                 }}
                                 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 accent-amber-400 cursor-pointer"
                               />
-                              <span className={`text-xs leading-snug ${done ? "line-through text-[#94A3B8]" : "text-amber-200/80"}`}>
+                              <span
+                                className={`text-xs leading-snug ${done ? "line-through text-[#94A3B8]" : "text-amber-200/80"}`}
+                              >
                                 {action}
                               </span>
                             </label>
-                          )
+                          );
                         })}
                       </div>
                     )}
                   </div>
                 )}
               </div>
-            )
+            );
           })}
         </div>
       )}
     </section>
-  )
+  );
 }
 
 // ── Section 4: Activity header ─────────────────────────────────────────────────
@@ -302,33 +380,39 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <span className="text-sm font-semibold uppercase tracking-widest text-[#94A3B8]">
       {children}
     </span>
-  )
+  );
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function ChiefOfStaffDashboard() {
-  const [sgtTime,         setSgtTime]         = useState("")
-  const [data,            setData]            = useState<DashboardData | null>(null)
-  const [tasks,           setTasks]           = useState<TaskRecord[]>([])
-  const [commits,         setCommits]         = useState<Record<string, GitCommit[]>>({})
-  const [activityLogs,    setActivityLogs]    = useState<AgentCallLog[]>([])
-  const [loading,         setLoading]         = useState(true)
-  const [activityLoading, setActivityLoading] = useState(false)
-  const [fetchError,      setFetchError]      = useState<string | null>(null)
-  const [lastRefreshed,   setLastRefreshed]   = useState<Date | null>(null)
-  const [pulse,           setPulse]           = useState(false)
-  const [expandedCard,    setExpandedCard]    = useState<string | null>(null)
-  const [openBriefVentures, setOpenBriefVentures] = useState<Set<string>>(new Set())
-  const [completedActions,  setCompletedActions]  = useState<Set<string>>(new Set())
-  const activityIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [sgtTime, setSgtTime] = useState("");
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [tasks, setTasks] = useState<TaskRecord[]>([]);
+  const [commits, setCommits] = useState<Record<string, GitCommit[]>>({});
+  const [activityLogs, setActivityLogs] = useState<AgentCallLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [pulse, setPulse] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [openBriefVentures, setOpenBriefVentures] = useState<Set<string>>(
+    new Set(),
+  );
+  const [completedActions, setCompletedActions] = useState<Set<string>>(
+    new Set(),
+  );
+  const activityIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   // ── SGT live clock ─────────────────────────────────────────────────────────
   useEffect(() => {
-    setSgtTime(sgtNow())
-    const id = setInterval(() => setSgtTime(sgtNow()), 1000)
-    return () => clearInterval(id)
-  }, [])
+    setSgtTime(sgtNow());
+    const id = setInterval(() => setSgtTime(sgtNow()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Fetch main dashboard data ──────────────────────────────────────────────
   const fetchMain = useCallback(async () => {
@@ -336,146 +420,148 @@ export default function ChiefOfStaffDashboard() {
       const [dashRes, tasksRes] = await Promise.all([
         apiFetch("/api/dashboard", { cache: "no-store" }),
         apiFetch("/api/tasks", { cache: "no-store" }),
-      ])
+      ]);
 
       if (dashRes.ok) {
-        const d = await dashRes.json() as DashboardData
-        setData(d)
-        setActivityLogs(d.callLogs ?? [])
-        setFetchError(null)
+        const d = (await dashRes.json()) as DashboardData;
+        setData(d);
+        setActivityLogs(d.callLogs ?? []);
+        setFetchError(null);
       } else {
-        const e = await dashRes.json().catch(() => ({})) as { error?: string }
-        setFetchError(e.error ?? `HTTP ${dashRes.status}`)
+        const e = (await dashRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setFetchError(e.error ?? `HTTP ${dashRes.status}`);
       }
 
       if (tasksRes.ok) {
-        const t = await tasksRes.json() as { tasks: TaskRecord[] }
-        setTasks(t.tasks ?? [])
+        const t = (await tasksRes.json()) as { tasks: TaskRecord[] };
+        setTasks(t.tasks ?? []);
       }
 
-      setLastRefreshed(new Date())
-      setPulse(true)
-      setTimeout(() => setPulse(false), 700)
+      setLastRefreshed(new Date());
+      setPulse(true);
+      setTimeout(() => setPulse(false), 700);
     } catch (e) {
-      setFetchError(e instanceof Error ? e.message : "fetch failed")
+      setFetchError(e instanceof Error ? e.message : "fetch failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   // ── Fetch GitHub commits per venture with repo ─────────────────────────────
   const fetchCommits = useCallback(async () => {
-    const repoVentures = VENTURE_ORDER.filter((v) => getVentureMeta(v).hasRepo)
+    const repoVentures = VENTURE_ORDER.filter((v) => getVentureMeta(v).hasRepo);
     const results = await Promise.allSettled(
       repoVentures.map(async (v) => {
-        const res = await apiFetch(`/api/github/${v}`, { cache: "no-store" })
-        if (!res.ok) return { venture: v, commits: [] }
-        const d = await res.json() as { commits: GitCommit[] }
-        return { venture: v, commits: d.commits ?? [] }
-      })
-    )
-    const map = new Map<string, GitCommit[]>()
+        const res = await apiFetch(`/api/github/${v}`, { cache: "no-store" });
+        if (!res.ok) return { venture: v, commits: [] };
+        const d = (await res.json()) as { commits: GitCommit[] };
+        return { venture: v, commits: d.commits ?? [] };
+      }),
+    );
+    const map = new Map<string, GitCommit[]>();
     for (const r of results) {
       if (r.status === "fulfilled") {
-        map.set(r.value.venture, r.value.commits)
+        map.set(r.value.venture, r.value.commits);
       }
     }
-    setCommits(Object.fromEntries(map))
-  }, [])
+    setCommits(Object.fromEntries(map));
+  }, []);
 
   // ── Refresh activity feed independently every 30s ──────────────────────────
   const refreshActivity = useCallback(async () => {
-    setActivityLoading(true)
+    setActivityLoading(true);
     try {
-      const res = await apiFetch("/api/dashboard", { cache: "no-store" })
+      const res = await apiFetch("/api/dashboard", { cache: "no-store" });
       if (res.ok) {
-        const d = await res.json() as DashboardData
-        setActivityLogs(d.callLogs ?? [])
+        const d = (await res.json()) as DashboardData;
+        setActivityLogs(d.callLogs ?? []);
       }
     } finally {
-      setActivityLoading(false)
+      setActivityLoading(false);
     }
-  }, [])
+  }, []);
 
   // ── On mount: initial load + schedules ────────────────────────────────────
   useEffect(() => {
-    fetchMain()
-    fetchCommits()
+    fetchMain();
+    fetchCommits();
 
     // Main data: refresh every 60s
     const mainId = setInterval(() => {
-      fetchMain()
-      fetchCommits()
-    }, 60_000)
+      fetchMain();
+      fetchCommits();
+    }, 60_000);
 
     // Activity feed: refresh every 30s
-    activityIntervalRef.current = setInterval(refreshActivity, 30_000)
+    activityIntervalRef.current = setInterval(refreshActivity, 30_000);
 
     return () => {
-      clearInterval(mainId)
-      if (activityIntervalRef.current) clearInterval(activityIntervalRef.current)
-    }
-  }, [fetchMain, fetchCommits, refreshActivity])
+      clearInterval(mainId);
+      if (activityIntervalRef.current)
+        clearInterval(activityIntervalRef.current);
+    };
+  }, [fetchMain, fetchCommits, refreshActivity]);
 
   // ── Mark action complete via Ror ───────────────────────────────────────────
   const markActionWithRor = useCallback(async (action: string) => {
     try {
       await apiPost("/api/agent-os/agent/ctech_corporate/chief_of_staff", {
         message: `Mark action as complete: ${action}`,
-      })
+      });
     } catch {
       // Fire-and-forget — UI already updated optimistically
     }
-  }, [])
+  }, []);
 
   const handleActionComplete = useCallback((key: string) => {
-    setCompletedActions((prev) => new Set([...prev, key]))
-  }, [])
+    setCompletedActions((prev) => new Set([...prev, key]));
+  }, []);
 
   // ── Build venture card data ────────────────────────────────────────────────
   const buildVentureCards = (): VentureCardData[] => {
     return VENTURE_ORDER.map((id) => {
-      const meta  = getVentureMeta(id)
-      const brief = data?.briefs.find((b) => b.company_id === id)
-      const ventureTasks = tasks.filter((t) => t.company_id === id)
-      const ventureCommits = getCommitList(commits, id)
-      const latestCommit = ventureCommits.at(0)
+      const meta = getVentureMeta(id);
+      const brief = data?.briefs.find((b) => b.company_id === id);
+      const ventureTasks = tasks.filter((t) => t.company_id === id);
+      const ventureCommits = getCommitList(commits, id);
+      const latestCommit = ventureCommits.at(0);
 
       return {
         id,
-        name:           meta.name,
-        businessHead:   meta.businessHead,
-        status:         meta.status,
-        briefExcerpt:   (brief?.content ?? "").slice(0, 120),
-        briefFull:      brief?.content ?? "",
+        name: meta.name,
+        businessHead: meta.businessHead,
+        status: meta.status,
+        briefExcerpt: (brief?.content ?? "").slice(0, 120),
+        briefFull: brief?.content ?? "",
         actionsRequired: brief?.actions_required ?? [],
-        lastCommit:     latestCommit
+        lastCommit: latestCommit
           ? {
               message: latestCommit.message,
-              author:  latestCommit.author,
+              author: latestCommit.author,
               timeAgo: latestCommit.date,
             }
           : null,
         taskCounts: {
-          pending:    ventureTasks.filter((t) => t.status === "pending").length,
-          blocked:    ventureTasks.filter((t) => t.status === "blocked").length,
+          pending: ventureTasks.filter((t) => t.status === "pending").length,
+          blocked: ventureTasks.filter((t) => t.status === "blocked").length,
           done_today: 0, // tasks endpoint only returns pending/blocked
         },
-      }
-    })
-  }
+      };
+    });
+  };
 
   // ── Loading state ──────────────────────────────────────────────────────────
-  if (loading && !data) return <PageSkeleton />
+  if (loading && !data) return <PageSkeleton />;
 
   // ── Budget ─────────────────────────────────────────────────────────────────
-  const budget   = data?.budget
-  const dayPct   = budget ? pct(budget.daily_spend, budget.daily_cap) : 0
-  const ventureCards = buildVentureCards()
+  const budget = data?.budget;
+  const dayPct = budget ? pct(budget.daily_spend, budget.daily_cap) : 0;
+  const ventureCards = buildVentureCards();
 
   return (
     <div className="min-h-screen bg-transparent text-navy">
-
       {/* ════════════════════════════════════════════════════════════════════
           SECTION 1 — Sticky top bar
          ════════════════════════════════════════════════════════════════════ */}
@@ -510,8 +596,11 @@ export default function ChiefOfStaffDashboard() {
             {/* Right: budget pill + controls */}
             <div className="flex items-center gap-2 flex-shrink-0">
               {budget && (
-                <span className={`rounded-full border px-3 py-1 text-xs font-semibold tabular-nums ${budgetPillClass(dayPct)}`}>
-                  ${(budget.daily_spend).toFixed(2)} / ${(budget.daily_cap).toFixed(0)} today
+                <span
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold tabular-nums ${budgetPillClass(dayPct)}`}
+                >
+                  ${budget.daily_spend.toFixed(2)} / $
+                  {budget.daily_cap.toFixed(0)} today
                 </span>
               )}
 
@@ -532,7 +621,10 @@ export default function ChiefOfStaffDashboard() {
 
               {/* Manual refresh */}
               <button
-                onClick={() => { fetchMain(); fetchCommits() }}
+                onClick={() => {
+                  fetchMain();
+                  fetchCommits();
+                }}
                 className="rounded-lg border border-[#E2E8F0] px-2.5 py-1.5 text-sm text-[#64748B] hover:border-[#94A3B8] hover:text-navy transition-colors"
                 title="Refresh all data"
               >
@@ -570,7 +662,6 @@ export default function ChiefOfStaffDashboard() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8">
-
         {/* ════════════════════════════════════════════════════════════════
             SECTION 2 — Venture cards
            ════════════════════════════════════════════════════════════════ */}
@@ -578,7 +669,8 @@ export default function ChiefOfStaffDashboard() {
           <div className="flex items-center justify-between mb-3">
             <SectionLabel>Ventures</SectionLabel>
             <span className="text-sm text-[#94A3B8]">
-              {tasks.filter((t) => t.status === "blocked").length} blocked across all ventures
+              {tasks.filter((t) => t.status === "blocked").length} blocked
+              across all ventures
             </span>
           </div>
 
@@ -592,7 +684,11 @@ export default function ChiefOfStaffDashboard() {
                   commits={commits[venture.id] ?? []}
                   expanded={expandedCard === venture.id}
                   completedActions={completedActions}
-                  onToggle={() => setExpandedCard((p) => (p === venture.id ? null : venture.id))}
+                  onToggle={() =>
+                    setExpandedCard((p) =>
+                      p === venture.id ? null : venture.id,
+                    )
+                  }
                   onActionComplete={handleActionComplete}
                 />
               </div>
@@ -609,15 +705,17 @@ export default function ChiefOfStaffDashboard() {
           completedActions={completedActions}
           onToggleVenture={(id) =>
             setOpenBriefVentures((prev) => {
-              const next = new Set(prev)
-              if (next.has(id)) next.delete(id)
-              else next.add(id)
-              return next
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
             })
           }
           onToggleAll={() => {
-            const allOpen = VENTURE_ORDER.every((v) => openBriefVentures.has(v))
-            setOpenBriefVentures(allOpen ? new Set() : new Set(VENTURE_ORDER))
+            const allOpen = VENTURE_ORDER.every((v) =>
+              openBriefVentures.has(v),
+            );
+            setOpenBriefVentures(allOpen ? new Set() : new Set(VENTURE_ORDER));
           }}
           onActionComplete={(key) => handleActionComplete(key)}
           onMarkActionWithRor={markActionWithRor}
@@ -630,7 +728,9 @@ export default function ChiefOfStaffDashboard() {
           <div className="flex items-center justify-between mb-3">
             <SectionLabel>Live Agent Activity</SectionLabel>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-[#94A3B8]">refreshes every 30s</span>
+              <span className="text-sm text-[#94A3B8]">
+                refreshes every 30s
+              </span>
               <button
                 onClick={refreshActivity}
                 className="text-sm text-[#94A3B8] hover:text-navy/90 transition-colors"
@@ -639,7 +739,10 @@ export default function ChiefOfStaffDashboard() {
               </button>
             </div>
           </div>
-          <AgentActivityFeed logs={activityLogs} loading={activityLoading && activityLogs.length === 0} />
+          <AgentActivityFeed
+            logs={activityLogs}
+            loading={activityLoading && activityLogs.length === 0}
+          />
         </section>
 
         {/* ════════════════════════════════════════════════════════════════
@@ -653,8 +756,7 @@ export default function ChiefOfStaffDashboard() {
             />
           </section>
         )}
-
       </div>
     </div>
-  )
+  );
 }

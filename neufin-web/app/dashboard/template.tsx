@@ -1,10 +1,14 @@
-'use client'
+"use client";
 
-import { usePathname } from 'next/navigation'
+import { usePathname } from "next/navigation";
 
 /** Soft enter on in-dashboard navigation to avoid abrupt content swaps. */
-export default function DashboardTemplate({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname()
+export default function DashboardTemplate({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
   return (
     <div
       key={pathname}
@@ -12,5 +16,5 @@ export default function DashboardTemplate({ children }: { children: React.ReactN
     >
       {children}
     </div>
-  )
+  );
 }

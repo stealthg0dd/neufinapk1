@@ -1,5 +1,5 @@
-"use client"
-export const dynamic = "force-dynamic"
+"use client";
+export const dynamic = "force-dynamic";
 
 /**
  * /dashboard/admin/leads
@@ -7,38 +7,38 @@ export const dynamic = "force-dynamic"
  * Admin-only (middleware enforces advisor role on /dashboard/admin).
  */
 
-import { useState, useEffect, useCallback } from "react"
-import { useAuth } from "@/lib/auth-context"
-import { apiFetch } from "@/lib/api-client"
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api-client";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface Lead {
-  id: string
-  name: string
-  email: string
-  company?: string
-  role?: string
-  aum_range?: string
-  source?: string
-  status: string
-  notes?: string
-  interested_plan?: string
-  created_at: string
-  contacted_at?: string
-  won_at?: string
+  id: string;
+  name: string;
+  email: string;
+  company?: string;
+  role?: string;
+  aum_range?: string;
+  source?: string;
+  status: string;
+  notes?: string;
+  interested_plan?: string;
+  created_at: string;
+  contacted_at?: string;
+  won_at?: string;
 }
 
 interface LeadStats {
-  total: number
-  by_status: Record<string, number>
-  conversion_rate: number
-  this_week: number
-  last_week: number
-  won_this_month: number
-  pipeline_mrr: number
+  total: number;
+  by_status: Record<string, number>;
+  conversion_rate: number;
+  this_week: number;
+  last_week: number;
+  won_this_month: number;
+  pipeline_mrr: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,33 +46,36 @@ interface LeadStats {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const COLUMNS: { key: string; label: string; color: string }[] = [
-  { key: "new",            label: "New",      color: "border-t-primary" },
-  { key: "contacted",      label: "Contacted", color: "border-t-yellow-500" },
-  { key: "demo_scheduled", label: "Demo",      color: "border-t-purple-500" },
-  { key: "proposal_sent",  label: "Proposal",  color: "border-t-orange-500" },
-  { key: "won",            label: "Won ✓",     color: "border-t-emerald-500" },
-  { key: "lost",           label: "Lost",      color: "border-t-red-500" },
-]
+  { key: "new", label: "New", color: "border-t-primary" },
+  { key: "contacted", label: "Contacted", color: "border-t-yellow-500" },
+  { key: "demo_scheduled", label: "Demo", color: "border-t-purple-500" },
+  { key: "proposal_sent", label: "Proposal", color: "border-t-orange-500" },
+  { key: "won", label: "Won ✓", color: "border-t-emerald-500" },
+  { key: "lost", label: "Lost", color: "border-t-red-500" },
+];
 
 const PLAN_BADGE: Record<string, string> = {
-  advisor:    "bg-purple-100 text-purple-800 border border-purple-200",
+  advisor: "bg-purple-100 text-purple-800 border border-purple-200",
   enterprise: "bg-primary-light text-primary-dark border border-primary/25",
-  retail:     "bg-emerald-50 text-emerald-800 border border-emerald-200",
-}
+  retail: "bg-emerald-50 text-emerald-800 border border-emerald-200",
+};
 
 const AUM_COLORS: Record<string, string> = {
-  ">200M":    "text-amber-700",
-  "50-200M":  "text-primary",
-  "10-50M":   "text-navy",
-  "<10M":     "text-muted2",
-}
+  ">200M": "text-amber-700",
+  "50-200M": "text-primary",
+  "10-50M": "text-navy",
+  "<10M": "text-muted2",
+};
 
 function fmt(iso: string) {
-  return new Date(iso).toLocaleDateString("en-SG", { month: "short", day: "numeric" })
+  return new Date(iso).toLocaleDateString("en-SG", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />
+  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,28 +87,31 @@ function LeadModal({
   onClose,
   onStatusChange,
 }: {
-  lead: Lead
-  onClose: () => void
-  onStatusChange: (id: string, status: string, notes?: string) => Promise<void>
+  lead: Lead;
+  onClose: () => void;
+  onStatusChange: (id: string, status: string, notes?: string) => Promise<void>;
 }) {
-  const [status, setStatus]   = useState(lead.status)
-  const [notes, setNotes]     = useState(lead.notes ?? "")
-  const [saving, setSaving]   = useState(false)
-  const [saved, setSaved]     = useState(false)
+  const [status, setStatus] = useState(lead.status);
+  const [notes, setNotes] = useState(lead.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   async function handleSave() {
-    setSaving(true)
+    setSaving(true);
     try {
-      await onStatusChange(lead.id, status, notes)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      await onStatusChange(lead.id, status, notes);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-lg space-y-5 rounded-2xl border border-border bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -114,9 +120,15 @@ function LeadModal({
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold text-navy">{lead.name}</h2>
-            <p className="text-sm text-muted2">{lead.company ?? "—"} · {lead.role ?? "—"}</p>
+            <p className="text-sm text-muted2">
+              {lead.company ?? "—"} · {lead.role ?? "—"}
+            </p>
           </div>
-          <button type="button" onClick={onClose} className="text-xl leading-none text-muted2 hover:text-navy">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xl leading-none text-muted2 hover:text-navy"
+          >
             ×
           </button>
         </div>
@@ -125,11 +137,20 @@ function LeadModal({
         <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           <div>
             <p className="mb-0.5 text-xs text-muted2">Email</p>
-            <a href={`mailto:${lead.email}`} className="text-primary hover:underline truncate block">{lead.email}</a>
+            <a
+              href={`mailto:${lead.email}`}
+              className="text-primary hover:underline truncate block"
+            >
+              {lead.email}
+            </a>
           </div>
           <div>
             <p className="mb-0.5 text-xs text-muted2">AUM</p>
-            <p className={`font-medium ${AUM_COLORS[lead.aum_range ?? ""] ?? "text-navy"}`}>{lead.aum_range ?? "—"}</p>
+            <p
+              className={`font-medium ${AUM_COLORS[lead.aum_range ?? ""] ?? "text-navy"}`}
+            >
+              {lead.aum_range ?? "—"}
+            </p>
           </div>
           <div>
             <p className="mb-0.5 text-xs text-muted2">Source</p>
@@ -205,7 +226,7 @@ function LeadModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -213,49 +234,62 @@ function LeadModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function LeadsAdminPage() {
-  const { getAccessToken } = useAuth()
-  const [leads, setLeads]     = useState<Lead[]>([])
-  const [stats, setStats]     = useState<LeadStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-  const [selected, setSelected] = useState<Lead | null>(null)
+  const { getAccessToken } = useAuth();
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [stats, setStats] = useState<LeadStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Lead | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const token = await getAccessToken()
-      if (!token) { setError("Not authenticated"); return }
+      const token = await getAccessToken();
+      if (!token) {
+        setError("Not authenticated");
+        return;
+      }
       const [leadsRes, statsRes] = await Promise.all([
         apiFetch("/api/admin/leads?per_page=200", { cache: "no-store" }),
         apiFetch("/api/admin/leads/stats", { cache: "no-store" }),
-      ])
-      if (leadsRes.status === 403) { setError("Admin access required."); return }
-      if (!leadsRes.ok) throw new Error(`HTTP ${leadsRes.status}`)
-      const leadsData = await leadsRes.json()
-      setLeads(leadsData.leads ?? leadsData ?? [])
-      if (statsRes.ok) setStats(await statsRes.json())
+      ]);
+      if (leadsRes.status === 403) {
+        setError("Admin access required.");
+        return;
+      }
+      if (!leadsRes.ok) throw new Error(`HTTP ${leadsRes.status}`);
+      const leadsData = await leadsRes.json();
+      setLeads(leadsData.leads ?? leadsData ?? []);
+      if (statsRes.ok) setStats(await statsRes.json());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [getAccessToken])
+  }, [getAccessToken]);
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const handleStatusChange = useCallback(async (id: string, status: string, notes?: string) => {
-    const res = await apiFetch(`/api/admin/leads/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status, notes }),
-    })
-    if (!res.ok) throw new Error("Could not update lead")
-    const updated = await res.json()
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)))
-    setSelected((prev) => (prev?.id === id ? { ...prev, ...updated } : prev))
-  }, [])
+  const handleStatusChange = useCallback(
+    async (id: string, status: string, notes?: string) => {
+      const res = await apiFetch(`/api/admin/leads/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, notes }),
+      });
+      if (!res.ok) throw new Error("Could not update lead");
+      const updated = await res.json();
+      setLeads((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, ...updated } : l)),
+      );
+      setSelected((prev) => (prev?.id === id ? { ...prev, ...updated } : prev));
+    },
+    [],
+  );
 
-  const byStatus = (status: string) => leads.filter((l) => l.status === status)
+  const byStatus = (status: string) => leads.filter((l) => l.status === status);
 
   if (loading) {
     return (
@@ -265,12 +299,14 @@ export default function LeadsAdminPage() {
           {COLUMNS.map((c) => (
             <div key={c.key} className="min-w-[240px] space-y-3">
               <Skeleton className="h-6 w-24" />
-              {[1,2,3].map((i) => <Skeleton key={i} className="h-28 w-full" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-28 w-full" />
+              ))}
             </div>
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -288,7 +324,7 @@ export default function LeadsAdminPage() {
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -317,7 +353,9 @@ export default function LeadsAdminPage() {
               <p className="mt-0.5 text-xs text-muted2">Total Leads</p>
             </div>
             <div className="data-card rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-primary">{stats.this_week}</p>
+              <p className="text-2xl font-bold text-primary">
+                {stats.this_week}
+              </p>
               <p className="mt-0.5 text-xs text-muted2">This Week</p>
             </div>
             <div className="data-card rounded-xl p-4 text-center">
@@ -327,7 +365,9 @@ export default function LeadsAdminPage() {
               <p className="mt-0.5 text-xs text-muted2">Conversion Rate</p>
             </div>
             <div className="data-card rounded-xl p-4 text-center">
-              <p className="text-2xl font-bold text-amber-700">{stats.won_this_month ?? 0}</p>
+              <p className="text-2xl font-bold text-amber-700">
+                {stats.won_this_month ?? 0}
+              </p>
               <p className="mt-0.5 text-xs text-muted2">Won This Month</p>
             </div>
           </div>
@@ -336,7 +376,7 @@ export default function LeadsAdminPage() {
         {/* Kanban board */}
         <div className="flex gap-4 overflow-x-auto pb-6">
           {COLUMNS.map((col) => {
-            const colLeads = byStatus(col.key)
+            const colLeads = byStatus(col.key);
             return (
               <div
                 key={col.key}
@@ -344,7 +384,9 @@ export default function LeadsAdminPage() {
               >
                 {/* Column header */}
                 <div className="flex items-center justify-between px-4 pb-2 pt-4">
-                  <h3 className="text-sm font-semibold text-navy">{col.label}</h3>
+                  <h3 className="text-sm font-semibold text-navy">
+                    {col.label}
+                  </h3>
                   <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted2">
                     {colLeads.length}
                   </span>
@@ -364,7 +406,9 @@ export default function LeadsAdminPage() {
                       className="w-full space-y-2 rounded-lg border border-border bg-surface-2 p-3 text-left transition-colors hover:border-primary/30 hover:bg-white"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium leading-tight text-navy">{lead.name}</p>
+                        <p className="text-sm font-medium leading-tight text-navy">
+                          {lead.name}
+                        </p>
                         {lead.aum_range && (
                           <span
                             className={`flex-shrink-0 whitespace-nowrap text-xs font-medium ${AUM_COLORS[lead.aum_range] ?? "text-muted2"}`}
@@ -373,7 +417,11 @@ export default function LeadsAdminPage() {
                           </span>
                         )}
                       </div>
-                      {lead.company && <p className="truncate text-xs text-muted2">{lead.company}</p>}
+                      {lead.company && (
+                        <p className="truncate text-xs text-muted2">
+                          {lead.company}
+                        </p>
+                      )}
                       <div className="flex items-center justify-between">
                         {lead.interested_plan ? (
                           <span
@@ -384,17 +432,22 @@ export default function LeadsAdminPage() {
                         ) : (
                           <span />
                         )}
-                        <span className="text-sm text-muted2">{fmt(lead.created_at)}</span>
+                        <span className="text-sm text-muted2">
+                          {fmt(lead.created_at)}
+                        </span>
                       </div>
-                      {lead.source && <p className="text-sm text-muted2">via {lead.source.replace(/_/g, " ")}</p>}
+                      {lead.source && (
+                        <p className="text-sm text-muted2">
+                          via {lead.source.replace(/_/g, " ")}
+                        </p>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
-            )
+            );
           })}
         </div>
-
       </div>
 
       {/* Detail modal */}
@@ -406,5 +459,5 @@ export default function LeadsAdminPage() {
         />
       )}
     </div>
-  )
+  );
 }

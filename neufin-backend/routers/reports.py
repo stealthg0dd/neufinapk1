@@ -33,6 +33,7 @@ from services.auth_dependency import (
 from services.calculator import calculate_portfolio_metrics
 from services.jwt_auth import JWTUser
 from services.pdf_generator import generate_advisor_report
+from services.quant_model_engine import analyze_financial_modes
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
 
@@ -75,6 +76,7 @@ class ReportRequest(BaseModel):
     theme: str = "light"  # "light" (default, institutional) | "dark" (fintech)
     inline_pdf: bool = False
     ic_grade_only: bool = False  # True → 422 if report would be draft-quality
+    quant_modes: list[str] | None = None
 
 
 def _positions_from_dna_row(dna: dict | None) -> list[dict]:
@@ -471,6 +473,26 @@ async def generate_report(
                 status_code=422, detail=f"Metrics calculation failed: {e!s}"
             ) from e
 
+        quant_modes = _normalize_quant_modes(body.quant_modes)
+        quant_result: dict | None = None
+        if quant_modes:
+            try:
+                quant_result = await analyze_financial_modes(
+                    body.portfolio_id,
+                    positions_raw,
+                    quant_modes,
+                )
+            except Exception as e:
+                logger.warning("reports.quant_model_failed", error=str(e))
+                quant_result = None
+
+        if quant_result:
+            swarm_row = _merge_quant_into_swarm_row(
+                swarm_row,
+                quant_result,
+                quant_modes,
+            )
+
         run_id = uuid.uuid4().hex[:8]
 
         advisor_config = {
@@ -553,6 +575,9 @@ async def generate_report(
             report_id = None
 
         analysis = _synthesis_payload(existing_dna, metrics, swarm_row)
+        if quant_result:
+            analysis["quant_modes"] = quant_modes
+            analysis["quant_model"] = quant_result
 
         if body.inline_pdf:
             headers = {
@@ -606,6 +631,67 @@ async def generate_report(
             status_code=500,
             detail=f"Report generation failed: {e!s}",
         ) from e
+
+
+def _normalize_quant_modes(raw: list[str] | None) -> list[str]:
+    allowed = {
+        "alpha",
+        "risk",
+        "forecast",
+        "macro",
+        "allocation",
+        "trading",
+        "institutional",
+    }
+    if not raw:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for mode in raw:
+        key = str(mode or "").strip().lower()
+        if not key or key not in allowed or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _merge_quant_into_swarm_row(
+    swarm_row: dict | None,
+    quant_result: dict,
+    quant_modes: list[str],
+) -> dict:
+    row = dict(swarm_row or {})
+
+    quant_analysis = row.get("quant_analysis")
+    if not isinstance(quant_analysis, dict):
+        quant_analysis = {}
+    quant_analysis["quant_model"] = quant_result
+    quant_analysis["quant_modes"] = quant_modes
+    quant_analysis["model_contribution_summary"] = (
+        quant_result.get("model_contribution_breakdown") or {}
+    )
+    quant_analysis["alpha_risk_tradeoffs"] = (
+        quant_result.get("risk_adjusted_metrics") or {}
+    )
+    quant_analysis["scenario_implications"] = {
+        "forecast": quant_result.get("forecast") or {},
+        "stress": quant_result.get("stress") or {},
+        "regime_context": quant_result.get("regime_context") or {},
+    }
+    row["quant_analysis"] = quant_analysis
+
+    rec_summary = str(row.get("recommendation_summary") or "").strip()
+    q_action = (
+        f"Quant overlay ({', '.join(quant_modes)}) alpha score "
+        f"{quant_result.get('alpha_score')} with risk-adjusted review "
+        f"{quant_result.get('risk_adjusted_metrics')}"
+    )
+    row["recommendation_summary"] = (
+        f"{rec_summary}\n{q_action}".strip() if rec_summary else q_action
+    )
+
+    return row
 
 
 @router.get("/{report_id}/download")

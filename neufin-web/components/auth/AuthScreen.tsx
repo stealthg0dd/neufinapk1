@@ -1,24 +1,27 @@
-'use client'
+"use client";
 
-import { Suspense, useState, useEffect, FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
-import { claimAnonymousRecord } from '@/lib/api'
-import { useNeufinAnalytics } from '@/lib/analytics'
-import { GlassCard } from '@/components/ui/GlassCard'
+import { Suspense, useState, useEffect, FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
+import { claimAnonymousRecord } from "@/lib/api";
+import { useNeufinAnalytics } from "@/lib/analytics";
+import { GlassCard } from "@/components/ui/GlassCard";
 
 async function claimPendingRecord(token: string) {
-  if (typeof window === 'undefined') return
-  const raw = localStorage.getItem('dnaResult')
-  if (!raw) return
+  if (typeof window === "undefined") return;
+  const raw = localStorage.getItem("dnaResult");
+  if (!raw) return;
   try {
-    const parsed = JSON.parse(raw)
-    const recordId = parsed?.record_id
+    const parsed = JSON.parse(raw);
+    const recordId = parsed?.record_id;
     if (recordId && !parsed?.user_id_claimed) {
-      await claimAnonymousRecord(recordId, token)
-      localStorage.setItem('dnaResult', JSON.stringify({ ...parsed, user_id_claimed: true }))
+      await claimAnonymousRecord(recordId, token);
+      localStorage.setItem(
+        "dnaResult",
+        JSON.stringify({ ...parsed, user_id_claimed: true }),
+      );
     }
   } catch {
     /* ignore */
@@ -45,10 +48,14 @@ function GoogleIcon() {
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
       />
     </svg>
-  )
+  );
 }
 
-export function AuthScreen({ initialMode }: { initialMode: 'login' | 'signup' }) {
+export function AuthScreen({
+  initialMode,
+}: {
+  initialMode: "login" | "signup";
+}) {
   return (
     <Suspense
       fallback={
@@ -59,96 +66,107 @@ export function AuthScreen({ initialMode }: { initialMode: 'login' | 'signup' })
     >
       <AuthScreenInner initialMode={initialMode} />
     </Suspense>
-  )
+  );
 }
 
-function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { capture } = useNeufinAnalytics()
+function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { capture } = useNeufinAnalytics();
 
-  const [mode, setMode] = useState<'login' | 'signup'>(initialMode)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [sent, setSent] = useState(false)
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(false);
 
-  const next = searchParams.get('next') || '/dashboard'
-  const oauthError = searchParams.get('error')
-  const [hasPending, setHasPending] = useState(false)
+  const next = searchParams.get("next") || "/dashboard";
+  const oauthError = searchParams.get("error");
+  const [hasPending, setHasPending] = useState(false);
   useEffect(() => {
     try {
-      setHasPending(!!JSON.parse(localStorage.getItem('dnaResult') || 'null')?.record_id)
+      setHasPending(
+        !!JSON.parse(localStorage.getItem("dnaResult") || "null")?.record_id,
+      );
     } catch {
-      setHasPending(false)
+      setHasPending(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    if (oauthError) setError(decodeURIComponent(oauthError))
-  }, [oauthError])
+    if (oauthError) setError(decodeURIComponent(oauthError));
+  }, [oauthError]);
 
   useEffect(() => {
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.access_token) {
-        await claimPendingRecord(session.access_token)
-        router.replace(next)
-      }
-    })
-    return () => listener.subscription.unsubscribe()
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (
+          (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
+          session?.access_token
+        ) {
+          await claimPendingRecord(session.access_token);
+          router.replace(next);
+        }
+      },
+    );
+    return () => listener.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [next])
+  }, [next]);
 
   async function handleGoogle() {
-    setLoading(true)
-    setError('')
-    sessionStorage.setItem('neufin_auth_method', 'google')
+    setLoading(true);
+    setError("");
+    sessionStorage.setItem("neufin_auth_method", "google");
     // Always redirect to the canonical domain so the Supabase OAuth callback
     // URL is consistent regardless of which domain the user started on
     // (neufin.ai, www.neufin.ai, or neufin-web.vercel.app).
     // A mismatched redirectTo causes Supabase to fall back to implicit flow
     // (landing on /#access_token= instead of /auth/callback?code=).
-    const CANONICAL_ORIGIN = 'https://www.neufin.ai'
-    const redirectTo = `${CANONICAL_ORIGIN}/auth/callback?next=${encodeURIComponent(next)}`
+    const CANONICAL_ORIGIN = "https://www.neufin.ai";
+    const redirectTo = `${CANONICAL_ORIGIN}/auth/callback?next=${encodeURIComponent(next)}`;
     const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
         redirectTo,
         skipBrowserRedirect: false,
         queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+          access_type: "offline",
+          prompt: "consent",
         },
       },
-    })
+    });
     if (err) {
-      setError(err.message)
-      setLoading(false)
+      setError(err.message);
+      setLoading(false);
     }
   }
 
   async function handlePassword(e: FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+    e.preventDefault();
+    setLoading(true);
+    setError("");
     try {
-      if (mode === 'signup') {
-        const { error: err } = await supabase.auth.signUp({ email, password })
-        if (err) throw err
-        capture('user_signed_up', { method: 'email' })
-        setSent(true)
+      if (mode === "signup") {
+        const { error: err } = await supabase.auth.signUp({ email, password });
+        if (err) throw err;
+        capture("user_signed_up", { method: "email" });
+        setSent(true);
       } else {
-        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
-        if (err) throw err
-        capture('user_logged_in', { method: 'email' })
-        if (data.session?.access_token) await claimPendingRecord(data.session.access_token)
-        router.replace(next)
+        const { data, error: err } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (err) throw err;
+        capture("user_logged_in", { method: "email" });
+        if (data.session?.access_token)
+          await claimPendingRecord(data.session.access_token);
+        router.replace(next);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Authentication failed')
+      setError(e instanceof Error ? e.message : "Authentication failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -159,21 +177,24 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
           <div className="text-4xl" aria-hidden>
             ✉️
           </div>
-          <h1 className="font-sans text-2xl text-[var(--text-primary)]">Check your email</h1>
+          <h1 className="font-sans text-2xl text-[var(--text-primary)]">
+            Check your email
+          </h1>
           <p className="text-sm text-[var(--text-secondary)]">
             We sent a confirmation link to {email}. Confirm then sign in.
           </p>
           {hasPending && (
             <p className="text-xs text-primary bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2">
-              Your portfolio analysis will link to your account when you confirm.
+              Your portfolio analysis will link to your account when you
+              confirm.
             </p>
           )}
           <button
             type="button"
             onClick={() => {
-              setSent(false)
-              setError('')
-              setEmail('')
+              setSent(false);
+              setError("");
+              setEmail("");
             }}
             className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
@@ -181,7 +202,7 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
           </button>
         </GlassCard>
       </div>
-    )
+    );
   }
 
   return (
@@ -191,20 +212,25 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
         className="w-full max-w-md"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
       >
         <GlassCard className="p-8 space-y-6">
           <div className="text-center space-y-2">
-            <Link href="/" className="inline-block font-sans text-2xl text-primary tracking-tight">
+            <Link
+              href="/"
+              className="inline-block font-sans text-2xl text-primary tracking-tight"
+            >
               NeuFin
             </Link>
             <h1 className="text-xl font-semibold text-[var(--text-primary)]">
-              {mode === 'login' ? 'Sign in to NeuFin' : 'Create your NeuFin account'}
+              {mode === "login"
+                ? "Sign in to NeuFin"
+                : "Create your NeuFin account"}
             </h1>
             <p className="text-sm text-[var(--text-secondary)]">
               {hasPending
-                ? 'Sign in to save your portfolio analysis across devices.'
-                : 'Institutional-grade behavioral intelligence, one account.'}
+                ? "Sign in to save your portfolio analysis across devices."
+                : "Institutional-grade behavioral intelligence, one account."}
             </p>
           </div>
 
@@ -245,7 +271,12 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
 
           <form onSubmit={handlePassword} className="space-y-4">
             <div>
-              <label htmlFor="auth-email" className="block text-xs text-[var(--text-secondary)] mb-1.5">Email</label>
+              <label
+                htmlFor="auth-email"
+                className="block text-xs text-[var(--text-secondary)] mb-1.5"
+              >
+                Email
+              </label>
               <input
                 id="auth-email"
                 type="email"
@@ -258,7 +289,12 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
               />
             </div>
             <div>
-              <label htmlFor="auth-password" className="block text-xs text-[var(--text-secondary)] mb-1.5">Password</label>
+              <label
+                htmlFor="auth-password"
+                className="block text-xs text-[var(--text-secondary)] mb-1.5"
+              >
+                Password
+              </label>
               <input
                 id="auth-password"
                 type="password"
@@ -267,7 +303,9 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                autoComplete={
+                  mode === "login" ? "current-password" : "new-password"
+                }
                 className="w-full rounded-lg bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-amber"
               />
             </div>
@@ -281,27 +319,36 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
               >
                 {loading ? (
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : mode === 'login' ? (
-                  'Sign in'
+                ) : mode === "login" ? (
+                  "Sign in"
                 ) : (
-                  'Create account'
+                  "Create account"
                 )}
               </motion.button>
             </motion.div>
           </form>
 
-          <motion.div layout className="text-center text-sm text-[var(--text-secondary)]">
-            {mode === 'login' ? (
+          <motion.div
+            layout
+            className="text-center text-sm text-[var(--text-secondary)]"
+          >
+            {mode === "login" ? (
               <>
-                Don&apos;t have an account?{' '}
-                <Link href={`/signup${next !== '/dashboard' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-primary font-medium hover:underline">
+                Don&apos;t have an account?{" "}
+                <Link
+                  href={`/signup${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}
+                  className="text-primary font-medium hover:underline"
+                >
                   Sign up
                 </Link>
               </>
             ) : (
               <>
-                Already have an account?{' '}
-                <Link href={`/login${next !== '/dashboard' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-primary font-medium hover:underline">
+                Already have an account?{" "}
+                <Link
+                  href={`/login${next !== "/dashboard" ? `?next=${encodeURIComponent(next)}` : ""}`}
+                  className="text-primary font-medium hover:underline"
+                >
                   Sign in
                 </Link>
               </>
@@ -309,19 +356,25 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
           </motion.div>
 
           <p className="text-center text-xs text-[var(--text-muted)]">
-            By continuing you agree to our{' '}
-            <Link href="/privacy" className="text-[var(--text-secondary)] underline underline-offset-2 hover:text-[var(--text-primary)]">
+            By continuing you agree to our{" "}
+            <Link
+              href="/privacy"
+              className="text-[var(--text-secondary)] underline underline-offset-2 hover:text-[var(--text-primary)]"
+            >
               Privacy Policy
             </Link>
           </p>
         </GlassCard>
 
         <p className="text-center mt-6">
-          <Link href="/" className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]">
+          <Link
+            href="/"
+            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+          >
             ← Back to home
           </Link>
         </p>
       </motion.div>
     </div>
-  )
+  );
 }

@@ -2,7 +2,6 @@
 export default function DashboardSkeleton() {
   return (
     <div className="max-w-screen-xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-
       {/* Portfolio value line chart */}
       <div className="data-card border border-[#E2E8F0] rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
@@ -17,7 +16,6 @@ export default function DashboardSkeleton() {
 
       {/* Three-column row */}
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-4">
-
         {/* Holdings list */}
         <div className="data-card border border-[#E2E8F0] rounded-xl p-5 flex flex-col gap-3">
           <div className="shimmer h-3 w-24 rounded" />
@@ -68,5 +66,5 @@ export default function DashboardSkeleton() {
         <div className="shimmer h-48 rounded-lg" />
       </div>
     </div>
-  )
+  );
 }

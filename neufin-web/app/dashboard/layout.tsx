@@ -1,13 +1,17 @@
-import { DashboardShell } from '@/components/dashboard/DashboardShell'
-import { OnboardingGate } from '@/components/OnboardingGate'
-import { getResearchRegime } from '@/lib/api'
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { OnboardingGate } from "@/components/OnboardingGate";
+import { getResearchRegime } from "@/lib/api";
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  let regime: unknown = null
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  let regime: unknown = null;
   try {
-    regime = await getResearchRegime()
+    regime = await getResearchRegime();
   } catch {
-    regime = null
+    regime = null;
   }
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-app">
@@ -16,5 +20,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {children}
       </DashboardShell>
     </div>
-  )
+  );
 }

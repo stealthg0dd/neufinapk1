@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 /**
  * Drop this into any page that might receive a ?ref= parameter
@@ -7,19 +7,19 @@
  *
  * Usage: <RefCapture />
  */
-import { Suspense, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { captureReferral } from '@/lib/api'
+import { Suspense, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { captureReferral } from "@/lib/api";
 
 function RefCaptureInner() {
-  const searchParams = useSearchParams()
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const ref = searchParams.get('ref')
-    if (ref) captureReferral(ref)
-  }, [searchParams])
+    const ref = searchParams.get("ref");
+    if (ref) captureReferral(ref);
+  }, [searchParams]);
 
-  return null
+  return null;
 }
 
 export default function RefCapture() {
@@ -27,5 +27,5 @@ export default function RefCapture() {
     <Suspense fallback={null}>
       <RefCaptureInner />
     </Suspense>
-  )
+  );
 }

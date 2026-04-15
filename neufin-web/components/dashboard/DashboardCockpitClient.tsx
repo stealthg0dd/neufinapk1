@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { motion } from 'framer-motion'
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   Activity,
   AlertTriangle,
@@ -11,104 +11,130 @@ import {
   Dna,
   TrendingUp,
   UploadCloud,
-} from 'lucide-react'
-import { KPICard } from '@/components/ui/KPICard'
-import ResearchFeedClient from '@/components/dashboard/ResearchFeedClient'
-import { usePortfolioDNA } from '@/hooks/usePortfolioDNA'
-import { useState } from 'react'
+} from "lucide-react";
+import { KPICard } from "@/components/ui/KPICard";
+import ResearchFeedClient from "@/components/dashboard/ResearchFeedClient";
+import { usePortfolioDNA } from "@/hooks/usePortfolioDNA";
+import { useState } from "react";
 
 export type CockpitNote = {
-  id: string
-  title: string
-  executive_summary: string
-  confidence_score?: number
-  generated_at: string
-  note_type?: string
-}
+  id: string;
+  title: string;
+  executive_summary: string;
+  confidence_score?: number;
+  generated_at: string;
+  note_type?: string;
+};
 
 export type RegimePayload = {
-  current?: { regime?: string; confidence?: number }
-}
+  current?: { regime?: string; confidence?: number };
+};
 
 function formatRegimeLabel(raw: string) {
-  return raw.replace(/_/g, ' ')
+  return raw.replace(/_/g, " ");
 }
 
-function regimeKpiVariant(regime: string): 'risk' | 'positive' | 'warning' {
-  const u = regime.toLowerCase()
-  if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession')) return 'risk'
-  if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery')) return 'positive'
-  return 'warning'
+function regimeKpiVariant(regime: string): "risk" | "positive" | "warning" {
+  const u = regime.toLowerCase();
+  if (
+    u.includes("risk_off") ||
+    u.includes("risk-off") ||
+    u.includes("recession")
+  )
+    return "risk";
+  if (u.includes("risk_on") || u.includes("risk-on") || u.includes("recovery"))
+    return "positive";
+  return "warning";
 }
 
-function dnaVariant(score: number | null): 'positive' | 'warning' | 'risk' {
-  if (score == null) return 'risk'
-  if (score > 70) return 'positive'
-  if (score > 50) return 'warning'
-  return 'risk'
+function dnaVariant(score: number | null): "positive" | "warning" | "risk" {
+  if (score == null) return "risk";
+  if (score > 70) return "positive";
+  if (score > 50) return "warning";
+  return "risk";
 }
 
 function countNotesThisWeek(notes: CockpitNote[]) {
-  const weekAgo = Date.now() - 7 * 86400000
-  return notes.filter((n) => new Date(n.generated_at).getTime() >= weekAgo).length
+  const weekAgo = Date.now() - 7 * 86400000;
+  return notes.filter((n) => new Date(n.generated_at).getTime() >= weekAgo)
+    .length;
 }
 
 function behavioralSignals(regimeRaw: string, hasPortfolio: boolean) {
-  const rl = regimeRaw.toLowerCase()
-  const riskOff = rl.includes('risk_off') || rl.includes('risk-off') || rl.includes('recession')
-  const signals: Array<{ key: string; bias: string; evidence: string; positive?: boolean }> = []
+  const rl = regimeRaw.toLowerCase();
+  const riskOff =
+    rl.includes("risk_off") ||
+    rl.includes("risk-off") ||
+    rl.includes("recession");
+  const signals: Array<{
+    key: string;
+    bias: string;
+    evidence: string;
+    positive?: boolean;
+  }> = [];
   if (riskOff) {
     signals.push({
-      key: 'recency',
-      bias: 'Recency Bias Risk',
-      evidence: 'Recent risk-off shift may trigger loss aversion',
+      key: "recency",
+      bias: "Recency Bias Risk",
+      evidence: "Recent risk-off shift may trigger loss aversion",
       positive: false,
-    })
+    });
   }
   if (!hasPortfolio) {
     signals.push({
-      key: 'anchor',
-      bias: 'Anchoring Gap',
-      evidence: 'No current portfolio baseline — decisions lack context',
+      key: "anchor",
+      bias: "Anchoring Gap",
+      evidence: "No current portfolio baseline — decisions lack context",
       positive: false,
-    })
+    });
   }
   signals.push({
-    key: 'regime',
-    bias: 'Market Regime Active',
+    key: "regime",
+    bias: "Market Regime Active",
     evidence: `Current ${formatRegimeLabel(regimeRaw)} regime affects optimal allocation`,
     positive: true,
-  })
-  return signals
+  });
+  return signals;
 }
 
 export default function DashboardCockpitClient({
   regimeData,
   researchNotes,
 }: {
-  regimeData: RegimePayload
-  researchNotes: CockpitNote[]
+  regimeData: RegimePayload;
+  researchNotes: CockpitNote[];
 }) {
-  const { loading: dnaLoading, score, hasPortfolio } = usePortfolioDNA()
-  const [marketTab, setMarketTab] = useState<'S&P 500' | 'NASDAQ' | 'STI' | 'FTSE'>('S&P 500')
+  const { loading: dnaLoading, score, hasPortfolio } = usePortfolioDNA();
+  const [marketTab, setMarketTab] = useState<
+    "S&P 500" | "NASDAQ" | "STI" | "FTSE"
+  >("S&P 500");
 
-  const notes = researchNotes ?? []
+  const notes = researchNotes ?? [];
 
-  const regimeRaw = regimeData.current?.regime ?? 'Unknown'
-  const regimeLabel = formatRegimeLabel(regimeRaw)
-  const confidence = Math.max(0, Math.min(1, regimeData.current?.confidence ?? 0))
-  const variant = regimeKpiVariant(regimeRaw)
+  const regimeRaw = regimeData.current?.regime ?? "Unknown";
+  const regimeLabel = formatRegimeLabel(regimeRaw);
+  const confidence = Math.max(
+    0,
+    Math.min(1, regimeData.current?.confidence ?? 0),
+  );
+  const variant = regimeKpiVariant(regimeRaw);
 
-  const notesThisWeek = countNotesThisWeek(notes)
+  const notesThisWeek = countNotesThisWeek(notes);
 
   const researchSubLabel =
     notesThisWeek > 0
-      ? { change: notesThisWeek as number | undefined, changeLabel: 'this week' as string | undefined }
+      ? {
+          change: notesThisWeek as number | undefined,
+          changeLabel: "this week" as string | undefined,
+        }
       : notes.length > 0
-        ? { change: undefined as number | undefined, changeLabel: 'No new notes this week' as string | undefined }
-        : { change: undefined, changeLabel: undefined }
+        ? {
+            change: undefined as number | undefined,
+            changeLabel: "No new notes this week" as string | undefined,
+          }
+        : { change: undefined, changeLabel: undefined };
 
-  const signals = behavioralSignals(regimeRaw, hasPortfolio)
+  const signals = behavioralSignals(regimeRaw, hasPortfolio);
 
   return (
     <div>
@@ -124,11 +150,11 @@ export default function DashboardCockpitClient({
           <div className="flex gap-2 overflow-x-auto pb-1">
             <span
               className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-medium ${
-                variant === 'risk'
-                  ? 'bg-risk/10 text-risk'
-                  : variant === 'positive'
-                    ? 'bg-positive/10 text-positive'
-                    : 'bg-warning/10 text-warning'
+                variant === "risk"
+                  ? "bg-risk/10 text-risk"
+                  : variant === "positive"
+                    ? "bg-positive/10 text-positive"
+                    : "bg-warning/10 text-warning"
               }`}
             >
               Regime → {regimeLabel}
@@ -163,8 +189,10 @@ export default function DashboardCockpitClient({
         />
         <KPICard
           title="Portfolio DNA"
-          value={dnaLoading ? '—' : typeof score === 'number' ? score : '—'}
-          changeLabel={!dnaLoading && !hasPortfolio ? 'Upload to analyze' : undefined}
+          value={dnaLoading ? "—" : typeof score === "number" ? score : "—"}
+          changeLabel={
+            !dnaLoading && !hasPortfolio ? "Upload to analyze" : undefined
+          }
           variant={dnaVariant(score)}
           loading={dnaLoading}
           icon={<Dna className="h-4 w-4" />}
@@ -211,32 +239,39 @@ export default function DashboardCockpitClient({
               <h3 className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
                 Market overview
               </h3>
-              <span className="text-sm text-muted-foreground">Index tabs (fallback mode)</span>
+              <span className="text-sm text-muted-foreground">
+                Index tabs (fallback mode)
+              </span>
             </div>
             <div className="mb-4 flex flex-wrap gap-2">
-              {(['S&P 500', 'NASDAQ', 'STI', 'FTSE'] as const).map((tab) => {
-                const active = tab === marketTab
+              {(["S&P 500", "NASDAQ", "STI", "FTSE"] as const).map((tab) => {
+                const active = tab === marketTab;
                 return (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setMarketTab(tab)}
                     className={[
-                      'rounded px-2 py-1 font-mono text-sm',
-                      active ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground',
-                    ].join(' ')}
+                      "rounded px-2 py-1 font-mono text-sm",
+                      active
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-foreground",
+                    ].join(" ")}
                     title="Index endpoint unavailable, showing regime-confidence fallback"
                   >
                     {tab}
                   </button>
-                )
+                );
               })}
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">{regimeLabel}</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {regimeLabel}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {marketTab} data endpoint unavailable — showing live regime confidence fallback
+                  {marketTab} data endpoint unavailable — showing live regime
+                  confidence fallback
                 </p>
               </div>
               <p className="shrink-0 font-mono text-sm tabular-nums text-foreground">
@@ -246,7 +281,11 @@ export default function DashboardCockpitClient({
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
               <div
                 className={`h-full rounded-full ${
-                  variant === 'risk' ? 'bg-risk' : variant === 'positive' ? 'bg-positive' : 'bg-warning'
+                  variant === "risk"
+                    ? "bg-risk"
+                    : variant === "positive"
+                      ? "bg-positive"
+                      : "bg-warning"
                 }`}
                 style={{ width: `${Math.round(confidence * 100)}%` }}
               />
@@ -260,9 +299,12 @@ export default function DashboardCockpitClient({
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <UploadCloud className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="mb-1 text-sm font-semibold text-foreground">Analyze Your Portfolio</h3>
+              <h3 className="mb-1 text-sm font-semibold text-foreground">
+                Analyze Your Portfolio
+              </h3>
               <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
-                Upload a CSV of your holdings for institutional-grade DNA scoring and AI-powered risk analysis.
+                Upload a CSV of your holdings for institutional-grade DNA
+                scoring and AI-powered risk analysis.
               </p>
               <Link
                 href="/dashboard/portfolio"
@@ -279,9 +321,11 @@ export default function DashboardCockpitClient({
                 Portfolio DNA
               </p>
               <p className="font-finance mt-2 text-3xl font-semibold tabular-nums text-foreground">
-                {typeof score === 'number' ? score : '—'}
+                {typeof score === "number" ? score : "—"}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">Latest score from your holdings</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Latest score from your holdings
+              </p>
               <Link
                 href="/dashboard/portfolio"
                 className="mt-3 inline-block text-sm text-primary hover:underline"
@@ -317,8 +361,12 @@ export default function DashboardCockpitClient({
                     <AlertTriangle className="mt-0.5 h-[13px] w-[13px] shrink-0 text-warning" />
                   )}
                   <div>
-                    <p className="text-sm font-medium text-foreground">{s.bias}</p>
-                    <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{s.evidence}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {s.bias}
+                    </p>
+                    <p className="mt-0.5 text-sm leading-snug text-muted-foreground">
+                      {s.evidence}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -327,5 +375,5 @@ export default function DashboardCockpitClient({
         </aside>
       </motion.div>
     </div>
-  )
+  );
 }

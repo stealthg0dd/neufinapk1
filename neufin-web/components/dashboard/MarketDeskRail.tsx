@@ -1,138 +1,151 @@
-'use client'
+"use client";
 
-import { useEffect, useMemo, useState } from 'react'
-import { Bot, ChevronLeft, Loader2, Send } from 'lucide-react'
-import { apiGet, apiPost } from '@/lib/api-client'
+import { useEffect, useMemo, useState } from "react";
+import { Bot, ChevronLeft, Loader2, Send } from "lucide-react";
+import { apiGet, apiPost } from "@/lib/api-client";
 
 type ChatMessage = {
-  id: string
-  role: 'user' | 'assistant'
-  text: string
-}
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+};
 
 const STARTER_PROMPTS = [
-  'What is the current market regime?',
-  'What are the risks in my portfolio?',
-  'What should I focus on today?',
-] as const
+  "What is the current market regime?",
+  "What are the risks in my portfolio?",
+  "What should I focus on today?",
+] as const;
 
 export function MarketDeskRail({
   open,
   onToggle,
 }: {
-  open: boolean
-  onToggle: () => void
+  open: boolean;
+  onToggle: () => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      id: 'welcome',
-      role: 'assistant',
-      text: 'Market Desk is ready. Ask for today’s regime, risks, or portfolio priorities.',
+      id: "welcome",
+      role: "assistant",
+      text: "Market Desk is ready. Ask for today’s regime, risks, or portfolio priorities.",
     },
-  ])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   /** Prefer latest swarm report; else DNA positions from localStorage for grounded MD chat */
   const [chatContext, setChatContext] = useState<
-    | { kind: 'record'; recordId: string }
+    | { kind: "record"; recordId: string }
     | {
-        kind: 'portfolio'
+        kind: "portfolio";
         positions: Array<{
-          symbol: string
-          shares: number
-          price: number
-          value: number
-          weight: number
-        }>
-        totalValue: number
+          symbol: string;
+          shares: number;
+          price: number;
+          value: number;
+          weight: number;
+        }>;
+        totalValue: number;
       }
-    | { kind: 'none' }
-  >({ kind: 'none' })
+    | { kind: "none" }
+  >({ kind: "none" });
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        const r = await apiGet<{ found?: boolean; report?: { id?: string } | null }>(
-          '/api/swarm/report/latest',
-        )
-        if (cancelled) return
+        const r = await apiGet<{
+          found?: boolean;
+          report?: { id?: string } | null;
+        }>("/api/swarm/report/latest");
+        if (cancelled) return;
         if (r?.report?.id) {
-          setChatContext({ kind: 'record', recordId: r.report.id })
-          return
+          setChatContext({ kind: "record", recordId: r.report.id });
+          return;
         }
       } catch {
         /* unauthenticated or no report */
       }
       try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('dnaResult') : null
-        if (!raw) return
+        const raw =
+          typeof localStorage !== "undefined"
+            ? localStorage.getItem("dnaResult")
+            : null;
+        if (!raw) return;
         const p = JSON.parse(raw) as {
-          positions?: Array<Record<string, unknown>>
-          total_value?: number
-        }
+          positions?: Array<Record<string, unknown>>;
+          total_value?: number;
+        };
         const positions = (p.positions ?? []).map((x) => ({
-          symbol: String(x.symbol ?? ''),
+          symbol: String(x.symbol ?? ""),
           shares: Number(x.shares ?? 0),
           price: Number(x.price ?? 0),
           value: Number(x.value ?? 0),
           weight: Number(x.weight ?? 0),
-        }))
+        }));
         const totalValue = Number(
           p.total_value ?? positions.reduce((s, x) => s + x.value, 0),
-        )
-        if (cancelled || !positions.length) return
-        setChatContext({ kind: 'portfolio', positions, totalValue })
+        );
+        if (cancelled || !positions.length) return;
+        setChatContext({ kind: "portfolio", positions, totalValue });
       } catch {
         /* ignore */
       }
-    })()
+    })();
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
-  const canSend = input.trim().length > 0 && !loading
+  const canSend = input.trim().length > 0 && !loading;
 
-  const widthClass = open ? 'w-[320px]' : 'w-12'
+  const widthClass = open ? "w-[320px]" : "w-12";
 
   const sendMessage = async (raw: string) => {
-    const text = raw.trim()
-    if (!text || loading) return
-    const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: 'user', text }
-    setMessages((prev) => [...prev, userMsg])
-    setInput('')
-    setLoading(true)
+    const text = raw.trim();
+    if (!text || loading) return;
+    const userMsg: ChatMessage = { id: `u-${Date.now()}`, role: "user", text };
+    setMessages((prev) => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
     try {
-      const payload: Record<string, unknown> = { message: text }
-      if (chatContext.kind === 'record') {
-        payload.record_id = chatContext.recordId
-      } else if (chatContext.kind === 'portfolio') {
-        payload.positions = chatContext.positions
-        payload.total_value = chatContext.totalValue
+      const payload: Record<string, unknown> = { message: text };
+      if (chatContext.kind === "record") {
+        payload.record_id = chatContext.recordId;
+      } else if (chatContext.kind === "portfolio") {
+        payload.positions = chatContext.positions;
+        payload.total_value = chatContext.totalValue;
       }
-      const data = await apiPost<Record<string, unknown>>('/api/swarm/chat', payload)
+      const data = await apiPost<Record<string, unknown>>(
+        "/api/swarm/chat",
+        payload,
+      );
       const reply =
-        (typeof data.reply === 'string' && data.reply) ||
-        (typeof data.answer === 'string' && data.answer) ||
-        (typeof data.message === 'string' && data.message) ||
-        'Market Desk could not parse a response right now.'
-      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'assistant', text: reply }])
+        (typeof data.reply === "string" && data.reply) ||
+        (typeof data.answer === "string" && data.answer) ||
+        (typeof data.message === "string" && data.message) ||
+        "Market Desk could not parse a response right now.";
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: "assistant", text: reply },
+      ]);
     } catch {
       setMessages((prev) => [
         ...prev,
         {
           id: `a-${Date.now()}`,
-          role: 'assistant',
-          text: 'I hit a temporary issue. Please try again in a few seconds.',
+          role: "assistant",
+          text: "I hit a temporary issue. Please try again in a few seconds.",
         },
-      ])
+      ]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const title = useMemo(() => (open ? 'Market Desk · Ask anything' : 'Open Market Desk'), [open])
+  const title = useMemo(
+    () => (open ? "Market Desk · Ask anything" : "Open Market Desk"),
+    [open],
+  );
 
   return (
     <aside
@@ -145,13 +158,19 @@ export function MarketDeskRail({
         className="m-2 flex h-8 items-center justify-center rounded-md border border-border/60 text-muted-foreground hover:text-foreground"
         aria-label={title}
       >
-        {open ? <ChevronLeft className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+        {open ? (
+          <ChevronLeft className="h-4 w-4" />
+        ) : (
+          <Bot className="h-4 w-4" />
+        )}
       </button>
 
       {open ? (
         <div className="flex min-h-0 flex-1 flex-col px-3 pb-3">
           <div className="mb-2 px-1">
-            <h3 className="text-sm font-semibold text-foreground">Market Desk · Ask anything</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Market Desk · Ask anything
+            </h3>
           </div>
 
           <div className="mb-2 flex flex-wrap gap-1">
@@ -172,9 +191,9 @@ export function MarketDeskRail({
               <div
                 key={m.id}
                 className={`rounded-md px-2.5 py-2 text-sm leading-relaxed ${
-                  m.role === 'assistant'
-                    ? 'bg-primary/10 text-foreground'
-                    : 'bg-surface-2 text-foreground'
+                  m.role === "assistant"
+                    ? "bg-primary/10 text-foreground"
+                    : "bg-surface-2 text-foreground"
                 }`}
               >
                 {m.text}
@@ -191,8 +210,8 @@ export function MarketDeskRail({
           <form
             className="mt-2 flex items-center gap-2"
             onSubmit={(e) => {
-              e.preventDefault()
-              void sendMessage(input)
+              e.preventDefault();
+              void sendMessage(input);
             }}
           >
             <input
@@ -213,5 +232,5 @@ export function MarketDeskRail({
         </div>
       ) : null}
     </aside>
-  )
+  );
 }
