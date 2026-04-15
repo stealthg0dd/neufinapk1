@@ -822,16 +822,39 @@ span:not(.badge):not(.chip) {
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* ── Light glassmorphism card (landing hero overlays) ── */
+/* ── Light glassmorphism card (landing hero overlays, product demo chat) ── */
 .glass-card-light {
   background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border: 1px solid rgba(30, 184, 204, 0.22);
   border-radius: 14px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+@keyframes landing-grid-shift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 48px 48px;
+  }
+}
+
+.landing-animated-grid {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: landing-grid-shift 48s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-animated-grid {
+    animation: none;
+  }
 }
 
 /* Landing hero — refined glass floating badges */
