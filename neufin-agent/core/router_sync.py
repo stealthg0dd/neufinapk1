@@ -23,6 +23,7 @@ _API_KEY = settings.AGENT_OS_API_KEY
 _HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {_API_KEY}",
+    "x-api-key": _API_KEY,
 }
 _VERSION: str = (
     os.getenv("GIT_COMMIT_SHA")

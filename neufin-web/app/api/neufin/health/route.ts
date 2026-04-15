@@ -13,7 +13,7 @@
 
 import { NextResponse } from "next/server"
 
-const BASE = (process.env.AGENT_OS_URL ?? "https://ctech-production.up.railway.app").replace(/\/$/, "")
+const BASE = (process.env.AGENT_OS_URL ?? "").replace(/\/$/, "")
 const KEY  = process.env.AGENT_OS_API_KEY ?? ""
 
 const NEUFIN_REPOS = ["neufin-backend", "neufin-web", "neufin-mobile", "neufin-agent"] as const
@@ -57,10 +57,10 @@ export interface NeuFinHealthData {
 }
 
 async function safeGet<T>(path: string, fallback: T): Promise<T> {
-  if (!KEY) return fallback
+  if (!BASE || !KEY) return fallback
   try {
     const res = await fetch(`${BASE}${path}`, {
-      headers: { "x-api-key": KEY },
+      headers: { "x-api-key": KEY, Authorization: `Bearer ${KEY}` },
       cache: "no-store",
       signal: AbortSignal.timeout(8_000),
     })
@@ -81,7 +81,7 @@ function classifyStatus(lastSeen: string | null): "live" | "stale" | "offline" {
 }
 
 export async function GET() {
-  if (!KEY) {
+  if (!BASE || !KEY) {
     // Return degraded-but-valid response so UI renders without crashing
     const offlineRepos: RepoHeartbeat[] = NEUFIN_REPOS.map((repo) => ({
       repo_id: repo, status: "offline", last_seen: null, version: null, environment: null,
@@ -92,7 +92,7 @@ export async function GET() {
       top_findings: [],
       deployments: NEUFIN_REPOS.map((r) => ({ repo_id: r, deployed_at: null, commit_sha: null, commit_msg: null, deployed_by: null })),
       error_rate: { unresolved_critical: 0, unresolved_high: 0 },
-      _warning: "AGENT_OS_API_KEY not configured — data unavailable",
+      _warning: "AGENT_OS_URL and AGENT_OS_API_KEY must both be set — data unavailable",
     } satisfies NeuFinHealthData & { _warning: string })
   }
 

@@ -151,6 +151,14 @@ _heartbeat_task: asyncio.Task | None = None
 _heartbeat_422_logged = False
 
 
+def _agent_os_headers(api_key: str) -> dict[str, str]:
+    """Auth headers accepted by different Agent OS / router-system builds."""
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "x-api-key": api_key,
+    }
+
+
 def _first_present_env(*names: str) -> str:
     """Return first env name that is present/non-empty, else MISSING."""
     for name in names:
@@ -162,6 +170,10 @@ def _first_present_env(*names: str) -> str:
 
 async def _register_with_router_system() -> None:
     """POST service registration to the Agent OS router-system on startup."""
+    base = (settings.AGENT_OS_URL or "").strip().rstrip("/")
+    if not base:
+        logger.info("router_system.skip", reason="AGENT_OS_URL not set")
+        return
     if not settings.AGENT_OS_API_KEY:
         logger.info("router_system.skip", reason="AGENT_OS_API_KEY not set")
         return
@@ -170,22 +182,26 @@ async def _register_with_router_system() -> None:
     payload = {
         "repo_id": "neufin-backend",
         "service_name": "NeuFin Backend API",
-        "health_url": f"{settings.APP_BASE_URL}/health",
+        "health_url": f"{settings.APP_BASE_URL.rstrip('/')}/health",
         "base_url": settings.APP_BASE_URL,
         "version": settings.GIT_COMMIT_SHA,
         "environment": settings.ENVIRONMENT,
     }
+    path = settings.AGENT_OS_REGISTER_PATH.strip()
+    if not path.startswith("/"):
+        path = "/" + path
+    url = f"{base}{path}"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                f"{settings.AGENT_OS_URL}/api/register",
+                url,
                 json=payload,
-                headers={"x-api-key": settings.AGENT_OS_API_KEY},
+                headers=_agent_os_headers(settings.AGENT_OS_API_KEY),
             )
             resp.raise_for_status()
-            logger.info("router_system.registered", status=resp.status_code)
+            logger.info("router_system.registered", status=resp.status_code, url=url)
     except Exception as exc:
-        logger.warning("router_system.register_failed", error=str(exc))
+        logger.warning("router_system.register_failed", error=str(exc), url=url)
 
 
 async def _heartbeat_loop() -> None:
@@ -194,9 +210,15 @@ async def _heartbeat_loop() -> None:
 
     global _heartbeat_422_logged
 
+    base = (settings.AGENT_OS_URL or "").strip().rstrip("/")
+    hb_path = settings.AGENT_OS_HEARTBEAT_PATH.strip()
+    if not hb_path.startswith("/"):
+        hb_path = "/" + hb_path
+    heartbeat_url = f"{base}{hb_path}" if base else ""
+
     while True:
         await asyncio.sleep(60)
-        if not settings.AGENT_OS_API_KEY:
+        if not base or not settings.AGENT_OS_API_KEY:
             continue
         try:
             payload = {
@@ -210,9 +232,9 @@ async def _heartbeat_loop() -> None:
             }
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
-                    f"{settings.AGENT_OS_URL}/api/heartbeat/neufin-backend",
+                    heartbeat_url,
                     json=payload,
-                    headers={"x-api-key": settings.AGENT_OS_API_KEY},
+                    headers=_agent_os_headers(settings.AGENT_OS_API_KEY),
                 )
                 if resp.status_code == 422:
                     if not _heartbeat_422_logged:
@@ -224,10 +246,33 @@ async def _heartbeat_loop() -> None:
                 else:
                     resp.raise_for_status()
                     logger.debug(
-                        "router_system.heartbeat_sent", status=resp.status_code
+                        "router_system.heartbeat_sent",
+                        status=resp.status_code,
+                        url=heartbeat_url,
                     )
+        except httpx.HTTPStatusError as exc:
+            detail = (exc.response.text or "")[:300]
+            hint = None
+            if exc.response.status_code == 404 and "Application not found" in detail:
+                hint = (
+                    "Railway returned 'Application not found' — AGENT_OS_URL is not a live "
+                    "router-system deployment. Set AGENT_OS_URL (and AGENT_OS_HEARTBEAT_PATH if needed) "
+                    "to your Agent OS service URL."
+                )
+            logger.warning(
+                "router_system.heartbeat_failed",
+                error=str(exc),
+                url=heartbeat_url,
+                status=exc.response.status_code,
+                detail=detail or None,
+                hint=hint,
+            )
         except Exception as exc:
-            logger.warning("router_system.heartbeat_failed", error=str(exc))
+            logger.warning(
+                "router_system.heartbeat_failed",
+                error=str(exc),
+                url=heartbeat_url or None,
+            )
 
 
 # ── FastAPI lifespan ──────────────────────────────────────────────────────────

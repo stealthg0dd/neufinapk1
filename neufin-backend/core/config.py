@@ -268,8 +268,12 @@ class Settings(BaseSettings):
 
     # ── Agent OS / router-system ──────────────────────────────────────────────
     AGENT_OS_URL: str = Field(
-        default="https://ctech-production.up.railway.app",
-        description="Agent OS base URL for service registration and heartbeats.",
+        default="",
+        description=(
+            "Agent OS / router-system base URL (no trailing slash), e.g. the Railway URL of the "
+            "router app. Leave empty to skip registration + heartbeats. "
+            "Do not point at a dead hostname — Railway returns 404 Application not found."
+        ),
     )
     AGENT_OS_API_KEY: str | None = Field(
         default=None,
@@ -277,7 +281,21 @@ class Settings(BaseSettings):
             "AGENT_OS_API_KEY",
             "ROUTER_SECRET_KEY",
         ),
-        description="API key for the Agent OS router-system. Provided by the AgentOS administrator.",
+        description=(
+            "Machine credential for the Agent OS router-system (not the Supabase service_role key). "
+            "Sent as Authorization: Bearer … and x-api-key for compatibility with router builds."
+        ),
+    )
+    AGENT_OS_REGISTER_PATH: str = Field(
+        default="/api/register",
+        description="POST path for service registration (appended to AGENT_OS_URL).",
+    )
+    AGENT_OS_HEARTBEAT_PATH: str = Field(
+        default="/api/heartbeat/neufin-backend",
+        description=(
+            "POST path for this service's heartbeat (appended to AGENT_OS_URL). "
+            "Override if your router exposes a different route (see repositories.yaml / ui_router)."
+        ),
     )
 
     # ── Git / deployment metadata ─────────────────────────────────────────────

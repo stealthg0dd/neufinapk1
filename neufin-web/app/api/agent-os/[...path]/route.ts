@@ -24,6 +24,7 @@ async function proxy(req: NextRequest, { params }: { params: Promise<{ path: str
   const headers: Record<string, string> = {
     'content-type': req.headers.get('content-type') || 'application/json',
     'x-api-key': AGENT_OS_KEY,
+    ...(AGENT_OS_KEY ? { Authorization: `Bearer ${AGENT_OS_KEY}` } : {}),
   }
 
   const body = req.method !== 'GET' && req.method !== 'HEAD'
