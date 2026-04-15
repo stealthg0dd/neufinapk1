@@ -143,7 +143,9 @@ def _fetch_full_history(sym: str) -> pd.Series:
 
         _av_msg = payload.get("Information", "") or payload.get("Note", "")
         if _av_msg:
-            _reason = "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
+            _reason = (
+                "premium endpoint" if "premium" in _av_msg.lower() else "rate-limit"
+            )
             logger.warning("stress_tester.av_blocked", symbol=sym_upper, reason=_reason)
             return _fetch_full_history_fallback(sym_upper)
 
@@ -165,7 +167,9 @@ def _fetch_full_history(sym: str) -> pd.Series:
         return series
 
     except Exception as e:
-        logger.warning("stress_tester.full_history_failed", symbol=sym_upper, error=str(e))
+        logger.warning(
+            "stress_tester.full_history_failed", symbol=sym_upper, error=str(e)
+        )
         return pd.Series(dtype=float, name=sym_upper)
 
 
@@ -317,7 +321,8 @@ def run_stress_tests(
         negative = [
             p
             for p in per_sym
-            if p["weighted_contribution_pct"] is not None and p["weighted_contribution_pct"] < 0
+            if p["weighted_contribution_pct"] is not None
+            and p["weighted_contribution_pct"] < 0
         ]
         weakest_link: dict = {}
         if negative:
@@ -391,7 +396,9 @@ def run_stress_tests(
 def compute_factor_metrics(
     symbols: list[str],
     weights: dict[str, float],
-    beta_map: (dict[str, float] | None) = None,  # from quant_node — skip re-fetch if provided
+    beta_map: (
+        dict[str, float] | None
+    ) = None,  # from quant_node — skip re-fetch if provided
     days: int = 60,
 ) -> list[dict]:
     """
@@ -494,7 +501,8 @@ def _fetch_history_polygon(sym: str, start: str, end: str) -> pd.Series:
         if not results:
             return pd.Series(dtype=float, name=sym)
         closes = {
-            datetime.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"] for bar in results
+            datetime.date.fromtimestamp(bar["t"] / 1000).isoformat(): bar["c"]
+            for bar in results
         }
         series = pd.Series(closes, dtype=float)
         series.name = sym
@@ -642,9 +650,13 @@ async def get_index_performance(stress_dict: dict) -> dict[str, dict]:
 
         # Human-readable alpha gap
         if alpha_spy < 0:
-            alpha_clause = f"Portfolio underperformed SPY by {abs(alpha_spy):.1f}% during {label}"
+            alpha_clause = (
+                f"Portfolio underperformed SPY by {abs(alpha_spy):.1f}% during {label}"
+            )
         elif alpha_spy > 0:
-            alpha_clause = f"Portfolio outperformed SPY by {alpha_spy:.1f}% during {label}"
+            alpha_clause = (
+                f"Portfolio outperformed SPY by {alpha_spy:.1f}% during {label}"
+            )
         else:
             alpha_clause = f"Portfolio matched SPY during {label}"
 
@@ -765,7 +777,9 @@ class StressTester:
                 "spy_return_pct": benchmark["SPY"],
                 "qqq_return_pct": benchmark["QQQ"],
                 "benchmark_impact": benchmark,
-                "outperformance_vs_spy_pct": round(portfolio_impact * 100 - benchmark["SPY"], 2),
+                "outperformance_vs_spy_pct": round(
+                    portfolio_impact * 100 - benchmark["SPY"], 2
+                ),
             }
 
         return results
@@ -817,7 +831,9 @@ class StressTester:
                         "benchmark_impact", {"SPY": r["spy_return_pct"], "QQQ": 0.0}
                     ),
                     "data_coverage_pct": 100.0,
-                    "alpha_gap_spy": r.get("alpha_gap_spy", r["outperformance_vs_spy_pct"]),
+                    "alpha_gap_spy": r.get(
+                        "alpha_gap_spy", r["outperformance_vs_spy_pct"]
+                    ),
                     "alpha_gap_qqq": r.get("alpha_gap_qqq", 0.0),
                     "alpha_gap_narrative": r.get("alpha_gap_narrative", ""),
                     "md_narrative": (

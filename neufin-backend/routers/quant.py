@@ -61,7 +61,9 @@ async def analyze_quant(body: QuantAnalyzeBody, user=Depends(get_current_user)) 
         raise HTTPException(status_code=503, detail="Could not load positions") from exc
 
     positions_raw = pos_res.data or []
-    total_val = sum(float(r.get("value") or 0) for r in positions_raw if r.get("value") is not None)
+    total_val = sum(
+        float(r.get("value") or 0) for r in positions_raw if r.get("value") is not None
+    )
     positions: list[dict] = []
     for r in positions_raw:
         sym = (r.get("symbol") or "").strip()
@@ -71,7 +73,9 @@ async def analyze_quant(body: QuantAnalyzeBody, user=Depends(get_current_user)) 
         if w is not None:
             positions.append({"symbol": sym, "weight_pct": float(w)})
         elif total_val > 0 and r.get("value") is not None:
-            positions.append({"symbol": sym, "weight_pct": float(r["value"]) / total_val * 100.0})
+            positions.append(
+                {"symbol": sym, "weight_pct": float(r["value"]) / total_val * 100.0}
+            )
         else:
             positions.append({"symbol": sym, "weight_pct": 0.0})
     # Equal-weight fallback if weights missing

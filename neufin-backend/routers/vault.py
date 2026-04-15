@@ -145,7 +145,9 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         "usage": {
             **usage,
             "dna_limit": dna_limit,
-            "dna_remaining": (max(0, dna_limit - usage["dna_analyses"]) if dna_limit != -1 else -1),
+            "dna_remaining": (
+                max(0, dna_limit - usage["dna_analyses"]) if dna_limit != -1 else -1
+            ),
         },
         "advisor_name": data.get("advisor_name"),
         "firm_name": data.get("firm_name"),
@@ -189,7 +191,12 @@ async def get_vault_history(user: JWTUser = Depends(get_current_user), limit: in
     names: dict[str, str | None] = {}
     if pids:
         try:
-            pr = supabase.table("portfolios").select("id, name").in_("id", pids).execute()
+            pr = (
+                supabase.table("portfolios")
+                .select("id, name")
+                .in_("id", pids)
+                .execute()
+            )
             for p in pr.data or []:
                 names[str(p["id"])] = p.get("name")
         except Exception as e:
@@ -236,7 +243,9 @@ class ClaimRequest(BaseModel):
 
 
 @router.post("/claim")
-async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get_current_user)):
+async def claim_anonymous_record(
+    body: ClaimRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Associate an anonymous dna_scores record with the now-authenticated user.
     Only succeeds if the record currently has no user_id (prevents hijacking).
@@ -259,10 +268,14 @@ async def claim_anonymous_record(body: ClaimRequest, user: JWTUser = Depends(get
     if record.get("user_id") is not None:
         if record["user_id"] == uid:
             return {"claimed": True, "record_id": body.record_id}
-        raise HTTPException(409, "This record is already associated with another account.")
+        raise HTTPException(
+            409, "This record is already associated with another account."
+        )
 
     try:
-        supabase.table("dna_scores").update({"user_id": uid}).eq("id", body.record_id).execute()
+        supabase.table("dna_scores").update({"user_id": uid}).eq(
+            "id", body.record_id
+        ).execute()
         return {"claimed": True, "record_id": body.record_id}
     except Exception as e:
         raise HTTPException(500, f"Claim failed: {e}") from e
@@ -385,7 +398,9 @@ class PortalRequest(BaseModel):
 
 
 @router.post("/stripe-portal")
-async def create_stripe_portal(body: PortalRequest, user: JWTUser = Depends(get_current_user)):
+async def create_stripe_portal(
+    body: PortalRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Create a Stripe Customer Portal session so users can manage their subscription.
     Looks up the Stripe customer_id from user_profiles; creates one if missing.

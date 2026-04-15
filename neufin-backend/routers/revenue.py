@@ -32,7 +32,13 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 def _require_advisor_role(user: JWTUser) -> None:
     """Raise HTTP 403 if the user does not have role='advisor' in user_profiles."""
     try:
-        result = supabase.table("user_profiles").select("role").eq("id", user.id).single().execute()
+        result = (
+            supabase.table("user_profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single()
+            .execute()
+        )
         profile = result.data or {}
     except Exception as exc:
         logger.warning("revenue.role_check_failed", user_id=user.id, error=str(exc))
@@ -110,7 +116,9 @@ async def revenue_stats(user: JWTUser = Depends(get_current_user)):
     # ── Subscriber counts ─────────────────────────────────────────────────────
     active_count = trial_count = expired_count = 0
     try:
-        profiles_result = supabase.table("user_profiles").select("subscription_status").execute()
+        profiles_result = (
+            supabase.table("user_profiles").select("subscription_status").execute()
+        )
         for row in profiles_result.data or []:
             status = row.get("subscription_status", "")
             if status == "active":
@@ -134,7 +142,11 @@ async def revenue_stats(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
         advisor_ids = list(
-            {r["advisor_id"] for r in (reports_result.data or []) if r.get("advisor_id")}
+            {
+                r["advisor_id"]
+                for r in (reports_result.data or [])
+                if r.get("advisor_id")
+            }
         )
 
         # Bulk-fetch emails for those advisors

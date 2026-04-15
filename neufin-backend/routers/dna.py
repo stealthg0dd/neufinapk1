@@ -38,7 +38,9 @@ async def generate_dna_score(
     try:
         df = pd.read_csv(io.StringIO(contents.decode("utf-8")))
     except Exception:
-        raise HTTPException(status_code=400, detail="Could not parse CSV file.") from None
+        raise HTTPException(
+            status_code=400, detail="Could not parse CSV file."
+        ) from None
 
     positions = df.to_dict("records")
 
@@ -192,7 +194,11 @@ async def get_shared_dna(token: str):
     """Fetch a shared DNA score by token (increments view count)."""
     try:
         result = (
-            supabase.table("dna_scores").select("*").eq("share_token", token).single().execute()
+            supabase.table("dna_scores")
+            .select("*")
+            .eq("share_token", token)
+            .single()
+            .execute()
         )
     except Exception:
         raise HTTPException(status_code=404, detail="Share not found.") from None
@@ -203,9 +209,9 @@ async def get_shared_dna(token: str):
 
     # Increment view count
     try:
-        supabase.table("dna_scores").update({"view_count": (record.get("view_count") or 0) + 1}).eq(
-            "share_token", token
-        ).execute()
+        supabase.table("dna_scores").update(
+            {"view_count": (record.get("view_count") or 0) + 1}
+        ).eq("share_token", token).execute()
     except Exception:
         logger.warning("Failed to update view count", exc_info=True)
 
