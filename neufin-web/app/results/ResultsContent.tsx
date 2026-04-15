@@ -22,7 +22,7 @@ const REF_STORAGE_KEY = 'ref_token'
 
 
 const TYPE_COLORS: Record<string, string> = {
-  'Diversified Strategist': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  'Diversified Strategist': 'bg-primary/15 text-primary border-primary/30',
   'Conviction Growth':      'bg-purple-500/15 text-purple-300 border-purple-500/30',
   'Momentum Trader':        'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   'Defensive Allocator':    'bg-green-500/15 text-green-300 border-green-500/30',
@@ -85,7 +85,7 @@ function ScoreCircle({ score }: { score: number }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className="text-4xl font-extrabold" style={{ color }}>{score}</span>
-        <span className="text-xs text-shell-subtle uppercase tracking-widest">DNA Score</span>
+        <span className="text-xs text-gray-300 uppercase tracking-widest">DNA Score</span>
       </div>
     </div>
   )
@@ -227,7 +227,7 @@ export default function ResultsContent() {
   if (!result) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
@@ -305,8 +305,8 @@ export default function ResultsContent() {
         {!user && (
           <div className="bg-blue-950/60 border-b border-blue-800/40">
             <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
-              <p className="text-xs text-blue-300">Sign in to save your DNA score across devices</p>
-              <Link href="/auth" className="text-xs font-semibold text-blue-400 hover:text-blue-300 whitespace-nowrap">
+              <p className="text-xs text-primary">Sign in to save your DNA score across devices</p>
+              <Link href="/auth" className="text-xs font-semibold text-primary hover:text-primary whitespace-nowrap">
                 Sign in to save →
               </Link>
             </div>
@@ -393,7 +393,7 @@ export default function ResultsContent() {
 
             {/* ── Action plan ────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="card border-blue-800/40 bg-blue-950/20">
-              <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
               <p className="text-shell-fg leading-relaxed">{result.recommendation}</p>
             </motion.div>
 
@@ -427,7 +427,7 @@ export default function ResultsContent() {
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-1.5 bg-shell-raised rounded-full overflow-hidden min-w-[64px]">
                                 <div
-                                  className="h-full bg-blue-500 rounded-full"
+                                  className="h-full bg-primary rounded-full"
                                   style={{ width: `${Math.min(p.weight, 100)}%` }}
                                 />
                               </div>
@@ -456,7 +456,7 @@ export default function ResultsContent() {
                         <p className="font-medium text-white">{usd(p.value)}</p>
                         <div className="flex items-center gap-1.5 justify-end mt-1">
                           <div className="w-12 h-1.5 bg-shell-raised rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
+                            <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
                           </div>
                           <span className="text-xs text-shell-muted">{pct(p.weight)}</span>
                         </div>
@@ -625,7 +625,7 @@ export default function ResultsContent() {
                   </ul>
 
                   {fulfillLoading ? (
-                    <div className="flex items-center justify-center gap-2 text-sm text-blue-400 py-3">
+                    <div className="flex items-center justify-center gap-2 text-sm text-primary py-3">
                       <span className="inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
                       Generating your report…
                     </div>

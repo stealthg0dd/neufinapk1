@@ -178,7 +178,7 @@ export default function SEAWealthManagementAIArticle() {
               {
                 num: '01',
                 title: 'Robo-Advisory and Automated Portfolio Management',
-                color: 'text-blue-400',
+                color: 'text-primary',
                 content: 'Singapore\'s robo-advisory sector — led by StashAway, Syfe, and Endowus — manages over SGD 12 billion in combined AUM as of 2024. These platforms use AI for portfolio construction (Modern Portfolio Theory optimisation), automatic rebalancing, and risk-adjusted allocation. The next wave: personalised portfolio adjustments based on detected behavioral profiles, not just stated risk scores.',
               },
               {
@@ -252,7 +252,7 @@ export default function SEAWealthManagementAIArticle() {
               ['Regulatory convergence', 'ASEAN cross-border advisory frameworks will enable Singapore-domiciled AI platforms to serve clients across Malaysia, Indonesia, and Thailand from a single regulatory licence — dramatically expanding the addressable market.'],
             ].map(([title, desc]) => (
               <div key={title} className="flex items-start gap-3 p-4 rounded-lg border border-shell-border">
-                <span className="text-blue-400 mt-0.5 flex-shrink-0">→</span>
+                <span className="text-primary mt-0.5 flex-shrink-0">→</span>
                 <div>
                   <span className="font-semibold text-sm text-shell-fg">{title}: </span>
                   <span className="text-sm text-shell-muted">{desc}</span>
@@ -285,7 +285,7 @@ export default function SEAWealthManagementAIArticle() {
           </div>
         </section>
 
-        <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
+        <div className="mt-12 rounded-2xl border border-primary/20 bg-primary/5 p-8">
           <h2 className="text-xl font-bold mb-2">NeuFin: Singapore&apos;s Behavioral Finance Platform</h2>
           <p className="text-shell-muted text-sm mb-5">
             Founded 2025 in Singapore. Detects cognitive biases in investment portfolios

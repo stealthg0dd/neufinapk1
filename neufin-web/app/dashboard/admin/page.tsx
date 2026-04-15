@@ -26,9 +26,9 @@ type PlanFilter = "all" | "active" | "trial" | "expired"
 function planBadgeClass(status: string): string {
   switch (status) {
     case "active":  return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-    case "trial":   return "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+    case "trial":   return "bg-primary/15 text-primary border border-primary/30"
     case "expired": return "bg-red-500/15 text-red-400 border border-red-500/30"
-    default:        return "bg-shell-raised text-shell-muted"
+    default:        return "bg-[#F8FAFC] text-[#94A3B8]"
   }
 }
 
@@ -50,15 +50,15 @@ function trialEnds(startedAt: string | null): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-shell-raised ${className}`} />
+  return <div className={`animate-pulse rounded-md bg-[#F8FAFC] ${className}`} />
 }
 
 function StatCard({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-shell-border bg-shell p-4">
-      <p className="text-xs text-shell-subtle mb-1">{label}</p>
-      <p className="text-2xl font-bold tabular-nums text-shell-fg">{value}</p>
-      {sub && <p className="text-xs text-shell-subtle mt-1">{sub}</p>}
+    <div className="data-card rounded-xl">
+      <p className="text-xs text-[#94A3B8] mb-1">{label}</p>
+      <p className="text-2xl font-bold tabular-nums text-navy">{value}</p>
+      {sub && <p className="text-xs text-[#94A3B8] mt-1">{sub}</p>}
     </div>
   )
 }
@@ -101,32 +101,32 @@ function ExtendTrialModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-shell-border bg-shell p-6 space-y-4">
-        <h3 className="font-semibold text-shell-fg">Extend Trial</h3>
-        <p className="text-sm text-shell-muted">{user.email || user.id}</p>
+      <div className="w-full max-w-sm rounded-2xl border border-[#E2E8F0] bg-white p-6 space-y-4">
+        <h3 className="font-semibold text-navy">Extend Trial</h3>
+        <p className="text-sm text-[#64748B]">{user.email || user.id}</p>
         <div>
-          <label className="text-xs text-shell-subtle block mb-1.5">Days to add</label>
+          <label className="text-xs text-[#94A3B8] block mb-1.5">Days to add</label>
           <input
             type="number"
             min={1}
             max={365}
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2 text-sm text-shell-fg focus:outline-none focus:border-blue-500"
+            className="input-base"
           />
         </div>
         {err && <p className="text-xs text-red-400">{err}</p>}
         <div className="flex gap-3 justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border border-shell-border px-4 py-1.5 text-sm text-shell-muted hover:text-shell-fg transition-colors"
+            className="rounded-lg border border-[#E2E8F0] px-4 py-1.5 text-sm text-[#64748B] hover:text-navy transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50 transition-colors"
           >
             {loading ? "Saving…" : "Confirm"}
           </button>
@@ -228,14 +228,14 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-shell-deep text-shell-fg">
+    <div className="min-h-screen bg-transparent text-navy">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">User Admin</h1>
-            <p className="text-sm text-shell-muted mt-0.5">Internal ops panel · advisor or admin</p>
+            <p className="text-sm text-[#64748B] mt-0.5">Internal ops panel · advisor or admin</p>
           </div>
           <div className="text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 bg-amber-500/10">
             Internal use only — not visible to regular users
@@ -262,15 +262,15 @@ export default function AdminPage() {
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Plan filter */}
-          <div className="flex rounded-lg border border-shell-border overflow-hidden text-xs">
+          <div className="flex rounded-lg border border-[#E2E8F0] overflow-hidden text-xs">
             {(["all", "active", "trial", "expired"] as PlanFilter[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setFilter(p)}
                 className={`px-3 py-1.5 capitalize transition-colors ${
                   filter === p
-                    ? "bg-shell-raised text-shell-fg"
-                    : "text-shell-subtle hover:text-shell-fg/90 hover:bg-shell-raised"
+                    ? "bg-[#F8FAFC] text-navy"
+                    : "text-[#94A3B8] hover:text-navy/90 hover:bg-[#F8FAFC]"
                 }`}
               >
                 {p}
@@ -283,25 +283,25 @@ export default function AdminPage() {
             placeholder="Search email or ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 min-w-[200px] rounded-lg border border-shell-border bg-shell px-3 py-1.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:outline-none focus:border-blue-500"
+            className="input-base flex-1 min-w-[200px]"
           />
-          <span className="text-xs text-shell-subtle">{displayed.length} users</span>
+          <span className="text-xs text-[#94A3B8]">{displayed.length} users</span>
         </div>
 
         {/* Table */}
-        <div className="rounded-xl border border-shell-border overflow-hidden">
+        <div className="rounded-xl border border-[#E2E8F0] overflow-hidden bg-white">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-shell border-b border-shell-border">
+            <table className="table-base">
+              <thead>
                 <tr>
                   {["Email", "Plan", "Trial Ends", "Joined", "Last Login", "DNA Scores", "Reports", "Actions"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-shell-subtle">
+                    <th key={h} className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-[#64748B]">
                       {h}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-shell-border/60">
+              <tbody className="divide-y divide-[#F1F5F9]">
                 {loading && Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i}>
                     {Array.from({ length: 8 }).map((_, j) => (
@@ -314,49 +314,49 @@ export default function AdminPage() {
 
                 {!loading && displayed.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-shell-subtle text-sm">
+                    <td colSpan={8} className="px-4 py-6 text-center text-[#94A3B8] text-sm">
                       No users found.
                     </td>
                   </tr>
                 )}
 
                 {!loading && displayed.map((row) => (
-                  <tr key={row.id} className="hover:bg-shell/50 transition-colors">
-                    <td className="px-4 py-3 text-shell-fg/90 max-w-[200px] truncate font-mono text-xs">
-                      {row.email || <span className="text-shell-subtle">{row.id.slice(0, 8)}…</span>}
+                  <tr key={row.id} className="hover:bg-[#F8FAFC] transition-colors">
+                    <td className="px-4 py-3 text-navy/90 max-w-[200px] truncate font-mono text-xs">
+                      {row.email || <span className="text-[#94A3B8]">{row.id.slice(0, 8)}…</span>}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${planBadgeClass(row.subscription_status)}`}>
                         {row.subscription_status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-shell-muted text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">
                       {row.subscription_status === "trial" ? trialEnds(row.trial_started_at) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-shell-muted text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">
                       {formatDate(row.created_at)}
                     </td>
-                    <td className="px-4 py-3 text-shell-muted text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">
                       {formatDate(row.last_sign_in_at)}
                     </td>
-                    <td className="px-4 py-3 text-shell-fg/90 tabular-nums text-center">
+                    <td className="px-4 py-3 text-navy/90 tabular-nums text-center">
                       {row.dna_score_count}
                     </td>
-                    <td className="px-4 py-3 text-shell-fg/90 tabular-nums text-center">
+                    <td className="px-4 py-3 text-navy/90 tabular-nums text-center">
                       {row.reports_purchased}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setExtending(row)}
-                          className="rounded-md border border-blue-500/30 px-2 py-1 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors whitespace-nowrap"
+                          className="rounded-md border border-primary/30 px-2 py-1 text-sm text-primary hover:bg-primary/10 transition-colors whitespace-nowrap"
                         >
                           Extend Trial
                         </button>
                         <button
                           onClick={() => resendOnboarding(row)}
                           disabled={resending === row.id}
-                          className="rounded-md border border-shell-border px-2 py-1 text-sm text-shell-muted hover:text-shell-fg hover:border-shell-muted disabled:opacity-50 transition-colors whitespace-nowrap"
+                          className="rounded-md border border-[#E2E8F0] px-2 py-1 text-sm text-[#64748B] hover:text-navy hover:border-[#94A3B8] disabled:opacity-50 transition-colors whitespace-nowrap"
                         >
                           {resending === row.id ? "Sending…" : "Resend Email"}
                         </button>
@@ -381,7 +381,7 @@ export default function AdminPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-emerald-500/30 bg-shell px-4 py-3 text-sm text-emerald-400 shadow-xl">
+        <div className="fixed bottom-6 right-6 z-50 rounded-xl border border-emerald-500/30 bg-white px-4 py-3 text-sm text-emerald-600 shadow-xl">
           {toast}
         </div>
       )}

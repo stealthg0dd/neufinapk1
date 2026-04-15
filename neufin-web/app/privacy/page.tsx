@@ -81,7 +81,7 @@ export default function PrivacyPage() {
               your full card number, CVV, or bank details. Stripe may collect billing address and
               card metadata per their own{' '}
               <a href="https://stripe.com/privacy" target="_blank" rel="noreferrer"
-                className="text-blue-400 hover:text-blue-300">Privacy Policy</a>.
+                className="text-primary hover:text-primary">Privacy Policy</a>.
             </p>
 
             <h3 className="text-white font-semibold mt-4 mb-2">2.6 Referral tokens</h3>
@@ -157,20 +157,20 @@ export default function PrivacyPage() {
             <ul className="space-y-2 text-shell-fg/90 mt-3">
               <li>
                 <strong className="text-white">Delete your Vault data</strong> — sign in, go to{' '}
-                <Link href="/vault" className="text-blue-400 hover:text-blue-300">/vault</Link>, and
+                <Link href="/vault" className="text-primary hover:text-primary">/vault</Link>, and
                 use the account settings to delete your history. This removes all DNA score records
                 associated with your account from our database.
               </li>
               <li>
                 <strong className="text-white">Delete your account</strong> — email{' '}
-                <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-400 hover:text-blue-300">
+                <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:text-primary">
                   {CONTACT_EMAIL}
                 </a>{' '}
                 with the subject &ldquo;Delete my account&rdquo;. We will process your request within 30 days.
               </li>
               <li>
                 <strong className="text-white">Export your data</strong> — email{' '}
-                <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-400 hover:text-blue-300">
+                <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:text-primary">
                   {CONTACT_EMAIL}
                 </a>{' '}
                 to request a JSON export of all data we hold about you.
@@ -204,7 +204,7 @@ export default function PrivacyPage() {
             <p>
               Neufin is not directed at children under 13. We do not knowingly collect personal
               information from anyone under 13. If you believe a child has provided us data,
-              contact us at <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-400 hover:text-blue-300">{CONTACT_EMAIL}</a> and we will delete it promptly.
+              contact us at <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:text-primary">{CONTACT_EMAIL}</a> and we will delete it promptly.
             </p>
           </Section>
 
@@ -217,7 +217,7 @@ export default function PrivacyPage() {
             </p>
             <p>
               No security system is perfect. If you discover a vulnerability, please disclose it
-              responsibly to <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-400 hover:text-blue-300">{CONTACT_EMAIL}</a>.
+              responsibly to <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:text-primary">{CONTACT_EMAIL}</a>.
             </p>
           </Section>
 
@@ -237,7 +237,7 @@ export default function PrivacyPage() {
               <p className="text-white font-semibold">{COMPANY}</p>
               <p className="text-shell-muted">
                 Email:{' '}
-                <a href={`mailto:${CONTACT_EMAIL}`} className="text-blue-400 hover:text-blue-300">
+                <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:text-primary">
                   {CONTACT_EMAIL}
                 </a>
               </p>

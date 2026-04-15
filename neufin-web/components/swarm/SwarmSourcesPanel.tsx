@@ -46,12 +46,12 @@ export function SwarmSourcesPanel({
             Sources & methodology
           </span>
           {observability?.runtime ? (
-            <span className="text-sm text-[#555]">
+            <span className="text-sm text-gray-300">
               · runtime: {observability.runtime}
             </span>
           ) : null}
           {observability?.pipeline ? (
-            <span className="text-sm text-[#555]">· {observability.pipeline}</span>
+            <span className="text-sm text-gray-300">· {observability.pipeline}</span>
           ) : null}
         </div>
 
@@ -68,7 +68,7 @@ export function SwarmSourcesPanel({
         ) : null}
 
         {sources?.tickers && sources.tickers.length > 0 ? (
-          <p className="mb-4 font-mono text-sm text-[#6b7280]">
+          <p className="mb-4 font-mono text-sm text-gray-400">
             Tickers in this run:{' '}
             <span className="text-[#a1a1aa]">{sources.tickers.join(', ')}</span>
           </p>

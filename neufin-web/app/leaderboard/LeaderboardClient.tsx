@@ -71,11 +71,11 @@ function PodiumCard({
         href={`/share/${entry.share_token}`}
         className={`w-full rounded-xl border p-4 text-center transition-all hover:scale-105 relative overflow-hidden
           ${pCfg.border} ${pCfg.bg}
-          ${isMe ? 'ring-2 ring-blue-500/60' : ''}`}
+          ${isMe ? 'ring-2 ring-primary/60' : ''}`}
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}
       >
         {isMe && (
-          <span className="absolute top-1.5 right-1.5 text-sm font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-1.5 py-0.5 leading-none">
+          <span className="absolute top-1.5 right-1.5 text-sm font-bold text-primary bg-primary/20 border border-primary/40 rounded-full px-1.5 py-0.5 leading-none">
             YOU
           </span>
         )}
@@ -152,9 +152,9 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
           className="card border-blue-800/40 bg-blue-950/20 flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3">
-            <Dna className="h-8 w-8 shrink-0 text-blue-400" aria-hidden />
+            <Dna className="h-8 w-8 shrink-0 text-primary" aria-hidden />
             <div>
-              <p className="text-sm font-semibold text-blue-300">Your current rank</p>
+              <p className="text-sm font-semibold text-primary">Your current rank</p>
               <p className="text-xs text-shell-subtle">Based on your last analysis</p>
             </div>
           </div>
@@ -231,7 +231,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
 
                     {/* "You" badge */}
                     {isMe && (
-                      <span className="text-sm font-bold text-blue-400 bg-blue-500/20 border border-blue-500/40 rounded-full px-2 py-0.5 shrink-0">
+                      <span className="text-sm font-bold text-primary bg-primary/20 border border-primary/40 rounded-full px-2 py-0.5 shrink-0">
                         You
                       </span>
                     )}

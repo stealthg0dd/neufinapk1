@@ -103,7 +103,7 @@ export default function AdvisorReportsPage() {
           </div>
           <div className="h-2 w-full rounded-full bg-shell-raised">
             <div
-              className={`h-2 rounded-full transition-all duration-700 ${usagePct >= 100 ? 'bg-red-500' : usagePct >= 80 ? 'bg-yellow-500' : 'bg-blue-500'}`}
+              className={`h-2 rounded-full transition-all duration-700 ${usagePct >= 100 ? 'bg-red-500' : usagePct >= 80 ? 'bg-yellow-500' : 'bg-primary'}`}
               style={{ width: `${usagePct}%` }}
             />
           </div>
@@ -130,7 +130,7 @@ export default function AdvisorReportsPage() {
           {reports.length === 0 ? (
             <div className="p-12 text-center">
               <p className="text-shell-subtle text-sm">No reports generated yet.</p>
-              <Link href="/advisor/dashboard" className="mt-3 inline-block text-sm text-blue-400 hover:text-blue-300">
+              <Link href="/advisor/dashboard" className="mt-3 inline-block text-sm text-primary hover:text-primary">
                 Go to dashboard to generate your first report →
               </Link>
             </div>
@@ -159,7 +159,7 @@ export default function AdvisorReportsPage() {
                         href={r.pdf_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+                        className="rounded-lg bg-primary hover:bg-primary px-3 py-1.5 text-xs font-medium text-white transition-colors"
                       >
                         Download PDF
                       </a>

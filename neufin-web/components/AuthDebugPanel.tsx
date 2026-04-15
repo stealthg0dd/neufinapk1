@@ -150,7 +150,7 @@ export function AuthDebugPanel() {
                   console.groupEnd()
                 })
               }}
-              className="bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded transition-colors"
+              className="bg-primary hover:bg-primary px-2 py-1 rounded transition-colors"
             >
               Log State
             </button>

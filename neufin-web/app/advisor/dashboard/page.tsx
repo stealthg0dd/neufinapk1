@@ -98,7 +98,7 @@ export default function AdvisorDashboardPage() {
   if (loading || fetching) {
     return (
       <div className="min-h-screen bg-shell-deep flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
@@ -173,7 +173,7 @@ export default function AdvisorDashboardPage() {
           >
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-white">Your Referral Link</h2>
-              <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">20% off for clients</span>
+              <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">20% off for clients</span>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -206,7 +206,7 @@ export default function AdvisorDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-white">Client Reports</h2>
             {!profile && (
-              <Link href="/advisor/settings" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+              <Link href="/advisor/settings" className="text-xs text-primary hover:text-primary transition-colors">
                 Set up branding first →
               </Link>
             )}
@@ -266,7 +266,7 @@ export default function AdvisorDashboardPage() {
                             href={report.pdf_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
+                            className="text-primary hover:text-primary text-xs transition-colors"
                           >
                             Download ↗
                           </a>

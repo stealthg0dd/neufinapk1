@@ -110,14 +110,14 @@ function getCommitList(commits: Record<string, GitCommit[]>, id: string): GitCom
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 
 function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-shell-raised ${className}`} />
+  return <div className={`animate-pulse rounded-lg bg-[#F8FAFC] ${className}`} />
 }
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-shell-deep">
+    <div className="min-h-screen bg-transparent">
       {/* Top bar */}
-      <div className="sticky top-0 z-40 bg-shell-deep/90 backdrop-blur-sm border-b border-shell-border px-4 sm:px-6 py-3">
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-sm border-b border-[#E2E8F0] px-4 sm:px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-5 w-40" />
@@ -170,19 +170,19 @@ function BriefPanel({
       {/* Collapsible header */}
       <button
         onClick={() => setPanelOpen((v) => !v)}
-        className="w-full flex items-center gap-3 rounded-xl border border-shell-border bg-shell/60 px-5 py-3.5 hover:bg-shell transition-colors"
+        className="w-full flex items-center gap-3 rounded-xl border border-[#E2E8F0] bg-white/60 px-5 py-3.5 hover:bg-white transition-colors"
       >
-        <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${panelOpen ? "bg-blue-400" : "bg-shell-muted"}`} />
+        <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${panelOpen ? "bg-primary" : "bg-[#94A3B8]"}`} />
         <div className="flex-1 text-left">
-          <span className="text-xs font-semibold text-shell-fg/90">Daily Brief — Ror&apos;s Triage</span>
+          <span className="text-xs font-semibold text-navy/90">Daily Brief — Ror&apos;s Triage</span>
           {!panelOpen && (
-            <span className="ml-3 text-xs text-shell-subtle truncate hidden sm:inline">
+            <span className="ml-3 text-xs text-[#94A3B8] truncate hidden sm:inline">
               {preview.slice(0, 120)}{preview.length > 120 ? "…" : ""}
             </span>
           )}
         </div>
         <svg
-          className={`h-4 w-4 text-shell-muted flex-shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-[#64748B] flex-shrink-0 transition-transform ${panelOpen ? "rotate-180" : ""}`}
           viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
         >
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -191,12 +191,12 @@ function BriefPanel({
 
       {/* Panel content */}
       {panelOpen && (
-        <div className="mt-2 rounded-xl border border-shell-border bg-shell/40 p-4 space-y-2">
+        <div className="mt-2 rounded-xl border border-[#E2E8F0] bg-white/40 p-4 space-y-2">
           {/* Toggle all */}
           <div className="flex justify-end mb-1">
             <button
               onClick={onToggleAll}
-              className="text-xs text-shell-subtle hover:text-shell-fg/90 transition-colors"
+              className="text-xs text-[#94A3B8] hover:text-navy/90 transition-colors"
             >
               {VENTURE_ORDER.every((v) => openVentures.has(v)) ? "Collapse all" : "Expand all"}
             </button>
@@ -209,16 +209,16 @@ function BriefPanel({
             const actions = brief?.actions_required ?? []
 
             return (
-              <div key={ventureId} className="rounded-xl border border-shell-border bg-shell overflow-hidden">
+              <div key={ventureId} className="rounded-xl border border-[#E2E8F0] bg-white overflow-hidden">
                 {/* Accordion header */}
                 <button
                   onClick={() => onToggleVenture(ventureId)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-shell-raised/40 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F8FAFC]/40 transition-colors"
                 >
-                  <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${brief ? "bg-emerald-400" : "bg-shell-muted"}`} />
-                  <span className="font-medium text-shell-fg text-sm">{meta.name}</span>
+                  <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${brief ? "bg-emerald-400" : "bg-[#94A3B8]"}`} />
+                  <span className="font-medium text-navy text-sm">{meta.name}</span>
                   {brief && (
-                    <span className="text-xs text-shell-subtle">{relativeTime(brief.created_at)}</span>
+                    <span className="text-xs text-[#94A3B8]">{relativeTime(brief.created_at)}</span>
                   )}
                   {actions.length > 0 && (
                     <span className="ml-2 rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-sm text-amber-300">
@@ -226,7 +226,7 @@ function BriefPanel({
                     </span>
                   )}
                   <svg
-                    className={`ml-auto h-4 w-4 text-shell-subtle transition-transform ${open ? "rotate-180" : ""}`}
+                    className={`ml-auto h-4 w-4 text-[#94A3B8] transition-transform ${open ? "rotate-180" : ""}`}
                     viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
                   >
                     <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -235,14 +235,14 @@ function BriefPanel({
 
                 {/* Accordion content */}
                 {open && (
-                  <div className="border-t border-shell-border px-4 py-4 space-y-4">
+                  <div className="border-t border-[#E2E8F0] px-4 py-4 space-y-4">
                     {/* Brief text */}
                     {brief ? (
-                      <pre className="whitespace-pre-wrap font-mono text-xs text-shell-muted leading-relaxed max-h-72 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap font-mono text-xs text-[#64748B] leading-relaxed max-h-72 overflow-y-auto">
                         {brief.content}
                       </pre>
                     ) : (
-                      <p className="text-sm text-shell-subtle">
+                      <p className="text-sm text-[#94A3B8]">
                         No brief generated yet. Morning Engine runs at 07:00 SGT.
                       </p>
                     )}
@@ -276,7 +276,7 @@ function BriefPanel({
                                 }}
                                 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 accent-amber-400 cursor-pointer"
                               />
-                              <span className={`text-xs leading-snug ${done ? "line-through text-shell-subtle" : "text-amber-200/80"}`}>
+                              <span className={`text-xs leading-snug ${done ? "line-through text-[#94A3B8]" : "text-amber-200/80"}`}>
                                 {action}
                               </span>
                             </label>
@@ -299,7 +299,7 @@ function BriefPanel({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-sm font-semibold uppercase tracking-widest text-shell-subtle">
+    <span className="text-sm font-semibold uppercase tracking-widest text-[#94A3B8]">
       {children}
     </span>
   )
@@ -474,22 +474,22 @@ export default function ChiefOfStaffDashboard() {
   const ventureCards = buildVentureCards()
 
   return (
-    <div className="min-h-screen bg-shell-deep text-shell-fg">
+    <div className="min-h-screen bg-transparent text-navy">
 
       {/* ════════════════════════════════════════════════════════════════════
           SECTION 1 — Sticky top bar
          ════════════════════════════════════════════════════════════════════ */}
-      <div className="sticky top-0 z-40 bg-shell-deep/95 backdrop-blur-md border-b border-shell-border">
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E2E8F0]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between gap-4 py-3">
             {/* Left: greeting + clock */}
             <div className="flex items-center gap-3 min-w-0">
               <div>
-                <p className="text-sm font-semibold text-shell-fg leading-none">
+                <p className="text-sm font-semibold text-navy leading-none">
                   {greeting()}, Varun
                 </p>
                 <p
-                  className="text-sm text-shell-subtle tabular-nums mt-0.5"
+                  className="text-sm text-[#94A3B8] tabular-nums mt-0.5"
                   suppressHydrationWarning
                 >
                   {sgtTime} SGT
@@ -499,10 +499,10 @@ export default function ChiefOfStaffDashboard() {
 
             {/* Center: title */}
             <div className="hidden sm:block text-center flex-shrink-0">
-              <p className="text-xs font-semibold uppercase tracking-widest text-shell-muted">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#64748B]">
                 CTech Ventures
               </p>
-              <p className="text-sm text-shell-subtle tracking-widest">
+              <p className="text-sm text-[#94A3B8] tracking-widest">
                 Command Centre
               </p>
             </div>
@@ -524,7 +524,7 @@ export default function ChiefOfStaffDashboard() {
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                 </span>
                 {lastRefreshed && (
-                  <span className="text-sm text-shell-subtle hidden sm:block">
+                  <span className="text-sm text-[#94A3B8] hidden sm:block">
                     {relativeTime(lastRefreshed.toISOString())}
                   </span>
                 )}
@@ -533,7 +533,7 @@ export default function ChiefOfStaffDashboard() {
               {/* Manual refresh */}
               <button
                 onClick={() => { fetchMain(); fetchCommits() }}
-                className="rounded-lg border border-shell-border px-2.5 py-1.5 text-sm text-shell-muted hover:border-shell-muted hover:text-shell-fg transition-colors"
+                className="rounded-lg border border-[#E2E8F0] px-2.5 py-1.5 text-sm text-[#64748B] hover:border-[#94A3B8] hover:text-navy transition-colors"
                 title="Refresh all data"
               >
                 ↻
@@ -543,7 +543,7 @@ export default function ChiefOfStaffDashboard() {
 
           {/* Budget progress bar — full width */}
           {budget && (
-            <div className="h-0.5 w-full bg-shell-raised -mb-px">
+            <div className="h-0.5 w-full bg-[#F8FAFC] -mb-px">
               <div
                 className={`h-0.5 transition-all duration-700 ${budgetBarClass(dayPct)}`}
                 style={{ width: `${dayPct}%` }}
@@ -577,7 +577,7 @@ export default function ChiefOfStaffDashboard() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <SectionLabel>Ventures</SectionLabel>
-            <span className="text-sm text-shell-subtle">
+            <span className="text-sm text-[#94A3B8]">
               {tasks.filter((t) => t.status === "blocked").length} blocked across all ventures
             </span>
           </div>
@@ -630,10 +630,10 @@ export default function ChiefOfStaffDashboard() {
           <div className="flex items-center justify-between mb-3">
             <SectionLabel>Live Agent Activity</SectionLabel>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-shell-subtle">refreshes every 30s</span>
+              <span className="text-sm text-[#94A3B8]">refreshes every 30s</span>
               <button
                 onClick={refreshActivity}
-                className="text-sm text-shell-subtle hover:text-shell-fg/90 transition-colors"
+                className="text-sm text-[#94A3B8] hover:text-navy/90 transition-colors"
               >
                 ↻
               </button>

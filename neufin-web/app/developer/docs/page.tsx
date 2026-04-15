@@ -59,7 +59,7 @@ const ENDPOINTS: Endpoint[] = [
 
 const METHOD_COLORS: Record<string, string> = {
   GET: 'bg-emerald-500/20 text-emerald-400',
-  POST: 'bg-blue-500/20 text-blue-400',
+  POST: 'bg-primary/20 text-primary',
   DELETE: 'bg-red-500/20 text-red-400',
   PATCH: 'bg-yellow-500/20 text-yellow-400',
 }

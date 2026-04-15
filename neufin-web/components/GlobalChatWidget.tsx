@@ -14,7 +14,7 @@ import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
 const AGENTS = [
-  { value: 'general',   label: 'General',    fullLabel: 'General Agent',        emoji: '🤖', color: 'text-blue-400',   accent: 'border-blue-400/60',  ring: 'ring-blue-400/30'  },
+  { value: 'general',   label: 'General',    fullLabel: 'General Agent',        emoji: '🤖', color: 'text-primary',   accent: 'border-blue-400/60',  ring: 'ring-primary/30'  },
   { value: 'quant',     label: 'Quant',      fullLabel: 'Quant Agent',           emoji: '📊', color: 'text-amber-400',  accent: 'border-amber-400/60', ring: 'ring-amber-400/30' },
   { value: 'macro',     label: 'Macro',      fullLabel: 'Macro Strategist',      emoji: '🌐', color: 'text-emerald-400',accent: 'border-emerald-400/60',ring: 'ring-emerald-400/30'},
   { value: 'technical', label: 'Technical',  fullLabel: 'Technical Analyst',     emoji: '📈', color: 'text-purple-400', accent: 'border-purple-400/60', ring: 'ring-purple-400/30'},

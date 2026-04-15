@@ -122,7 +122,7 @@ export default function SwarmHeroTerminal() {
             >
               <StatusIcon status={status} />
               <span className="w-28 shrink-0 text-sm font-bold uppercase text-primary">{a.name}</span>
-              <span className="text-sm leading-snug text-slate-400">{shown}</span>
+              <span className="text-sm leading-snug text-slate-200">{shown}</span>
             </div>
           )
         })}

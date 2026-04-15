@@ -176,7 +176,7 @@ export default function Article1() {
           <div className="space-y-8">
             {/* Bias 1 */}
             <div className="rounded-xl border border-shell-border bg-shell/50 p-5">
-              <h3 className="font-bold text-blue-400 mb-2">1. Recency Bias</h3>
+              <h3 className="font-bold text-primary mb-2">1. Recency Bias</h3>
               <p className="text-shell-muted leading-relaxed mb-3">
                 Recency Bias causes investors to overweight recent events when making
                 decisions. During a market rally, affected SMEs increase equity exposure.
@@ -331,7 +331,7 @@ export default function Article1() {
         </section>
 
         {/* CTA */}
-        <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
+        <div className="mt-12 rounded-2xl border border-primary/20 bg-primary/5 p-8">
           <h2 className="text-xl font-bold mb-2">Find Your Behavioral Biases Now</h2>
           <p className="text-shell-muted text-sm mb-5">
             Upload your portfolio CSV and NeuFin will score your behavioral biases in under

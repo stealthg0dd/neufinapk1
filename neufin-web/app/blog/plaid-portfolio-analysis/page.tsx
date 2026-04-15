@@ -154,7 +154,7 @@ export default function PlaidPortfolioAnalysisArticle() {
               {
                 step: '1',
                 title: 'Prepare Your Portfolio Data',
-                color: 'text-blue-400',
+                color: 'text-primary',
                 content: [
                   'NeuFin accepts two input methods: Plaid API connection (preferred — provides full transaction history for dynamic bias detection) or CSV upload (provides static portfolio snapshot).',
                   'For CSV upload: prepare a spreadsheet with columns for symbol, shares, and cost basis. Download the template at neufin.com/upload.',
@@ -271,7 +271,7 @@ export default function PlaidPortfolioAnalysisArticle() {
           </div>
         </section>
 
-        <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
+        <div className="mt-12 rounded-2xl border border-primary/20 bg-primary/5 p-8">
           <h2 className="text-xl font-bold mb-2">Ready to Analyse Your Portfolio?</h2>
           <p className="text-shell-muted text-sm mb-5">
             Upload your portfolio CSV or connect via Plaid. Get your Investor DNA Score

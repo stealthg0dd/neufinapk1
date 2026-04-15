@@ -96,7 +96,7 @@ export default function UploadPage() {
           <div className="w-full max-w-xl space-y-5">
             {/* Status header */}
             <div className="text-center space-y-2 mb-8">
-              <div className="inline-flex items-center gap-2 text-blue-400 text-sm font-medium">
+              <div className="inline-flex items-center gap-2 text-primary text-sm font-medium">
                 <span className="inline-block w-3.5 h-3.5 border-2 border-blue-400/40 border-t-blue-400 rounded-full animate-spin" />
                 AI is analyzing your portfolio…
               </div>
@@ -152,7 +152,7 @@ export default function UploadPage() {
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-xl">
           <h1 className="text-3xl font-bold mb-2">Upload your portfolio</h1>
-          <p className="text-shell-muted mb-8">CSV with columns: <code className="text-blue-400">symbol</code>, <code className="text-blue-400">shares</code>, and optional <code className="text-blue-400">cost_basis</code></p>
+          <p className="text-shell-muted mb-8">CSV with columns: <code className="text-primary">symbol</code>, <code className="text-primary">shares</code>, and optional <code className="text-primary">cost_basis</code></p>
 
           {/* Drop zone */}
           <div
@@ -161,7 +161,7 @@ export default function UploadPage() {
             onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
             onDragLeave={() => setDragging(false)}
             className={`relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200
-              ${dragging ? 'border-blue-500 bg-blue-500/5' : 'border-shell-border hover:border-shell-muted hover:bg-shell/50'}
+              ${dragging ? 'border-primary bg-primary/5' : 'border-shell-border hover:border-shell-muted hover:bg-shell/50'}
               ${file ? 'border-green-600/60 bg-green-500/5' : ''}`}
           >
             <input

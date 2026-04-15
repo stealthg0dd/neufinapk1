@@ -8,7 +8,7 @@ import type { VentureCard as VentureCardData, TaskRecord, GitCommit } from "@/li
 const VENTURE_COLORS: Record<string, {
   border: string; glow: string; badge: string; dot: string
 }> = {
-  neufin:    { border: "border-blue-700/40",    glow: "hover:border-blue-500/60",   badge: "bg-blue-500/15 text-blue-300",    dot: "bg-blue-400" },
+  neufin:    { border: "border-primary-dark/40",    glow: "hover:border-primary/60",   badge: "bg-primary/15 text-primary",    dot: "bg-primary" },
   arisole:   { border: "border-emerald-700/40", glow: "hover:border-emerald-500/60",badge: "bg-emerald-500/15 text-emerald-300",dot: "bg-emerald-400" },
   neumas:    { border: "border-purple-700/40",  glow: "hover:border-purple-500/60", badge: "bg-purple-500/15 text-purple-300", dot: "bg-purple-400" },
   apex_golf: { border: "border-amber-700/40",   glow: "hover:border-amber-500/60",  badge: "bg-amber-500/15 text-amber-300",  dot: "bg-amber-400" },

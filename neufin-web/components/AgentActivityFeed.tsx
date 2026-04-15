@@ -23,7 +23,7 @@ const BH_NAMES: Record<string, string> = {
 }
 
 const VENTURE_DOT: Record<string, string> = {
-  neufin:          "bg-blue-400",
+  neufin:          "bg-primary",
   arisole:         "bg-emerald-400",
   neumas:          "bg-purple-400",
   apex_golf:       "bg-amber-400",

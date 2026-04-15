@@ -68,7 +68,7 @@ export default function PricingSuccessPage() {
       <main className="flex-1 flex items-center justify-center px-6 py-section">
         <div className="w-full max-w-md text-center space-y-6">
           {loading ? (
-            <div className="flex items-center justify-center gap-3 text-blue-400">
+            <div className="flex items-center justify-center gap-3 text-primary">
               <span className="inline-block w-5 h-5 border-2 border-blue-400/40 border-t-blue-400 rounded-full animate-spin" />
               <span>Confirming your plan…</span>
             </div>

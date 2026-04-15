@@ -121,7 +121,7 @@ export default function FeaturesPage() {
 
           {/* Hero */}
           <div className="text-center mb-16">
-            <span className="badge bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-4">
+            <span className="badge bg-primary/10 text-primary border border-primary/20 mb-4">
               Built for Singapore CFOs & Wealth Managers
             </span>
             <h1 className="text-4xl md:text-5xl font-extrabold mb-6 leading-tight">
@@ -195,7 +195,7 @@ export default function FeaturesPage() {
           </section>
 
           {/* CTA */}
-          <section className="text-center rounded-2xl border border-blue-500/20 bg-blue-500/5 p-12">
+          <section className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
             <h2 className="text-2xl font-bold mb-3">Ready to Find Your Behavioral Blind Spots?</h2>
             <p className="text-shell-muted mb-6">
               Upload your portfolio CSV and get your Investor DNA Score in under 10 seconds.

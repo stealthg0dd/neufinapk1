@@ -46,7 +46,7 @@ interface LeadStats {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const COLUMNS: { key: string; label: string; color: string }[] = [
-  { key: "new",            label: "New",      color: "border-t-blue-500" },
+  { key: "new",            label: "New",      color: "border-t-primary" },
   { key: "contacted",      label: "Contacted", color: "border-t-yellow-500" },
   { key: "demo_scheduled", label: "Demo",      color: "border-t-purple-500" },
   { key: "proposal_sent",  label: "Proposal",  color: "border-t-orange-500" },
@@ -56,13 +56,13 @@ const COLUMNS: { key: string; label: string; color: string }[] = [
 
 const PLAN_BADGE: Record<string, string> = {
   advisor:    "bg-purple-500/20 text-purple-300",
-  enterprise: "bg-blue-500/20 text-blue-300",
+  enterprise: "bg-primary/20 text-primary",
   retail:     "bg-emerald-500/20 text-emerald-300",
 }
 
 const AUM_COLORS: Record<string, string> = {
   ">200M":    "text-yellow-400",
-  "50-200M":  "text-blue-400",
+  "50-200M":  "text-primary",
   "10-50M":   "text-shell-fg/90",
   "<10M":     "text-shell-subtle",
 }
@@ -123,7 +123,7 @@ function LeadModal({
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-xs text-shell-subtle mb-0.5">Email</p>
-            <a href={`mailto:${lead.email}`} className="text-blue-400 hover:underline truncate block">{lead.email}</a>
+            <a href={`mailto:${lead.email}`} className="text-primary hover:underline truncate block">{lead.email}</a>
           </div>
           <div>
             <p className="text-xs text-shell-subtle mb-0.5">AUM</p>
@@ -161,7 +161,7 @@ function LeadModal({
                 onClick={() => setStatus(col.key)}
                 className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
                   status === col.key
-                    ? "bg-blue-500 border-blue-500 text-white"
+                    ? "bg-primary border-primary text-white"
                     : "border-shell-border text-shell-muted hover:border-shell-muted"
                 }`}
               >
@@ -178,7 +178,7 @@ function LeadModal({
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none resize-none"
+            className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none resize-none"
             placeholder="Internal notes..."
           />
         </div>
@@ -194,7 +194,7 @@ function LeadModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-5 py-2 text-sm font-semibold text-white transition-colors"
+            className="rounded-lg bg-primary hover:bg-primary disabled:opacity-50 px-5 py-2 text-sm font-semibold text-white transition-colors"
           >
             {saving ? "Saving…" : saved ? "Saved ✓" : "Save Changes"}
           </button>
@@ -304,7 +304,7 @@ export default function LeadsAdminPage() {
               <p className="text-xs text-shell-subtle mt-0.5">Total Leads</p>
             </div>
             <div className="rounded-xl border border-shell-border bg-shell p-4 text-center">
-              <p className="text-2xl font-bold text-blue-400">{stats.this_week}</p>
+              <p className="text-2xl font-bold text-primary">{stats.this_week}</p>
               <p className="text-xs text-shell-subtle mt-0.5">This Week</p>
             </div>
             <div className="rounded-xl border border-shell-border bg-shell p-4 text-center">

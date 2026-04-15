@@ -14,7 +14,7 @@ const MILESTONES = [
 ] as const
 
 const MILESTONE_COLORS = {
-  blue:   { ring: 'ring-blue-500/50',   bg: 'bg-blue-500/10',   text: 'text-blue-300',   bar: 'bg-blue-500'   },
+  blue:   { ring: 'ring-primary/50',   bg: 'bg-primary/10',   text: 'text-primary',   bar: 'bg-primary'   },
   purple: { ring: 'ring-purple-500/50', bg: 'bg-purple-500/10', text: 'text-purple-300', bar: 'bg-purple-500' },
   amber:  { ring: 'ring-amber-500/50',  bg: 'bg-amber-500/10',  text: 'text-amber-300',  bar: 'bg-amber-500'  },
 }
@@ -227,7 +227,7 @@ export default function ReferralsPage() {
               </>
             ) : (
               <div className="text-center py-4">
-                <div className="w-5 h-5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto" />
+                <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
               </div>
             )}
           </motion.div>
@@ -313,7 +313,7 @@ export default function ReferralsPage() {
                 { step: '4', title: 'You unlock rewards',     body: 'Hit milestones to earn free reports and lifetime pro access.' },
               ].map(({ step, title, body }) => (
                 <div key={step} className="flex gap-4">
-                  <div className="w-6 h-6 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-400 shrink-0 mt-0.5">
+                  <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary shrink-0 mt-0.5">
                     {step}
                   </div>
                   <div>

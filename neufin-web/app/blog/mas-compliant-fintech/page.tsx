@@ -246,7 +246,7 @@ export default function MASCompliantArticle() {
           </div>
         </section>
 
-        <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
+        <div className="mt-12 rounded-2xl border border-primary/20 bg-primary/5 p-8">
           <h2 className="text-xl font-bold mb-2">MAS-Compliant Behavioral Finance Analysis</h2>
           <p className="text-shell-muted text-sm mb-5">
             NeuFin provides behavioral insights under Singapore&apos;s PDPA framework.

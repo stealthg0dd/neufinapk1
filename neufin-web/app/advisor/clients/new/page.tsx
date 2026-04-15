@@ -65,7 +65,7 @@ export default function NewClientPage() {
               value={form.client_name}
               onChange={(e) => handleField('client_name', e.target.value)}
               placeholder="e.g. John Tan"
-              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -76,7 +76,7 @@ export default function NewClientPage() {
               value={form.client_email}
               onChange={(e) => handleField('client_email', e.target.value)}
               placeholder="client@example.com (optional)"
-              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none"
             />
           </div>
 
@@ -87,7 +87,7 @@ export default function NewClientPage() {
               value={form.notes}
               onChange={(e) => handleField('notes', e.target.value)}
               placeholder="Investment objectives, risk tolerance, key concerns..."
-              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-blue-500 focus:outline-none resize-none"
+              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none resize-none"
             />
           </div>
 
@@ -100,7 +100,7 @@ export default function NewClientPage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 py-3 text-sm font-semibold text-white transition-colors"
+            className="w-full rounded-xl bg-primary hover:bg-primary disabled:opacity-50 py-3 text-sm font-semibold text-white transition-colors"
           >
             {saving ? 'Adding client…' : 'Add Client'}
           </button>

@@ -93,7 +93,7 @@ export default function AdvisorSettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-shell-deep flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
@@ -267,7 +267,7 @@ export default function AdvisorSettingsPage() {
                   type="button"
                   onClick={() => handleField('white_label', !form.white_label)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    form.white_label ? 'bg-blue-600' : 'bg-shell-raised'
+                    form.white_label ? 'bg-primary' : 'bg-shell-raised'
                   }`}
                 >
                   <span

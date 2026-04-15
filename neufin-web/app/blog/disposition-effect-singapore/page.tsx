@@ -180,7 +180,7 @@ export default function DispositionEffectArticle() {
               'Worst affected sector: Singapore REITs — investors held declining REIT positions an average of 11.4 months vs. 4.1 months for profitable REIT exits',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2 text-shell-muted text-sm">
-                <span className="text-blue-400 mt-1 flex-shrink-0">→</span>
+                <span className="text-primary mt-1 flex-shrink-0">→</span>
                 {item}
               </li>
             ))}
@@ -265,7 +265,7 @@ export default function DispositionEffectArticle() {
           </div>
         </section>
 
-        <div className="mt-12 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8">
+        <div className="mt-12 rounded-2xl border border-primary/20 bg-primary/5 p-8">
           <h2 className="text-xl font-bold mb-2">Measure Your Disposition Effect Score</h2>
           <p className="text-shell-muted text-sm mb-5">
             NeuFin calculates your PGR/PLR ratio and Disposition Effect score from your

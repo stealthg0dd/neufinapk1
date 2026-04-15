@@ -24,7 +24,7 @@ function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> 
       <label className="text-xs text-shell-subtle">{label}</label>
       <input
         {...props}
-        className="bg-shell border border-shell-border rounded-lg px-3 py-2 text-sm text-shell-fg focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-shell border border-shell-border rounded-lg px-3 py-2 text-sm text-shell-fg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </div>
   )
@@ -386,7 +386,7 @@ export default function SettingsPage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }

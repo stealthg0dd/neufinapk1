@@ -21,7 +21,7 @@ const fmt = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const TYPE_COLORS: Record<string, string> = {
-  'Diversified Strategist': 'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  'Diversified Strategist': 'text-primary bg-primary/10 border-primary/20',
   'Conviction Growth':      'text-purple-400 bg-purple-500/10 border-purple-500/20',
   'Momentum Trader':        'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
   'Defensive Allocator':    'text-green-400 bg-green-500/10 border-green-500/20',
@@ -92,7 +92,7 @@ export default function VaultPage() {
   if (authLoading || fetching) {
     return (
       <div className="min-h-screen bg-shell-deep flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
@@ -285,7 +285,7 @@ export default function VaultPage() {
                     <div className="flex flex-col gap-1.5 shrink-0 items-end">
                       <Link
                         href={`/share/${record.share_token}`}
-                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                        className="text-xs text-primary hover:text-primary transition-colors"
                       >
                         View ↗
                       </Link>
