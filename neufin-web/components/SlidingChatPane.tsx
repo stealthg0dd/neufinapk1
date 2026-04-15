@@ -100,7 +100,7 @@ function StreamingBubble({ msg }: { msg: Message }) {
 
       <div className="flex max-w-[88%] flex-1 flex-col gap-2">
         <div
-          className="px-2.5 py-2 text-[10px] leading-relaxed"
+          className="px-2.5 py-2 text-sm leading-relaxed"
           style={{
             background: '#0f1419',
             border: `1px solid ${msg.error ? '#ef4444' : TRANS_BORDER}`,
@@ -128,7 +128,7 @@ function StreamingBubble({ msg }: { msg: Message }) {
             {Object.entries(msg.keyNumbers).map(([k, v]) => (
               <div key={k} className="flex items-center gap-1.5">
                 <span className="text-[8px] uppercase tracking-wide text-slate-500">{k}:</span>
-                <span className="text-[10px] font-bold" style={{ color: TRANS_ACCENT }}>
+                <span className="text-sm font-bold" style={{ color: TRANS_ACCENT }}>
                   {String(v)}
                 </span>
               </div>
@@ -138,7 +138,7 @@ function StreamingBubble({ msg }: { msg: Message }) {
 
         {isDone && msg.action && (
           <div
-            className="border-l-2 border-emerald-600 pl-2 text-[9px] leading-snug text-emerald-400"
+            className="border-l-2 border-emerald-600 pl-2 text-sm leading-snug text-emerald-400"
             style={{ fontFamily: MONO }}
           >
             ▶ {msg.action}
@@ -281,12 +281,12 @@ export function SlidingChatPane({
             <Bot className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             <div className="flex min-w-0 flex-col">
               <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">Managing Director</span>
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted2">IC Q&amp;A</span>
+              <span className="text-sm font-medium uppercase tracking-wide text-muted2">IC Q&amp;A</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {recordId && (
-              <span className="hidden font-mono text-[10px] text-muted2 sm:inline">#{recordId.slice(0, 8)}</span>
+              <span className="hidden font-mono text-sm text-muted2 sm:inline">#{recordId.slice(0, 8)}</span>
             )}
             <button
               type="button"
@@ -301,14 +301,14 @@ export function SlidingChatPane({
 
         {showSuggested && (
           <div className="shrink-0 border-b border-border-light bg-white px-4 py-2">
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted2">Suggested questions</p>
+            <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted2">Suggested questions</p>
             <div className="flex flex-wrap gap-1.5">
               {SUGGESTED_QUESTIONS.map((q, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => void send(q)}
-                  className="max-w-full rounded border border-border bg-surface-2 px-2 py-1 text-left text-[10px] text-slate2 transition-colors hover:border-primary/40 hover:text-primary-dark"
+                  className="max-w-full rounded border border-border bg-surface-2 px-2 py-1 text-left text-sm text-slate2 transition-colors hover:border-primary/40 hover:text-primary-dark"
                   style={{ fontFamily: MONO }}
                 >
                   {q}
@@ -328,7 +328,7 @@ export function SlidingChatPane({
               msg.role === 'user' ? (
                 <div key={idx} className="flex justify-end gap-2">
                   <div
-                    className="max-w-[85%] px-2.5 py-2 text-[10px] leading-relaxed text-slate-300"
+                    className="max-w-[85%] px-2.5 py-2 text-sm leading-relaxed text-slate-300"
                     style={{
                       background: '#0f1419',
                       border: `1px solid ${TRANS_BORDER}`,
@@ -347,7 +347,7 @@ export function SlidingChatPane({
             )}
 
             {loading && (
-              <div className="flex items-center gap-2 text-[9px]" style={{ fontFamily: MONO, color: TRANS_MUTED }}>
+              <div className="flex items-center gap-2 text-sm" style={{ fontFamily: MONO, color: TRANS_MUTED }}>
                 <span
                   className="shrink-0 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-primary"
                   style={{ border: `1px solid ${TRANS_ACCENT}44` }}
@@ -384,7 +384,7 @@ export function SlidingChatPane({
               <Send className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-1.5 flex justify-between text-[10px] text-muted2" style={{ fontFamily: MONO }}>
+          <div className="mt-1.5 flex justify-between text-sm text-muted2" style={{ fontFamily: MONO }}>
             <span>
               {thesisContext ? 'Thesis loaded' : recordId ? `Report ${recordId.slice(0, 8)}` : 'Demo mode'}
             </span>

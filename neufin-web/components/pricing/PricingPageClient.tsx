@@ -116,7 +116,7 @@ export default function PricingPageClient() {
         </div>
       </nav>
 
-      <main className="flex-1 px-4 py-16 sm:px-6">
+      <main className="flex-1 px-4 py-section sm:px-6">
         <div className="mx-auto mb-12 max-w-5xl text-center">
           <h1 className="mb-4 font-sans text-4xl text-navy md:text-5xl">Pricing</h1>
           <p className="mx-auto max-w-xl text-[var(--slate)]">
@@ -247,7 +247,7 @@ export default function PricingPageClient() {
         </div>
       </main>
 
-      <section className="border-t border-[var(--border)] py-8 px-4">
+      <section className="border-t border-[var(--border)] py-section px-4">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-sm leading-relaxed text-[var(--muted)]">
             <strong className="text-[var(--slate)]">Regulatory Disclaimer:</strong> NeuFin provides financial

@@ -2,47 +2,48 @@
 
 import Link from 'next/link'
 import { ReportDocument, sampleInstitutionalReportModel } from '@/lib/report-template'
+import { FadeIn } from '@/components/ui/FadeIn'
 import '@/lib/report-print.css'
 
 /**
  * Institutional HTML report preview (print CSS).
- *
- * Paged.js is installed for a future flow: mount generated HTML in an iframe,
- * run `new (await import('pagedjs')).Previewer().preview(source, [], target)`,
- * then print / capture. The production PDF path remains backend ReportLab.
+ * Backend ReportLab PDF remains production; this mirrors section structure for print QA.
  */
 export default function ReportPreviewPage() {
   return (
-    <div className="min-h-screen bg-app px-4 py-8 text-navy">
+    <div className="min-h-screen bg-app px-4 py-section text-navy">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-page-title font-semibold tracking-tight">Report print preview</h1>
-            <p className="mt-1 text-sm text-muted2">
-              HTML + print CSS template. Use the browser print dialog for a quick PDF check. Optional:{' '}
-              <code className="rounded bg-surface-3 px-1 text-xs">pagedjs</code> Previewer for page breaks.
-            </p>
+        <FadeIn>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-page-title font-semibold tracking-tight">Report preview</h1>
+              <p className="mt-1 text-sm text-muted2">
+                Institutional layout — use print to validate typography. Optional Paged.js for page breaks.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-lg border border-gray-300 bg-[#1EB8CC] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition duration-200 ease-out hover:bg-[#189fb2] hover:shadow-md active:scale-[0.99]"
+              >
+                Print / Save PDF
+              </button>
+              <Link
+                href="/dashboard/reports"
+                className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition duration-200 ease-out hover:border-gray-400 hover:bg-gray-50 active:scale-[0.99]"
+              >
+                Back
+              </Link>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="rounded-lg border border-border bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary-dark"
-            >
-              Print / Save PDF
-            </button>
-            <Link
-              href="/dashboard/reports"
-              className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-primary-dark shadow-sm hover:border-primary/40"
-            >
-              Back
-            </Link>
-          </div>
-        </div>
+        </FadeIn>
 
-        <div className="rounded-lg border border-border bg-white p-6 shadow-sm print:border-0 print:shadow-none">
-          <ReportDocument model={sampleInstitutionalReportModel()} />
-        </div>
+        <FadeIn className="delay-75">
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow duration-200 print:border-0 print:p-0 print:shadow-none hover:shadow-md">
+            <ReportDocument model={sampleInstitutionalReportModel()} />
+          </div>
+        </FadeIn>
       </div>
     </div>
   )

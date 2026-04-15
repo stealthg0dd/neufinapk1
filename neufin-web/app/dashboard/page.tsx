@@ -23,18 +23,18 @@ function formatRegimeLabel(regime: RegimeData | null): string {
 function regimePillClass(regime: RegimeData | null): string {
   const u = (regime?.regime ?? regime?.label ?? '').toLowerCase()
   if (u.includes('inflation')) {
-    return 'inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800'
+    return 'inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold text-red-800'
   }
   if (u.includes('stagflation')) {
-    return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900'
+    return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
   }
   if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession') || u.includes('crisis')) {
-    return 'inline-block rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-900'
+    return 'inline-block rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-sm font-semibold text-blue-900'
   }
   if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery') || u.includes('growth')) {
-    return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-900'
+    return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-semibold text-emerald-900'
   }
-  return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-900'
+  return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
 }
 
 function fmtMetric(v: number | null | undefined, digits = 2): string {
@@ -92,7 +92,7 @@ export default function DashboardPage() {
           <p className="text-label">Portfolio intelligence</p>
           <h2 className="text-section-title mt-2">{portfolioTitle}</h2>
           {lastAnalyzed && (
-            <p className="mt-1 text-[12px] text-slate-500">
+            <p className="mt-1 text-sm text-slate-500">
               Last analysed{' '}
               {new Date(lastAnalyzed).toLocaleDateString('en-SG', {
                 day: 'numeric',
@@ -120,7 +120,7 @@ export default function DashboardPage() {
           {!hasPortfolio && (
             <p className="mt-4 text-sm text-slate-600">
               Welcome to NeuFin.{' '}
-              <Link href="/dashboard/portfolio" className="font-medium text-[#1D4ED8] hover:underline">
+              <Link href="/dashboard/portfolio" className="font-medium text-primary-dark hover:underline">
                 Upload a portfolio
               </Link>{' '}
               to see your DNA score and regime context.
@@ -150,7 +150,7 @@ export default function DashboardPage() {
           <div>
             <Link
               href={hasPortfolio ? '/swarm' : '/dashboard/portfolio'}
-              className="inline-flex items-center justify-center rounded-lg bg-[#1D4ED8] px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-blue-800"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-dark"
             >
               Generate IC report
             </Link>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(latestDna.strengths ?? []).length > 0 && (
             <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Top strengths</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Top strengths</p>
               {latestDna.strengths.slice(0, 2).map((s, i) => (
                 <div key={i} className="mb-2 border-l-2 border-[#16A34A] pl-2.5 last:mb-0">
                   <p className="text-xs text-slate-800">{s.split('.')[0]}.</p>
@@ -174,7 +174,7 @@ export default function DashboardPage() {
 
           {latestDna.recommendation && (
             <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Recommended action</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Recommended action</p>
               <div className="border-l-2 border-amber-400 pl-2.5">
                 <p className="text-xs text-slate-800">{latestDna.recommendation}</p>
               </div>
@@ -183,7 +183,7 @@ export default function DashboardPage() {
 
           {(latestDna.weaknesses ?? []).length > 0 && (
             <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Key risks</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Key risks</p>
               {latestDna.weaknesses.slice(0, 2).map((w, i) => (
                 <div key={i} className="mb-2 border-l-2 border-[#DC2626] pl-2.5 last:mb-0">
                   <p className="text-xs text-slate-800">{w.split('.')[0]}.</p>
@@ -195,7 +195,7 @@ export default function DashboardPage() {
           {latestDna.tax_analysis &&
             ((latestDna.tax_analysis.total_liability ?? 0) > 0 || (latestDna.tax_analysis.total_harvest_opp ?? 0) > 0) && (
               <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm md:col-span-2 xl:col-span-1">
-                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Tax snapshot</p>
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-dark">Tax snapshot</p>
                 {(latestDna.tax_analysis?.total_liability ?? 0) > 0 && (
                   <div className="mb-2 border-l-2 border-amber-400 pl-2.5">
                     <p className="text-xs text-slate-500">CGT exposure</p>
@@ -221,13 +221,13 @@ export default function DashboardPage() {
 
       {hasPortfolio && !swarmReport && (
         <section className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#1D4ED8]">Swarm IC analysis</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-primary-dark">Swarm IC analysis</p>
           <p className="mb-3 text-xs text-slate-600">
             Run the 7-agent swarm on your portfolio for regime-adjusted signals, tax context, and an IC-grade memo.
           </p>
           <Link
             href="/swarm"
-            className="inline-block rounded-lg border border-blue-200 bg-[#EFF6FF] px-3 py-2 text-xs font-semibold text-[#1D4ED8] hover:bg-blue-100"
+            className="inline-block rounded-lg border border-blue-200 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-blue-100"
           >
             Run Swarm IC →
           </Link>
@@ -239,9 +239,9 @@ export default function DashboardPage() {
       </section>
 
       {!hasPortfolio && (
-        <section className="rounded-xl border border-dashed border-[#CBD5E1] bg-white px-5 py-12 text-center shadow-sm">
+        <section className="rounded-xl border border-dashed border-[#CBD5E1] bg-white px-5 py-section text-center shadow-sm">
           <div className="mb-3 flex justify-center">
-            <PieChart className="h-10 w-10 text-[#1D4ED8]" aria-hidden />
+            <PieChart className="h-10 w-10 text-primary-dark" aria-hidden />
           </div>
           <p className="text-sm font-medium text-slate-900">Start your first analysis</p>
           <p className="mt-1.5 text-xs text-slate-600">
@@ -249,7 +249,7 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/dashboard/portfolio"
-            className="mt-5 inline-block rounded-lg bg-[#1D4ED8] px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
+            className="mt-5 inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark"
           >
             Upload portfolio →
           </Link>
@@ -264,7 +264,7 @@ export default function DashboardPage() {
         <Link href="/feedback" target="_blank" className="shrink-0">
           <button
             type="button"
-            className="rounded-lg border border-blue-200 bg-[#EFF6FF] px-4 py-2 text-xs font-semibold text-[#1D4ED8] hover:bg-blue-100"
+            className="rounded-lg border border-blue-200 bg-primary-light px-4 py-2 text-xs font-semibold text-primary-dark hover:bg-blue-100"
           >
             Share feedback →
           </button>

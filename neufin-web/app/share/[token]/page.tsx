@@ -76,8 +76,8 @@ export default async function SharePage({
 
   if (!data) {
     return (
-      <div className="min-h-screen flex flex-col bg-gray-950">
-        <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="min-h-screen flex flex-col bg-shell-deep">
+        <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           </div>
@@ -85,7 +85,7 @@ export default async function SharePage({
         <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
           <p className="text-5xl">🔍</p>
           <h1 className="text-2xl font-bold text-white">Result Not Found</h1>
-          <p className="text-gray-400 text-sm max-w-xs">
+          <p className="text-shell-muted text-sm max-w-xs">
             This link may have expired or never existed. Create your own free DNA score below.
           </p>
           <Link href="/upload" className="btn-primary mt-2">
@@ -97,9 +97,9 @@ export default async function SharePage({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
+    <div className="min-h-screen flex flex-col bg-shell-deep">
       {/* Nav */}
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
           <Link href="/upload" className="btn-primary py-2 text-sm">
@@ -108,7 +108,7 @@ export default async function SharePage({
         </div>
       </nav>
 
-      <main className="flex-1 flex flex-col items-center px-6 py-10 max-w-3xl mx-auto w-full">
+      <main className="flex-1 flex flex-col items-center px-6 py-section max-w-3xl mx-auto w-full">
         <ShareCard data={data} />
       </main>
     </div>

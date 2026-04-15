@@ -200,7 +200,7 @@ function MarketRegimeCard({ data }: { data: Record<string, any> }) {
     <IntelCard title="Market Regime" icon={<Globe size={12} />} accent={meta.color}>
       {/* Regime badge */}
       <div
-        className="w-full py-2 px-3 rounded text-center font-bold text-[12px] uppercase tracking-widest"
+        className="w-full py-2 px-3 rounded text-center font-bold text-sm uppercase tracking-widest"
         style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.color}33` }}
       >
         {meta.label}
@@ -293,7 +293,7 @@ function StrategistIntelCard({ data }: { data: Record<string, any> }) {
         style={{ background: `${sentimentCfg.color}15`, border: `1px solid ${sentimentCfg.color}33` }}
       >
         <sentimentCfg.Icon size={12} style={{ color: sentimentCfg.color }} />
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: sentimentCfg.color }}>
+        <span className="text-sm font-bold uppercase tracking-widest" style={{ color: sentimentCfg.color }}>
           {sentimentCfg.label}
         </span>
       </div>
@@ -428,7 +428,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
           >
             <div />
             {cmData.symbols.map((s) => (
-              <div key={s} className="pb-0.5 text-center font-mono text-[10px] text-muted2">{s}</div>
+              <div key={s} className="pb-0.5 text-center font-mono text-sm text-muted2">{s}</div>
             ))}
           </div>
           {/* Rows */}
@@ -438,7 +438,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
               className="mb-px grid gap-px"
               style={{ gridTemplateColumns: `40px repeat(${cmData.symbols.length}, 1fr)` }}
             >
-              <div className="flex items-center justify-end pr-1 font-mono text-[10px] text-muted2">
+              <div className="flex items-center justify-end pr-1 font-mono text-sm text-muted2">
                 {cmData.symbols.at(i) ?? ''}
               </div>
               {row.map((v, j) => {
@@ -471,7 +471,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
               {cl.map((s) => (
                 <span
                   key={s}
-                  className="rounded border border-amber-200 bg-amber-50 px-1 font-mono text-[10px] text-amber-900"
+                  className="rounded border border-amber-200 bg-amber-50 px-1 font-mono text-sm text-amber-900"
                 >
                   {s}
                 </span>
@@ -588,7 +588,7 @@ function RiskWatchdogCard({ data }: { data: Record<string, any> }) {
           style={{ background: levelCfg.bg, border: `1px solid ${levelCfg.color}33` }}
         >
           <levelCfg.icon size={13} style={{ color: levelCfg.color }} />
-          <span className="text-[11px] font-bold" style={{ color: levelCfg.color }}>{levelCfg.label}</span>
+          <span className="text-sm font-bold" style={{ color: levelCfg.color }}>{levelCfg.label}</span>
         </div>
         {/* Mini gauge */}
         <div className="relative w-14 h-14 shrink-0">
@@ -606,8 +606,8 @@ function RiskWatchdogCard({ data }: { data: Record<string, any> }) {
             </RadialBar>
           </RadialBarChart>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[11px] font-bold" style={{ color: levelCfg.color }}>{score.toFixed(1)}</span>
-            <span className="text-[10px] text-muted2">/10</span>
+            <span className="text-sm font-bold" style={{ color: levelCfg.color }}>{score.toFixed(1)}</span>
+            <span className="text-sm text-muted2">/10</span>
           </div>
         </div>
       </div>
@@ -680,7 +680,7 @@ function AlphaScoutCard({ data }: { data: Record<string, any> }) {
       )}
 
       {/* Spacer note */}
-      <p className="border-t border-border-light pt-2 text-center text-[10px] uppercase tracking-wide text-muted2">
+      <p className="border-t border-border-light pt-2 text-center text-sm uppercase tracking-wide text-muted2">
         Alpha Scout · {opps.length} opportunity(ies) identified
       </p>
     </IntelCard>
@@ -1302,7 +1302,7 @@ export default function SwarmPage() {
               <kbd className="rounded border border-border bg-surface-2 px-1 py-0.5 font-mono text-muted2">⌘K</kbd>{' '}
               to query agents
             </div>
-            <div className="text-[10px] uppercase tracking-wide text-muted2">Powered by LangGraph</div>
+            <div className="text-sm uppercase tracking-wide text-muted2">Powered by LangGraph</div>
           </div>
         </div>
 
@@ -1396,7 +1396,7 @@ export default function SwarmPage() {
       ) : null}
 
       {thesis && (
-        <div className="mx-auto max-w-[1600px] px-4 pb-8">
+        <div className="mx-auto max-w-[1600px] px-4 pb-section">
           <div className="mb-4 flex items-center gap-3 border-t border-border-light pt-5">
             <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">Research intelligence</span>
             <span className="text-xs text-border">|</span>

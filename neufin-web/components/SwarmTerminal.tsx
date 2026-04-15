@@ -132,7 +132,7 @@ export default function SwarmTerminal({
         </div>
         <div className="h-[3px] overflow-hidden rounded-sm bg-[#E5E7EB]">
           <div
-            className="h-full rounded-sm bg-[#1D4ED8] transition-all duration-500"
+            className="h-full rounded-sm bg-primary transition-all duration-500"
             style={{ width: `${(completeCount / 7) * 100}%` }}
           />
         </div>

@@ -69,10 +69,10 @@ export default function BlogIndex() {
           Behavioral Finance Research
         </span>
         <h1 className="text-3xl font-extrabold mb-3">NeuFin Blog</h1>
-        <p className="text-gray-400 leading-relaxed max-w-xl">
+        <p className="text-shell-muted leading-relaxed max-w-xl">
           Research and practical guides on behavioral finance for Singapore SMEs,
           CFOs, wealth managers, and investors across Southeast Asia.
-          By <strong className="text-gray-300">NeuFin</strong>, founded 2025, Singapore.
+          By <strong className="text-shell-fg/90">NeuFin</strong>, founded 2025, Singapore.
         </p>
       </div>
 
@@ -81,13 +81,13 @@ export default function BlogIndex() {
         {posts.map((post) => (
           <article key={post.slug} className="group">
             <Link href={`/blog/${post.slug}`} className="block">
-              <div className="card hover:border-blue-500/30 transition-colors space-y-3">
+              <div className="card hover:border-primary/30 transition-colors space-y-3">
                 {/* Tags */}
                 <div className="flex flex-wrap gap-2">
                   {post.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="badge bg-gray-800 text-gray-400 text-[10px] px-2 py-0.5"
+                      className="badge bg-shell-raised text-shell-muted text-sm px-2 py-0.5"
                     >
                       {tag}
                     </span>
@@ -95,15 +95,15 @@ export default function BlogIndex() {
                 </div>
 
                 {/* Title */}
-                <h2 className="text-lg font-bold text-gray-100 group-hover:text-blue-400 transition-colors leading-snug">
+                <h2 className="text-lg font-bold text-shell-fg group-hover:text-primary transition-colors leading-snug">
                   {post.title}
                 </h2>
 
                 {/* Excerpt */}
-                <p className="text-sm text-gray-400 leading-relaxed">{post.excerpt}</p>
+                <p className="text-sm text-shell-muted leading-relaxed">{post.excerpt}</p>
 
                 {/* Meta */}
-                <div className="flex items-center gap-3 text-xs text-gray-500 pt-1">
+                <div className="flex items-center gap-3 text-xs text-shell-subtle pt-1">
                   <time dateTime={post.date}>
                     {new Date(post.date).toLocaleDateString('en-SG', {
                       year: 'numeric',
@@ -113,7 +113,7 @@ export default function BlogIndex() {
                   </time>
                   <span>·</span>
                   <span>{post.readTime}</span>
-                  <span className="ml-auto text-blue-400 group-hover:text-blue-300 transition-colors">
+                  <span className="ml-auto text-primary group-hover:text-primary transition-colors">
                     Read →
                   </span>
                 </div>
@@ -124,9 +124,9 @@ export default function BlogIndex() {
       </div>
 
       {/* CTA */}
-      <div className="mt-16 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-8 text-center">
+      <div className="mt-16 rounded-2xl border border-primary/20 bg-primary/5 p-8 text-center">
         <h2 className="text-xl font-bold mb-2">See Your Own Behavioral Biases</h2>
-        <p className="text-gray-400 text-sm mb-5">
+        <p className="text-shell-muted text-sm mb-5">
           Everything you read about here — NeuFin detects it in your portfolio in under 10 seconds.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

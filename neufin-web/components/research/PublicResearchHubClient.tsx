@@ -57,7 +57,7 @@ export default function PublicResearchHubClient({ notes }: { notes: BlogNote[] }
                 setPage(1)
               }}
               className={[
-                'rounded-full border px-3 py-1.5 text-[11px] font-mono transition-colors',
+                'rounded-full border px-3 py-1.5 text-sm font-mono transition-colors',
                 active
                   ? 'border-primary/40 bg-primary/10 text-primary'
                   : 'border-border text-muted-foreground hover:text-foreground',
@@ -75,18 +75,18 @@ export default function PublicResearchHubClient({ notes }: { notes: BlogNote[] }
             key={note.id}
             className="rounded-xl border border-border bg-surface p-5 transition-colors hover:border-primary/30"
           >
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-mono ${typeCls(note.note_type.toLowerCase())}`}>
+            <span className={`rounded-full border px-2 py-0.5 text-sm font-mono ${typeCls(note.note_type.toLowerCase())}`}>
               {fmtType(note.note_type)}
             </span>
             <h3 className="mb-2 mt-2 text-base font-semibold leading-snug text-foreground">{note.title}</h3>
             <p className="mb-3 line-clamp-3 text-[13px] text-muted-foreground">{note.executive_summary}</p>
-            <div className="flex items-center justify-between gap-2 text-[11px]">
+            <div className="flex items-center justify-between gap-2 text-sm">
               <span className="font-mono text-muted-foreground/60">
                 {new Date(note.created_at).toLocaleDateString('en-SG', { dateStyle: 'medium' })}
               </span>
               <span className="font-mono text-primary">{Math.round((note.confidence_score ?? 0) * 100)}% confidence</span>
             </div>
-            <Link href={`/research/${note.slug}`} className="mt-3 inline-block text-[11px] text-primary hover:underline">
+            <Link href={`/research/${note.slug}`} className="mt-3 inline-block text-sm text-primary hover:underline">
               Read →
             </Link>
           </article>

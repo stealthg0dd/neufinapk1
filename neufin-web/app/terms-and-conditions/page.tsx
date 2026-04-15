@@ -51,13 +51,13 @@ export default function TermsPage() {
         </p>
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 py-12">
+      <div className="mx-auto max-w-7xl px-6 py-section">
         <div className="flex gap-12">
 
           {/* ── Left ToC — desktop only ── */}
           <aside className="hidden w-64 shrink-0 xl:block">
             <div className="sticky top-24">
-              <p className="mb-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/60">
+              <p className="mb-4 font-mono text-sm uppercase tracking-widest text-muted-foreground/60">
                 Table of Contents
               </p>
               <nav className="space-y-1">
@@ -277,7 +277,7 @@ export default function TermsPage() {
             </div>
 
             {/* ── Page footer ── */}
-            <div className="mt-14 border-t border-border/40 pt-8 text-[12px] text-muted-foreground/60">
+            <div className="mt-14 border-t border-border/40 pt-6 text-sm text-muted-foreground/60">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <p>© 2026 Neufin OÜ. All rights reserved. A unit of CTech Ventures.</p>
                 <nav className="flex gap-4">

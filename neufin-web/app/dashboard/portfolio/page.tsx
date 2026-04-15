@@ -44,8 +44,8 @@ function StepIndicator({ step }: { step: AnalysisStep }) {
   return (
     <div style={{
       display: 'flex', gap: 0, marginBottom: 20,
-      background: 'hsl(var(--surface))',
-      borderRadius: 8, border: '1px solid hsl(var(--border))',
+      background: 'var(--surface)',
+      borderRadius: 8, border: '1px solid var(--border)',
       padding: '14px 16px',
     }}>
       {ANALYSIS_STEPS.map((s, i) => {
@@ -58,28 +58,28 @@ function StepIndicator({ step }: { step: AnalysisStep }) {
               <div style={{
                 position: 'absolute', top: 14, right: '50%', width: '100%',
                 height: 2, background: doneIds.includes(ANALYSIS_STEPS[i - 1].id)
-                  ? 'hsl(var(--primary))' : 'hsl(var(--border))',
+                  ? 'var(--primary)' : 'var(--border)',
                 zIndex: 0,
               }} />
             )}
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
-              background: done ? 'hsl(var(--primary))' : active ? 'hsl(var(--primary)/0.2)' : 'hsl(var(--surface-2))',
-              border: `2px solid ${done ? 'hsl(var(--primary))' : active ? 'hsl(var(--primary))' : 'hsl(var(--border))'}`,
-              color: done ? '#0B0F14' : active ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+              background: done ? 'var(--primary)' : active ? 'color-mix(in srgb, var(--primary) 20%, transparent)' : 'var(--surface-2)',
+              border: `2px solid ${done ? 'var(--primary)' : active ? 'var(--primary)' : 'var(--border)'}`,
+              color: done ? '#0B0F14' : active ? 'var(--primary)' : 'var(--text-secondary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 6px', fontSize: 11, fontWeight: 700,
+              margin: '0 auto 6px', fontSize: 14, fontWeight: 700,
               position: 'relative', zIndex: 1,
             }}>
               {done ? '✓' : i + 1}
             </div>
             <div style={{
-              fontSize: 11, fontWeight: 600,
-              color: done || active ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+              fontSize: 14, fontWeight: 600,
+              color: done || active ? 'var(--text-primary)' : 'var(--text-secondary)',
             }}>
               {s.label}
             </div>
-            <div style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))' }}>
+            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
               {s.desc}
             </div>
           </div>
@@ -439,33 +439,33 @@ export default function PortfolioPage() {
         onClick={() => inputRef.current?.click()}
         className={`flex min-h-[280px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all ${
           dragging
-            ? 'border-[hsl(var(--primary))] bg-[hsl(var(--primary)/0.05)]'
-            : 'border-[hsl(var(--border))] bg-[hsl(var(--surface)/0.5)] hover:border-[hsl(var(--primary)/0.4)] hover:bg-surface'
+            ? 'border-primary bg-primary/5'
+            : 'border-border bg-surface/50 hover:border-primary/40 hover:bg-surface'
         }`}
       >
         <input ref={inputRef} type="file" accept=".csv" onChange={onPick} className="hidden" />
         {!file ? (
           <>
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-[hsl(var(--border))] bg-surface-2">
-              <UploadCloud className="h-7 w-7 text-[hsl(var(--muted-foreground))]" strokeWidth={1.5} />
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-surface-2">
+              <UploadCloud className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
             </div>
-            <p className="mb-1 text-lg font-semibold text-[hsl(var(--foreground))]">Drop your portfolio CSV</p>
-            <p className="mb-4 text-sm text-[hsl(var(--muted-foreground))]">or click to browse</p>
+            <p className="mb-1 text-lg font-semibold text-foreground">Drop your portfolio CSV</p>
+            <p className="mb-4 text-sm text-muted-foreground">or click to browse</p>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <span className="rounded border border-[hsl(var(--border)/0.5)] bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-[hsl(var(--muted-foreground)/0.6)]">
+              <span className="rounded border border-border/50 bg-surface-2 px-2 py-0.5 font-mono text-sm text-muted-foreground/60">
                 .CSV
               </span>
-              <span className="rounded border border-[hsl(var(--border)/0.5)] bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-[hsl(var(--muted-foreground)/0.6)]">
+              <span className="rounded border border-border/50 bg-surface-2 px-2 py-0.5 font-mono text-sm text-muted-foreground/60">
                 .XLSX
               </span>
-              <span className="rounded border border-[hsl(var(--border)/0.5)] bg-surface-2 px-2 py-0.5 font-mono text-[10px] text-[hsl(var(--muted-foreground)/0.6)]">
+              <span className="rounded border border-border/50 bg-surface-2 px-2 py-0.5 font-mono text-sm text-muted-foreground/60">
                 MAX 10MB
               </span>
             </div>
           </>
         ) : (
           <div
-            className="w-full max-w-md rounded-lg border border-[hsl(var(--border))] bg-surface p-4"
+            className="w-full max-w-md rounded-lg border border-border bg-surface p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
@@ -473,10 +473,10 @@ export default function PortfolioPage() {
                 <FileSpreadsheet className="h-5 w-5 text-positive" />
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <p className="truncate text-sm font-medium text-[hsl(var(--foreground))]">{file.name}</p>
-                <p className="text-[11px] text-[hsl(var(--muted-foreground))]">{fileSize}</p>
+                <p className="truncate text-sm font-medium text-foreground">{file.name}</p>
+                <p className="text-sm text-muted-foreground">{fileSize}</p>
               </div>
-              <span className="shrink-0 rounded px-2 py-0.5 font-mono text-[10px] text-positive bg-positive/10">
+              <span className="shrink-0 rounded px-2 py-0.5 font-mono text-sm text-positive bg-positive/10">
                 Ready to analyze
               </span>
             </div>
@@ -491,7 +491,7 @@ export default function PortfolioPage() {
           void runAnalyze()
         }}
         disabled={!file || busy}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[hsl(var(--primary))] font-medium text-[hsl(var(--primary-foreground))] disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? (
           <>
@@ -504,8 +504,8 @@ export default function PortfolioPage() {
       </button>
 
       {busy && (
-        <div className="rounded-xl border border-[hsl(var(--border))] bg-surface p-6">
-          <p className="mb-6 text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+        <div className="rounded-xl border border-border bg-surface p-6">
+          <p className="mb-6 text-sm font-mono uppercase tracking-widest text-muted-foreground">
             Analysis in progress
           </p>
           <div className="space-y-0">
@@ -515,15 +515,15 @@ export default function PortfolioPage() {
               return (
                 <div
                   key={s.label}
-                  className="flex items-center gap-3 border-b border-[hsl(var(--border)/0.4)] py-3 last:border-0"
+                  className="flex items-center gap-3 border-b border-border/40 py-3 last:border-0"
                 >
                   <div
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium ${
                       done
                         ? 'border-positive/50 bg-positive/20 text-positive'
                         : active
-                          ? 'border-[hsl(var(--primary)/0.5)] bg-[hsl(var(--primary)/0.2)] text-[hsl(var(--primary))]'
-                          : 'border-[hsl(var(--border)/0.5)] bg-surface-2 text-[hsl(var(--muted-foreground))]'
+                          ? 'border-primary/50 bg-primary/20 text-primary'
+                          : 'border-border/50 bg-surface-2 text-muted-foreground'
                     }`}
                   >
                     {done ? (
@@ -536,19 +536,19 @@ export default function PortfolioPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`text-sm font-medium ${active ? 'text-[hsl(var(--foreground))]' : 'text-[hsl(var(--muted-foreground))]'}`}
+                      className={`text-sm font-medium ${active ? 'text-foreground' : 'text-muted-foreground'}`}
                     >
                       {s.label}
                     </p>
-                    <p className="text-[11px] text-[hsl(var(--muted-foreground)/0.6)]">{s.sub}</p>
+                    <p className="text-sm text-muted-foreground/60">{s.sub}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     {done ? (
                       <Check className="ml-auto h-4 w-4 text-positive" strokeWidth={2} />
                     ) : active ? (
-                      <span className="font-mono text-[11px] text-[hsl(var(--primary))]">{progress}%</span>
+                      <span className="font-mono text-sm text-primary">{progress}%</span>
                     ) : (
-                      <span className="font-mono text-[11px] text-[hsl(var(--muted-foreground)/0.5)]">—</span>
+                      <span className="font-mono text-sm text-muted-foreground/50">—</span>
                     )}
                   </div>
                 </div>
@@ -557,7 +557,7 @@ export default function PortfolioPage() {
           </div>
           <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
             <motion.div
-              className="h-full rounded-full bg-[hsl(var(--primary))]"
+              className="h-full rounded-full bg-primary"
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.7 }}
             />
@@ -573,10 +573,10 @@ export default function PortfolioPage() {
           className="space-y-6"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+            <span className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
               Portfolio intelligence report
             </span>
-            <span className="font-mono text-[10px] text-[hsl(var(--muted-foreground)/0.8)]">{reportAt ?? '—'}</span>
+            <span className="font-mono text-sm text-muted-foreground/80">{reportAt ?? '—'}</span>
           </div>
 
           {/* DNA score ring */}
@@ -589,7 +589,7 @@ export default function PortfolioPage() {
                   cy="70"
                   r="58"
                   fill="none"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeWidth="12"
                   strokeLinecap="round"
                   strokeDasharray={RING_C}
@@ -599,24 +599,24 @@ export default function PortfolioPage() {
                 />
               </svg>
               <div className="relative z-10 flex flex-col items-center">
-                <motion.span className="font-finance text-4xl font-bold tabular-nums text-[hsl(var(--foreground))]">
+                <motion.span className="font-finance text-4xl font-bold tabular-nums text-foreground">
                   {displayScore}
                 </motion.span>
-                <span className="text-sm text-[hsl(var(--muted-foreground))]">/100</span>
+                <span className="text-sm text-muted-foreground">/100</span>
               </div>
             </div>
-            <p className="mt-2 text-center text-[10px] font-mono tracking-widest text-[hsl(var(--muted-foreground))]">
+            <p className="mt-2 text-center text-sm font-mono tracking-widest text-muted-foreground">
               Portfolio DNA score
             </p>
           </div>
 
           {piePositions.length ? (
-            <div className="rounded-xl border border-[hsl(var(--border))] bg-surface p-5">
+            <div className="rounded-xl border border-border bg-surface p-5">
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+                <span className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
                   PORTFOLIO COMPOSITION
                 </span>
-                <span className="text-[11px] text-[hsl(var(--muted-foreground))]">Top holdings by value</span>
+                <span className="text-sm text-muted-foreground">Top holdings by value</span>
               </div>
               <PortfolioPie positions={piePositions} />
             </div>
@@ -624,8 +624,8 @@ export default function PortfolioPage() {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="text-sm font-medium text-[hsl(var(--foreground))]">{result.investor_type}</p>
-              <p className="mt-0.5 text-[11px] text-[hsl(var(--muted-foreground))]">Investor profile</p>
+              <p className="text-sm font-medium text-foreground">{result.investor_type}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Investor profile</p>
             </div>
             <div className="flex items-start justify-end">
               <span
@@ -650,8 +650,8 @@ export default function PortfolioPage() {
 
           <div>
             <div className="mb-3 flex items-center gap-2">
-              <Brain className="h-4 w-4 text-[hsl(var(--accent))]" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+              <Brain className="h-4 w-4 text-accent" />
+              <span className="text-sm font-mono uppercase tracking-widest text-muted-foreground">
                 AI insights
               </span>
             </div>
@@ -659,7 +659,7 @@ export default function PortfolioPage() {
               {insightItems.map((rec, i) => (
                 <div
                   key={i}
-                  className="rounded-r-lg border border-[hsl(var(--border))] border-l-2 border-l-[hsl(var(--accent)/0.5)] bg-surface-2 p-3 text-[12px] leading-relaxed text-[hsl(var(--muted-foreground))]"
+                  className="rounded-r-lg border border-border border-l-2 border-l-accent/50 bg-surface-2 p-3 text-sm leading-relaxed text-muted-foreground"
                 >
                   {rec}
                 </div>
@@ -668,9 +668,9 @@ export default function PortfolioPage() {
           </div>
 
           {!!result.positions?.length && (
-            <div className="relative overflow-hidden rounded-lg border border-[hsl(var(--border))] bg-surface">
+            <div className="relative overflow-hidden rounded-lg border border-border bg-surface">
               <table className="w-full text-sm">
-                <thead className="border-b border-[hsl(var(--border))] bg-[hsl(var(--surface-2))] text-[11px] uppercase tracking-widest text-[hsl(var(--muted-foreground))]">
+                <thead className="border-b border-border bg-surface-2 text-sm uppercase tracking-widest text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3 text-left">Symbol</th>
                     <th className="px-4 py-3 text-right">Shares</th>
@@ -681,7 +681,7 @@ export default function PortfolioPage() {
                 </thead>
                 <tbody>
                   {result.positions.slice(0, 10).map((p) => (
-                    <tr key={p.symbol} className="border-b border-[hsl(var(--border)/0.4)] hover:bg-[hsl(var(--surface-2)/0.5)]">
+                    <tr key={p.symbol} className="border-b border-border/40 hover:bg-surface-2/50">
                       <td className="px-4 py-3 font-mono">{p.symbol}</td>
                       <td className="px-4 py-3 text-right font-mono">{p.shares.toLocaleString()}</td>
                       <td className="px-4 py-3 text-right font-mono">${p.price.toFixed(2)}</td>
@@ -698,7 +698,7 @@ export default function PortfolioPage() {
             <section className="mt-8">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-medium text-white">Chart Lab</h2>
-                <span className="text-xs text-gray-500">AI-enriched · Swarm annotations active</span>
+                <span className="text-xs text-shell-subtle">AI-enriched · Swarm annotations active</span>
               </div>
               <ChartLab
                 positions={result.positions.map((p) => ({
@@ -757,7 +757,7 @@ export default function PortfolioPage() {
                   // Ignore circular reference errors from React-decorated objects
                 }
               }}
-              className="rounded-lg border border-[hsl(var(--border))] bg-transparent px-4 py-2 text-sm font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--surface-2))]"
+              className="rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2"
             >
               Save Analysis
             </button>
@@ -767,8 +767,8 @@ export default function PortfolioPage() {
               disabled={downloadLoading || !portfolioId}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${
                 isAdvisorPlan
-                  ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
-                  : 'bg-warning text-[hsl(var(--warning-foreground))]'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-warning text-[var(--text-primary)]'
               }`}
             >
               {downloadLoading ? (
@@ -785,7 +785,7 @@ export default function PortfolioPage() {
             {!isAdvisorPlan && (
               <Link
                 href="/pricing"
-                className="rounded-lg border border-[hsl(var(--border))] px-4 py-2 text-sm text-[hsl(var(--primary))]"
+                className="rounded-lg border border-border px-4 py-2 text-sm text-primary"
               >
                 Advisor report available on Pro plan
               </Link>
@@ -797,15 +797,15 @@ export default function PortfolioPage() {
             <div
               style={{
                 marginTop: 8, padding: '16px 20px',
-                background: 'hsl(var(--surface))',
-                border: '1px solid hsl(var(--primary)/0.3)',
+                background: 'var(--surface)',
+                border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
                 borderRadius: 10,
               }}
             >
-              <p className="mb-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+              <p className="mb-1 text-sm font-semibold text-foreground">
                 Step 2 unlocked — Run IC Analysis
               </p>
-              <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 12 }}>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
                 Your DNA score is ready. Run the 7-agent IC Analysis to unlock the full swarm briefing,
                 macro regime, alpha signals, and an IC-grade investment memo.
               </p>
@@ -813,13 +813,13 @@ export default function PortfolioPage() {
                 href="/swarm"
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
                 style={{
-                  background: 'hsl(var(--primary))',
-                  color: 'hsl(var(--primary-foreground))',
+                  background: 'var(--primary)',
+                  color: '#ffffff',
                 }}
               >
                 Run IC Analysis — 7-Agent Swarm →
               </Link>
-              <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 6 }}>
                 ~90 seconds · Required for the full 10-page IC report
               </p>
             </div>
@@ -828,15 +828,15 @@ export default function PortfolioPage() {
             <div
               style={{
                 marginTop: 8, padding: '16px 20px',
-                background: 'hsl(var(--surface))',
-                border: '1px solid hsl(var(--primary)/0.3)',
+                background: 'var(--surface)',
+                border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
                 borderRadius: 10,
               }}
             >
-              <p className="mb-1 text-sm font-semibold text-[hsl(var(--foreground))]">
+              <p className="mb-1 text-sm font-semibold text-foreground">
                 Step 3 unlocked — Generate IC Report PDF
               </p>
-              <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 12 }}>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
                 IC Analysis complete. Generate the full 10-page IC memo combining DNA + Swarm analysis.
               </p>
               <button
@@ -845,8 +845,8 @@ export default function PortfolioPage() {
                 disabled={downloadLoading || !portfolioId}
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
                 style={{
-                  background: 'hsl(var(--primary))',
-                  color: 'hsl(var(--primary-foreground))',
+                  background: 'var(--primary)',
+                  color: '#ffffff',
                 }}
               >
                 {downloadLoading ? (
