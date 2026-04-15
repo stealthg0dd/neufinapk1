@@ -45,7 +45,9 @@ def _get_embedding_sync(text: str) -> list[float] | None:
         from core.config import settings
 
         client = OpenAI(api_key=settings.OPENAI_KEY)
-        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:8000])
+        resp = client.embeddings.create(
+            model="text-embedding-3-small", input=text[:8000]
+        )
         return resp.data[0].embedding
     except Exception as exc:
         logger.warning("synthesiser.embedding_failed", error=str(exc))
@@ -115,8 +117,12 @@ def _build_events_text(events: list[dict]) -> str:
     lines = []
     for e in events:
         ticker = f" [{e['company_ticker']}]" if e.get("company_ticker") else ""
-        score = f" ({e['impact_score']:+.1f})" if e.get("impact_score") is not None else ""
-        lines.append(f"  • {e['event_type'].upper()}{ticker}: {e['title'][:100]}{score}")
+        score = (
+            f" ({e['impact_score']:+.1f})" if e.get("impact_score") is not None else ""
+        )
+        lines.append(
+            f"  • {e['event_type'].upper()}{ticker}: {e['title'][:100]}{score}"
+        )
     return "\n".join(lines)
 
 
@@ -147,13 +153,13 @@ async def generate_research_note(
     events = _fetch_recent_events(context_days)
     regime_summary = get_current_regime_summary()
 
-    instruction = NOTE_TYPE_INSTRUCTIONS.get(note_type, NOTE_TYPE_INSTRUCTIONS["macro_outlook"])
+    instruction = NOTE_TYPE_INSTRUCTIONS.get(
+        note_type, NOTE_TYPE_INSTRUCTIONS["macro_outlook"]
+    )
 
     override_text = ""
     if override_context:
-        override_text = (
-            f"\nADDITIONAL CONTEXT:\n{json.dumps(override_context, indent=2, default=str)}\n"
-        )
+        override_text = f"\nADDITIONAL CONTEXT:\n{json.dumps(override_context, indent=2, default=str)}\n"
 
     prompt = f"""Using the data below, produce a {note_type.replace("_", " ")} research note.
 
@@ -242,7 +248,8 @@ Return ONLY valid JSON — no markdown, no preamble:
         "confidence_score": confidence,
         "data_sources": data_sources,
         "generated_by": "synthesiser",
-        "is_public": note_type in ("macro_outlook", "regime_change"),  # Public notes visible to all
+        "is_public": note_type
+        in ("macro_outlook", "regime_change"),  # Public notes visible to all
     }
     if embedding:
         payload["embedding"] = embedding
@@ -254,7 +261,9 @@ Return ONLY valid JSON — no markdown, no preamble:
             # Migration lag safeguard: if slug column isn't deployed yet, retry without slug.
             if "slug" in str(exc).lower():
                 payload_no_slug = {k: v for k, v in payload.items() if k != "slug"}
-                insert_result = supabase.table("research_notes").insert(payload_no_slug).execute()
+                insert_result = (
+                    supabase.table("research_notes").insert(payload_no_slug).execute()
+                )
             else:
                 raise
         note = insert_result.data[0] if insert_result.data else payload

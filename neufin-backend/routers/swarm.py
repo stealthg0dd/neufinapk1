@@ -108,7 +108,9 @@ class GlobalChatRequest(BaseModel):
 
 
 # ── Background persistence helper ──────────────────────────────────────────────
-async def _persist_swarm_result(report_id: str, user_id: str | None, result: dict) -> str:
+async def _persist_swarm_result(
+    report_id: str, user_id: str | None, result: dict
+) -> str:
     """
     Persist swarm result to Supabase swarm_reports table.
     Now async and awaited directly in the analyze endpoint so the record is
@@ -162,7 +164,8 @@ async def _persist_swarm_result(report_id: str, user_id: str | None, result: dic
             thesis.get("recommendation_summary") or thesis.get("action_plan")
         ),
         # Market context columns
-        "investment_thesis": thesis.get("investment_thesis_body") or thesis.get("briefing"),
+        "investment_thesis": thesis.get("investment_thesis_body")
+        or thesis.get("briefing"),
         "market_regime": thesis.get("market_regime"),
         "quant_analysis": thesis.get("quant_analysis"),
         # tax_report is TEXT in schema — store as JSON string if it's a dict
@@ -187,7 +190,9 @@ async def _persist_swarm_result(report_id: str, user_id: str | None, result: dic
 
     try:
         await asyncio.to_thread(
-            lambda: supabase.table("swarm_reports").upsert(row, on_conflict="id").execute()
+            lambda: supabase.table("swarm_reports")
+            .upsert(row, on_conflict="id")
+            .execute()
         )
         logger.info("swarm.persist_ok", report_id=report_id, columns=list(row.keys()))
     except Exception as e:
@@ -429,7 +434,9 @@ async def get_swarm_status(job_id: str):
                     "_source": "supabase_fallback",
                 }
         except Exception as e:
-            logger.warning("swarm.status_db_fallback_failed", job_id=job_id, error=str(e))
+            logger.warning(
+                "swarm.status_db_fallback_failed", job_id=job_id, error=str(e)
+            )
         raise HTTPException(404, "Job not found or expired")
 
     result = job.get("result") or {}
@@ -442,7 +449,9 @@ async def get_swarm_status(job_id: str):
         "created_at": job["created_at"],
         "updated_at": job["updated_at"],
         "dna_score": (
-            thesis.get("dna_score") if isinstance(thesis, dict) else result.get("dna_score")
+            thesis.get("dna_score")
+            if isinstance(thesis, dict)
+            else result.get("dna_score")
         ),
         "headline": (thesis.get("headline") if isinstance(thesis, dict) else None),
     }
@@ -465,7 +474,11 @@ async def get_swarm_result(job_id: str):
     # Fallback 2: query Supabase — result persisted before job state expired
     try:
         db = await asyncio.to_thread(
-            lambda: supabase.table("swarm_reports").select("*").eq("id", job_id).limit(1).execute()
+            lambda: supabase.table("swarm_reports")
+            .select("*")
+            .eq("id", job_id)
+            .limit(1)
+            .execute()
         )
         if db.data:
             logger.info("swarm.result_db_fallback_hit", job_id=job_id)
@@ -509,7 +522,9 @@ async def analyze_with_swarm_sync(
         "critique": result.get("critique", ""),
         "agent_trace": result.get("agent_trace", []),
         "key_numbers": {
-            "dna_score": str(thesis.get("dna_score") or thesis.get("health_score") or ""),
+            "dna_score": str(
+                thesis.get("dna_score") or thesis.get("health_score") or ""
+            ),
             "weighted_beta": str(thesis.get("weighted_beta") or ""),
             "sharpe_ratio": str(thesis.get("sharpe_ratio") or ""),
             "regime": str(thesis.get("regime") or ""),
@@ -641,7 +656,9 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Could not fetch swarm report: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Could not fetch swarm report: {exc}"
+        ) from exc
 
     if not result.data:
         return {
@@ -704,7 +721,9 @@ async def get_latest_report(user: JWTUser = Depends(get_current_user)):
 
     # alpha_signal (new column name) / alpha_scout (old fallback) / strategist_intel
     alpha_scout = (
-        row.get("alpha_signal") or row.get("alpha_scout") or {"opportunities": [], "watchlist": []}
+        row.get("alpha_signal")
+        or row.get("alpha_scout")
+        or {"opportunities": [], "watchlist": []}
     )
     # strategist_intel is not a real column — reconstruct from macro_advice/recommendation_summary
     strategist_intel = row.get("strategist_intel") or {
@@ -739,7 +758,13 @@ async def get_report(report_id: str, user: JWTUser | None = Depends(get_optional
     Used by the frontend to restore thesis state on page refresh.
     """
     try:
-        row = supabase.table("swarm_reports").select("*").eq("id", report_id).single().execute()
+        row = (
+            supabase.table("swarm_reports")
+            .select("*")
+            .eq("id", report_id)
+            .single()
+            .execute()
+        )
         if not row.data:
             raise HTTPException(status_code=404, detail="Report not found.")
         report_user_id = row.data.get("user_id")
@@ -806,7 +831,9 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
         except HTTPException:
             raise
         except Exception as e:
-            logger.warning("chat.supabase_fetch_failed", record_id=body.record_id, error=str(e))
+            logger.warning(
+                "chat.supabase_fetch_failed", record_id=body.record_id, error=str(e)
+            )
         # Fall through to positions fallback if DB lookup fails
 
     # ── 3. Positions fallback (guest / no persisted report) ───────────────────
@@ -847,7 +874,9 @@ async def chat(body: ChatRequest, user: JWTUser | None = Depends(get_optional_us
         }
 
     # Dashboard / copilot with message only: market intelligence (no 400 loop)
-    return await global_chat(GlobalChatRequest(message=clean_message, agent_type="general"))
+    return await global_chat(
+        GlobalChatRequest(message=clean_message, agent_type="general")
+    )
 
 
 # ── System prompts per agent type ──────────────────────────────────────────────
@@ -909,7 +938,9 @@ async def global_chat(body: GlobalChatRequest):
         }
 
     agent_type = body.agent_type.lower().strip() if body.agent_type else "general"
-    system_prose = _GLOBAL_AGENT_PROMPTS.get(agent_type, _GLOBAL_AGENT_PROMPTS["general"])
+    system_prose = _GLOBAL_AGENT_PROMPTS.get(
+        agent_type, _GLOBAL_AGENT_PROMPTS["general"]
+    )
 
     prompt = f"""{system_prose}
 
@@ -987,7 +1018,9 @@ async def export_swarm_analysis_pdf(user: JWTUser = Depends(get_current_user)):
         )
     except Exception as exc:
         logger.error("swarm.export_pdf_query_failed", error=str(exc))
-        raise HTTPException(status_code=500, detail="Could not load Swarm analysis.") from exc
+        raise HTTPException(
+            status_code=500, detail="Could not load Swarm analysis."
+        ) from exc
 
     if not res.data:
         raise HTTPException(

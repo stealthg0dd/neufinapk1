@@ -47,7 +47,9 @@ def _portfolio_dataframe(positions: list[dict[str, Any]]) -> pd.DataFrame | None
     return df
 
 
-def _safe_build_risk_report(symbols: list[str], weights: dict[str, float]) -> dict[str, Any]:
+def _safe_build_risk_report(
+    symbols: list[str], weights: dict[str, float]
+) -> dict[str, Any]:
     try:
         from services.risk_engine import build_risk_report
 
@@ -78,7 +80,9 @@ async def _maybe_stress(portfolio_df: pd.DataFrame) -> dict[str, Any] | None:
         return None
 
 
-def _factor_metrics_safe(symbols: list[str], weights: dict[str, float]) -> list[dict[str, Any]]:
+def _factor_metrics_safe(
+    symbols: list[str], weights: dict[str, float]
+) -> list[dict[str, Any]]:
     try:
         from services.stress_tester import compute_factor_metrics
 
@@ -105,7 +109,9 @@ def run_models(
     pf_df = _portfolio_dataframe(positions)
     symbols = pf_df["ticker"].tolist() if pf_df is not None else []
     weights = (
-        {r["ticker"]: float(r["weight"]) for _, r in pf_df.iterrows()} if pf_df is not None else {}
+        {r["ticker"]: float(r["weight"]) for _, r in pf_df.iterrows()}
+        if pf_df is not None
+        else {}
     )
 
     parts: dict[str, Any] = {
@@ -160,7 +166,9 @@ async def combine_outputs(
     regime: dict[str, Any] | None = parts.get("regime")
     factors: list[dict[str, Any]] = parts.get("factor_metrics") or []
 
-    diversification_index = float((risk_report or {}).get("diversification_index") or 0.0)
+    diversification_index = float(
+        (risk_report or {}).get("diversification_index") or 0.0
+    )
     avg_corr = float((risk_report or {}).get("avg_pairwise_correlation") or 0.5)
 
     # Alpha score proxy: diversification reward minus correlation penalty
@@ -178,11 +186,14 @@ async def combine_outputs(
     vol_proxy = round(0.12 + avg_corr * 0.18, 4)
     sharpe_proxy = round(0.25 + (alpha_score / 100.0) * 0.9 - vol_proxy * 0.8, 3)
     max_dd_proxy = round(
-        0.08 + avg_corr * 0.12 + (1.0 - min(diversification_index / 10.0, 1.0)) * 0.05, 4
+        0.08 + avg_corr * 0.12 + (1.0 - min(diversification_index / 10.0, 1.0)) * 0.05,
+        4,
     )
 
     forecast_horizon_days = 20 if "forecast" in modes or "trading" in modes else 60
-    vol_shift_pct = round(-8.0 if "risk" in modes else (5.0 if "alpha" in modes else 0.0), 1)
+    vol_shift_pct = round(
+        -8.0 if "risk" in modes else (5.0 if "alpha" in modes else 0.0), 1
+    )
 
     regime_ctx: dict[str, Any] = {
         "label": (regime or {}).get("regime") or "neutral",
@@ -198,7 +209,10 @@ async def combine_outputs(
             for key, scen in list(stress_raw.items())[:4]:
                 if isinstance(scen, dict) and "impact_pct" in scen:
                     weakest_impacts.append(
-                        {"scenario": key, "impact_pct": round(float(scen["impact_pct"]), 2)}
+                        {
+                            "scenario": key,
+                            "impact_pct": round(float(scen["impact_pct"]), 2),
+                        }
                     )
             stress_summary = {
                 "scenarios_sampled": len(stress_raw),

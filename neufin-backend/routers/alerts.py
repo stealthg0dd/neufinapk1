@@ -151,7 +151,11 @@ async def notify_macro_shift(
         sb.table("macro_shift_alerts").insert(alert_row).execute()
 
         # Fetch all subscriptions
-        subs = sb.table("push_alert_subscriptions").select("expo_push_token,symbols").execute()
+        subs = (
+            sb.table("push_alert_subscriptions")
+            .select("expo_push_token,symbols")
+            .execute()
+        )
         if not subs.data:
             return
 
@@ -211,7 +215,9 @@ def _send_expo_messages(messages: list[dict]) -> None:
                 timeout=10.0,
             )
             if not r.ok:
-                logger.warning("alerts.expo_push_error", status=r.status_code, detail=r.text[:200])
+                logger.warning(
+                    "alerts.expo_push_error", status=r.status_code, detail=r.text[:200]
+                )
         except Exception as e:
             logger.warning("alerts.expo_push_request_failed", error=str(e))
 

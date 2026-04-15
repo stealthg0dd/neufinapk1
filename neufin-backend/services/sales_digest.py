@@ -51,7 +51,9 @@ def _build_digest() -> str:
 
     # This-week vs last-week new leads
     new_this_week = [row for row in leads if row.get("created_at", "") >= week_ago]
-    new_last_week = [row for row in leads if two_weeks_ago <= row.get("created_at", "") < week_ago]
+    new_last_week = [
+        row for row in leads if two_weeks_ago <= row.get("created_at", "") < week_ago
+    ]
 
     # Status counts across all time
     by_status: dict[str, int] = {}
@@ -65,7 +67,9 @@ def _build_digest() -> str:
 
     # Conversions this week
     won_this_week = [
-        row for row in leads if row.get("status") == "won" and row.get("won_at", "") >= week_ago
+        row
+        for row in leads
+        if row.get("status") == "won" and row.get("won_at", "") >= week_ago
     ]
 
     # Pipeline MRR potential (active non-lost, non-won leads)
@@ -83,7 +87,9 @@ def _build_digest() -> str:
     )
 
     # Top lead this week (most recently created)
-    top_lead = max(new_this_week, key=lambda row: row.get("created_at", ""), default=None)
+    top_lead = max(
+        new_this_week, key=lambda row: row.get("created_at", ""), default=None
+    )
     top_lead_str = (
         f"{top_lead['name']} from {top_lead.get('company', '—')}"
         if top_lead

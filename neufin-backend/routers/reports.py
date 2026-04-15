@@ -85,7 +85,12 @@ def _positions_from_dna_row(dna: dict | None) -> list[dict]:
         return []
     syms = dna.get("symbols") or dna.get("tickers")
     wts = dna.get("weights")
-    if isinstance(syms, list) and isinstance(wts, list) and len(syms) == len(wts) and len(syms) > 0:
+    if (
+        isinstance(syms, list)
+        and isinstance(wts, list)
+        and len(syms) == len(wts)
+        and len(syms) > 0
+    ):
         out = []
         for i in range(len(syms)):
             s, w = syms[i], wts[i]
@@ -118,12 +123,16 @@ def _normalize_positions(positions: list) -> list:
     if total_value <= 0:
         total_value = sum(
             float(p.get("shares") or 0)
-            * float(p.get("price") or p.get("current_price") or p.get("last_price") or 0)
+            * float(
+                p.get("price") or p.get("current_price") or p.get("last_price") or 0
+            )
             for p in positions
         )
 
     # Check current weight sum
-    weight_sum = sum(float(p.get("weight_pct") or p.get("weight") or 0) for p in positions)
+    weight_sum = sum(
+        float(p.get("weight_pct") or p.get("weight") or 0) for p in positions
+    )
 
     # Normalize if weights look like share counts (sum >> 100)
     # or weights are all zero
@@ -192,7 +201,9 @@ def _upload_to_storage(pdf_bytes: bytes, filename: str) -> str | None:
         )
         # Prefer a signed URL so the bucket can remain private
         try:
-            signed = supabase.storage.from_("advisor-reports").create_signed_url(path, 3600)
+            signed = supabase.storage.from_("advisor-reports").create_signed_url(
+                path, 3600
+            )
             url = signed.get("signedURL") or signed.get("signedUrl")
             if url:
                 return url
@@ -226,7 +237,9 @@ def _load_report_for_advisor(report_id: str, user: JWTUser) -> dict:
 
 
 @router.post("/generate")
-async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_current_user)):
+async def generate_report(
+    body: ReportRequest, user: JWTUser = Depends(get_current_user)
+):
     """
     Generate a 10-page IC PDF from portfolio metrics, DNA scores, and latest swarm output.
     No extra LLM calls — formatting and synthesis only.
@@ -236,7 +249,9 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
     """
     # Resolve advisor_id — "self" and None both map to the authenticated user.
     effective_advisor_id = (
-        body.advisor_id if body.advisor_id and body.advisor_id not in ("self", "") else str(user.id)
+        body.advisor_id
+        if body.advisor_id and body.advisor_id not in ("self", "")
+        else str(user.id)
     )
     logger.info(
         "report_generate_called",
@@ -248,10 +263,14 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
         # Gate: trial/paid advisor/enterprise generate directly; otherwise return checkout URL
         if not await can_download_report_free(user.id):
             if not STRIPE_PRICE_ADVISOR_REPORT_ONETIME:
-                raise HTTPException(503, "Stripe single-report price is not configured.")
+                raise HTTPException(
+                    503, "Stripe single-report price is not configured."
+                )
             try:
                 session = stripe.checkout.Session.create(
-                    line_items=[{"price": STRIPE_PRICE_ADVISOR_REPORT_ONETIME, "quantity": 1}],
+                    line_items=[
+                        {"price": STRIPE_PRICE_ADVISOR_REPORT_ONETIME, "quantity": 1}
+                    ],
                     mode="payment",
                     success_url=f"{APP_BASE_URL}/pricing/success",
                     cancel_url=f"{APP_BASE_URL}/pricing",
@@ -351,13 +370,17 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
                         parsed = json.loads(raw_alpha)
                         parsed_opps = (
                             parsed.get("opportunities")
-                            or parsed.get("alpha_opportunities", {}).get("opportunities")
+                            or parsed.get("alpha_opportunities", {}).get(
+                                "opportunities"
+                            )
                             or []
                         )
                     elif isinstance(raw_alpha, dict):
                         parsed_opps = (
                             raw_alpha.get("opportunities")
-                            or raw_alpha.get("alpha_opportunities", {}).get("opportunities")
+                            or raw_alpha.get("alpha_opportunities", {}).get(
+                                "opportunities"
+                            )
                             or []
                         )
                     elif isinstance(raw_alpha, list):
@@ -418,7 +441,9 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
                 portfolio_id=getattr(body, "portfolio_id", "unknown"),
                 user_id=str(user.id) if user else "unknown",
             )
-            raise HTTPException(status_code=500, detail=f"Data fetch failed: {e!s}") from e
+            raise HTTPException(
+                status_code=500, detail=f"Data fetch failed: {e!s}"
+            ) from e
 
         positions_raw = list(positions_result.data or [])
         if not positions_raw:
@@ -444,7 +469,9 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
                 num_positions=len(positions_raw),
                 portfolio_id=getattr(body, "portfolio_id", "unknown"),
             )
-            raise HTTPException(status_code=422, detail=f"Metrics calculation failed: {e!s}") from e
+            raise HTTPException(
+                status_code=422, detail=f"Metrics calculation failed: {e!s}"
+            ) from e
 
         quant_modes = _normalize_quant_modes(body.quant_modes)
         quant_result: dict | None = None
@@ -469,7 +496,9 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
         run_id = uuid.uuid4().hex[:8]
 
         advisor_config = {
-            "firm_name": (body.firm_name or adv.get("firm_name") or profile.get("full_name") or ""),
+            "firm_name": (
+                body.firm_name or adv.get("firm_name") or profile.get("full_name") or ""
+            ),
             "advisor_name": (
                 body.advisor_name
                 or adv.get("advisor_name")
@@ -478,7 +507,9 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
             ),
             "logo_base64": (body.logo_base64 or adv.get("logo_base64")),
             "logo_url": (
-                body.advisor_logo_url or profile.get("firm_logo_url") or profile.get("avatar_url")
+                body.advisor_logo_url
+                or profile.get("firm_logo_url")
+                or profile.get("avatar_url")
             ),
             "brand_colors": (
                 body.color_scheme.model_dump()
@@ -486,7 +517,9 @@ async def generate_report(body: ReportRequest, user: JWTUser = Depends(get_curre
                 else {"primary": profile.get("brand_primary_color") or "#1EB8CC"}
             ),
             "white_label": (body.white_label or bool(adv.get("white_label")) or False),
-            "advisor_email": (body.advisor_email or profile.get("email") or "info@neufin.ai"),
+            "advisor_email": (
+                body.advisor_email or profile.get("email") or "info@neufin.ai"
+            ),
             "client_name": body.client_name,
             "report_run_id": run_id,
         }
@@ -638,7 +671,9 @@ def _merge_quant_into_swarm_row(
     quant_analysis["model_contribution_summary"] = (
         quant_result.get("model_contribution_breakdown") or {}
     )
-    quant_analysis["alpha_risk_tradeoffs"] = quant_result.get("risk_adjusted_metrics") or {}
+    quant_analysis["alpha_risk_tradeoffs"] = (
+        quant_result.get("risk_adjusted_metrics") or {}
+    )
     quant_analysis["scenario_implications"] = {
         "forecast": quant_result.get("forecast") or {},
         "stress": quant_result.get("stress") or {},
@@ -660,21 +695,29 @@ def _merge_quant_into_swarm_row(
 
 
 @router.get("/{report_id}/download")
-async def download_report(report_id: str, user: JWTUser = Depends(require_active_subscription)):
+async def download_report(
+    report_id: str, user: JWTUser = Depends(require_active_subscription)
+):
     """Redirect to the Supabase Storage public URL for this report."""
     record = _load_report_for_advisor(report_id, user)
     pdf_url = record.get("pdf_url")
     if not pdf_url:
-        raise HTTPException(status_code=404, detail="PDF not yet available for this report.")
+        raise HTTPException(
+            status_code=404, detail="PDF not yet available for this report."
+        )
 
     return RedirectResponse(url=pdf_url)
 
 
 @router.get("/advisor/{advisor_id}")
-async def get_advisor_reports(advisor_id: str, user: JWTUser = Depends(get_current_user)):
+async def get_advisor_reports(
+    advisor_id: str, user: JWTUser = Depends(get_current_user)
+):
     """List all reports generated by an advisor, including public PDF URLs."""
     if advisor_id != user.id:
-        raise HTTPException(status_code=403, detail="You do not have access to these reports.")
+        raise HTTPException(
+            status_code=403, detail="You do not have access to these reports."
+        )
 
     try:
         result = (
