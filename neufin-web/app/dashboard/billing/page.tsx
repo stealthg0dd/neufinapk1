@@ -15,9 +15,9 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const PLAN_COLORS: Record<string, string> = {
-  trial: 'text-amber-400',
-  active: 'text-green-400',
-  expired: 'text-red-400',
+  trial: 'text-amber-700',
+  active: 'text-emerald-700',
+  expired: 'text-red-700',
 }
 
 function getPlanLabel(status: 'trial' | 'active' | 'expired'): string {
@@ -99,27 +99,27 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-section flex flex-col gap-6">
+    <div className="page-container max-w-2xl flex flex-col gap-6 py-section">
       <div>
         <h1 className="text-2xl font-bold text-navy">Subscription & Billing</h1>
         <p className="text-sm text-[#64748B] mt-1">Manage your Neufin plan</p>
       </div>
 
       {/* Current plan */}
-      <div className="glass-card-dark rounded-xl p-6">
-        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-4">Current Plan</h2>
+      <div className="data-card rounded-xl">
+        <h2 className="text-sm font-semibold text-[#64748B] uppercase tracking-wide mb-4">Current Plan</h2>
         <div className="flex items-center justify-between">
           <div>
             <p className={`text-xl font-bold ${getPlanColor(status)}`}>{getPlanLabel(status)}</p>
             {status === 'trial' && daysRemaining !== undefined && (
-              <p className="text-sm text-slate-300 mt-0.5">
+              <p className="text-sm text-[#64748B] mt-0.5">
                 {daysRemaining > 0
                   ? `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} remaining`
                   : 'Trial has ended'}
               </p>
             )}
             {status === 'active' && (
-              <p className="text-sm text-slate-300 mt-0.5">$99 / month · billed via Stripe</p>
+              <p className="text-sm text-[#64748B] mt-0.5">$99 / month · billed via Stripe</p>
             )}
           </div>
 
@@ -135,7 +135,7 @@ export default function BillingPage() {
 
         {/* Pro features list */}
         {status === 'active' && (
-          <ul className="mt-4 space-y-1.5 text-sm text-slate-300">
+          <ul className="mt-4 space-y-1.5 text-sm text-[#334155]">
             {[
               'Unlimited advisor reports',
               'White-label branding',
@@ -153,9 +153,9 @@ export default function BillingPage() {
 
       {/* Manage billing (Stripe portal) */}
       {status === 'active' && (
-        <div className="glass-card-dark rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-4">Manage Billing</h2>
-          <p className="text-sm text-slate-300 mb-4">
+        <div className="data-card rounded-xl">
+          <h2 className="text-sm font-semibold text-[#64748B] uppercase tracking-wide mb-4">Manage Billing</h2>
+          <p className="text-sm text-[#334155] mb-4">
             Update your payment method, download invoices, or cancel your subscription via the Stripe Customer Portal.
           </p>
           {portalError && <p className="text-xs text-red-400 mb-3">{portalError}</p>}
@@ -179,20 +179,20 @@ export default function BillingPage() {
 
       {/* DNA Score history (invoice-like record) */}
       {history.length > 0 && (
-        <div className="glass-card-dark rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-4">
+        <div className="data-card rounded-xl">
+          <h2 className="text-sm font-semibold text-[#64748B] uppercase tracking-wide mb-4">
             Analysis History
           </h2>
-          <div className="divide-y divide-white/10">
+          <div className="divide-y divide-[#F1F5F9]">
             {history.map((record) => (
               <div key={record.id} className="py-3 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-slate-100">{record.investor_type}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{fmtDate(record.created_at)}</p>
+                  <p className="text-sm font-medium text-navy">{record.investor_type}</p>
+                  <p className="text-xs text-[#64748B] mt-0.5">{fmtDate(record.created_at)}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-semibold text-primary">Score {record.dna_score}</p>
-                  <p className="text-xs text-slate-400">{fmtCurrency.format(record.total_value)}</p>
+                  <p className="text-xs text-[#64748B]">{fmtCurrency.format(record.total_value)}</p>
                 </div>
               </div>
             ))}

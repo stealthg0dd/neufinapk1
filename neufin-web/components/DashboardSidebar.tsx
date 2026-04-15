@@ -218,7 +218,7 @@ export default function DashboardSidebar({ user }: { user: User }) {
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] leading-snug text-[#64748B]">{user?.email ?? '—'}</p>
+            <p className="truncate text-sm leading-snug text-[#64748B]">{user?.email ?? '—'}</p>
           </div>
           <button
             type="button"

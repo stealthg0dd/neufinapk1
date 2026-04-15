@@ -97,17 +97,19 @@ export default function AdvisorDashboardPage() {
 
   if (loading || fetching) {
     return (
-      <div className="min-h-screen bg-shell-deep flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-app">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary/40 border-t-primary" />
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-shell-deep flex flex-col items-center justify-center gap-4 text-center px-6">
-        <p className="text-2xl font-bold text-white">Sign in required</p>
-        <Link href="/auth?next=/advisor/dashboard" className="btn-primary px-6 py-2">Sign In</Link>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-app px-6 text-center text-navy">
+        <p className="text-2xl font-bold">Sign in required</p>
+        <Link href="/auth?next=/advisor/dashboard" className="btn-primary px-6 py-2">
+          Sign In
+        </Link>
       </div>
     )
   }
@@ -116,30 +118,32 @@ export default function AdvisorDashboardPage() {
   const pendingReports = reports.filter(r => !r.is_paid)
 
   return (
-    <div className="min-h-screen flex flex-col bg-shell-deep">
+    <div className="flex min-h-screen flex-col bg-app text-navy">
       {/* Nav */}
-      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
+      <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
+          <Link href="/" className="text-xl font-bold text-gradient">
+            Neufin
+          </Link>
           <div className="flex items-center gap-4">
-            <Link href="/advisor/settings" className="text-shell-muted hover:text-white text-sm transition-colors">
+            <Link href="/advisor/settings" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
               ⚙ Settings
             </Link>
-            <Link href="/results" className="text-shell-muted hover:text-white text-sm transition-colors">
+            <Link href="/results" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
               DNA Results
             </Link>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-4xl mx-auto px-6 py-section w-full space-y-8">
+      <main className="mx-auto w-full max-w-4xl flex-1 space-y-8 px-6 py-section">
 
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-          <h1 className="text-2xl font-bold text-white mb-1">
+          <h1 className="mb-1 text-2xl font-bold text-navy">
             {profile?.firm_name ? `${profile.firm_name} Dashboard` : 'Advisor Dashboard'}
           </h1>
-          <p className="text-shell-subtle text-sm">Manage client reports and track your referral performance.</p>
+          <p className="text-sm text-muted2">Manage client reports and track your referral performance.</p>
         </motion.div>
 
         {/* Stats row */}
@@ -155,10 +159,10 @@ export default function AdvisorDashboardPage() {
             { label: 'Shares Sent',     value: shareCount,           icon: '📤' },
             { label: 'Referral Links',  value: referralUrl ? 1 : 0,  icon: '🔗' },
           ].map(stat => (
-            <div key={stat.label} className="card text-center">
-              <div className="text-2xl mb-1">{stat.icon}</div>
-              <div className="text-2xl font-bold text-white">{stat.value}</div>
-              <div className="text-xs text-shell-subtle mt-0.5">{stat.label}</div>
+            <div key={stat.label} className="card text-center ring-1 ring-inset ring-primary/30">
+              <div className="mb-1 text-2xl">{stat.icon}</div>
+              <div className="text-2xl font-bold text-navy">{stat.value}</div>
+              <div className="mt-0.5 text-xs text-muted2">{stat.label}</div>
             </div>
           ))}
         </motion.div>
@@ -169,10 +173,10 @@ export default function AdvisorDashboardPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.1 }}
-            className="card space-y-3"
+            className="card space-y-3 ring-1 ring-inset ring-primary/30"
           >
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-white">Your Referral Link</h2>
+              <h2 className="font-semibold text-navy">Your Referral Link</h2>
               <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">20% off for clients</span>
             </div>
             <div className="flex items-center gap-2">
@@ -190,8 +194,9 @@ export default function AdvisorDashboardPage() {
                 Copy
               </button>
             </div>
-            <p className="text-xs text-shell-subtle">
-              Share this link with potential clients. When they upload their portfolio through your link, they receive 20% off their first report — and you get credit for the referral.
+            <p className="text-xs text-muted2">
+              Share this link with potential clients. When they upload their portfolio through your link, they receive
+              20% off their first report — and you get credit for the referral.
             </p>
           </motion.div>
         )}
@@ -201,10 +206,10 @@ export default function AdvisorDashboardPage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.15 }}
-          className="card"
+          className="card ring-1 ring-inset ring-primary/30"
         >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-white">Client Reports</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold text-navy">Client Reports</h2>
             {!profile && (
               <Link href="/advisor/settings" className="text-xs text-primary hover:text-primary transition-colors">
                 Set up branding first →
@@ -213,17 +218,18 @@ export default function AdvisorDashboardPage() {
           </div>
 
           {genError && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 mb-4">
+            <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               {genError}
             </p>
           )}
 
           {reports.length === 0 ? (
-            <div className="text-center py-section space-y-3">
+            <div className="space-y-3 py-section text-center">
               <p className="text-4xl">📊</p>
-              <p className="text-shell-muted font-medium">No reports yet</p>
-              <p className="text-shell-subtle text-sm">
-                Share your referral link with clients. When they pay for a report through your link, it will appear here.
+              <p className="font-medium text-muted2">No reports yet</p>
+              <p className="text-sm text-muted2">
+                Share your referral link with clients. When they pay for a report through your link, it will appear
+                here.
               </p>
               <Link href="/advisor/settings" className="btn-primary inline-block mt-2 px-4 py-2 text-sm">
                 Set Up Your Profile
@@ -233,29 +239,25 @@ export default function AdvisorDashboardPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-xs text-shell-subtle border-b border-shell-border">
-                    <th className="text-left py-2 pr-4 font-medium">Date</th>
-                    <th className="text-left py-2 pr-4 font-medium">Portfolio ID</th>
-                    <th className="text-left py-2 pr-4 font-medium">Status</th>
-                    <th className="text-left py-2 font-medium">PDF</th>
+                  <tr className="border-b border-border text-xs text-muted2">
+                    <th className="py-2 pr-4 text-left font-medium">Date</th>
+                    <th className="py-2 pr-4 text-left font-medium">Portfolio ID</th>
+                    <th className="py-2 pr-4 text-left font-medium">Status</th>
+                    <th className="py-2 text-left font-medium">PDF</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-shell-border/60">
-                  {reports.map(report => (
-                    <tr key={report.id} className="hover:bg-shell/40 transition-colors">
-                      <td className="py-3 pr-4 text-shell-muted whitespace-nowrap">
-                        {fmt(report.created_at)}
-                      </td>
-                      <td className="py-3 pr-4 font-mono text-shell-fg/90 text-xs">
-                        {report.portfolio_id.slice(0, 12)}…
-                      </td>
+                <tbody className="divide-y divide-border">
+                  {reports.map((report) => (
+                    <tr key={report.id} className="transition-colors hover:bg-surface-2">
+                      <td className="whitespace-nowrap py-3 pr-4 text-muted2">{fmt(report.created_at)}</td>
+                      <td className="py-3 pr-4 font-mono text-xs text-navy">{report.portfolio_id.slice(0, 12)}…</td>
                       <td className="py-3 pr-4">
                         {report.is_paid ? (
-                          <span className="text-xs bg-green-500/15 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full">
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
                             Paid
                           </span>
                         ) : (
-                          <span className="text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-2 py-0.5 rounded-full">
+                          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-900">
                             Pending
                           </span>
                         )}
@@ -266,7 +268,7 @@ export default function AdvisorDashboardPage() {
                             href={report.pdf_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-primary hover:text-primary text-xs transition-colors"
+                            className="text-xs text-primary transition-colors hover:text-primary-dark"
                           >
                             Download ↗
                           </a>
@@ -275,11 +277,11 @@ export default function AdvisorDashboardPage() {
                             type="button"
                             disabled={generating === report.portfolio_id}
                             onClick={() => handleGeneratePDF(report.portfolio_id)}
-                            className="text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50 flex items-center gap-1"
+                            className="flex items-center gap-1 text-xs text-primary transition-colors hover:text-primary-dark disabled:opacity-50"
                           >
                             {generating === report.portfolio_id ? (
                               <>
-                                <span className="w-3 h-3 border border-purple-400/40 border-t-purple-400 rounded-full animate-spin" />
+                                <span className="h-3 w-3 animate-spin rounded-full border border-primary/40 border-t-primary" />
                                 Generating…
                               </>
                             ) : (
@@ -287,7 +289,7 @@ export default function AdvisorDashboardPage() {
                             )}
                           </button>
                         ) : (
-                          <span className="text-shell-subtle text-xs">—</span>
+                          <span className="text-xs text-muted2">—</span>
                         )}
                       </td>
                     </tr>
@@ -304,20 +306,21 @@ export default function AdvisorDashboardPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.2 }}
-            className="card border-purple-500/20 bg-purple-500/5"
+            className="card border border-primary/30 bg-primary-light/50 ring-1 ring-inset ring-primary/20"
           >
             <div className="flex items-start gap-4">
-              <div className="text-3xl shrink-0">🏷️</div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-white mb-1">Unlock White-Label Reports</h3>
-                <p className="text-shell-muted text-sm mb-3">
-                  Replace Neufin branding with your firm&apos;s logo and colors. Impress clients with fully branded advisor PDFs.
+              <div className="shrink-0 text-3xl">🏷️</div>
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1 font-semibold text-navy">Unlock White-Label Reports</h3>
+                <p className="mb-3 text-sm text-muted2">
+                  Replace Neufin branding with your firm&apos;s logo and colors. Impress clients with fully branded
+                  advisor PDFs.
                 </p>
                 <div className="flex items-center gap-3">
-                  <Link href="/advisor/settings" className="btn-primary text-sm px-4 py-2">
+                  <Link href="/advisor/settings" className="btn-primary px-4 py-2 text-sm">
                     Enable White-Labeling
                   </Link>
-                  <span className="text-xs text-shell-subtle">Requires Pro plan · $99/mo</span>
+                  <span className="text-xs text-muted2">Requires Pro plan · $99/mo</span>
                 </div>
               </div>
             </div>

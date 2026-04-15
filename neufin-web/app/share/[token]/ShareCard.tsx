@@ -202,10 +202,10 @@ export default function ShareCard({ data }: { data: DNAShare }) {
       {/* ── Primary CTA ────────────────────────────────────────────── */}
       <motion.div
         variants={fadeUp}
-        className="w-full card text-center border-blue-800/30 bg-gradient-to-br from-blue-950/40 to-purple-950/30"
+        className="card w-full border-primary/20 bg-gradient-to-br from-primary-light/80 to-surface-2 text-center"
       >
-        <p className="text-shell-fg/90 font-semibold mb-1">What&apos;s your Investor DNA?</p>
-        <p className="text-shell-subtle text-sm mb-4">
+        <p className="mb-1 font-semibold text-navy">What&apos;s your Investor DNA?</p>
+        <p className="mb-4 text-sm text-muted2">
           Upload your portfolio CSV — your analysis is ready in under 10 seconds.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

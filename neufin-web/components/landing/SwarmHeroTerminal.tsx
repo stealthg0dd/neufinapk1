@@ -101,7 +101,7 @@ export default function SwarmHeroTerminal() {
         <span className="h-2.5 w-2.5 rounded-full bg-risk/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
         <span className="h-2.5 w-2.5 rounded-full bg-positive/70" />
-        <span className="ml-2 font-mono text-sm text-slate-500">NEUFIN SWARM TERMINAL</span>
+        <span className="ml-2 font-mono text-sm text-slate-200">NEUFIN SWARM TERMINAL</span>
         <span className="ml-auto inline-flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-positive" style={{ animation: 'pulse-dot 1.2s ease-in-out infinite' }} />
           <span className="font-mono text-sm text-positive">LIVE</span>

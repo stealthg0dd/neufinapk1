@@ -97,7 +97,7 @@ export default function UploadPage() {
             {/* Status header */}
             <div className="text-center space-y-2 mb-8">
               <div className="inline-flex items-center gap-2 text-primary text-sm font-medium">
-                <span className="inline-block w-3.5 h-3.5 border-2 border-blue-400/40 border-t-blue-400 rounded-full animate-spin" />
+                <span className="inline-block w-3.5 h-3.5 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
                 AI is analyzing your portfolio…
               </div>
               <p className="text-xs text-shell-subtle">This usually takes 5–10 seconds</p>

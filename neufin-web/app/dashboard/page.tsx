@@ -29,7 +29,7 @@ function regimePillClass(regime: RegimeData | null): string {
     return 'inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900'
   }
   if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession') || u.includes('crisis')) {
-    return 'inline-block rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-sm font-semibold text-blue-900'
+    return 'inline-block rounded-md border border-primary/25 bg-primary-light px-2 py-0.5 text-sm font-semibold text-primary-dark'
   }
   if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery') || u.includes('growth')) {
     return 'inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-semibold text-emerald-900'
@@ -150,7 +150,7 @@ export default function DashboardPage() {
           <div>
             <Link
               href={hasPortfolio ? '/swarm' : '/dashboard/portfolio'}
-              className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-primary-dark"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
             >
               Generate IC report
             </Link>
@@ -227,7 +227,7 @@ export default function DashboardPage() {
           </p>
           <Link
             href="/swarm"
-            className="inline-block rounded-lg border border-blue-200 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-blue-100"
+            className="inline-block rounded-lg border border-primary/30 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-primary/15"
           >
             Run Swarm IC →
           </Link>
@@ -256,7 +256,7 @@ export default function DashboardPage() {
         </section>
       )}
 
-      <section className="flex flex-col justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
+      <section className="flex flex-col flex-wrap justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
         <div>
           <p className="text-sm font-medium text-slate-900">You&apos;re on NeuFin beta — your feedback shapes what we build.</p>
           <p className="mt-0.5 text-xs text-slate-600">Takes about five minutes · Read by the founding team</p>
@@ -264,7 +264,7 @@ export default function DashboardPage() {
         <Link href="/feedback" target="_blank" className="shrink-0">
           <button
             type="button"
-            className="rounded-lg border border-blue-200 bg-primary-light px-4 py-2 text-xs font-semibold text-primary-dark hover:bg-blue-100"
+            className="rounded-lg border border-primary/30 bg-primary-light px-4 py-2 text-xs font-semibold text-primary-dark hover:bg-primary/15"
           >
             Share feedback →
           </button>

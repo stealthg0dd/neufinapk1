@@ -335,7 +335,7 @@ export default function MarketClient({ health, trend }: Props) {
                   stroke="#3b82f6"
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ r: 4, fill: '#3b82f6' }}
+                  activeDot={{ r: 4, fill: '#1EB8CC' }}
                   name="Avg DNA Score"
                 />
               </LineChart>
@@ -348,9 +348,12 @@ export default function MarketClient({ health, trend }: Props) {
         </motion.div>
 
         {/* ── CTA ──────────────────────────────────────────────── */}
-        <motion.div variants={fadeUp} className="card border-blue-800/30 bg-gradient-to-br from-blue-950/30 to-purple-950/20 text-center space-y-3">
-          <p className="text-white font-semibold">Where do you rank?</p>
-          <p className="text-shell-subtle text-sm">
+        <motion.div
+          variants={fadeUp}
+          className="card space-y-3 border-primary/20 bg-gradient-to-br from-primary-light/80 to-surface-2 text-center"
+        >
+          <p className="font-semibold text-navy">Where do you rank?</p>
+          <p className="text-sm text-muted2">
             Upload your portfolio and see how your DNA Score compares to the platform average of {health.avg_dna_score}.
           </p>
           <div className="flex justify-center gap-3">

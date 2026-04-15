@@ -60,8 +60,8 @@ export function SwarmSourcesPanel({
             {items.map((s) => (
               <li key={s.id} className="text-sm leading-relaxed">
                 <span className="font-bold text-[#e5e5e5]">{s.label}</span>
-                <span className="text-[#666]"> — </span>
-                <span className="text-[#9ca3af]">{s.description}</span>
+                <span className="text-gray-400"> — </span>
+                <span className="text-gray-300">{s.description}</span>
               </li>
             ))}
           </ul>
@@ -70,7 +70,7 @@ export function SwarmSourcesPanel({
         {sources?.tickers && sources.tickers.length > 0 ? (
           <p className="mb-4 font-mono text-sm text-gray-400">
             Tickers in this run:{' '}
-            <span className="text-[#a1a1aa]">{sources.tickers.join(', ')}</span>
+            <span className="text-gray-300">{sources.tickers.join(', ')}</span>
           </p>
         ) : null}
 
@@ -80,21 +80,21 @@ export function SwarmSourcesPanel({
               <span className="inline group-open:hidden">Show agent run log ({steps.length} events)</span>
               <span className="hidden group-open:inline">Hide agent run log</span>
             </summary>
-            <div className="mt-4 max-h-64 overflow-y-auto rounded border border-[#1e1e1e] bg-[#080808] p-2 font-mono text-sm text-[#9ca3af]">
+            <div className="mt-4 max-h-64 overflow-y-auto rounded border border-[#1e1e1e] bg-[#080808] p-2 font-mono text-sm text-gray-300">
               {steps.map((ev, i) => (
                 <div
                   key={`${ev.agent}-${ev.ts}-${i}`}
                   className="border-b border-[#1a1a1a] py-1 last:border-0"
                 >
-                  <span className="text-[#444]">{ev.ts?.slice(11, 23) ?? '—'}</span>{' '}
+                  <span className="text-gray-400">{ev.ts?.slice(11, 23) ?? '—'}</span>{' '}
                   <span className="text-cyan-400/80">{ev.agent}</span>{' '}
                   <span className={ev.status === 'complete' ? 'text-green-500/90' : 'text-amber-400/90'}>
                     {ev.status}
                   </span>
                   {typeof ev.duration_ms === 'number' ? (
-                    <span className="text-[#666]"> · {ev.duration_ms.toFixed(0)}ms</span>
+                    <span className="text-gray-400"> · {ev.duration_ms.toFixed(0)}ms</span>
                   ) : null}
-                  {ev.summary ? <span className="text-[#555]"> — {ev.summary}</span> : null}
+                  {ev.summary ? <span className="text-gray-300"> — {ev.summary}</span> : null}
                 </div>
               ))}
             </div>

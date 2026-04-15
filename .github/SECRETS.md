@@ -62,8 +62,8 @@ Each webhook URL is an Incoming Webhook configured in the Neufin Slack workspace
 
 | Secret | Status | Description |
 |---|---|---|
-| `AGENT_OS_URL` | ✅ CONFIRMED SET | Base URL of the router-system (e.g. `https://ctech-production.up.railway.app`). Used to POST `/api/heartbeat/<service>` after deploys. |
-| `AGENT_OS_API_KEY` | ✅ CONFIRMED SET | Bearer token for heartbeat requests to Agent OS. |
+| `AGENT_OS_URL` | ✅ CONFIRMED SET | Base URL of the **live** router-system Railway service (no trailing slash). Dead hostnames produce Railway `Application not found` 404s, not FastAPI errors. |
+| `AGENT_OS_API_KEY` | ✅ CONFIRMED SET | Router machine credential (same value sent as `Authorization: Bearer` and `x-api-key`). **Not** the Supabase `service_role` key. |
 
 ---
 

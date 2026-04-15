@@ -3,19 +3,20 @@
  * The API key is injected from Vercel env and never reaches the browser.
  *
  * Required Vercel env vars:
- *   AGENT_OS_URL=https://ctech-production.up.railway.app
+ *   AGENT_OS_URL=https://<your-router-system>.up.railway.app
  *   AGENT_OS_API_KEY=<value of AGENT_OS_API_KEY in Railway>
  */
 
 import { NextResponse } from "next/server"
 
-const BASE = (process.env.AGENT_OS_URL ?? "https://ctech-production.up.railway.app").replace(/\/$/, "")
+const BASE = (process.env.AGENT_OS_URL ?? "").replace(/\/$/, "")
 const KEY  = process.env.AGENT_OS_API_KEY ?? ""
 
 async function get<T>(path: string, fallback: T): Promise<T> {
+  if (!BASE || !KEY) return fallback
   try {
     const res = await fetch(`${BASE}${path}`, {
-      headers: { "x-api-key": KEY },
+      headers: { "x-api-key": KEY, Authorization: `Bearer ${KEY}` },
       cache: "no-store",
     })
     if (!res.ok) return fallback
@@ -26,11 +27,11 @@ async function get<T>(path: string, fallback: T): Promise<T> {
 }
 
 export async function GET() {
-  if (!KEY) {
+  if (!BASE || !KEY) {
     return NextResponse.json({
       timestamp: new Date().toISOString(),
       providers: {}, budget: {}, briefs: [], agents: {}, rateLimits: {},
-      _warning: "AGENT_OS_API_KEY not configured — data unavailable",
+      _warning: "AGENT_OS_URL and AGENT_OS_API_KEY must both be set — data unavailable",
     })
   }
 

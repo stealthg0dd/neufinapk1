@@ -448,7 +448,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
                 return (
                   <div
                     key={j}
-                    className="aspect-square flex items-center justify-center rounded-sm text-[7px] font-mono cursor-default"
+                    className="aspect-square flex cursor-default items-center justify-center rounded-sm font-mono text-xs"
                     style={{ background: bg, color: text }}
                     title={`${rowSym} × ${colSym}: ρ=${v.toFixed(2)}`}
                   >
@@ -1081,15 +1081,15 @@ export default function SwarmPage() {
         </div>
       )}
 
-      <nav className="sticky top-0 z-10 flex h-12 items-center justify-between border-b border-border bg-white/95 px-6 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
+      <nav className="sticky top-0 z-10 flex min-h-12 flex-wrap items-center justify-between gap-y-2 border-b border-border bg-white/95 px-4 py-2 backdrop-blur-sm sm:px-6">
+        <div className="flex min-w-0 flex-shrink-0 items-center gap-3">
           <a href="/dashboard" className="text-sm font-bold tracking-wide text-primary transition-colors hover:text-primary-dark">
             NEUFIN
           </a>
           <span className="text-sm text-border">/</span>
           <span className="text-xs font-medium uppercase tracking-wide text-muted2">Investment Committee</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
           <Suspense fallback={null}>
             <CommandPalette
               positions={positions}

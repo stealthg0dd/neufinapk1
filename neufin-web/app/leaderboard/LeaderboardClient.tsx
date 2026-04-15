@@ -13,7 +13,7 @@ export interface LeaderboardEntry {
 }
 
 const TYPE_CONFIG: Record<string, { mono: string; color: string }> = {
-  'Diversified Strategist': { mono: 'DS', color: '#3b82f6' },
+  'Diversified Strategist': { mono: 'DS', color: '#1EB8CC' },
   'Conviction Growth': { mono: 'CG', color: '#8b5cf6' },
   'Momentum Trader': { mono: 'MT', color: '#f59e0b' },
   'Defensive Allocator': { mono: 'DA', color: '#16a34a' },
@@ -129,8 +129,8 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
         className="card text-center py-section"
       >
         <Trophy className="mx-auto mb-4 h-14 w-14 text-amber-500/80" aria-hidden />
-        <p className="text-shell-fg/90 font-semibold mb-1">The leaderboard is empty</p>
-        <p className="text-shell-subtle text-sm mb-6">Be the first investor to claim the top spot.</p>
+        <p className="mb-1 font-semibold text-navy">The leaderboard is empty</p>
+        <p className="mb-6 text-sm text-muted2">Be the first investor to claim the top spot.</p>
         <Link href="/upload" className="btn-primary inline-block">
           Analyze My Portfolio →
         </Link>
@@ -149,7 +149,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
       {myRank > 0 && (
         <motion.div
           variants={fadeUp}
-          className="card border-blue-800/40 bg-blue-950/20 flex items-center justify-between gap-3"
+          className="card flex items-center justify-between gap-3 border-primary/25 bg-primary-light/60"
         >
           <div className="flex items-center gap-3">
             <Dna className="h-8 w-8 shrink-0 text-primary" aria-hidden />
@@ -159,7 +159,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
             </div>
           </div>
           <div className="text-right shrink-0">
-            <span className="text-2xl font-extrabold text-white">#{myRank}</span>
+            <span className="text-2xl font-extrabold text-navy">#{myRank}</span>
             <p className="text-xs text-shell-subtle">of {entries.length}</p>
           </div>
         </motion.div>
@@ -209,7 +209,7 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
                   <Link
                     href={`/share/${entry.share_token}`}
                     className={`flex items-center gap-4 px-5 py-3.5 hover:bg-shell-raised/30 transition-colors group relative
-                      ${isMe ? 'bg-blue-950/20 border-l-2 border-l-blue-500' : ''}`}
+                      ${isMe ? 'border-l-2 border-l-primary bg-primary-light/50' : ''}`}
                   >
                     {/* Rank */}
                     <span className="w-8 text-center text-sm font-bold text-shell-subtle shrink-0">
@@ -258,10 +258,10 @@ export default function LeaderboardClient({ entries }: { entries: LeaderboardEnt
       {/* ── Bottom CTA ────────────────────────────────────────────── */}
       <motion.div
         variants={fadeUp}
-        className="card text-center border-blue-800/30 bg-gradient-to-br from-blue-950/40 to-purple-950/30 pb-6"
+        className="card border-primary/20 bg-gradient-to-br from-primary-light/80 to-surface-2 pb-6 text-center"
       >
-        <p className="text-shell-fg font-semibold mb-1">Think you can beat the top score?</p>
-        <p className="text-shell-subtle text-sm mb-4">
+        <p className="mb-1 font-semibold text-navy">Think you can beat the top score?</p>
+        <p className="mb-4 text-sm text-muted2">
           Upload your portfolio CSV and get your Investor DNA Score in seconds.
         </p>
         <Link href="/upload" className="btn-primary inline-block px-10 py-3">

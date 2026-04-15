@@ -10,8 +10,8 @@ import { apiFetch, apiGet } from '@/lib/api-client'
 // ── Section wrapper ────────────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="glass-card-dark rounded-xl p-6">
-      <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">{title}</h2>
+    <div className="data-card rounded-xl border border-[#E2E8F0]">
+      <h2 className="text-sm font-semibold text-[#64748B] uppercase tracking-wide mb-4">{title}</h2>
       {children}
     </div>
   )
@@ -21,10 +21,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-shell-subtle">{label}</label>
+      <label className="text-xs text-[#64748B]">{label}</label>
       <input
         {...props}
-        className="bg-shell border border-shell-border rounded-lg px-3 py-2 text-sm text-shell-fg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="input-base disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </div>
   )
@@ -35,21 +35,22 @@ function DeleteModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel:
   const [input, setInput] = useState('')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-shell border border-red-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
-        <h3 className="text-lg font-bold text-red-400 mb-2">Delete Account</h3>
-        <p className="text-sm text-shell-muted mb-4">
+      <div className="w-full max-w-sm rounded-xl border border-red-200 bg-white p-6 shadow-xl">
+        <h3 className="mb-2 text-lg font-bold text-red-700">Delete Account</h3>
+        <p className="mb-4 text-sm text-muted2">
           This permanently deletes your account and all data. Type <span className="font-mono text-red-400">DELETE</span> to confirm.
         </p>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="DELETE"
-          className="w-full bg-shell-raised border border-shell-border rounded-lg px-3 py-2 text-sm text-shell-fg focus:outline-none focus:ring-2 focus:ring-red-500/50 mb-4"
+          className="input-base mb-4 focus:ring-2 focus:ring-red-500/30"
         />
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={onCancel}
-            className="flex-1 py-2 rounded-lg border border-shell-border text-sm text-shell-muted hover:bg-shell-raised transition-colors"
+            className="flex-1 rounded-lg border border-border py-2 text-sm text-muted2 transition-colors hover:bg-surface-2"
           >
             Cancel
           </button>

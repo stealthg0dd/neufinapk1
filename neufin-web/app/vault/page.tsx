@@ -21,11 +21,11 @@ const fmt = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 const TYPE_COLORS: Record<string, string> = {
-  'Diversified Strategist': 'text-primary bg-primary/10 border-primary/20',
-  'Conviction Growth':      'text-purple-400 bg-purple-500/10 border-purple-500/20',
-  'Momentum Trader':        'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
-  'Defensive Allocator':    'text-green-400 bg-green-500/10 border-green-500/20',
-  'Speculative Investor':   'text-red-400 bg-red-500/10 border-red-500/20',
+  'Diversified Strategist': 'border-primary/30 bg-primary-light text-primary-dark',
+  'Conviction Growth': 'border-purple-200 bg-purple-50 text-purple-900',
+  'Momentum Trader': 'border-amber-200 bg-amber-50 text-amber-900',
+  'Defensive Allocator': 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  'Speculative Investor': 'border-red-200 bg-red-50 text-red-800',
 }
 
 const stagger = {
@@ -75,14 +75,16 @@ export default function VaultPage() {
   // Redirect to auth if not logged in
   if (!authLoading && !user) {
     return (
-      <div className="min-h-screen bg-shell-deep flex flex-col items-center justify-center gap-5 text-center px-6">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-app px-6 text-center text-navy">
         <div className="text-5xl">🔒</div>
-        <h1 className="text-2xl font-bold text-white">Your Vault</h1>
-        <p className="text-shell-subtle text-sm max-w-xs">
+        <h1 className="text-2xl font-bold">Your Vault</h1>
+        <p className="max-w-xs text-sm text-muted2">
           Sign in to access your portfolio history, saved reports, and subscription details — across all your devices.
         </p>
-        <Link href="/auth?next=/vault" className="btn-primary px-8 py-3">Sign In →</Link>
-        <Link href="/upload" className="text-sm text-shell-subtle hover:text-shell-muted transition-colors">
+        <Link href="/auth?next=/vault" className="btn-primary px-8 py-3">
+          Sign In →
+        </Link>
+        <Link href="/upload" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
           Or analyse a portfolio first
         </Link>
       </div>
@@ -91,8 +93,8 @@ export default function VaultPage() {
 
   if (authLoading || fetching) {
     return (
-      <div className="min-h-screen bg-shell-deep flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-app">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary/40 border-t-primary" />
       </div>
     )
   }
@@ -107,39 +109,44 @@ export default function VaultPage() {
   const latestScore = history[0]?.dna_score ?? null
 
   return (
-    <div className="min-h-screen flex flex-col bg-shell-deep">
+    <div className="flex min-h-screen flex-col bg-app text-navy">
       <AppHeader />
       {/* Nav */}
-      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
+      <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
+          <Link href="/" className="text-xl font-bold text-gradient">
+            Neufin
+          </Link>
           <div className="flex items-center gap-4">
-            <Link href="/results" className="text-shell-muted hover:text-white text-sm transition-colors">
+            <Link href="/results" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
               Results
             </Link>
-            <button onClick={signOut} className="text-shell-subtle hover:text-shell-muted text-sm transition-colors">
+            <button
+              type="button"
+              onClick={signOut}
+              className="text-sm text-muted2 transition-colors hover:text-primary-dark"
+            >
               Sign out
             </button>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-4xl mx-auto px-6 py-section w-full">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-section">
         <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-8">
 
           {/* ── Header ─────────────────────────────────────── */}
           <motion.div variants={fadeUp} className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+              <h1 className="flex items-center gap-2 text-2xl font-bold text-navy">
                 Your Vault
                 {isPro && (
-                  <span className="text-xs bg-gradient-to-r from-yellow-500/20 to-amber-500/20
-                    border border-yellow-500/30 text-yellow-400 px-2 py-0.5 rounded-full font-semibold">
+                  <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900">
                     PRO
                   </span>
                 )}
               </h1>
-              <p className="text-shell-subtle text-sm mt-0.5">
+              <p className="mt-0.5 text-sm text-muted2">
                 {user?.email} · {history.length} analysis{history.length !== 1 ? 'es' : ''} saved
               </p>
             </div>
@@ -156,32 +163,29 @@ export default function VaultPage() {
               { label: 'Total Analyses',  value: history.length,       icon: '📊' },
               { label: 'Plan',            value: isPro ? 'Pro' : 'Free', icon: isPro ? '⭐' : '🆓' },
             ].map(stat => (
-              <div key={stat.label} className="card text-center">
-                <div className="text-2xl mb-1">{stat.icon}</div>
-                <div className="text-2xl font-bold text-white">{stat.value}</div>
-                <div className="text-xs text-shell-subtle mt-0.5">{stat.label}</div>
+              <div key={stat.label} className="card text-center ring-1 ring-inset ring-primary/30">
+                <div className="mb-1 text-2xl">{stat.icon}</div>
+                <div className="text-2xl font-bold text-navy">{stat.value}</div>
+                <div className="mt-0.5 text-xs text-muted2">{stat.label}</div>
               </div>
             ))}
           </motion.div>
 
           {/* ── Subscription card ──────────────────────────── */}
-          <motion.div variants={fadeUp}
-            className={`card ${isPro
-              ? 'border-yellow-500/20 bg-gradient-to-br from-yellow-950/20 to-amber-950/10'
-              : 'border-shell-border'}`}
+          <motion.div
+            variants={fadeUp}
+            className={`card ring-1 ring-inset ring-primary/30 ${
+              isPro ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-surface-2' : ''
+            }`}
           >
-            <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="mb-1 flex items-center gap-2">
                   <span className="text-lg">{isPro ? '⭐' : '🆓'}</span>
-                  <h2 className="font-semibold text-white">
-                    {isPro ? 'Pro Advisor' : 'Free Plan'}
-                  </h2>
-                  {advisorName && (
-                    <span className="text-xs text-shell-subtle">· {advisorName}</span>
-                  )}
+                  <h2 className="font-semibold text-navy">{isPro ? 'Pro Advisor' : 'Free Plan'}</h2>
+                  {advisorName && <span className="text-xs text-muted2">· {advisorName}</span>}
                 </div>
-                <p className="text-shell-subtle text-sm">
+                <p className="text-sm text-muted2">
                   {isPro
                     ? 'Unlimited reports · White-label PDFs · Priority AI analysis'
                     : 'Upgrade to Pro for unlimited reports and white-label advisor branding.'}
@@ -194,9 +198,9 @@ export default function VaultPage() {
                     disabled={portalLoading}
                     className="btn-outline text-sm px-4 py-2 flex items-center gap-2"
                   >
-                    {portalLoading
-                      ? <span className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                      : null}
+                    {portalLoading ? (
+                      <span className="h-3 w-3 animate-spin rounded-full border border-primary/40 border-t-primary" />
+                    ) : null}
                     Manage Billing
                   </button>
                 ) : (
@@ -207,16 +211,14 @@ export default function VaultPage() {
               </div>
             </div>
             {portalError && (
-              <p className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">
-                {portalError}
-              </p>
+              <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{portalError}</p>
             )}
           </motion.div>
 
           {/* ── Analysis history ───────────────────────────── */}
-          <motion.div variants={fadeUp} className="card space-y-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <h2 className="font-semibold text-white">Analysis History</h2>
+          <motion.div variants={fadeUp} className="card space-y-4 ring-1 ring-inset ring-primary/30">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-semibold text-navy">Analysis History</h2>
               {history.length > 4 && (
                 <input
                   type="search"
@@ -231,14 +233,10 @@ export default function VaultPage() {
             {filtered.length === 0 ? (
               <div className="text-center py-section space-y-3">
                 <p className="text-4xl">📭</p>
-                <p className="text-shell-muted font-medium">
-                  {history.length === 0 ? 'No analyses yet' : 'No matches'}
-                </p>
+                <p className="font-medium text-muted2">{history.length === 0 ? 'No analyses yet' : 'No matches'}</p>
                 {history.length === 0 && (
                   <>
-                    <p className="text-shell-subtle text-sm">
-                      Upload your first portfolio CSV to see your Investor DNA Score here.
-                    </p>
+                    <p className="text-sm text-muted2">Upload your first portfolio CSV to see your Investor DNA Score here.</p>
                     <Link href="/upload" className="btn-primary inline-block mt-2 px-5 py-2 text-sm">
                       Analyse My Portfolio →
                     </Link>
@@ -246,7 +244,7 @@ export default function VaultPage() {
                 )}
               </div>
             ) : (
-              <div className="divide-y divide-shell-border/60">
+              <div className="divide-y divide-border">
                 {filtered.map((record, i) => (
                   <motion.div
                     key={record.id}
@@ -256,10 +254,14 @@ export default function VaultPage() {
                     className="py-4 flex items-start gap-4"
                   >
                     {/* Score badge */}
-                    <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 font-bold
-                      ${record.dna_score >= 70 ? 'bg-green-500/15 text-green-400'
-                        : record.dna_score >= 40 ? 'bg-yellow-500/15 text-yellow-400'
-                        : 'bg-red-500/15 text-red-400'}`}
+                    <div
+                      className={`flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl font-bold ${
+                        record.dna_score >= 70
+                          ? 'bg-emerald-50 text-emerald-800'
+                          : record.dna_score >= 40
+                            ? 'bg-amber-50 text-amber-900'
+                            : 'bg-red-50 text-red-800'
+                      }`}
                     >
                       <span className="text-lg leading-none">{record.dna_score}</span>
                       <span className="text-sm text-current opacity-70">DNA</span>
@@ -268,30 +270,33 @@ export default function VaultPage() {
                     {/* Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-xs border px-2 py-0.5 rounded-full ${
-                          TYPE_COLORS[record.investor_type] ?? 'text-shell-muted bg-shell-raised border-shell-border'
-                        }`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-xs ${
+                            TYPE_COLORS[record.investor_type] ??
+                            'border-border bg-surface-2 text-muted2'
+                          }`}
+                        >
                           {record.investor_type}
                         </span>
-                        <span className="text-xs text-shell-subtle">{fmt(record.created_at)}</span>
+                        <span className="text-xs text-muted2">{fmt(record.created_at)}</span>
                         {record.total_value > 0 && (
-                          <span className="text-xs text-shell-subtle">{usd(record.total_value)}</span>
+                          <span className="text-xs text-muted2">{usd(record.total_value)}</span>
                         )}
                       </div>
-                      <p className="text-xs text-shell-subtle mt-1.5 line-clamp-2">{record.recommendation}</p>
+                      <p className="mt-1.5 line-clamp-2 text-xs text-muted2">{record.recommendation}</p>
                     </div>
 
                     {/* Actions */}
                     <div className="flex flex-col gap-1.5 shrink-0 items-end">
                       <Link
                         href={`/share/${record.share_token}`}
-                        className="text-xs text-primary hover:text-primary transition-colors"
+                        className="text-xs text-primary transition-colors hover:text-primary-dark"
                       >
                         View ↗
                       </Link>
                       <Link
                         href={`/upload?rerun=${record.share_token}`}
-                        className="text-xs text-shell-subtle hover:text-shell-fg/90 transition-colors"
+                        className="text-xs text-muted2 transition-colors hover:text-navy"
                         title="Re-run with current market prices"
                       >
                         Re-run ↻
@@ -304,17 +309,25 @@ export default function VaultPage() {
           </motion.div>
 
           {/* ── Account actions ─────────────────────────────── */}
-          <motion.div variants={fadeUp}
-            className="flex items-center justify-between text-xs text-shell-subtle border-t border-shell-border/60 pt-4"
+          <motion.div
+            variants={fadeUp}
+            className="flex items-center justify-between border-t border-border pt-4 text-xs text-muted2"
           >
             <div className="flex gap-4">
-              <Link href="/advisor/settings" className="hover:text-shell-muted transition-colors">Advisor Settings</Link>
-              <Link href="/advisor/dashboard" className="hover:text-shell-muted transition-colors">Dashboard</Link>
-              <Link href="/market" className="hover:text-shell-muted transition-colors">Market DNA</Link>
+              <Link href="/advisor/settings" className="transition-colors hover:text-primary-dark">
+                Advisor Settings
+              </Link>
+              <Link href="/advisor/dashboard" className="transition-colors hover:text-primary-dark">
+                Dashboard
+              </Link>
+              <Link href="/market" className="transition-colors hover:text-primary-dark">
+                Market DNA
+              </Link>
             </div>
             <button
+              type="button"
               onClick={signOut}
-              className="text-shell-subtle hover:text-red-400 transition-colors"
+              className="transition-colors hover:text-red-600"
             >
               Sign out
             </button>

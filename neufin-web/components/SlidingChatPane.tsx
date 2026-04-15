@@ -88,7 +88,7 @@ function StreamingBubble({ msg }: { msg: Message }) {
   return (
     <div className="flex justify-start gap-2">
       <div
-        className="mt-1 h-fit flex-shrink-0 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider"
+        className="mt-1 h-fit flex-shrink-0 px-1 py-0.5 text-xs font-bold uppercase tracking-wider"
         style={{
           border: `1px solid ${TRANS_ACCENT}66`,
           color: TRANS_ACCENT,
@@ -127,7 +127,7 @@ function StreamingBubble({ msg }: { msg: Message }) {
           >
             {Object.entries(msg.keyNumbers).map(([k, v]) => (
               <div key={k} className="flex items-center gap-1.5">
-                <span className="text-[8px] uppercase tracking-wide text-slate-500">{k}:</span>
+                <span className="text-xs uppercase tracking-wide text-slate-500">{k}:</span>
                 <span className="text-sm font-bold" style={{ color: TRANS_ACCENT }}>
                   {String(v)}
                 </span>
@@ -146,7 +146,7 @@ function StreamingBubble({ msg }: { msg: Message }) {
         )}
 
         {isDone && msg.steps && msg.steps.length > 0 && (
-          <details className="text-[8px]" style={{ fontFamily: MONO }}>
+          <details className="text-xs" style={{ fontFamily: MONO }}>
             <summary className="cursor-pointer uppercase tracking-wide text-slate-600">
               {msg.steps.length} reasoning steps
             </summary>
@@ -335,7 +335,7 @@ export function SlidingChatPane({
                       fontFamily: MONO,
                     }}
                   >
-                    <div className="mb-1 flex items-center gap-1 text-[8px] uppercase tracking-wide text-slate-600">
+                    <div className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wide text-slate-600">
                       <User className="h-3 w-3" /> You
                     </div>
                     {msg.content}
@@ -349,7 +349,7 @@ export function SlidingChatPane({
             {loading && (
               <div className="flex items-center gap-2 text-sm" style={{ fontFamily: MONO, color: TRANS_MUTED }}>
                 <span
-                  className="shrink-0 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-primary"
+                  className="shrink-0 px-1 py-0.5 text-xs font-bold uppercase tracking-wider text-primary"
                   style={{ border: `1px solid ${TRANS_ACCENT}44` }}
                 >
                   MD

@@ -4,7 +4,7 @@
  * API key is injected from env — never exposed to the browser.
  *
  * Required env vars:
- *   AGENT_OS_URL=https://ctech-production.up.railway.app
+ *   AGENT_OS_URL=https://<your-router-system>.up.railway.app
  *   AGENT_OS_API_KEY=<your key>
  */
 
@@ -13,13 +13,14 @@ import type { DashboardData } from "@/lib/dashboard-types"
 
 export const revalidate = 30
 
-const BASE = (process.env.AGENT_OS_URL ?? "https://ctech-production.up.railway.app").replace(/\/$/, "")
+const BASE = (process.env.AGENT_OS_URL ?? "").replace(/\/$/, "")
 const KEY  = process.env.AGENT_OS_API_KEY ?? ""
 
 async function agentGet<T>(path: string, fallback: T): Promise<T> {
+  if (!BASE || !KEY) return fallback
   try {
     const res = await fetch(`${BASE}${path}`, {
-      headers: { "x-api-key": KEY },
+      headers: { "x-api-key": KEY, Authorization: `Bearer ${KEY}` },
       next: { revalidate: 30 },
     })
     if (!res.ok) return fallback
@@ -30,13 +31,13 @@ async function agentGet<T>(path: string, fallback: T): Promise<T> {
 }
 
 export async function GET() {
-  if (!KEY) {
+  if (!BASE || !KEY) {
     const empty: DashboardData = {
       timestamp: new Date().toISOString(),
       briefs: [], providers: {}, rateLimits: {}, callLogs: [],
       budget: { daily_spend: 0, daily_cap: 15, daily_remaining: 15, monthly_spend: 0, monthly_cap: 400, monthly_remaining: 400 },
     }
-    return NextResponse.json({ ...empty, _warning: "AGENT_OS_API_KEY not configured — data unavailable" })
+    return NextResponse.json({ ...empty, _warning: "AGENT_OS_URL and AGENT_OS_API_KEY must both be set — data unavailable" })
   }
 
   const [briefs, routerStatus, callLogsRaw, _agents] = await Promise.all([

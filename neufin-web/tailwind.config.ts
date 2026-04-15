@@ -90,6 +90,18 @@ const config: Config = {
         },
         ring: t.primary,
       },
+      borderRadius: {
+        sm: '6px',
+        md: '10px',
+        lg: '14px',
+        xl: '20px',
+        '2xl': '24px',
+      },
+      boxShadow: {
+        sm: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+        md: '0 4px 12px rgba(0,0,0,0.08)',
+        lg: '0 8px 24px rgba(0,0,0,0.10)',
+      },
       fontSize: {
         h1: ['2.25rem', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
         'h1-lg': ['3rem', { lineHeight: '1.15', letterSpacing: '-0.025em' }],

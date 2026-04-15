@@ -79,7 +79,7 @@ export default function PublicResearchHubClient({ notes }: { notes: BlogNote[] }
               {fmtType(note.note_type)}
             </span>
             <h3 className="mb-2 mt-2 text-base font-semibold leading-snug text-foreground">{note.title}</h3>
-            <p className="mb-3 line-clamp-3 text-[13px] text-muted-foreground">{note.executive_summary}</p>
+            <p className="mb-3 line-clamp-3 text-sm text-muted-foreground">{note.executive_summary}</p>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="font-mono text-muted-foreground/60">
                 {new Date(note.created_at).toLocaleDateString('en-SG', { dateStyle: 'medium' })}

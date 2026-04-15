@@ -16,13 +16,19 @@ export default function NewClientPage() {
   const [error, setError] = useState<string | null>(null)
 
   function handleField(key: keyof typeof form, value: string) {
-    setForm(f => ({ ...f, [key]: value }))
+    setForm((f) => ({ ...f, [key]: value }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!token) { setError('Not authenticated'); return }
-    if (!form.client_name.trim()) { setError('Client name is required'); return }
+    if (!token) {
+      setError('Not authenticated')
+      return
+    }
+    if (!form.client_name.trim()) {
+      setError('Client name is required')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -44,71 +50,73 @@ export default function NewClientPage() {
   }
 
   return (
-    <div className="min-h-screen bg-shell-deep text-shell-fg px-4 py-section">
-      <div className="max-w-lg mx-auto space-y-6">
+    <div className="min-h-screen bg-app px-4 py-section text-navy">
+      <div className="mx-auto max-w-lg space-y-6">
         <div className="flex items-center gap-4">
-          <Link href="/advisor/dashboard" className="text-shell-subtle hover:text-shell-fg/90 text-sm">
+          <Link href="/advisor/dashboard" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
             ← Back
           </Link>
           <div>
-            <h1 className="text-xl font-bold">Add New Client</h1>
-            <p className="text-sm text-shell-muted">Create a client portfolio in your dashboard</p>
+            <h1 className="text-xl font-bold text-navy">Add New Client</h1>
+            <p className="text-sm text-muted2">Create a client portfolio in your dashboard</p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-shell-border bg-shell p-6 space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5 rounded-2xl border border-primary/30 bg-white p-6 shadow-sm"
+        >
           <div>
-            <label className="block text-sm font-medium text-shell-fg/90 mb-1.5">Client Name *</label>
+            <label className="mb-1.5 block text-sm font-medium text-navy">Client Name *</label>
             <input
               type="text"
               required
               value={form.client_name}
               onChange={(e) => handleField('client_name', e.target.value)}
               placeholder="e.g. John Tan"
-              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none"
+              className="input-base text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-shell-fg/90 mb-1.5">Client Email</label>
+            <label className="mb-1.5 block text-sm font-medium text-navy">Client Email</label>
             <input
               type="email"
               value={form.client_email}
               onChange={(e) => handleField('client_email', e.target.value)}
               placeholder="client@example.com (optional)"
-              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none"
+              className="input-base text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-shell-fg/90 mb-1.5">Notes</label>
+            <label className="mb-1.5 block text-sm font-medium text-navy">Notes</label>
             <textarea
               rows={3}
               value={form.notes}
               onChange={(e) => handleField('notes', e.target.value)}
               placeholder="Investment objectives, risk tolerance, key concerns..."
-              className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2.5 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none resize-none"
+              className="input-base resize-none text-sm"
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={saving}
-            className="w-full rounded-xl bg-primary hover:bg-primary disabled:opacity-50 py-3 text-sm font-semibold text-white transition-colors"
+            className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:opacity-50"
           >
             {saving ? 'Adding client…' : 'Add Client'}
           </button>
         </form>
 
-        <div className="rounded-xl border border-shell-border bg-shell/50 p-4">
-          <p className="text-xs text-shell-subtle">
-            After adding the client, you can upload their portfolio CSV from the advisor dashboard to run a DNA analysis and generate white-label reports.
+        <div className="rounded-xl border border-primary/30 bg-primary-light/40 p-4">
+          <p className="text-xs text-muted2">
+            After adding the client, you can upload their portfolio CSV from the advisor dashboard to run a DNA
+            analysis and generate white-label reports.
           </p>
         </div>
       </div>

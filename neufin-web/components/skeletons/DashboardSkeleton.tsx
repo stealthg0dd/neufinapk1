@@ -4,7 +4,7 @@ export default function DashboardSkeleton() {
     <div className="max-w-screen-xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
 
       {/* Portfolio value line chart */}
-      <div className="glass-card-dark rounded-xl p-5">
+      <div className="data-card border border-[#E2E8F0] rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="space-y-2">
             <div className="shimmer h-3 w-32 rounded" />
@@ -19,7 +19,7 @@ export default function DashboardSkeleton() {
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_280px] gap-4">
 
         {/* Holdings list */}
-        <div className="glass-card-dark rounded-xl p-5 flex flex-col gap-3">
+        <div className="data-card border border-[#E2E8F0] rounded-xl p-5 flex flex-col gap-3">
           <div className="shimmer h-3 w-24 rounded" />
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="space-y-1.5">
@@ -33,7 +33,7 @@ export default function DashboardSkeleton() {
         </div>
 
         {/* Candlestick chart */}
-        <div className="glass-card-dark rounded-xl p-5 flex flex-col gap-3">
+        <div className="data-card border border-[#E2E8F0] rounded-xl p-5 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <div className="shimmer h-6 w-16 rounded" />
             <div className="shimmer h-4 w-12 rounded" />
@@ -42,7 +42,7 @@ export default function DashboardSkeleton() {
         </div>
 
         {/* AI Insights */}
-        <div className="glass-card-dark rounded-xl p-5 flex flex-col gap-4">
+        <div className="data-card border border-[#E2E8F0] rounded-xl p-5 flex flex-col gap-4">
           <div className="shimmer h-3 w-32 rounded" />
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -63,7 +63,7 @@ export default function DashboardSkeleton() {
       </div>
 
       {/* Sector pie */}
-      <div className="glass-card-dark rounded-xl p-5">
+      <div className="data-card border border-[#E2E8F0] rounded-xl p-5">
         <div className="shimmer h-3 w-32 rounded mb-4" />
         <div className="shimmer h-48 rounded-lg" />
       </div>

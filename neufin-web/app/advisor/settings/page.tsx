@@ -10,7 +10,7 @@ import { debugAuth } from '@/lib/auth-debug'
 import { upsertAdvisorProfile, type AdvisorProfile } from '@/lib/api'
 
 const BRAND_COLORS = [
-  '#1A56DB', '#8B5CF6', '#F97316', '#10B981',
+  '#1EB8CC', '#8B5CF6', '#F97316', '#10B981',
   '#EF4444', '#EC4899', '#F59E0B', '#06B6D4',
 ]
 
@@ -24,7 +24,7 @@ export default function AdvisorSettingsPage() {
     firm_name:     '',
     calendar_link: '',
     logo_base64:   null,
-    brand_color:   '#1A56DB',
+    brand_color:   '#1EB8CC',
     white_label:   false,
   })
 
@@ -92,58 +92,60 @@ export default function AdvisorSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-shell-deep flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-app">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary/40 border-t-primary" />
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-shell-deep flex flex-col items-center justify-center gap-4 text-center px-6">
-        <p className="text-2xl font-bold text-white">Sign in required</p>
-        <p className="text-shell-subtle text-sm">You need an account to manage your advisor profile.</p>
-        <Link href="/auth?next=/advisor/settings" className="btn-primary px-6 py-2">Sign In</Link>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-app px-6 text-center text-navy">
+        <p className="text-2xl font-bold">Sign in required</p>
+        <p className="text-sm text-muted2">You need an account to manage your advisor profile.</p>
+        <Link href="/auth?next=/advisor/settings" className="btn-primary px-6 py-2">
+          Sign In
+        </Link>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-shell-deep">
+    <div className="flex min-h-screen flex-col bg-app text-navy">
       {/* Nav */}
-      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
+      <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
+          <Link href="/" className="text-xl font-bold text-gradient">
+            Neufin
+          </Link>
           <div className="flex items-center gap-4">
-            <Link href="/advisor/dashboard" className="text-shell-muted hover:text-white text-sm transition-colors">
+            <Link href="/advisor/dashboard" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
               Dashboard
             </Link>
-            <Link href="/results" className="text-shell-muted hover:text-white text-sm transition-colors">
+            <Link href="/results" className="text-sm text-muted2 transition-colors hover:text-primary-dark">
               DNA Results
             </Link>
           </div>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-2xl mx-auto px-6 py-section w-full">
+      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-section">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <h1 className="text-2xl font-bold text-white mb-1">Advisor Settings</h1>
-          <p className="text-shell-subtle text-sm mb-8">
-            Personalise your white-label reports and client-facing profile.
-          </p>
+          <h1 className="mb-1 text-2xl font-bold text-navy">Advisor Settings</h1>
+          <p className="mb-8 text-sm text-muted2">Personalise your white-label reports and client-facing profile.</p>
 
           <form onSubmit={handleSave} className="space-y-6">
 
             {/* ── Identity ── */}
-            <section className="card space-y-4">
-              <h2 className="text-sm font-semibold text-shell-fg/90 uppercase tracking-wider">Identity</h2>
+            <section className="card space-y-4 ring-1 ring-inset ring-primary/30">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-navy">Identity</h2>
 
               <div>
-                <label className="block text-xs text-shell-muted mb-1">Advisor Name</label>
+                <label className="mb-1 block text-xs text-muted2">Advisor Name</label>
                 <input
                   type="text"
                   value={form.advisor_name}
@@ -154,7 +156,7 @@ export default function AdvisorSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-shell-muted mb-1">Firm Name</label>
+                <label className="mb-1 block text-xs text-muted2">Firm Name</label>
                 <input
                   type="text"
                   value={form.firm_name}
@@ -165,7 +167,7 @@ export default function AdvisorSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-xs text-shell-muted mb-1">Calendly / Booking Link</label>
+                <label className="mb-1 block text-xs text-muted2">Calendly / Booking Link</label>
                 <input
                   type="url"
                   value={form.calendar_link}
@@ -173,17 +175,17 @@ export default function AdvisorSettingsPage() {
                   placeholder="https://calendly.com/your-link"
                   className="input w-full"
                 />
-                <p className="text-xs text-shell-subtle mt-1">Shown as a CTA button when clients view their shared results.</p>
+                <p className="mt-1 text-xs text-muted2">Shown as a CTA button when clients view their shared results.</p>
               </div>
             </section>
 
             {/* ── Branding ── */}
-            <section className="card space-y-4">
-              <h2 className="text-sm font-semibold text-shell-fg/90 uppercase tracking-wider">Branding</h2>
+            <section className="card space-y-4 ring-1 ring-inset ring-primary/30">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-navy">Branding</h2>
 
               {/* Logo upload */}
               <div>
-                <label className="block text-xs text-shell-muted mb-2">Firm Logo</label>
+                <label className="mb-2 block text-xs text-muted2">Firm Logo</label>
                 <div className="flex items-center gap-4">
                   {logoPreview ? (
                     <Image
@@ -192,10 +194,10 @@ export default function AdvisorSettingsPage() {
                       width={64}
                       height={64}
                       unoptimized
-                      className="w-16 h-16 object-contain rounded-lg border border-shell-border bg-shell p-1"
+                      className="h-16 w-16 rounded-lg border border-border bg-white object-contain p-1"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-lg border border-dashed border-shell-border bg-shell flex items-center justify-center text-shell-subtle text-xs text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-border bg-surface-2 text-center text-xs text-muted2">
                       No<br/>Logo
                     </div>
                   )}
@@ -211,12 +213,12 @@ export default function AdvisorSettingsPage() {
                       <button
                         type="button"
                         onClick={() => { setLogoPreview(null); handleField('logo_base64', null) }}
-                        className="text-xs text-shell-subtle hover:text-red-400 transition-colors"
+                        className="text-xs text-muted2 transition-colors hover:text-red-600"
                       >
                         Remove
                       </button>
                     )}
-                    <p className="text-xs text-shell-subtle">PNG or JPG · max {MAX_LOGO_KB} KB</p>
+                    <p className="text-xs text-muted2">PNG or JPG · max {MAX_LOGO_KB} KB</p>
                   </div>
                 </div>
                 <input
@@ -230,7 +232,7 @@ export default function AdvisorSettingsPage() {
 
               {/* Brand color */}
               <div>
-                <label className="block text-xs text-shell-muted mb-2">Brand Color</label>
+                <label className="mb-2 block text-xs text-muted2">Brand Color</label>
                 <div className="flex items-center gap-3 flex-wrap">
                   {BRAND_COLORS.map(color => (
                     <button
@@ -239,7 +241,7 @@ export default function AdvisorSettingsPage() {
                       onClick={() => handleField('brand_color', color)}
                       className={`w-8 h-8 rounded-full transition-all ${
                         form.brand_color === color
-                          ? 'ring-2 ring-white ring-offset-2 ring-offset-shell scale-110'
+                          ? 'scale-110 ring-2 ring-primary ring-offset-2 ring-offset-white'
                           : 'opacity-80 hover:opacity-100'
                       }`}
                       style={{ backgroundColor: color }}
@@ -252,7 +254,7 @@ export default function AdvisorSettingsPage() {
                       onChange={e => handleField('brand_color', e.target.value)}
                       className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
                     />
-                    <span className="text-xs text-shell-subtle font-mono">{form.brand_color}</span>
+                    <span className="font-mono text-xs text-muted2">{form.brand_color}</span>
                   </div>
                 </div>
               </div>
@@ -260,14 +262,16 @@ export default function AdvisorSettingsPage() {
               {/* White-label toggle */}
               <div className="flex items-center justify-between pt-1">
                 <div>
-                  <p className="text-sm text-shell-fg/90 font-medium">White-label PDFs</p>
-                  <p className="text-xs text-shell-subtle mt-0.5">Replace Neufin branding with your firm logo and colors in generated reports.</p>
+                  <p className="text-sm font-medium text-navy">White-label PDFs</p>
+                  <p className="mt-0.5 text-xs text-muted2">
+                    Replace Neufin branding with your firm logo and colors in generated reports.
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => handleField('white_label', !form.white_label)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    form.white_label ? 'bg-primary' : 'bg-shell-raised'
+                    form.white_label ? 'bg-primary' : 'bg-surface-3'
                   }`}
                 >
                   <span
@@ -280,8 +284,8 @@ export default function AdvisorSettingsPage() {
             </section>
 
             {/* ── Preview card ── */}
-            <section className="card space-y-3">
-              <h2 className="text-sm font-semibold text-shell-fg/90 uppercase tracking-wider">Profile Preview</h2>
+            <section className="card space-y-3 ring-1 ring-inset ring-primary/30">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-navy">Profile Preview</h2>
               <div
                 className="rounded-xl p-4 flex items-center gap-4 border"
                 style={{ borderColor: `${form.brand_color}40`, background: `${form.brand_color}10` }}
@@ -304,12 +308,8 @@ export default function AdvisorSettingsPage() {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <p className="text-white font-semibold text-sm truncate">
-                    {form.advisor_name || 'Your Name'}
-                  </p>
-                  <p className="text-shell-muted text-xs truncate">
-                    {form.firm_name || 'Your Firm'}
-                  </p>
+                  <p className="truncate text-sm font-semibold text-navy">{form.advisor_name || 'Your Name'}</p>
+                  <p className="truncate text-xs text-muted2">{form.firm_name || 'Your Firm'}</p>
                   {form.calendar_link && (
                     <p className="text-xs mt-1 truncate" style={{ color: form.brand_color }}>
                       Book a consultation →
@@ -317,12 +317,12 @@ export default function AdvisorSettingsPage() {
                   )}
                 </div>
               </div>
-              <p className="text-xs text-shell-subtle">This card appears on results pages shared via your referral link.</p>
+              <p className="text-xs text-muted2">This card appears on results pages shared via your referral link.</p>
             </section>
 
             {/* ── Save ── */}
             {error && (
-              <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                 {error}
               </p>
             )}
@@ -348,7 +348,7 @@ export default function AdvisorSettingsPage() {
               <motion.p
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center text-sm text-green-400"
+                className="text-center text-sm text-emerald-700"
               >
                 Profile saved! Your branding will appear on all new PDF reports.
               </motion.p>

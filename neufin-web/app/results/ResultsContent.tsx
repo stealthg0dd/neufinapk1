@@ -85,7 +85,7 @@ function ScoreCircle({ score }: { score: number }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className="text-4xl font-extrabold" style={{ color }}>{score}</span>
-        <span className="text-xs text-gray-300 uppercase tracking-widest">DNA Score</span>
+        <span className="text-xs uppercase tracking-widest text-muted2">DNA Score</span>
       </div>
     </div>
   )
@@ -232,7 +232,7 @@ export default function ResultsContent() {
     )
   }
 
-  const typeClass = TYPE_COLORS[result.investor_type] || 'bg-shell-raised text-shell-fg/90 border-shell-border'
+  const typeClass = TYPE_COLORS[result.investor_type] || 'border-border bg-surface-2 text-navy'
 
   // Price warnings from backend (stale/alias/unresolvable tickers)
   const priceWarnings: string[] = result.warnings ?? []
@@ -241,7 +241,7 @@ export default function ResultsContent() {
   return (
     <>
       <SocialProof />
-      <div className="min-h-screen flex flex-col">
+      <div className="flex min-h-screen flex-col bg-app text-navy">
 
         {/* Ticker warning banner — non-blocking, shown above results */}
         {(priceWarnings.length > 0 || failedTickers.length > 0) && (
@@ -273,9 +273,13 @@ export default function ResultsContent() {
         )}
 
         {/* Nav */}
-        <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-            <button onClick={startOver} className="text-shell-muted hover:text-white text-sm transition-colors">
+        <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
+          <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
+            <button
+              type="button"
+              onClick={startOver}
+              className="text-sm text-muted2 transition-colors hover:text-primary-dark"
+            >
               ← New analysis
             </button>
             <span className="text-xl font-bold text-gradient">Neufin</span>
@@ -303,17 +307,17 @@ export default function ResultsContent() {
 
         {/* Sign-in nudge */}
         {!user && (
-          <div className="bg-blue-950/60 border-b border-blue-800/40">
-            <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
-              <p className="text-xs text-primary">Sign in to save your DNA score across devices</p>
-              <Link href="/auth" className="text-xs font-semibold text-primary hover:text-primary whitespace-nowrap">
+          <div className="border-b border-primary/20 bg-primary-light/80">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-2.5">
+              <p className="text-xs text-primary-dark">Sign in to save your DNA score across devices</p>
+              <Link href="/auth" className="whitespace-nowrap text-xs font-semibold text-primary-dark hover:text-primary">
                 Sign in to save →
               </Link>
             </div>
           </div>
         )}
 
-        <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-section">
+        <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-section">
           <motion.div
             variants={stagger}
             initial="hidden"
@@ -332,26 +336,26 @@ export default function ResultsContent() {
                   {result.investor_type}
                 </span>
               </div>
-              <p className="text-shell-muted text-sm mt-3">
+              <p className="mt-3 text-sm text-slate2">
                 Portfolio value:&nbsp;
-                <span className="text-white font-semibold">{usd(result.total_value)}</span>
+                <span className="font-semibold text-navy">{usd(result.total_value)}</span>
                 &nbsp;·&nbsp;
                 {result.num_positions} positions
                 &nbsp;·&nbsp;
                 Max position:&nbsp;
-                <span className="text-white font-semibold">{pct(result.max_position_pct)}</span>
+                <span className="font-semibold text-navy">{pct(result.max_position_pct)}</span>
               </p>
             </motion.div>
 
             {/* ── Overview cards ─────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="grid grid-cols-2 gap-4">
               <div className="card text-center">
-                <p className="text-xs text-shell-subtle uppercase tracking-wide mb-1">Total Value</p>
-                <p className="text-2xl font-bold text-white">{usd(result.total_value)}</p>
+                <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Total Value</p>
+                <p className="text-2xl font-bold text-navy">{usd(result.total_value)}</p>
               </div>
               <div className="card text-center">
-                <p className="text-xs text-shell-subtle uppercase tracking-wide mb-1">Positions</p>
-                <p className="text-2xl font-bold text-white">{result.num_positions}</p>
+                <p className="mb-1 text-xs uppercase tracking-wide text-muted2">Positions</p>
+                <p className="text-2xl font-bold text-navy">{result.num_positions}</p>
               </div>
             </motion.div>
 
@@ -366,7 +370,7 @@ export default function ResultsContent() {
                       initial={{ opacity: 0, x: -16 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
-                      className="flex gap-2 text-sm text-shell-fg/90"
+                      className="flex gap-2 text-sm text-slate2"
                     >
                       <span className="text-green-500 mt-0.5 shrink-0">✓</span>{s}
                     </motion.li>
@@ -382,7 +386,7 @@ export default function ResultsContent() {
                       initial={{ opacity: 0, x: 16 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
-                      className="flex gap-2 text-sm text-shell-fg/90"
+                      className="flex gap-2 text-sm text-slate2"
                     >
                       <span className="text-red-500 mt-0.5 shrink-0">!</span>{w}
                     </motion.li>
@@ -392,21 +396,21 @@ export default function ResultsContent() {
             </motion.div>
 
             {/* ── Action plan ────────────────────────────────────────────── */}
-            <motion.div variants={fadeUp} className="card border-blue-800/40 bg-blue-950/20">
+            <motion.div variants={fadeUp} className="card border-primary/25 bg-primary/5">
               <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
-              <p className="text-shell-fg leading-relaxed">{result.recommendation}</p>
+              <p className="leading-relaxed text-slate2">{result.recommendation}</p>
             </motion.div>
 
             {/* ── Holdings table ─────────────────────────────────────────── */}
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
-                <h3 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">Holdings</h3>
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted2">Holdings</h3>
 
                 {/* Desktop table */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-shell-subtle uppercase tracking-wide border-b border-shell-border">
+                      <tr className="border-b border-border text-xs uppercase tracking-wide text-muted2">
                         <th className="text-left pb-2 pr-4">Symbol</th>
                         <th className="text-right pb-2 px-4">Shares</th>
                         <th className="text-right pb-2 px-4">Price</th>
@@ -414,24 +418,24 @@ export default function ResultsContent() {
                         <th className="text-left pb-2 pl-4">Weight</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-shell-border/60">
+                    <tbody className="divide-y divide-border">
                       {result.positions.map((p) => (
-                        <tr key={p.symbol} className="hover:bg-shell-raised/30 transition-colors">
-                          <td className="py-2.5 pr-4 font-mono font-bold text-white">{p.symbol}</td>
-                          <td className="py-2.5 px-4 text-right text-shell-fg/90">
+                        <tr key={p.symbol} className="transition-colors hover:bg-surface-2">
+                          <td className="py-2.5 pr-4 font-mono font-bold text-navy">{p.symbol}</td>
+                          <td className="py-2.5 px-4 text-right text-slate2">
                             {new Intl.NumberFormat('en-US').format(p.shares)}
                           </td>
-                          <td className="py-2.5 px-4 text-right text-shell-fg/90">{usdFull(p.price)}</td>
-                          <td className="py-2.5 px-4 text-right text-white font-medium">{usd(p.value)}</td>
+                          <td className="py-2.5 px-4 text-right text-slate2">{usdFull(p.price)}</td>
+                          <td className="py-2.5 px-4 text-right font-medium text-navy">{usd(p.value)}</td>
                           <td className="py-2.5 pl-4">
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-shell-raised rounded-full overflow-hidden min-w-[64px]">
+                              <div className="h-1.5 min-w-[64px] flex-1 overflow-hidden rounded-full bg-surface-3">
                                 <div
                                   className="h-full bg-primary rounded-full"
                                   style={{ width: `${Math.min(p.weight, 100)}%` }}
                                 />
                               </div>
-                              <span className="text-shell-muted text-xs w-10 text-right shrink-0">
+                              <span className="w-10 shrink-0 text-right text-xs text-muted2">
                                 {pct(p.weight)}
                               </span>
                             </div>
@@ -445,20 +449,23 @@ export default function ResultsContent() {
                 {/* Mobile cards */}
                 <div className="sm:hidden space-y-3">
                   {result.positions.map((p) => (
-                    <div key={p.symbol} className="flex items-center justify-between py-2 border-b border-shell-border/60 last:border-0">
+                    <div
+                      key={p.symbol}
+                      className="flex items-center justify-between border-b border-border py-2 last:border-0"
+                    >
                       <div>
-                        <p className="font-mono font-bold text-white">{p.symbol}</p>
-                        <p className="text-xs text-shell-subtle mt-0.5">
+                        <p className="font-mono font-bold text-navy">{p.symbol}</p>
+                        <p className="mt-0.5 text-xs text-muted2">
                           {new Intl.NumberFormat('en-US').format(p.shares)} shares · {usdFull(p.price)}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-white">{usd(p.value)}</p>
-                        <div className="flex items-center gap-1.5 justify-end mt-1">
-                          <div className="w-12 h-1.5 bg-shell-raised rounded-full overflow-hidden">
+                        <p className="font-medium text-navy">{usd(p.value)}</p>
+                        <div className="mt-1 flex items-center justify-end gap-1.5">
+                          <div className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-3">
                             <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
                           </div>
-                          <span className="text-xs text-shell-muted">{pct(p.weight)}</span>
+                          <span className="text-xs text-muted2">{pct(p.weight)}</span>
                         </div>
                       </div>
                     </div>
@@ -471,9 +478,7 @@ export default function ResultsContent() {
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-shell-muted uppercase tracking-wide">
-                    Allocation Overview
-                  </h3>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted2">Allocation Overview</h3>
                   {result.max_position_pct > 40 && (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-full px-2.5 py-1">
                       ⚠ High concentration
@@ -519,7 +524,7 @@ export default function ResultsContent() {
               {/* Start Over */}
               <button
                 onClick={startOver}
-                className="flex items-center justify-center gap-2 py-3 text-sm rounded-lg border border-shell-border text-shell-muted hover:text-white hover:border-shell-muted transition-colors"
+                className="flex items-center justify-center gap-2 rounded-lg border border-border py-3 text-sm text-muted2 transition-colors hover:border-primary hover:text-primary-dark"
               >
                 ↩ Start Over
               </button>
@@ -527,7 +532,7 @@ export default function ResultsContent() {
 
             {/* ── Share panel ─────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="card">
-              <h3 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-3">Share your result</h3>
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted2">Share your result</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   onClick={copyShare}
@@ -537,7 +542,7 @@ export default function ResultsContent() {
                 </button>
                 <button
                   onClick={shareTwitter}
-                  className="bg-sky-600/80 hover:bg-sky-500/80 text-white text-xs font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-primary py-2.5 text-xs font-semibold text-white transition-colors hover:bg-primary-dark"
                 >
                   𝕏 Twitter/X
                 </button>
@@ -562,15 +567,15 @@ export default function ResultsContent() {
 
             {/* ── Referral link ───────────────────────────────────────────── */}
             {referralUrl && (
-              <motion.div variants={fadeUp} className="card border-purple-800/30 bg-purple-950/20">
-                <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wide mb-1">🎁 Your referral link</h3>
-                <p className="text-xs text-shell-subtle mb-3">
+              <motion.div variants={fadeUp} className="card border border-primary/20 bg-primary-light/50">
+                <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-primary-dark">🎁 Your referral link</h3>
+                <p className="mb-3 text-xs text-muted2">
                   Share this link — friends get 20% off their first report, and you build your Neufin reputation.
                 </p>
                 <div className="flex gap-2">
                   <input
                     readOnly value={referralUrl}
-                    className="flex-1 bg-shell border border-shell-border rounded-lg px-3 py-2 text-xs text-shell-fg/90 font-mono"
+                    className="input-base flex-1 rounded-lg px-3 py-2 font-mono text-xs"
                   />
                   <button
                     onClick={() => { navigator.clipboard.writeText(referralUrl); track('referral_link_copied') }}
@@ -597,11 +602,11 @@ export default function ResultsContent() {
                   ⬇ Download Your Advisor Report (PDF)
                 </a>
               ) : (
-                <div className="card border-blue-800/40 bg-gradient-to-br from-blue-950/30 to-purple-950/20">
-                  <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="card border border-primary/25 bg-gradient-to-br from-primary-light/90 to-surface-2">
+                  <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
-                      <h2 className="text-lg font-bold text-white">Unlock Your Full Report</h2>
-                      <p className="text-shell-subtle text-xs mt-0.5">AI-generated · 10-page PDF · one-time $29</p>
+                      <h2 className="text-lg font-bold text-navy">Unlock Your Full Report</h2>
+                      <p className="mt-0.5 text-xs text-muted2">AI-generated · 10-page PDF · one-time $29</p>
                     </div>
                     <span className="text-2xl shrink-0">📄</span>
                   </div>
@@ -617,8 +622,8 @@ export default function ResultsContent() {
                       <li key={label} className="flex items-start gap-3">
                         <span className="text-base shrink-0 mt-0.5">{icon}</span>
                         <div>
-                          <p className="text-sm font-semibold text-shell-fg">{label}</p>
-                          <p className="text-xs text-shell-subtle">{sub}</p>
+                          <p className="text-sm font-semibold text-navy">{label}</p>
+                          <p className="text-xs text-muted2">{sub}</p>
                         </div>
                       </li>
                     ))}
@@ -626,7 +631,7 @@ export default function ResultsContent() {
 
                   {fulfillLoading ? (
                     <div className="flex items-center justify-center gap-2 text-sm text-primary py-3">
-                      <span className="inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                      <span className="inline-block w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                       Generating your report…
                     </div>
                   ) : (
@@ -653,15 +658,15 @@ export default function ResultsContent() {
                     </p>
                   )}
 
-                  <p className="text-center text-xs text-shell-subtle mt-3">
+                  <p className="mt-3 text-center text-xs text-muted2">
                     Secured by Stripe · instant delivery · no subscription
                   </p>
 
                   {/* Free unlock via referrals */}
-                  <div className="mt-3 pt-3 border-t border-shell-border/60 text-center">
+                  <div className="mt-3 border-t border-border pt-3 text-center">
                     <Link
                       href="/referrals"
-                      className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                      className="text-xs text-primary-dark transition-colors hover:text-primary"
                     >
                       🎁 Or get it free by inviting 3 friends →
                     </Link>
