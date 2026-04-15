@@ -12,6 +12,7 @@ import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
 import { supabase } from '@/lib/supabase'
 import PortfolioPie from '@/components/PortfolioPie'
 import ChartLab from '@/components/dashboard/ChartLab'
+import FinancialModelSelector from '@/components/dashboard/FinancialModelSelector'
 import { getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
 
 const STAGES = [
@@ -428,6 +429,8 @@ export default function PortfolioPage() {
       {/* 3-step analysis progress indicator — always visible */}
       <StepIndicator step={step} />
 
+      <FinancialModelSelector portfolioId={portfolioId} defaultCollapsed />
+
       {/* Upload zone */}
       <div
         onDrop={onDrop}
@@ -810,7 +813,7 @@ export default function PortfolioPage() {
                 macro regime, alpha signals, and an IC-grade investment memo.
               </p>
               <Link
-                href="/swarm"
+                href="/dashboard/swarm"
                 className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
                 style={{
                   background: 'var(--primary)',

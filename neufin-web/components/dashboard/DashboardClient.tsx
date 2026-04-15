@@ -399,7 +399,7 @@ export default function DashboardClient() {
                   Upload Portfolio CSV
                 </Link>
                 <Link
-                  href="/swarm"
+                  href="/dashboard/swarm"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-[var(--glass-border)] text-[var(--text-primary)] font-semibold text-sm hover:border-[var(--border-accent)] transition-colors"
                 >
                   <Bot className="h-4 w-4 shrink-0" aria-hidden />
