@@ -114,7 +114,7 @@ export default function AdvisorSettingsPage() {
     <div className="flex min-h-screen flex-col bg-app text-navy">
       {/* Nav */}
       <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 md:px-6">
           <Link href="/" className="text-xl font-bold text-gradient">
             Neufin
           </Link>
@@ -129,7 +129,7 @@ export default function AdvisorSettingsPage() {
         </div>
       </nav>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-section">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-section md:px-0">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,26 +144,28 @@ export default function AdvisorSettingsPage() {
             <section className="card space-y-4 ring-1 ring-inset ring-primary/30">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-navy">Identity</h2>
 
-              <div>
-                <label className="mb-1 block text-xs text-muted2">Advisor Name</label>
-                <input
-                  type="text"
-                  value={form.advisor_name}
-                  onChange={e => handleField('advisor_name', e.target.value)}
-                  placeholder="e.g. Jane Smith, CFP"
-                  className="input w-full"
-                />
-              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs text-muted2">Advisor Name</label>
+                  <input
+                    type="text"
+                    value={form.advisor_name}
+                    onChange={e => handleField('advisor_name', e.target.value)}
+                    placeholder="e.g. Jane Smith, CFP"
+                    className="input w-full"
+                  />
+                </div>
 
-              <div>
-                <label className="mb-1 block text-xs text-muted2">Firm Name</label>
-                <input
-                  type="text"
-                  value={form.firm_name}
-                  onChange={e => handleField('firm_name', e.target.value)}
-                  placeholder="e.g. Smith Capital Advisors"
-                  className="input w-full"
-                />
+                <div>
+                  <label className="mb-1 block text-xs text-muted2">Firm Name</label>
+                  <input
+                    type="text"
+                    value={form.firm_name}
+                    onChange={e => handleField('firm_name', e.target.value)}
+                    placeholder="e.g. Smith Capital Advisors"
+                    className="input w-full"
+                  />
+                </div>
               </div>
 
               <div>

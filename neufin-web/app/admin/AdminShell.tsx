@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
@@ -64,9 +65,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   }, [mobileOpen])
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row">
+    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100 md:flex-row">
       <header className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3 md:hidden">
-        <p className="text-sm font-semibold text-zinc-100">NeuFin Admin</p>
+        <div className="flex items-center gap-2">
+          <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
+          <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+          <span className="sr-only">NeuFin Admin</span>
+        </div>
         <button
           type="button"
           className="rounded-md p-2 text-zinc-300 hover:bg-zinc-900 hover:text-white"
@@ -91,9 +96,12 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                 <X className="h-5 w-5" strokeWidth={1.5} />
               </button>
             </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-zinc-500">NeuFin</p>
-              <p className="text-sm font-semibold text-zinc-100">Admin</p>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
+                <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Admin</p>
             </div>
             <AdminNavLinks pathname={pathname} onNavigate={() => setMobileOpen(false)} />
           </aside>
@@ -101,13 +109,16 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       ) : null}
 
       <aside className="hidden w-56 shrink-0 flex-col gap-6 border-r border-zinc-800/80 p-4 md:flex">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-zinc-500">NeuFin</p>
-          <p className="text-sm font-semibold text-zinc-100">Admin</p>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Image src="/logo-icon.png" alt="" width={32} height={32} className="h-8 w-8 rounded-sm" />
+            <Image src="/logo.png" alt="NeuFin" width={120} height={32} className="h-8 w-auto" />
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Admin</p>
         </div>
         <AdminNavLinks pathname={pathname} />
       </aside>
-      <main className="flex-1 min-w-0 overflow-auto">{children}</main>
+      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>
   )
 }

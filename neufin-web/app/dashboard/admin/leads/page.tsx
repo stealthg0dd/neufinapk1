@@ -122,7 +122,7 @@ function LeadModal({
         </div>
 
         {/* Details grid */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           <div>
             <p className="mb-0.5 text-xs text-muted2">Email</p>
             <a href={`mailto:${lead.email}`} className="text-primary hover:underline truncate block">{lead.email}</a>
@@ -311,7 +311,7 @@ export default function LeadsAdminPage() {
 
         {/* Stats bar */}
         {stats && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="data-card rounded-xl p-4 text-center">
               <p className="text-2xl font-bold text-navy">{stats.total}</p>
               <p className="mt-0.5 text-xs text-muted2">Total Leads</p>

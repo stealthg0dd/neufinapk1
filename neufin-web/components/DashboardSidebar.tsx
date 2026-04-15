@@ -42,6 +42,8 @@ function isActivePath(pathname: string, href: string): boolean {
   return pathname.startsWith(`${href}/`)
 }
 
+type PortfolioListRow = { dna_score?: number | null }
+
 type SubscriptionStatus = {
   plan?: string
   subscription_tier?: string
@@ -86,11 +88,12 @@ function NavSection({ label, items, pathname }: { label: string; items: NavItem[
   )
 }
 
-export default function DashboardSidebar({ user }: { user: User }) {
+export default function DashboardSidebar({ user, embedded = false }: { user: User; embedded?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   const { isAdmin: isAdminFromHook } = useUser()
   const [subscription, setSubscription] = useState<SubscriptionStatus>({})
+  const [sidebarDnaScore, setSidebarDnaScore] = useState<number | null>(null)
 
   const initials = useMemo(() => {
     const email = user?.email || 'NF'
@@ -105,6 +108,25 @@ export default function DashboardSidebar({ user }: { user: User }) {
         if (!cancelled) setSubscription(res ?? {})
       } catch {
         if (!cancelled) setSubscription({})
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const raw = await apiGet<PortfolioListRow[] | { portfolios?: PortfolioListRow[] }>('/api/portfolio/list')
+        const ports = Array.isArray(raw) ? raw : raw?.portfolios ?? []
+        const s = ports[0]?.dna_score
+        if (!cancelled) {
+          setSidebarDnaScore(typeof s === 'number' && !Number.isNaN(s) ? s : null)
+        }
+      } catch {
+        if (!cancelled) setSidebarDnaScore(null)
       }
     })()
     return () => {
@@ -156,14 +178,34 @@ export default function DashboardSidebar({ user }: { user: User }) {
     return 'border border-slate-200 bg-slate-50 text-slate-700'
   })()
 
+  const rootClass = embedded
+    ? 'flex h-full min-h-0 w-full flex-col bg-white'
+    : 'flex h-full w-[220px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white'
+
   return (
-    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white">
-      <div className="border-b border-[#F1F5F9] px-5 pb-4 pt-5">
-        <div className="flex items-center gap-2">
-          <Image src="/logo-icon.png" alt="NeuFin" width={28} height={28} className="rounded-sm" />
-          <Image src="/logo.png" alt="NeuFin" width={80} height={24} className="h-6 w-auto" />
+    <aside className={rootClass} aria-label={embedded ? undefined : 'Main navigation'}>
+      {!embedded && (
+        <div className="flex h-16 shrink-0 items-center justify-center gap-3 border-b border-[#F1F5F9] bg-gradient-to-r from-white to-[#F8FAFC] px-5">
+          <Image src="/logo-icon.png" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-sm" />
+          <Image src="/logo.png" alt="NeuFin" width={100} height={28} className="h-7 w-auto max-w-[140px] shrink-0 object-contain object-left" />
         </div>
-      </div>
+      )}
+
+      {sidebarDnaScore != null && (
+        <div className="mx-3 mb-2 mt-4 rounded-xl border border-[#1EB8CC]/20 bg-gradient-to-br from-[#E0F7FA] to-[#F0FDF4] p-3">
+          <p className="mb-1 text-xs font-bold uppercase tracking-widest text-[#1EB8CC]">Portfolio Health</p>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[22px] font-bold tabular-nums tracking-tight text-[#0F172A]">{sidebarDnaScore}</span>
+            <span className="badge badge-success shrink-0 text-xs">Active</span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
+            <div
+              className="h-1.5 min-w-[4px] rounded-full bg-[#1EB8CC] transition-all duration-500"
+              style={{ width: `${Math.min(100, Math.max(0, Number(sidebarDnaScore)))}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <nav className="flex flex-1 flex-col overflow-y-auto pb-3 pt-1">
         <NavSection label="Overview" items={NAV_OVERVIEW} pathname={pathname} />

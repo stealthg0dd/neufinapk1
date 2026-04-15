@@ -1069,7 +1069,7 @@ export default function SwarmPage() {
   }
 
   return (
-    <div className="min-h-screen bg-app font-sans text-navy">
+    <div className="min-h-screen min-w-0 overflow-x-hidden bg-app font-sans text-navy">
       <AppHeader />
       {toast && (
         <div
@@ -1081,7 +1081,7 @@ export default function SwarmPage() {
         </div>
       )}
 
-      <nav className="sticky top-0 z-10 flex min-h-12 flex-wrap items-center justify-between gap-y-2 border-b border-border bg-white/95 px-4 py-2 backdrop-blur-sm sm:px-6">
+      <nav className="sticky top-0 z-10 flex min-h-12 flex-wrap items-center justify-between gap-2 gap-y-2 border-b border-border bg-white/95 px-4 py-2 backdrop-blur-sm sm:px-6">
         <div className="flex min-w-0 flex-shrink-0 items-center gap-3">
           <a href="/dashboard" className="text-sm font-bold tracking-wide text-primary transition-colors hover:text-primary-dark">
             NEUFIN

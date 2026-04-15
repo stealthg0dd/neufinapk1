@@ -22,7 +22,15 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.neufin.ai'),
-  icons: { icon: '/logo-icon.png', apple: '/logo-icon.png' },
+  applicationName: 'NeuFin',
+  icons: {
+    icon: [
+      { url: '/logo-icon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo-icon.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [{ url: '/logo-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: '/logo-icon.png',
+  },
   title: {
     default: 'NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence',
     template: '%s | NeuFin'
@@ -96,7 +104,7 @@ const softwareApplicationSchema = {
   "creator": {
     "@type": "Organization",
     "name": "Neufin OÜ",
-    "url": "https://neufin-web.vercel.app",
+    "url": "https://www.neufin.ai",
     "email": "info@neufin.ai",
     "address": {
       "@type": "PostalAddress",
@@ -114,7 +122,7 @@ const softwareApplicationSchema = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#F6F8FB',
+  themeColor: [{ media: '(prefers-color-scheme: light)', color: '#1EB8CC' }, { color: '#F6F8FB' }],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

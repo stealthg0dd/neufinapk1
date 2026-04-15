@@ -109,7 +109,7 @@ export default function AdminSystemPage() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-1 text-sm">
           <p className="text-xs text-zinc-500 uppercase">Redis (admin probe)</p>
           <p className="text-lg text-white">
-            {sys?.redis === null ? 'Not configured' : sys.redis ? 'Up' : 'Down'}
+            {sys == null ? '—' : sys.redis === null ? 'Not configured' : sys.redis ? 'Up' : 'Down'}
           </p>
         </div>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-1 text-sm">

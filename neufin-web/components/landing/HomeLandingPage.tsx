@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
+import { GraphicPlaceholder } from '@/components/GraphicPlaceholder'
+import SwarmHeroTerminal from '@/components/landing/SwarmHeroTerminal'
 
 const SWARM_AGENTS = [
   {
@@ -247,7 +249,8 @@ export default function HomeLandingPage({
           />
 
           <div className="relative mx-auto max-w-7xl px-6 py-24">
-            <div className="max-w-4xl">
+            <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
+              <div className="min-w-0 max-w-4xl">
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -338,6 +341,53 @@ export default function HomeLandingPage({
                   )
                 )}
               </motion.div>
+              </div>
+
+              <div className="relative hidden min-w-0 flex-col gap-6 lg:flex">
+                {/* Swarm terminal — original hero right column (dark live demo) */}
+                <div className="relative w-full max-w-lg">
+                  <div
+                    className="pointer-events-none absolute -inset-4 -z-10 scale-95 rounded-3xl bg-[#1EB8CC]/15 blur-3xl"
+                    aria-hidden
+                  />
+                  <SwarmHeroTerminal />
+                  <div className="hero-float-badge absolute -bottom-3 -left-3 px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#DCFCE7]/90">
+                        <svg className="h-4 w-4 text-[#16A34A]" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-[#0F172A]">IC Briefing Ready</p>
+                        <p className="text-xs text-[#475569]">Generated in 58 seconds</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="hero-float-badge absolute -right-3 -top-3 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-[#F5A623]" />
+                      <p className="text-xs font-semibold text-[#0F172A]">Regime: Risk-Off</p>
+                      <span className="badge badge-warning text-xs">82%</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Product still — dashboard mockup */}
+                <div className="relative overflow-hidden rounded-2xl border border-[#1EB8CC]/20 shadow-xl shadow-[#1EB8CC]/10">
+                  <GraphicPlaceholder
+                    src="/graphics/hero-dashboard-mockup.png"
+                    alt="NeuFin dashboard preview"
+                    width={1200}
+                    height={640}
+                    className="h-auto w-full"
+                    label="Dashboard preview — add hero-dashboard-mockup.png under public/graphics/"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -373,8 +423,18 @@ export default function HomeLandingPage({
         </section>
 
         {/* Seven agents */}
-        <section className="bg-white py-24" id="demo">
-          <div className="mx-auto max-w-7xl px-6">
+        <section className="relative bg-white py-24" id="demo">
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <GraphicPlaceholder
+              src="/graphics/ai-agents-visualization.png"
+              alt=""
+              width={500}
+              height={500}
+              className="absolute right-0 top-1/2 w-[500px] -translate-y-1/2 rounded-3xl opacity-10"
+              label="Agent visualization — Add ai-agents-visualization.png to public/graphics/"
+            />
+          </div>
+          <div className="relative mx-auto max-w-7xl px-6">
             <div className="mb-16 text-center">
               <motion.p
                 initial={{ opacity: 0, y: 10 }}

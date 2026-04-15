@@ -173,7 +173,7 @@ export default function RevenuePage() {
     return (
       <div className="min-h-screen bg-transparent p-6 max-w-7xl mx-auto space-y-6">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
         <Skeleton className="h-48" />
@@ -206,23 +206,25 @@ export default function RevenuePage() {
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
 
         {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="section-header">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Revenue Command Centre</h1>
-            <p className="text-sm text-[#64748B] mt-0.5">{month} · Stripe + Supabase</p>
+            <h1>Revenue Command Centre</h1>
+            <p>
+              {month} · Stripe + Supabase
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard/admin/leads" className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 hover:border-[#94A3B8] transition-colors">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/dashboard/admin/leads" className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 transition-colors hover:border-[#94A3B8]">
               Leads →
             </Link>
-            <button onClick={load} className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 hover:border-[#94A3B8] transition-colors">
+            <button type="button" onClick={load} className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 transition-colors hover:border-[#94A3B8]">
               Refresh
             </button>
           </div>
         </div>
 
         {/* ── ROW 1 — MRR / ARR / Subscribers ─────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="MRR"
             value={formatUSD(mrr)}
@@ -257,7 +259,7 @@ export default function RevenuePage() {
             </div>
             <div className="data-card rounded-xl">
               {/* Stats bar */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-navy">{leads.total}</p>
                   <p className="text-xs text-[#94A3B8] mt-0.5">Total Leads</p>
@@ -316,9 +318,8 @@ export default function RevenuePage() {
           <h2 className="text-sm font-semibold uppercase tracking-widest text-[#94A3B8] mb-3">
             Recent Purchases
           </h2>
-          <div className="rounded-xl border border-[#E2E8F0] overflow-hidden bg-white">
-            <div className="overflow-x-auto">
-              <table className="table-base">
+          <div className="overflow-x-auto -mx-4 rounded-xl border border-[#E2E8F0] bg-white md:mx-0">
+            <table className="table-base min-w-[640px]">
                 <thead>
                   <tr>
                     {["User", "Plan", "Amount", "Date"].map((h) => (
@@ -352,7 +353,6 @@ export default function RevenuePage() {
                   ))}
                 </tbody>
               </table>
-            </div>
           </div>
         </section>
 

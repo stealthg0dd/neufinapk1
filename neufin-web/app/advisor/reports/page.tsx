@@ -63,7 +63,7 @@ export default function AdvisorReportsPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto min-h-screen max-w-4xl space-y-6 bg-app p-6">
+      <div className="mx-auto min-h-screen w-full max-w-3xl space-y-6 bg-app px-4 py-6 md:px-0">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-16" />
         <div className="space-y-3">
@@ -76,15 +76,15 @@ export default function AdvisorReportsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-app px-4 py-6 text-navy">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <div className="min-h-screen bg-app py-6 text-navy">
+      <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-0">
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="section-header">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-navy">Client Reports</h1>
-            <p className="mt-0.5 text-sm text-muted2">White-label PDF reports for all clients</p>
+            <h1>Client Reports</h1>
+            <p>White-label PDF reports for all clients</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/advisor/dashboard"
               className="rounded-lg border border-border px-3 py-1.5 text-xs text-navy transition-colors hover:border-primary/40"

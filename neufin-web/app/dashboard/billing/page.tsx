@@ -99,10 +99,12 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="page-container max-w-2xl flex flex-col gap-6 py-section">
-      <div>
-        <h1 className="text-2xl font-bold text-navy">Subscription & Billing</h1>
-        <p className="text-sm text-[#64748B] mt-1">Manage your Neufin plan</p>
+    <div className="page-container flex max-w-2xl flex-col gap-6 py-section">
+      <div className="section-header">
+        <div>
+          <h1>Subscription & Billing</h1>
+          <p>Manage your Neufin plan</p>
+        </div>
       </div>
 
       {/* Current plan */}
