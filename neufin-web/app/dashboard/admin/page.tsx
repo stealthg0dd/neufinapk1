@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 /**
  * /dashboard/admin
@@ -10,39 +10,47 @@
  * Linked from the dashboard sidebar when is_admin / admin role.
  */
 
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/lib/auth-context"
-import { useUser } from "@/lib/store"
-import { apiFetch } from "@/lib/api-client"
-import type { UserAdminRow } from "@/app/api/admin/users/route"
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { useUser } from "@/lib/store";
+import { apiFetch } from "@/lib/api-client";
+import type { UserAdminRow } from "@/app/api/admin/users/route";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-type PlanFilter = "all" | "active" | "trial" | "expired"
+type PlanFilter = "all" | "active" | "trial" | "expired";
 
 function planBadgeClass(status: string): string {
   switch (status) {
-    case "active":  return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-    case "trial":   return "bg-primary/15 text-primary border border-primary/30"
-    case "expired": return "bg-red-500/15 text-red-400 border border-red-500/30"
-    default:        return "bg-[#F8FAFC] text-[#94A3B8]"
+    case "active":
+      return "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+    case "trial":
+      return "bg-primary/15 text-primary border border-primary/30";
+    case "expired":
+      return "bg-red-500/15 text-red-400 border border-red-500/30";
+    default:
+      return "bg-[#F8FAFC] text-[#94A3B8]";
   }
 }
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("en-SG", { year: "numeric", month: "short", day: "numeric" })
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-SG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function trialEnds(startedAt: string | null): string {
-  if (!startedAt) return "—"
-  const ends = new Date(new Date(startedAt).getTime() + 14 * 86400_000)
-  const daysLeft = Math.ceil((ends.getTime() - Date.now()) / 86400_000)
-  if (daysLeft <= 0) return "Expired"
-  return `${daysLeft}d left (${formatDate(ends.toISOString())})`
+  if (!startedAt) return "—";
+  const ends = new Date(new Date(startedAt).getTime() + 14 * 86400_000);
+  const daysLeft = Math.ceil((ends.getTime() - Date.now()) / 86400_000);
+  if (daysLeft <= 0) return "Expired";
+  return `${daysLeft}d left (${formatDate(ends.toISOString())})`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,17 +58,27 @@ function trialEnds(startedAt: string | null): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-[#F8FAFC] ${className}`} />
+  return (
+    <div className={`animate-pulse rounded-md bg-[#F8FAFC] ${className}`} />
+  );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
+function StatCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: number | string;
+  sub?: string;
+}) {
   return (
     <div className="data-card rounded-xl">
       <p className="text-xs text-[#94A3B8] mb-1">{label}</p>
       <p className="text-2xl font-bold tabular-nums text-navy">{value}</p>
       {sub && <p className="text-xs text-[#94A3B8] mt-1">{sub}</p>}
     </div>
-  )
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,30 +90,32 @@ function ExtendTrialModal({
   onClose,
   onSuccess,
 }: {
-  user: UserAdminRow
-  onClose: () => void
-  onSuccess: (msg: string) => void
+  user: UserAdminRow;
+  onClose: () => void;
+  onSuccess: (msg: string) => void;
 }) {
-  const [days, setDays] = useState(7)
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+  const [days, setDays] = useState(7);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
-    setLoading(true)
-    setErr(null)
+    setLoading(true);
+    setErr(null);
     try {
       const res = await apiFetch(`/api/admin/users/${user.id}/extend-trial`, {
         method: "POST",
         body: JSON.stringify({ days }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.message ?? "Failed")
-      onSuccess(`Trial extended — new end date: ${formatDate(json.new_trial_ends)}`)
-      onClose()
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message ?? "Failed");
+      onSuccess(
+        `Trial extended — new end date: ${formatDate(json.new_trial_ends)}`,
+      );
+      onClose();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -105,7 +125,9 @@ function ExtendTrialModal({
         <h3 className="font-semibold text-navy">Extend Trial</h3>
         <p className="text-sm text-[#64748B]">{user.email || user.id}</p>
         <div>
-          <label className="text-xs text-[#94A3B8] block mb-1.5">Days to add</label>
+          <label className="text-xs text-[#94A3B8] block mb-1.5">
+            Days to add
+          </label>
           <input
             type="number"
             min={1}
@@ -133,7 +155,7 @@ function ExtendTrialModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,96 +163,123 @@ function ExtendTrialModal({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
-  const router = useRouter()
-  const { user, getAccessToken } = useAuth()
-  const { isAdmin, loading: authSubscriptionLoading, subscriptionTier } = useUser()
-  const [rows, setRows]         = useState<UserAdminRow[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
-  const [filter, setFilter]     = useState<PlanFilter>("all")
-  const [search, setSearch]     = useState("")
-  const [toast, setToast]       = useState<string | null>(null)
-  const [extending, setExtending] = useState<UserAdminRow | null>(null)
-  const [resending, setResending] = useState<string | null>(null)
+  const router = useRouter();
+  const { user, getAccessToken } = useAuth();
+  const {
+    isAdmin,
+    loading: authSubscriptionLoading,
+    subscriptionTier,
+  } = useUser();
+  const [rows, setRows] = useState<UserAdminRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<PlanFilter>("all");
+  const [search, setSearch] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+  const [extending, setExtending] = useState<UserAdminRow | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
 
-  const load = useCallback(async (plan: PlanFilter) => {
-    const t = await getAccessToken()
-    if (!t) { setError("Not authenticated"); setLoading(false); return }
-    setLoading(true)
-    setError(null)
-    try {
-      const url = plan === "all" ? "/api/admin/users" : `/api/admin/users?plan=${plan}`
-      const res = await apiFetch(url, { cache: "no-store" })
-      if (res.status === 403) { setError("Advisor or admin access required for this panel."); return }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setRows(await res.json())
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [getAccessToken])
-
-  useEffect(() => { load(filter) }, [filter, load])
-
-  const canAccessPanel =
-    isAdmin || subscriptionTier === "advisor" || subscriptionTier === "enterprise"
+  const load = useCallback(
+    async (plan: PlanFilter) => {
+      const t = await getAccessToken();
+      if (!t) {
+        setError("Not authenticated");
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const url =
+          plan === "all" ? "/api/admin/users" : `/api/admin/users?plan=${plan}`;
+        const res = await apiFetch(url, { cache: "no-store" });
+        if (res.status === 403) {
+          setError("Advisor or admin access required for this panel.");
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setRows(await res.json());
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [getAccessToken],
+  );
 
   useEffect(() => {
-    if (authSubscriptionLoading || !user) return
+    load(filter);
+  }, [filter, load]);
+
+  const canAccessPanel =
+    isAdmin ||
+    subscriptionTier === "advisor" ||
+    subscriptionTier === "enterprise";
+
+  useEffect(() => {
+    if (authSubscriptionLoading || !user) return;
     if (!canAccessPanel) {
-      router.replace("/dashboard")
+      router.replace("/dashboard");
     }
-  }, [authSubscriptionLoading, user, canAccessPanel, router])
+  }, [authSubscriptionLoading, user, canAccessPanel, router]);
 
   function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 4000)
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
   }
 
   async function resendOnboarding(row: UserAdminRow) {
-    setResending(row.id)
+    setResending(row.id);
     try {
-      const res = await apiFetch(`/api/admin/users/${row.id}/resend-onboarding`, {
-        method: "POST",
-      })
-      const json = await res.json()
-      showToast(json.ok ? `Onboarding email sent to ${row.email || row.id}` : "Failed to send email")
+      const res = await apiFetch(
+        `/api/admin/users/${row.id}/resend-onboarding`,
+        {
+          method: "POST",
+        },
+      );
+      const json = await res.json();
+      showToast(
+        json.ok
+          ? `Onboarding email sent to ${row.email || row.id}`
+          : "Failed to send email",
+      );
     } catch {
-      showToast("Failed to send email")
+      showToast("Failed to send email");
     } finally {
-      setResending(null)
+      setResending(null);
     }
   }
 
   // Filter rows by search
   const displayed = rows.filter((r) => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return r.email.toLowerCase().includes(q) || r.id.toLowerCase().includes(q)
-  })
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return r.email.toLowerCase().includes(q) || r.id.toLowerCase().includes(q);
+  });
 
   // Stats
-  const active  = rows.filter((r) => r.subscription_status === "active").length
-  const trial   = rows.filter((r) => r.subscription_status === "trial").length
-  const expired = rows.filter((r) => r.subscription_status === "expired").length
+  const active = rows.filter((r) => r.subscription_status === "active").length;
+  const trial = rows.filter((r) => r.subscription_status === "trial").length;
+  const expired = rows.filter(
+    (r) => r.subscription_status === "expired",
+  ).length;
 
   if (authSubscriptionLoading || !user) {
     return (
       <div className="flex min-h-[240px] items-center justify-center text-sm text-slate-500">
         Loading…
       </div>
-    )
+    );
   }
 
   if (!canAccessPanel) {
-    return null
+    return null;
   }
 
   return (
     <div className="min-h-screen bg-transparent text-navy">
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-
         {/* Header */}
         <div className="section-header">
           <div>
@@ -252,10 +301,14 @@ export default function AdminPage() {
         {/* Stats row */}
         {!loading && !error && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Total Users"   value={rows.length} />
-            <StatCard label="Active"        value={active}  sub="paid subscribers" />
-            <StatCard label="Trial"         value={trial}   sub="14-day trial" />
-            <StatCard label="Expired"       value={expired} sub="trial ended, no payment" />
+            <StatCard label="Total Users" value={rows.length} />
+            <StatCard label="Active" value={active} sub="paid subscribers" />
+            <StatCard label="Trial" value={trial} sub="14-day trial" />
+            <StatCard
+              label="Expired"
+              value={expired}
+              sub="trial ended, no payment"
+            />
           </div>
         )}
 
@@ -263,19 +316,21 @@ export default function AdminPage() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Plan filter */}
           <div className="flex rounded-lg border border-[#E2E8F0] overflow-hidden text-xs">
-            {(["all", "active", "trial", "expired"] as PlanFilter[]).map((p) => (
-              <button
-                key={p}
-                onClick={() => setFilter(p)}
-                className={`px-3 py-1.5 capitalize transition-colors ${
-                  filter === p
-                    ? "bg-[#F8FAFC] text-navy"
-                    : "text-[#94A3B8] hover:text-navy/90 hover:bg-[#F8FAFC]"
-                }`}
-              >
-                {p}
-              </button>
-            ))}
+            {(["all", "active", "trial", "expired"] as PlanFilter[]).map(
+              (p) => (
+                <button
+                  key={p}
+                  onClick={() => setFilter(p)}
+                  className={`px-3 py-1.5 capitalize transition-colors ${
+                    filter === p
+                      ? "bg-[#F8FAFC] text-navy"
+                      : "text-[#94A3B8] hover:text-navy/90 hover:bg-[#F8FAFC]"
+                  }`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
           </div>
           {/* Search */}
           <input
@@ -285,23 +340,38 @@ export default function AdminPage() {
             onChange={(e) => setSearch(e.target.value)}
             className="input-base flex-1 min-w-[200px]"
           />
-          <span className="text-xs text-[#94A3B8]">{displayed.length} users</span>
+          <span className="text-xs text-[#94A3B8]">
+            {displayed.length} users
+          </span>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto -mx-4 rounded-xl border border-[#E2E8F0] bg-white md:mx-0">
           <table className="table-base min-w-[640px]">
-              <thead>
-                <tr>
-                  {["Email", "Plan", "Trial Ends", "Joined", "Last Login", "DNA Scores", "Reports", "Actions"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-[#64748B]">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F1F5F9]">
-                {loading && Array.from({ length: 8 }).map((_, i) => (
+            <thead>
+              <tr>
+                {[
+                  "Email",
+                  "Plan",
+                  "Trial Ends",
+                  "Joined",
+                  "Last Login",
+                  "DNA Scores",
+                  "Reports",
+                  "Actions",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-wide text-[#64748B]"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F1F5F9]">
+              {loading &&
+                Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i}>
                     {Array.from({ length: 8 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
@@ -311,26 +381,41 @@ export default function AdminPage() {
                   </tr>
                 ))}
 
-                {!loading && displayed.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-[#94A3B8] text-sm">
-                      No users found.
-                    </td>
-                  </tr>
-                )}
+              {!loading && displayed.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-6 text-center text-[#94A3B8] text-sm"
+                  >
+                    No users found.
+                  </td>
+                </tr>
+              )}
 
-                {!loading && displayed.map((row) => (
-                  <tr key={row.id} className="hover:bg-[#F8FAFC] transition-colors">
+              {!loading &&
+                displayed.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="hover:bg-[#F8FAFC] transition-colors"
+                  >
                     <td className="px-4 py-3 text-navy/90 max-w-[200px] truncate font-mono text-xs">
-                      {row.email || <span className="text-[#94A3B8]">{row.id.slice(0, 8)}…</span>}
+                      {row.email || (
+                        <span className="text-[#94A3B8]">
+                          {row.id.slice(0, 8)}…
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${planBadgeClass(row.subscription_status)}`}>
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-sm font-medium ${planBadgeClass(row.subscription_status)}`}
+                      >
                         {row.subscription_status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">
-                      {row.subscription_status === "trial" ? trialEnds(row.trial_started_at) : "—"}
+                      {row.subscription_status === "trial"
+                        ? trialEnds(row.trial_started_at)
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-[#64748B] text-xs whitespace-nowrap">
                       {formatDate(row.created_at)}
@@ -363,8 +448,8 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -384,5 +469,5 @@ export default function AdminPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

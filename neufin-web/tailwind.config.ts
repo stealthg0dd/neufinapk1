@@ -1,43 +1,43 @@
-import type { Config } from 'tailwindcss'
-import { designTokens as t } from './lib/design-tokens'
+import type { Config } from "tailwindcss";
+import { designTokens as t } from "./lib/design-tokens";
 
 const config: Config = {
   content: [
-    './app/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './lib/**/*.{ts,tsx}',
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./lib/**/*.{ts,tsx}",
   ],
   theme: {
     extend: {
       maxWidth: {
-        content: '80rem',
-        prose: '48rem',
+        content: "80rem",
+        prose: "48rem",
       },
       /** Page blocks: `py-section` ≈ py-16; top hero bands: `py-section-hero` ≈ py-24 */
       spacing: {
-        section: '4rem',
-        'section-hero': '6rem',
+        section: "4rem",
+        "section-hero": "6rem",
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'Inter', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       colors: {
         brand: {
-          dark: '#030712',
+          dark: "#030712",
         },
         primary: {
           DEFAULT: t.primary,
           dark: t.primaryDark,
           light: t.primaryLight,
-          foreground: '#ffffff',
+          foreground: "#ffffff",
         },
         navy: t.textPrimary,
         slate2: t.textBody,
         muted2: t.textSecondary,
-        'app-bg': t.bg,
-        'card-bg': t.surface,
-        'border-std': t.border,
+        "app-bg": t.bg,
+        "card-bg": t.surface,
+        "border-std": t.border,
         success2: t.success,
         warning2: t.warning,
         danger2: t.danger,
@@ -86,44 +86,44 @@ const config: Config = {
         },
         destructive: {
           DEFAULT: t.danger,
-          foreground: '#ffffff',
+          foreground: "#ffffff",
         },
         ring: t.primary,
       },
       borderRadius: {
-        sm: '6px',
-        md: '10px',
-        lg: '14px',
-        xl: '20px',
-        '2xl': '24px',
+        sm: "6px",
+        md: "10px",
+        lg: "14px",
+        xl: "20px",
+        "2xl": "24px",
       },
       boxShadow: {
-        sm: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        md: '0 4px 12px rgba(0,0,0,0.08)',
-        lg: '0 8px 24px rgba(0,0,0,0.10)',
+        sm: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+        md: "0 4px 12px rgba(0,0,0,0.08)",
+        lg: "0 8px 24px rgba(0,0,0,0.10)",
       },
       fontSize: {
-        h1: ['2.25rem', { lineHeight: '1.2', letterSpacing: '-0.02em' }],
-        'h1-lg': ['3rem', { lineHeight: '1.15', letterSpacing: '-0.025em' }],
-        h2: ['1.5rem', { lineHeight: '1.35', letterSpacing: '-0.01em' }],
-        h3: ['1.125rem', { lineHeight: '1.45' }],
-        body: ['1rem', { lineHeight: '1.65' }],
-        'body-sm': ['0.9375rem', { lineHeight: '1.6' }],
-        meta: ['0.875rem', { lineHeight: '1.5' }],
+        h1: ["2.25rem", { lineHeight: "1.2", letterSpacing: "-0.02em" }],
+        "h1-lg": ["3rem", { lineHeight: "1.15", letterSpacing: "-0.025em" }],
+        h2: ["1.5rem", { lineHeight: "1.35", letterSpacing: "-0.01em" }],
+        h3: ["1.125rem", { lineHeight: "1.45" }],
+        body: ["1rem", { lineHeight: "1.65" }],
+        "body-sm": ["0.9375rem", { lineHeight: "1.6" }],
+        meta: ["0.875rem", { lineHeight: "1.5" }],
       },
       animation: {
-        'spin-slow': 'spin 2s linear',
-        'fade-in': 'fadeIn 0.5s ease-in-out',
+        "spin-slow": "spin 2s linear",
+        "fade-in": "fadeIn 0.5s ease-in-out",
       },
       keyframes: {
         fadeIn: {
-          '0%': { opacity: '0', transform: 'translateY(10px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
       },
     },
   },
   plugins: [],
-}
+};
 
-export default config
+export default config;

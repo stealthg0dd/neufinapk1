@@ -1,5 +1,5 @@
-import { NextRequest } from 'next/server'
-import { proxyToRailway } from '@/lib/proxy'
+import { NextRequest } from "next/server";
+import { proxyToRailway } from "@/lib/proxy";
 export async function POST(req: NextRequest) {
-  return proxyToRailway(req, '/api/reports/generate')
+  return proxyToRailway(req, "/api/reports/generate");
 }

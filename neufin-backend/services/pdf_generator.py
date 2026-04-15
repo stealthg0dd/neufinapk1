@@ -180,17 +180,11 @@ def _styles(p: dict) -> dict:
             spaceAfter=3,
         ),
         "body": ps("bd", fontName="Helvetica", fontSize=11, textColor=B, leading=15),
-        "body_b": ps(
-            "bdb", fontName="Helvetica-Bold", fontSize=11, textColor=B, leading=15
-        ),
+        "body_b": ps("bdb", fontName="Helvetica-Bold", fontSize=11, textColor=B, leading=15),
         "body_sm": ps("bsm", fontName="Helvetica", fontSize=9, textColor=B, leading=12),
-        "muted": ps(
-            "mt", fontName="Helvetica-Oblique", fontSize=9, textColor=M, leading=12
-        ),
+        "muted": ps("mt", fontName="Helvetica-Oblique", fontSize=9, textColor=M, leading=12),
         "muted8": ps("m8", fontName="Helvetica", fontSize=8, textColor=M, leading=10),
-        "label": ps(
-            "lb", fontName="Helvetica-Bold", fontSize=8, textColor=M, leading=10
-        ),
+        "label": ps("lb", fontName="Helvetica-Bold", fontSize=8, textColor=M, leading=10),
         "center": ps(
             "cn",
             fontName="Helvetica",
@@ -240,19 +234,13 @@ def _quality_check(ctx: dict) -> list[str]:
 
     beta = float(ctx.get("weighted_beta") or 0)
     if beta > 5:
-        warnings.append(
-            "Beta headline capped for display; verify position weights and pricing."
-        )
+        warnings.append("Beta headline capped for display; verify position weights and pricing.")
 
     positions = ctx.get("positions") or []
     if positions:
-        wsum = sum(
-            float(p.get("weight") or p.get("weight_pct") or 0) for p in positions
-        )
+        wsum = sum(float(p.get("weight") or p.get("weight_pct") or 0) for p in positions)
         if wsum < 50:
-            warnings.append(
-                "Position weights appear unnormalized; AUM reconciled from marks."
-            )
+            warnings.append("Position weights appear unnormalized; AUM reconciled from marks.")
 
     if not ctx.get("swarm_available"):
         warnings.append(
@@ -260,15 +248,11 @@ def _quality_check(ctx: dict) -> list[str]:
         )
 
     if not ctx.get("tax_positions"):
-        warnings.append(
-            "Cost basis not provided; tax figures are limited or illustrative only."
-        )
+        warnings.append("Cost basis not provided; tax figures are limited or illustrative only.")
 
     dna_score = int(ctx.get("dna_score") or 0)
     if dna_score == 0:
-        warnings.append(
-            "DNA score unavailable; run behavioral analysis for full classification."
-        )
+        warnings.append("DNA score unavailable; run behavioral analysis for full classification.")
 
     return warnings
 
@@ -403,9 +387,7 @@ def _donut_chart_image(
     if not HAS_MPL:
         return None
     try:
-        filtered = [
-            (lbl, v) for lbl, v in zip(labels, values, strict=True) if float(v) > 0.01
-        ]
+        filtered = [(lbl, v) for lbl, v in zip(labels, values, strict=True) if float(v) > 0.01]
         if not filtered:
             return None
         _fl, fv = zip(*filtered, strict=True)
@@ -453,11 +435,7 @@ def _gauge_image(score: int, p: dict, w: float = 180, h: float = 88) -> Image | 
         col = ACCENT_AMBER
     else:
         col = ACCENT_GREEN
-    d.add(
-        Rect(
-            0, 20, w, 36, fillColor=p["card"], strokeColor=p["border"], strokeWidth=0.5
-        )
-    )
+    d.add(Rect(0, 20, w, 36, fillColor=p["card"], strokeColor=p["border"], strokeWidth=0.5))
     fill_w = max(1.0, (w - 4) * (score / 100.0))
     d.add(Rect(2, 22, fill_w, 32, fillColor=col, strokeColor=col))
     d.add(
@@ -672,9 +650,7 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
         }
 
     atr = row.get("agent_trace")
-    agent_trace_list = (
-        [atr] if isinstance(atr, str) else atr if isinstance(atr, list) else []
-    )
+    agent_trace_list = [atr] if isinstance(atr, str) else atr if isinstance(atr, list) else []
 
     mr = inv.get("market_regime") or row.get("market_regime") or {}
     if not isinstance(mr, dict):
@@ -684,9 +660,7 @@ def _normalize_swarm(swarm: Any) -> dict[str, Any]:
         "investment_thesis": inv,
         "market_regime": mr,
         "quant_analysis": inv.get("quant_analysis") or row.get("quant_analysis") or {},
-        "tax_recommendation": inv.get("tax_recommendation")
-        or row.get("tax_recommendation")
-        or {},
+        "tax_recommendation": inv.get("tax_recommendation") or row.get("tax_recommendation") or {},
         "risk_sentinel": inv.get("risk_sentinel") or row.get("risk_sentinel") or {},
         "alpha_signal": inv.get("alpha_signal") or row.get("alpha_signal") or {},
         "alpha_signal_parsed": row.get("alpha_signal_parsed") or [],
@@ -753,11 +727,36 @@ def _build_report_context(
         hhi = hhi_from_canon
     else:
         hhi_raw = float(
-            (d.get("score_breakdown") or {}).get("hhi_concentration")
-            or m.get("hhi")
-            or 0
+            (d.get("score_breakdown") or {}).get("hhi_concentration") or m.get("hhi") or 0
         )
         hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
+
+    quant_blob = s.get("quant_analysis") or {}
+    if not isinstance(quant_blob, dict):
+        quant_blob = {}
+    quant_model_blob = quant_blob.get("quant_model") or {}
+    if not isinstance(quant_model_blob, dict):
+        quant_model_blob = {}
+    quant_modes_selected = quant_blob.get("quant_modes") or quant_model_blob.get("modes_requested")
+    if not isinstance(quant_modes_selected, list):
+        quant_modes_selected = []
+    quant_model_contrib = quant_blob.get("model_contribution_summary") or quant_model_blob.get(
+        "model_contribution_breakdown"
+    )
+    if not isinstance(quant_model_contrib, dict):
+        quant_model_contrib = {}
+    quant_alpha_risk = quant_blob.get("alpha_risk_tradeoffs") or quant_model_blob.get(
+        "risk_adjusted_metrics"
+    )
+    if not isinstance(quant_alpha_risk, dict):
+        quant_alpha_risk = {}
+    quant_scenarios = quant_blob.get("scenario_implications") or {
+        "forecast": quant_model_blob.get("forecast") or {},
+        "stress": quant_model_blob.get("stress") or {},
+        "regime_context": quant_model_blob.get("regime_context") or {},
+    }
+    if not isinstance(quant_scenarios, dict):
+        quant_scenarios = {}
 
     # ── Tax from DNA ───────────────────────────────────────────────────────────
     tax_positions: list[dict] = tax_analysis.get("positions") or []
@@ -770,14 +769,9 @@ def _build_report_context(
             cost_basis = float(pos.get("cost_basis") or 0)
             shares = float(pos.get("shares") or 0)
             price = float(
-                pos.get("price")
-                or pos.get("current_price")
-                or pos.get("last_price")
-                or 0
+                pos.get("price") or pos.get("current_price") or pos.get("last_price") or 0
             )
-            value = float(
-                pos.get("value") or (price * shares if price and shares else 0)
-            )
+            value = float(pos.get("value") or (price * shares if price and shares else 0))
             if cost_basis > 0 and value > 0:
                 gain = value - cost_basis
                 tax_positions.append(
@@ -789,12 +783,8 @@ def _build_report_context(
                     }
                 )
         if tax_positions:
-            total_tax_liability = sum(
-                float(t.get("tax_liability") or 0) for t in tax_positions
-            )
-            total_harvest_opp = sum(
-                float(t.get("harvest_credit") or 0) for t in tax_positions
-            )
+            total_tax_liability = sum(float(t.get("tax_liability") or 0) for t in tax_positions)
+            total_harvest_opp = sum(float(t.get("harvest_credit") or 0) for t in tax_positions)
 
     # ── Regime ─────────────────────────────────────────────────────────────────
     mkt_regime = s.get("market_regime") or {}
@@ -809,8 +799,7 @@ def _build_report_context(
             or ""
         )
         regime_conf = float(
-            (mkt_regime.get("confidence") if isinstance(mkt_regime, dict) else None)
-            or 0
+            (mkt_regime.get("confidence") if isinstance(mkt_regime, dict) else None) or 0
         )
 
     _rmap = {
@@ -851,9 +840,7 @@ def _build_report_context(
 
     # ── Mandate ────────────────────────────────────────────────────────────────
     has_gold = any(pos.get("symbol") == "GLD" for pos in positions)
-    has_bonds = any(
-        pos.get("symbol") in ("TLT", "BND", "AGG", "IEF", "GOVT") for pos in positions
-    )
+    has_bonds = any(pos.get("symbol") in ("TLT", "BND", "AGG", "IEF", "GOVT") for pos in positions)
     if weighted_beta > 1.2:
         mandate, mandate_desc = "Aggressive Growth", "Equity-heavy, high-beta profile"
     elif has_gold and has_bonds and weighted_beta < 1.1:
@@ -873,17 +860,13 @@ def _build_report_context(
         )
 
     # ── Investment thesis ──────────────────────────────────────────────────────
-    briefing = (
-        thesis_obj.get("briefing") or thesis_obj.get("body") or s.get("briefing") or ""
-    )
+    briefing = thesis_obj.get("briefing") or thesis_obj.get("body") or s.get("briefing") or ""
     _EMPTY_MARKERS = ("swarm output was not available", "run portfolio intelligence")
     if any(mk in briefing.lower() for mk in _EMPTY_MARKERS):
         briefing = ""
     thesis = briefing.strip()
     if not thesis:
-        top3 = sorted(
-            positions, key=lambda x: float(x.get("weight") or 0), reverse=True
-        )[:3]
+        top3 = sorted(positions, key=lambda x: float(x.get("weight") or 0), reverse=True)[:3]
         top_names = ", ".join(str(pos.get("symbol", "")) for pos in top3)
         tax_note = (
             (
@@ -924,11 +907,7 @@ def _build_report_context(
 
     # ── Recommendations ────────────────────────────────────────────────────────
     recs: list[dict] = []
-    rec_summary = (
-        s.get("recommendation_summary")
-        or thesis_obj.get("recommendation_summary")
-        or ""
-    )
+    rec_summary = s.get("recommendation_summary") or thesis_obj.get("recommendation_summary") or ""
     if rec_summary:
         recs.append(
             {
@@ -949,9 +928,7 @@ def _build_report_context(
         )
     if total_harvest_opp > 50:
         harvest_syms = [
-            tp["symbol"]
-            for tp in tax_positions
-            if float(tp.get("harvest_credit") or 0) > 0
+            tp["symbol"] for tp in tax_positions if float(tp.get("harvest_credit") or 0) > 0
         ]
         recs.append(
             {
@@ -977,10 +954,7 @@ def _build_report_context(
     # ── Alpha opportunities (use parsed list when available) ───────────────────
     alpha_signal_parsed: list = s.get("alpha_signal_parsed") or []
     alpha_signal_text = (
-        s.get("alpha_signal")
-        or thesis_obj.get("alpha_signal")
-        or s.get("alpha_outlook")
-        or ""
+        s.get("alpha_signal") or thesis_obj.get("alpha_signal") or s.get("alpha_outlook") or ""
     )
     alpha_opps: list[dict] = []
 
@@ -998,9 +972,7 @@ def _build_report_context(
                 conf_str = str(raw_conf)
             alpha_opps.append(
                 {
-                    "title": (
-                        f"Alpha Scout: {symbol}" if symbol else "Alpha Scout Signal"
-                    ),
+                    "title": (f"Alpha Scout: {symbol}" if symbol else "Alpha Scout Signal"),
                     "description": reason,
                     "confidence": conf_str,
                     "regime": regime_label or "All regimes",
@@ -1027,9 +999,7 @@ def _build_report_context(
                         alpha_opps.append(
                             {
                                 "title": (
-                                    f"Alpha Scout: {symbol}"
-                                    if symbol
-                                    else "Alpha Scout Signal"
+                                    f"Alpha Scout: {symbol}" if symbol else "Alpha Scout Signal"
                                 ),
                                 "description": reason,
                                 "confidence": conf_str,
@@ -1076,9 +1046,7 @@ def _build_report_context(
         )
     if total_harvest_opp > 0:
         harvest_syms = [
-            tp["symbol"]
-            for tp in tax_positions
-            if float(tp.get("harvest_credit") or 0) > 0
+            tp["symbol"] for tp in tax_positions if float(tp.get("harvest_credit") or 0) > 0
         ]
         alpha_opps.append(
             {
@@ -1124,6 +1092,10 @@ def _build_report_context(
         "sharpe_ratio": sharpe_ratio,
         "avg_corr": avg_corr,
         "hhi": hhi,
+        "quant_modes_selected": quant_modes_selected,
+        "quant_model_contribution_summary": quant_model_contrib,
+        "quant_alpha_risk_tradeoffs": quant_alpha_risk,
+        "quant_scenario_implications": quant_scenarios,
         "report_metrics_note": report_metrics_note,
         # Tax
         "tax_positions": tax_positions,
@@ -1146,10 +1118,7 @@ def _build_report_context(
         "swarm_available": bool(
             swarm_norm
             and isinstance(swarm_norm, dict)
-            and any(
-                swarm_norm.get(k)
-                for k in ("regime", "investment_thesis", "quant_analysis")
-            )
+            and any(swarm_norm.get(k) for k in ("regime", "investment_thesis", "quant_analysis"))
         ),
         # Advisor
         "advisor_name": advisor_config.get("advisor_name") or "NeuFin Intelligence",
@@ -1199,9 +1168,7 @@ def _prepare_logo_bytes(raw: bytes | None) -> bytes | None:
 # ─── EMERGENCY FALLBACK PDF ────────────────────────────────────────────────────
 
 
-def _generate_emergency_pdf(
-    message: str, advisor_config: dict, pal: dict | None = None
-) -> bytes:
+def _generate_emergency_pdf(message: str, advisor_config: dict, pal: dict | None = None) -> bytes:
     if pal is None:
         pal = _palette("light")
     buffer = io.BytesIO()
@@ -1299,19 +1266,11 @@ def build_swarm_ic_export_pdf(swarm_row: dict) -> bytes:
             bits.append(f"Weighted beta: {wb}")
         if sh is not None:
             bits.append(f"Sharpe ratio: {sh}")
-        summary = (
-            "; ".join(bits)
-            if bits
-            else "Quantitative detail available in the NeuFin app."
-        )
+        summary = "; ".join(bits) if bits else "Quantitative detail available in the NeuFin app."
         story.append(Paragraph(_xml(summary), st["body"]))
         story.append(Spacer(1, 8))
 
-    rec = str(
-        norm.get("recommendation_summary")
-        or swarm_row.get("recommendation_summary")
-        or ""
-    )
+    rec = str(norm.get("recommendation_summary") or swarm_row.get("recommendation_summary") or "")
     if rec:
         story.append(Paragraph("<b>Recommendations</b>", st["h3"]))
         story.append(Paragraph(_xml(rec), st["body"]))
@@ -1379,9 +1338,7 @@ def _make_cover_callback(
         canvas.rect(0, A4_H - 22, A4_W, 22, fill=1, stroke=0)
         canvas.setFont("Helvetica-Bold", 7)
         canvas.setFillColor(WHITE)
-        canvas.drawCentredString(
-            A4_W / 2, A4_H - 14, "RESTRICTED — INVESTMENT COMMITTEE USE ONLY"
-        )
+        canvas.drawCentredString(A4_W / 2, A4_H - 14, "RESTRICTED — INVESTMENT COMMITTEE USE ONLY")
         # Report state ribbon (draft / review — not IC-final)
         if report_state != REPORT_FINAL:
             canvas.setFillColor(ACCENT_AMBER)
@@ -1402,9 +1359,7 @@ def _make_cover_callback(
         if logo_bytes:
             try:
                 ir = ImageReader(io.BytesIO(logo_bytes))
-                canvas.drawImage(
-                    ir, MARGIN, y_logo - 35, width=120, height=34, mask="auto"
-                )
+                canvas.drawImage(ir, MARGIN, y_logo - 35, width=120, height=34, mask="auto")
             except Exception:
                 canvas.setFont("Helvetica-Bold", 16)
                 canvas.setFillColor(pal["text_pri"])
@@ -1418,9 +1373,7 @@ def _make_cover_callback(
         _light_cover = pal["theme"] in ("light", "white")
         canvas.setFont("Helvetica-Bold", 24)
         canvas.setFillColor(pal["text_pri"] if _light_cover else ACCENT_TEAL)
-        canvas.drawCentredString(
-            A4_W / 2, A4_H / 2 + 70, "PORTFOLIO INTELLIGENCE REPORT"
-        )
+        canvas.drawCentredString(A4_W / 2, A4_H / 2 + 70, "PORTFOLIO INTELLIGENCE REPORT")
         canvas.setFont("Helvetica", 12)
         canvas.setFillColor(pal["text_mut"])
         canvas.drawCentredString(
@@ -1464,14 +1417,10 @@ def _make_cover_callback(
         canvas.roundRect(MARGIN, vbox_y - 26, CONTENT_W, 52, 4, fill=0, stroke=1)
         canvas.setFillColor(verdict_color)
         canvas.setFont("Helvetica-Bold", 15)
-        canvas.drawCentredString(
-            A4_W / 2, vbox_y + 14, f"PORTFOLIO VERDICT:  {verdict}"
-        )
+        canvas.drawCentredString(A4_W / 2, vbox_y + 14, f"PORTFOLIO VERDICT:  {verdict}")
         canvas.setFont("Helvetica", 9)
         canvas.setFillColor(pal["text_mut"])
-        canvas.drawCentredString(
-            A4_W / 2, vbox_y - 6, str(ctx.get("verdict_desc") or "")[:240]
-        )
+        canvas.drawCentredString(A4_W / 2, vbox_y - 6, str(ctx.get("verdict_desc") or "")[:240])
 
         # ── 4-metric strip ──────────────────────────────────────────────────
         strip_y = vbox_y - 65
@@ -1512,21 +1461,13 @@ def _make_cover_callback(
         disc = (
             "This report is generated by NeuFin AI and is provided for informational purposes only. "
             "Not investment advice. NeuFin OÜ (EU). "
-            + (
-                f"{firm_name} is responsible for validating these insights."
-                if firm_name
-                else ""
-            )
+            + (f"{firm_name} is responsible for validating these insights." if firm_name else "")
         )
         canvas.drawCentredString(A4_W / 2, MARGIN - 4, disc[:400])
 
         if ctx["white_label"]:
             # White-labeled: show firm attribution instead of NeuFin branding
-            footer_text = (
-                f"Prepared by {firm_name} · Confidential"
-                if firm_name
-                else "Confidential"
-            )
+            footer_text = f"Prepared by {firm_name} · Confidential" if firm_name else "Confidential"
             canvas.setFont("Helvetica-Bold", 8)
             canvas.setFillColor(pal["text_mut"])
             canvas.drawCentredString(A4_W / 2, MARGIN + 12, footer_text)
@@ -1535,9 +1476,7 @@ def _make_cover_callback(
             canvas.setFillColor(
                 pal["text_mut"] if pal["theme"] in ("light", "white") else ACCENT_TEAL
             )
-            canvas.drawCentredString(
-                A4_W / 2, MARGIN + 12, "Powered by NeuFin Intelligence"
-            )
+            canvas.drawCentredString(A4_W / 2, MARGIN + 12, "Powered by NeuFin Intelligence")
 
         canvas.restoreState()
 
@@ -1547,9 +1486,7 @@ def _make_cover_callback(
 def _make_hf_callback(ctx: dict, pal: dict, firm_name: str) -> Any:
     """Header/footer onPage callback for body pages."""
     disc = "For informational purposes only. Not investment advice. NeuFin OÜ (EU)." + (
-        f" {firm_name} is responsible for validating these insights."
-        if firm_name
-        else ""
+        f" {firm_name} is responsible for validating these insights." if firm_name else ""
     )
 
     def callback(canvas, doc):
@@ -1613,9 +1550,7 @@ def _ic_body_section_header(
 # ─── PAGE 2 — EXECUTIVE MEMO ──────────────────────────────────────────────────
 
 
-def _page_executive_memo(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_executive_memo(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     warnings: list[str] = extra.get("warnings") or []
 
@@ -1701,9 +1636,7 @@ def _page_executive_memo(
         regime_col = ACCENT_AMBER
         mandate_col = ACCENT_TEAL
     conf_label = (
-        f"{int(ctx['regime_conf'] * 100)}% conf"
-        if ctx["regime_conf"] > 0
-        else "portfolio-derived"
+        f"{int(ctx['regime_conf'] * 100)}% conf" if ctx["regime_conf"] > 0 else "portfolio-derived"
     )
     cw3 = cw / 3
     cards = Table(
@@ -1841,9 +1774,7 @@ def _page_executive_memo(
 # ─── PAGE 3 — PORTFOLIO SNAPSHOT ──────────────────────────────────────────────
 
 
-def _page_portfolio_snapshot(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_portfolio_snapshot(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     metrics = extra.get("metrics") or {}
     pos_sorted = extra.get("pos_sorted") or []
@@ -2075,9 +2006,7 @@ def _page_portfolio_snapshot(
             except (TypeError, ValueError):
                 dc_f = None
             dc_col = (
-                pal["text_mut"]
-                if dc_f is None
-                else (ACCENT_GREEN if dc_f >= 0 else ACCENT_RED)
+                pal["text_mut"] if dc_f is None else (ACCENT_GREEN if dc_f >= 0 else ACCENT_RED)
             )
             hold.append(
                 [
@@ -2086,23 +2015,17 @@ def _page_portfolio_snapshot(
                     f"${val:,.0f}" if val else "—",
                     str(int(pos.get("shares") or 0)) or "—",
                     f"{beta_p:.2f}" if beta_p else "—",
-                    Paragraph(
-                        f'<font color="{_hex(dc_col)}">{dc_s}</font>', st["body"]
-                    ),
+                    Paragraph(f'<font color="{_hex(dc_col)}">{dc_s}</font>', st["body"]),
                 ]
             )
-        items.append(
-            Table(hold, colWidths=[52, 58, 80, 52, 48, 52], style=_tbl_std(pal))
-        )
+        items.append(Table(hold, colWidths=[52, 58, 80, 52, 48, 52], style=_tbl_std(pal)))
     return items
 
 
 # ─── PAGE 4 — BEHAVIORAL DNA ──────────────────────────────────────────────────
 
 
-def _page_behavioral_dna(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_behavioral_dna(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(_ic_body_section_header("5", "BEHAVIORAL INSIGHTS", None, pal, st, cw))
 
@@ -2110,11 +2033,7 @@ def _page_behavioral_dna(
     dna_score = ctx["dna_score"]
     gauge = _gauge_image(dna_score, pal)
     if gauge is None:
-        col_hex = (
-            "#22C55E"
-            if dna_score >= 71
-            else ("#F5A623" if dna_score >= 41 else "#EF4444")
-        )
+        col_hex = "#22C55E" if dna_score >= 71 else ("#F5A623" if dna_score >= 41 else "#EF4444")
         gauge = Paragraph(
             f'<font size="26" color="{col_hex}"><b>{dna_score}</b></font>'
             f'<font size="11" color="{_hex(pal["text_mut"])}"> / 100</font>',
@@ -2144,9 +2063,7 @@ def _page_behavioral_dna(
     strengths_items = []
     for s in ctx.get("strengths") or []:
         strengths_items.append(
-            Paragraph(
-                f'<font color="{_hex(ACCENT_GREEN)}">✓  </font>{_xml(s)}', st["body"]
-            )
+            Paragraph(f'<font color="{_hex(ACCENT_GREEN)}">✓  </font>{_xml(s)}', st["body"])
         )
         strengths_items.append(Spacer(1, 5))
 
@@ -2243,9 +2160,7 @@ def _page_behavioral_dna(
     }
     wt_lower = " ".join(ctx.get("weaknesses") or []).lower()
     biases = [
-        {"name": n, "description": d}
-        for kw, (n, d) in _BIAS_KEYWORDS.items()
-        if kw in wt_lower
+        {"name": n, "description": d} for kw, (n, d) in _BIAS_KEYWORDS.items() if kw in wt_lower
     ]
 
     items.append(Paragraph("DETECTED BEHAVIORAL BIASES", st["h3"]))
@@ -2262,11 +2177,7 @@ def _page_behavioral_dna(
                     ),
                 ]
             )
-        items.append(
-            Table(
-                bias_rows, colWidths=[120, 220, 130], style=_tbl_std(pal, ACCENT_AMBER)
-            )
-        )
+        items.append(Table(bias_rows, colWidths=[120, 220, 130], style=_tbl_std(pal, ACCENT_AMBER)))
     else:
         items.append(Paragraph("No behavioral bias patterns detected.", st["muted"]))
     return items
@@ -2277,17 +2188,13 @@ def _page_behavioral_dna(
 
 def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
-    items.extend(
-        _ic_body_section_header("4", "RISK ANALYSIS", "Macro & regime", pal, st, cw)
-    )
+    items.extend(_ic_body_section_header("4", "RISK ANALYSIS", "Macro & regime", pal, st, cw))
 
     regime = ctx["regime_label"] or "Pending IC Analysis"
     _, regime_color = _regime_display(regime)
     conf_val = ctx["regime_conf"]
     conf_label = (
-        f"Confidence: {conf_val * 100:.0f}%"
-        if conf_val > 0
-        else "Portfolio-derived classification"
+        f"Confidence: {conf_val * 100:.0f}%" if conf_val > 0 else "Portfolio-derived classification"
     )
     sub_line = (
         f"{conf_label} · Classification based on FRED macro signals via Swarm IC."
@@ -2427,9 +2334,7 @@ def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -
 # ─── PAGE 6 — RISK & CORRELATION ──────────────────────────────────────────────
 
 
-def _page_risk_correlation(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_risk_correlation(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(
         _ic_body_section_header(
@@ -2449,10 +2354,7 @@ def _page_risk_correlation(
 
     # Risk Sentinel verdict box
     sentinel_verdict = str(
-        sentinel.get("verdict")
-        or sentinel.get("summary")
-        or sentinel.get("risk_level")
-        or ""
+        sentinel.get("verdict") or sentinel.get("summary") or sentinel.get("risk_level") or ""
     )
     if sentinel_verdict:
         items.append(
@@ -2480,19 +2382,13 @@ def _page_risk_correlation(
         items.append(Paragraph("IDENTIFIED RISK FLAGS", st["h3"]))
         risk_rows = [["#", "Risk Flag", "Severity"]]
         for i, rf in enumerate(risk_flags[:6]):
-            sev = (
-                "HIGH"
-                if "concentration" in rf.lower() or "beta" in rf.lower()
-                else "MEDIUM"
-            )
+            sev = "HIGH" if "concentration" in rf.lower() or "beta" in rf.lower() else "MEDIUM"
             sev_col = _hex(ACCENT_RED) if sev == "HIGH" else _hex(ACCENT_AMBER)
             risk_rows.append(
                 [
                     str(i + 1),
                     Paragraph(_xml(rf), st["body"]),
-                    Paragraph(
-                        f'<font color="{sev_col}"><b>{sev}</b></font>', st["body"]
-                    ),
+                    Paragraph(f'<font color="{sev_col}"><b>{sev}</b></font>', st["body"]),
                 ]
             )
         items.append(Table(risk_rows, colWidths=[25, cw - 95, 60], style=_tbl_std(pal)))
@@ -2572,14 +2468,10 @@ def _page_risk_correlation(
 # ─── PAGE 7 — TAX & OPTIMIZATION ──────────────────────────────────────────────
 
 
-def _page_tax_optimization(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_tax_optimization(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(
-        _ic_body_section_header(
-            "7", "RECOMMENDATIONS", "Tax & implementation", pal, st, cw
-        )
+        _ic_body_section_header("7", "RECOMMENDATIONS", "Tax & implementation", pal, st, cw)
     )
 
     cgt_total = ctx["total_tax_liability"]
@@ -2623,11 +2515,7 @@ def _page_tax_optimization(
             unr = float(tp.get("unrealised_gain") or 0)
             cgt = float(tp.get("tax_liability") or 0)
             hrc = float(tp.get("harvest_credit") or 0)
-            status = (
-                "Harvest candidate"
-                if hrc > 0
-                else ("Taxable gain" if cgt > 0 else "Neutral")
-            )
+            status = "Harvest candidate" if hrc > 0 else ("Taxable gain" if cgt > 0 else "Neutral")
             gcol = _hex(ACCENT_GREEN) if unr >= 0 else _hex(ACCENT_RED)
             tax_rows.append(
                 [
@@ -2683,17 +2571,13 @@ def _page_tax_optimization(
 # ─── PAGE 8 — STRESS TESTING ──────────────────────────────────────────────────
 
 
-def _page_stress_testing(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_stress_testing(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(_ic_body_section_header("6", "SCENARIO ANALYSIS", None, pal, st, cw))
 
     thesis = extra.get("thesis") or {}
     swarm_norm = extra.get("swarm_norm") or {}
-    stress_results = (
-        thesis.get("stress_results") or swarm_norm.get("stress_results") or {}
-    )
+    stress_results = thesis.get("stress_results") or swarm_norm.get("stress_results") or {}
 
     regime_label = ctx["regime_label"] or "Market-Neutral"
     beta = float(ctx.get("weighted_beta") or 0)
@@ -2710,13 +2594,11 @@ def _page_stress_testing(
     stress_artifact = True
     if isinstance(stress_results, dict) and stress_results:
         stress_artifact = any(
-            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
-            for v in stress_results.values()
+            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200 for v in stress_results.values()
         )
     elif isinstance(stress_results, list) and stress_results:
         stress_artifact = any(
-            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
-            for v in stress_results
+            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200 for v in stress_results
         )
     elif stress_results:
         stress_artifact = False
@@ -2785,8 +2667,7 @@ def _page_stress_testing(
             [
                 "2024 AI Rotation",
                 "S&P -8.5%",
-                f"Est. -{max(4, tech_w * 0.3):.0f}% to "
-                f"-{max(8, tech_w * 0.45):.0f}%",
+                f"Est. -{max(4, tech_w * 0.3):.0f}% to -{max(8, tech_w * 0.45):.0f}%",
                 "Tech cluster amplifies rotation",
             ],
         ]
@@ -2830,9 +2711,7 @@ def _page_stress_testing(
                 return False
             return abs(v) <= 200
 
-        stress_raw = [
-            r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)
-        ]
+        stress_raw = [r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)]
 
         if not stress_raw:
             items.append(
@@ -2854,9 +2733,7 @@ def _page_stress_testing(
                 return False
 
         has_row_artifact = any(
-            _is_artifact_val(
-                row.get("portfolio_impact") or row.get("portfolio_return_pct", "")
-            )
+            _is_artifact_val(row.get("portfolio_impact") or row.get("portfolio_return_pct", ""))
             for row in stress_raw
             if isinstance(row, dict)
         )
@@ -2877,33 +2754,19 @@ def _page_stress_testing(
             ("Bear", "20%", regime_label, _beta_impact(-0.15)),
         ]
         scen_rows = [["Scenario", "Probability", "Regime", "Est. Portfolio Impact"]]
-        for i, (label, default_prob, default_reg, default_impact) in enumerate(
-            scenario_defaults
-        ):
-            if (
-                (not has_row_artifact)
-                and i < len(stress_raw)
-                and isinstance(stress_raw[i], dict)
-            ):
+        for i, (label, default_prob, default_reg, default_impact) in enumerate(scenario_defaults):
+            if (not has_row_artifact) and i < len(stress_raw) and isinstance(stress_raw[i], dict):
                 row = stress_raw[i]
                 impact = str(
-                    row.get("portfolio_impact")
-                    or row.get("portfolio_return_pct")
-                    or default_impact
+                    row.get("portfolio_impact") or row.get("portfolio_return_pct") or default_impact
                 )[:200]
-                prob = (
-                    _fpct(row.get("probability"))
-                    if row.get("probability")
-                    else default_prob
-                )
+                prob = _fpct(row.get("probability")) if row.get("probability") else default_prob
                 reg = str(row.get("regime") or default_reg)[:200]
             else:
                 impact, prob, reg = default_impact, default_prob, default_reg
             scen_rows.append([label, prob, reg, impact])
 
-        items.append(
-            Table(scen_rows, colWidths=[60, 70, 100, 210], style=_tbl_std(pal))
-        )
+        items.append(Table(scen_rows, colWidths=[60, 70, 100, 210], style=_tbl_std(pal)))
         items.append(Spacer(1, 10))
 
     commentary = (
@@ -2957,14 +2820,10 @@ def _page_stress_testing(
 # ─── PAGE 9 — ALPHA OPPORTUNITIES ────────────────────────────────────────────
 
 
-def _page_alpha_opportunities(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_alpha_opportunities(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(
-        _ic_body_section_header(
-            "7", "RECOMMENDATIONS", "Alpha & opportunities", pal, st, cw
-        )
+        _ic_body_section_header("7", "RECOMMENDATIONS", "Alpha & opportunities", pal, st, cw)
     )
 
     swarm_norm = extra.get("swarm_norm") or {}
@@ -3157,22 +3016,20 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         pri_col = (
             _hex(ACCENT_RED)
             if "HIGH" in pri_str.upper()
-            else _hex(ACCENT_AMBER) if "MED" in pri_str.upper() else _hex(ACCENT_GREEN)
+            else _hex(ACCENT_AMBER)
+            if "MED" in pri_str.upper()
+            else _hex(ACCENT_GREEN)
         )
         prio_rows.append(
             [
                 str(i + 1),
-                Paragraph(
-                    f'<font color="{pri_col}"><b>{_xml(pri_str)}</b></font>', st["body"]
-                ),
+                Paragraph(f'<font color="{pri_col}"><b>{_xml(pri_str)}</b></font>', st["body"]),
                 Paragraph(_xml(action), st["body"]),
                 Paragraph(_xml(rational), st["body"]),
                 _xml(timeline),
             ]
         )
-    items.append(
-        Table(prio_rows, colWidths=[22, 45, 185, 160, 65], style=_tbl_std(pal))
-    )
+    items.append(Table(prio_rows, colWidths=[22, 45, 185, 160, 65], style=_tbl_std(pal)))
     items.append(Spacer(1, 10))
 
     # Current vs. Target allocation (only when weights are normalized)
@@ -3185,12 +3042,8 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
             cur = _w(pos) * 100
             tgt = max(cur * 0.95, 0.0)
             action_txt = "Trim" if cur > tgt + 0.5 else "Hold"
-            alloc_rows.append(
-                [sym, f"{cur:.1f}%", f"{tgt:.1f}% (illustrative)", action_txt]
-            )
-        items.append(
-            Table(alloc_rows, colWidths=[60, 70, 130, 60], style=_tbl_std(pal))
-        )
+            alloc_rows.append([sym, f"{cur:.1f}%", f"{tgt:.1f}% (illustrative)", action_txt])
+        items.append(Table(alloc_rows, colWidths=[60, 70, 130, 60], style=_tbl_std(pal)))
         items.append(Spacer(1, 10))
 
     # Next review box
@@ -3235,9 +3088,7 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
 # ─── PAGE 11 — AGENT ATTRIBUTION ─────────────────────────────────────────────
 
 
-def _page_agent_attribution(
-    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
-) -> list:
+def _page_agent_attribution(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(
         _ic_body_section_header(
@@ -3290,6 +3141,65 @@ def _page_agent_attribution(
             ]
         )
     items.append(Table(agent_rows, colWidths=[90, 95, 110, 160], style=_tbl_std(pal)))
+    items.append(Spacer(1, 10))
+
+    # Quant model I/O section
+    items.append(Paragraph("QUANT MODEL INPUTS & OUTPUTS", st["h3"]))
+    q_modes = ctx.get("quant_modes_selected") or []
+    q_contrib = ctx.get("quant_model_contribution_summary") or {}
+    q_tradeoffs = ctx.get("quant_alpha_risk_tradeoffs") or {}
+    q_scen = ctx.get("quant_scenario_implications") or {}
+
+    modes_text = (
+        ", ".join(str(m).upper() for m in q_modes) if q_modes else "Default (none selected)"
+    )
+    if q_contrib:
+        contrib_parts: list[str] = []
+        for k, v in q_contrib.items():
+            try:
+                contrib_parts.append(f"{k}: {round(float(v) * 100)}%")
+            except (TypeError, ValueError):
+                contrib_parts.append(f"{k}: {v}")
+        contrib_text = ", ".join(contrib_parts)
+    else:
+        contrib_text = "No quant contribution overlay was applied for this run."
+    alpha_val = q_tradeoffs.get("sharpe_proxy")
+    vol_val = q_tradeoffs.get("volatility_annualized_proxy")
+    dd_val = q_tradeoffs.get("max_drawdown_proxy")
+    tradeoff_text = (
+        f"Sharpe proxy: {alpha_val if alpha_val is not None else 'n/a'} | "
+        f"Volatility proxy: {vol_val if vol_val is not None else 'n/a'} | "
+        f"Drawdown proxy: {dd_val if dd_val is not None else 'n/a'}"
+    )
+
+    forecast = q_scen.get("forecast") if isinstance(q_scen.get("forecast"), dict) else {}
+    stress = q_scen.get("stress") if isinstance(q_scen.get("stress"), dict) else {}
+    regime_context = (
+        q_scen.get("regime_context") if isinstance(q_scen.get("regime_context"), dict) else {}
+    )
+    scenario_text = (
+        f"Forecast horizon: {forecast.get('horizon_days', 'n/a')} days; "
+        f"Vol shift vs baseline: {forecast.get('volatility_shift_pct_vs_baseline', 'n/a')}%. "
+        f"Stress scenarios sampled: {stress.get('scenarios_sampled', 'n/a')}. "
+        f"Regime context: {regime_context.get('label', 'n/a')}"
+    )
+
+    quant_rows = [
+        [Paragraph("Selected modes", st["label"]), Paragraph(_xml(modes_text), st["body_sm"])],
+        [
+            Paragraph("Model contribution summary", st["label"]),
+            Paragraph(_xml(contrib_text), st["body_sm"]),
+        ],
+        [
+            Paragraph("Alpha vs risk tradeoffs", st["label"]),
+            Paragraph(_xml(tradeoff_text), st["body_sm"]),
+        ],
+        [
+            Paragraph("Scenario implications", st["label"]),
+            Paragraph(_xml(scenario_text), st["body_sm"]),
+        ],
+    ]
+    items.append(Table(quant_rows, colWidths=[130, cw - 130], style=_tbl_std(pal)))
     items.append(Spacer(1, 10))
 
     # Data sources
@@ -3390,9 +3300,7 @@ def _build_pdf_sync(
     quant = swarm_norm.get("quant_analysis") or thesis.get("quant_analysis") or {}
     if not isinstance(quant, dict):
         quant = {}
-    tax_r = (
-        swarm_norm.get("tax_recommendation") or thesis.get("tax_recommendation") or {}
-    )
+    tax_r = swarm_norm.get("tax_recommendation") or thesis.get("tax_recommendation") or {}
     if not isinstance(tax_r, dict):
         tax_r = {}
     sentinel = swarm_norm.get("risk_sentinel") or thesis.get("risk_sentinel") or {}
@@ -3691,9 +3599,7 @@ if __name__ == "__main__":
             ("dark", out_dir / "report_dark.pdf"),
         ):
             try:
-                data = await generate_advisor_report(
-                    _PORTFOLIO, _DNA, None, _ADVISOR, theme=theme
-                )
+                data = await generate_advisor_report(_PORTFOLIO, _DNA, None, _ADVISOR, theme=theme)
                 fname.write_bytes(data)
                 print(f"OK {theme:5s} theme  {len(data):>8,} bytes  ->  {fname}")
             except Exception as exc:

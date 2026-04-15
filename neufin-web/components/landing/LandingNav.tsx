@@ -1,28 +1,38 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import Image from 'next/image'
-import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+import { Menu, X } from "lucide-react";
 
 const LINKS = [
-  { href: '/features', label: 'Features' },
-  { href: '/about', label: 'About' },
-  { href: '/research', label: 'Research' },
-  { href: '/pricing', label: 'Pricing' },
-  { href: '/partners', label: 'Partners' },
-  { href: '#api', label: 'API' },
-] as const
+  { href: "/features", label: "Features" },
+  { href: "/about", label: "About" },
+  { href: "/research", label: "Research" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/partners", label: "Partners" },
+  { href: "#api", label: "API" },
+] as const;
 
 export default function LandingNav() {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex h-14 items-center justify-between gap-3">
-          <Link href="/" className="flex min-w-0 flex-none items-center gap-3" onClick={() => setOpen(false)}>
-            <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-10 w-auto" />
+          <Link
+            href="/"
+            className="flex min-w-0 flex-none items-center gap-3"
+            onClick={() => setOpen(false)}
+          >
+            <Image
+              src="/logo.png"
+              alt="NeuFin"
+              width={160}
+              height={40}
+              className="h-10 w-auto"
+            />
           </Link>
 
           <div className="hidden flex-1 items-center justify-center gap-8 md:flex">
@@ -53,7 +63,7 @@ export default function LandingNav() {
             <button
               type="button"
               aria-expanded={open}
-              aria-label={open ? 'Close menu' : 'Open menu'}
+              aria-label={open ? "Close menu" : "Open menu"}
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/60 text-foreground md:hidden"
               onClick={() => setOpen((o) => !o)}
             >
@@ -73,7 +83,10 @@ export default function LandingNav() {
               {label}
             </Link>
           ))}
-          <Link href="/login" className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link
+            href="/login"
+            className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
             Sign In
           </Link>
         </div>
@@ -103,5 +116,5 @@ export default function LandingNav() {
         ) : null}
       </div>
     </nav>
-  )
+  );
 }

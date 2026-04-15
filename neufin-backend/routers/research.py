@@ -14,6 +14,7 @@ Endpoints:
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from datetime import UTC, datetime
 from typing import Any
 
@@ -71,9 +72,7 @@ def _require_plan(user_id: str, min_plan: str) -> str:
     return plan
 
 
-def _coerce_pagination(
-    value: str | None, *, default: int, minimum: int, maximum: int
-) -> int:
+def _coerce_pagination(value: str | None, *, default: int, minimum: int, maximum: int) -> int:
     """Parse pagination query params defensively to avoid 422s from malformed input."""
     if value is None or value == "":
         return default
@@ -94,9 +93,7 @@ class SemanticSearchRequest(BaseModel):
 
 
 class GenerateNoteRequest(BaseModel):
-    note_type: str = (
-        "macro_outlook"  # macro_outlook|sector_analysis|regime_change|risk_alert
-    )
+    note_type: str = "macro_outlook"  # macro_outlook|sector_analysis|regime_change|risk_alert
     context_days: int = 7
 
 
@@ -140,6 +137,161 @@ async def get_regime():
     return {
         "current": regime,
         "recent_history": recent_history,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/global-map")
+async def get_global_macro_map(days: int = Query(30, ge=7, le=180)):
+    """
+    Region-level macro map for frontend choropleth overlays.
+    Color dimensions: sentiment, volatility, and current regime.
+    """
+    from datetime import timedelta
+
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    rows: list[dict[str, Any]] = []
+    try:
+        res = (
+            supabase.table("macro_signals")
+            .select("region,signal_type,change_pct,significance,signal_date,title,value")
+            .gte("signal_date", cutoff)
+            .order("signal_date", desc=True)
+            .limit(600)
+            .execute()
+        )
+        rows = list(res.data or [])
+    except Exception as exc:
+        logger.warning("research.global_map_fetch_failed", error=str(exc))
+
+    regime = get_current_regime_summary() or {}
+    current_regime = str(regime.get("regime") or "neutral")
+
+    by_region: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        r = str(row.get("region") or "GLOBAL").upper().strip()
+        by_region[r].append(row)
+
+    points: list[dict[str, Any]] = []
+    for region, items in by_region.items():
+        if not items:
+            continue
+        sentiment_score = 0.0
+        volatility_score = 0.0
+        weight_total = 0.0
+        latest = items[0]
+        for it in items:
+            sig = str(it.get("significance") or "medium").lower()
+            w = (
+                1.6
+                if sig == "critical"
+                else 1.2
+                if sig == "high"
+                else 0.8
+                if sig == "medium"
+                else 0.4
+            )
+            c = float(it.get("change_pct") or 0.0)
+            st = str(it.get("signal_type") or "").lower()
+            sentiment_score += c * w
+            if st in ("volatility", "yield_curve", "interest_rate"):
+                volatility_score += abs(c) * w
+            weight_total += w
+
+        if weight_total > 0:
+            sentiment_score = sentiment_score / weight_total
+            volatility_score = volatility_score / weight_total
+
+        points.append(
+            {
+                "region": region,
+                "sentiment": round(sentiment_score, 3),
+                "volatility": round(volatility_score, 3),
+                "regime": current_regime,
+                "latest_signal": {
+                    "title": latest.get("title"),
+                    "signal_type": latest.get("signal_type"),
+                    "value": latest.get("value"),
+                    "date": latest.get("signal_date"),
+                },
+            }
+        )
+
+    points.sort(key=lambda p: p["region"])
+    return {
+        "regime": current_regime,
+        "regions": points,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+
+
+@router.get("/regime-heatmap")
+async def get_regime_heatmap(days: int = Query(60, ge=14, le=365)):
+    """
+    Time x region heatmap payload for regime state intensity.
+    """
+    from datetime import timedelta
+
+    cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
+    rows: list[dict[str, Any]] = []
+    try:
+        res = (
+            supabase.table("macro_signals")
+            .select("region,signal_type,significance,change_pct,signal_date")
+            .gte("signal_date", cutoff)
+            .order("signal_date", asc=True)
+            .limit(1600)
+            .execute()
+        )
+        rows = list(res.data or [])
+    except Exception as exc:
+        logger.warning("research.regime_heatmap_fetch_failed", error=str(exc))
+
+    regime = get_current_regime_summary() or {}
+    regime_label = str(regime.get("regime") or "neutral")
+
+    buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
+    for row in rows:
+        dt = str(row.get("signal_date") or "")[:10]
+        region = str(row.get("region") or "GLOBAL").upper().strip()
+        if not dt:
+            continue
+        sig = str(row.get("significance") or "medium").lower()
+        sig_weight = (
+            1.8 if sig == "critical" else 1.3 if sig == "high" else 1.0 if sig == "medium" else 0.6
+        )
+        delta = abs(float(row.get("change_pct") or 0.0))
+        buckets[(dt, region)].append(delta * sig_weight)
+
+    points: list[dict[str, Any]] = []
+    for (dt, region), vals in buckets.items():
+        intensity = sum(vals) / len(vals) if vals else 0.0
+        if intensity >= 8:
+            regime_state = "risk_off"
+        elif intensity >= 4:
+            regime_state = "transition"
+        elif intensity > 0:
+            regime_state = "risk_on"
+        else:
+            regime_state = "neutral"
+        points.append(
+            {
+                "time": dt,
+                "region": region,
+                "regime_state": regime_state,
+                "intensity": round(intensity, 3),
+                "global_regime": regime_label,
+            }
+        )
+
+    points.sort(key=lambda x: (x["time"], x["region"]))
+    regions = sorted({p["region"] for p in points})
+    timeline = sorted({p["time"] for p in points})
+    return {
+        "regime": regime_label,
+        "regions": regions,
+        "timeline": timeline,
+        "cells": points,
         "generated_at": datetime.now(UTC).isoformat(),
     }
 
@@ -298,9 +450,7 @@ async def get_blog_note(slug: str):
             )
     except Exception as exc:
         logger.error("research.blog_note_failed", slug=slug, error=str(exc))
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve blog note."
-        ) from exc
+        raise HTTPException(status_code=500, detail="Failed to retrieve blog note.") from exc
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Research note not found.")
@@ -322,9 +472,7 @@ async def get_blog_note(slug: str):
     try:
         rel_res = (
             supabase.table("research_notes")
-            .select(
-                "id,slug,title,executive_summary,note_type,generated_at,confidence_score"
-            )
+            .select("id,slug,title,executive_summary,note_type,generated_at,confidence_score")
             .eq("is_public", True)
             .eq("note_type", note.get("note_type"))
             .neq("id", note.get("id"))
@@ -379,13 +527,7 @@ async def get_note(note_id: str, user: JWTUser = Depends(get_current_user)):
     """Full research note — soft paywall (auth required, even if trial expired)."""
 
     try:
-        result = (
-            supabase.table("research_notes")
-            .select("*")
-            .eq("id", note_id)
-            .limit(1)
-            .execute()
-        )
+        result = supabase.table("research_notes").select("*").eq("id", note_id).limit(1).execute()
         if not result.data:
             raise HTTPException(status_code=404, detail="Research note not found.")
 
@@ -441,9 +583,7 @@ async def get_signals(
         return {"signals": result.data or [], "days": days}
     except Exception as exc:
         logger.error("research.get_signals_failed", error=str(exc))
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve signals."
-        ) from exc
+        raise HTTPException(status_code=500, detail="Failed to retrieve signals.") from exc
 
 
 @router.post("/query")
@@ -473,9 +613,7 @@ async def semantic_search(
         query_embedding: list[float] = embed_resp.data[0].embedding
     except Exception as exc:
         logger.error("research.embed_query_failed", error=str(exc))
-        raise HTTPException(
-            status_code=503, detail="Embedding service unavailable."
-        ) from exc
+        raise HTTPException(status_code=503, detail="Embedding service unavailable.") from exc
 
     results: dict[str, list[Any]] = {"notes": [], "signals": [], "events": []}
     limit = min(body.limit, 10)
@@ -533,9 +671,7 @@ async def semantic_search(
 
 
 @router.get("/portfolio-context/{portfolio_id}")
-async def portfolio_context(
-    portfolio_id: str, user: JWTUser = Depends(get_current_user)
-):
+async def portfolio_context(portfolio_id: str, user: JWTUser = Depends(get_current_user)):
     """
     Returns all recent research notes and signals relevant to a saved portfolio's holdings.
     Soft paywall: allow access after trial expiry (banner handled in UI).
@@ -557,9 +693,7 @@ async def portfolio_context(
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(
-            status_code=500, detail="Failed to fetch portfolio."
-        ) from exc
+        raise HTTPException(status_code=500, detail="Failed to fetch portfolio.") from exc
 
     # Extract tickers from portfolio
     ticker_data = portfolio.get("ticker_data") or []
@@ -581,9 +715,7 @@ async def portfolio_context(
             for ticker in tickers[:5]:  # Limit to top 5 to keep query small
                 note_result = (
                     supabase.table("research_notes")
-                    .select(
-                        "id,note_type,title,executive_summary,regime,time_horizon,generated_at"
-                    )
+                    .select("id,note_type,title,executive_summary,regime,time_horizon,generated_at")
                     .contains("affected_tickers", [ticker])
                     .order("generated_at", desc=True)
                     .limit(3)
@@ -599,9 +731,7 @@ async def portfolio_context(
     try:
         latest_notes = (
             supabase.table("research_notes")
-            .select(
-                "id,note_type,title,executive_summary,regime,time_horizon,generated_at"
-            )
+            .select("id,note_type,title,executive_summary,regime,time_horizon,generated_at")
             .in_("note_type", ["macro_outlook", "regime_change"])
             .order("generated_at", desc=True)
             .limit(3)
@@ -626,9 +756,7 @@ async def portfolio_context(
 
 
 @router.post("/generate")
-async def generate_note(
-    body: GenerateNoteRequest, user: JWTUser = Depends(get_subscribed_user)
-):
+async def generate_note(body: GenerateNoteRequest, user: JWTUser = Depends(get_subscribed_user)):
     """
     Trigger on-demand research note generation.
     Requires advisor plan or above.
@@ -658,7 +786,5 @@ async def generate_note(
             "note_type": body.note_type,
         }
     except Exception as exc:
-        logger.error(
-            "research.generate_failed", note_type=body.note_type, error=str(exc)
-        )
+        logger.error("research.generate_failed", note_type=body.note_type, error=str(exc))
         raise HTTPException(status_code=500, detail="Note generation failed.") from exc

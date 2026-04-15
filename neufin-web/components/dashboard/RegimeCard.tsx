@@ -1,34 +1,46 @@
-'use client'
+"use client";
 
-import type { RegimeData } from '@/hooks/usePortfolioData'
+import type { RegimeData } from "@/hooks/usePortfolioData";
 
 interface Props {
-  regime: RegimeData | null
+  regime: RegimeData | null;
 }
 
 function regimeColor(r: string | undefined) {
-  const u = (r ?? '').toLowerCase()
-  if (u.includes('risk_off') || u.includes('risk-off') || u.includes('recession') || u.includes('crisis')) return '#DC2626'
-  if (u.includes('risk_on') || u.includes('risk-on') || u.includes('recovery') || u.includes('growth')) return '#16A34A'
-  return '#d97706'
+  const u = (r ?? "").toLowerCase();
+  if (
+    u.includes("risk_off") ||
+    u.includes("risk-off") ||
+    u.includes("recession") ||
+    u.includes("crisis")
+  )
+    return "#DC2626";
+  if (
+    u.includes("risk_on") ||
+    u.includes("risk-on") ||
+    u.includes("recovery") ||
+    u.includes("growth")
+  )
+    return "#16A34A";
+  return "#d97706";
 }
 
 function regimeLabel(r: string | undefined) {
-  if (!r || r === 'unknown') return 'Pending'
+  if (!r || r === "unknown") return "Pending";
   return r
-    .replace(/_/g, ' ')
-    .replace(/-/g, '-')
-    .split(' ')
+    .replace(/_/g, " ")
+    .replace(/-/g, "-")
+    .split(" ")
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
+    .join(" ");
 }
 
 export function RegimeCard({ regime }: Props) {
-  const raw = regime?.regime ?? regime?.label ?? undefined
-  const col = regimeColor(raw)
-  const label = regimeLabel(raw)
-  const conf = regime?.confidence ?? 0
-  const confPct = conf > 0 ? Math.round(conf * 100) : null
+  const raw = regime?.regime ?? regime?.label ?? undefined;
+  const col = regimeColor(raw);
+  const label = regimeLabel(raw);
+  const conf = regime?.confidence ?? 0;
+  const confPct = conf > 0 ? Math.round(conf * 100) : null;
 
   return (
     <div className="card-elevated flex flex-col gap-1">
@@ -52,11 +64,15 @@ export function RegimeCard({ regime }: Props) {
               style={{ background: col, width: `${confPct}%` }}
             />
           </div>
-          <p className="mt-1 text-body-sm text-slate-600">Confidence: {confPct}%</p>
+          <p className="mt-1 text-body-sm text-slate-600">
+            Confidence: {confPct}%
+          </p>
         </>
       ) : (
-        <p className="mt-2 text-body-sm text-slate-600">Live macro signal · Updates daily</p>
+        <p className="mt-2 text-body-sm text-slate-600">
+          Live macro signal · Updates daily
+        </p>
       )}
     </div>
-  )
+  );
 }

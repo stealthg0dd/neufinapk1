@@ -1,26 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import { NextRequest, NextResponse } from "next/server";
+import { Resend } from "resend";
 
 function stars(n: number) {
-  return n ? '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)) : 'Not rated'
+  return n ? "★".repeat(n) + "☆".repeat(Math.max(0, 5 - n)) : "Not rated";
 }
 
 function npsLabel(n: number) {
-  return n >= 9 ? 'Promoter' : n >= 7 ? 'Passive' : 'Detractor'
+  return n >= 9 ? "Promoter" : n >= 7 ? "Passive" : "Detractor";
 }
 
 export async function POST(request: NextRequest) {
   try {
     if (!process.env.RESEND_API_KEY) {
-      console.error('[feedback] RESEND_API_KEY missing')
-      return NextResponse.json({ error: 'Feedback email service unavailable' }, { status: 500 })
+      console.error("[feedback] RESEND_API_KEY missing");
+      return NextResponse.json(
+        { error: "Feedback email service unavailable" },
+        { status: 500 },
+      );
     }
-    const resend = new Resend(process.env.RESEND_API_KEY)
-    const data = (await request.json()) as Record<string, unknown>
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const data = (await request.json()) as Record<string, unknown>;
 
-    const missingRequired = !data?.name || data?.nps === undefined || !data?.pay_intent
+    const missingRequired =
+      !data?.name || data?.nps === undefined || !data?.pay_intent;
     if (missingRequired) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 },
+      );
     }
 
     const emailHtml = `
@@ -60,26 +67,29 @@ export async function POST(request: NextRequest) {
 <body>
 <div class="badge">NeuFin Beta Feedback</div>
 <div class="card">
-  <h1>${String(data.name ?? '')}</h1>
-  <p class="meta">${String(data.email ?? 'No email provided')} &nbsp;·&nbsp;
-    ${String(data.role ?? 'Role not specified')} &nbsp;·&nbsp;
-    ${new Date(String(data.submitted_at ?? Date.now())).toLocaleString('en-SG', {
-      timeZone: 'Asia/Singapore',
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })} SGT</p>
+  <h1>${String(data.name ?? "")}</h1>
+  <p class="meta">${String(data.email ?? "No email provided")} &nbsp;·&nbsp;
+    ${String(data.role ?? "Role not specified")} &nbsp;·&nbsp;
+    ${new Date(String(data.submitted_at ?? Date.now())).toLocaleString(
+      "en-SG",
+      {
+        timeZone: "Asia/Singapore",
+        dateStyle: "medium",
+        timeStyle: "short",
+      },
+    )} SGT</p>
 </div>
 <div class="card">
   <h2>NPS &amp; Intent</h2>
   <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px">
     <div>
-      <div class="nps-score">${String(data.nps ?? '—')}</div>
-      <div class="nps-label">NPS Score · ${data.nps !== null && data.nps !== undefined ? npsLabel(Number(data.nps)) : '—'}</div>
+      <div class="nps-score">${String(data.nps ?? "—")}</div>
+      <div class="nps-label">NPS Score · ${data.nps !== null && data.nps !== undefined ? npsLabel(Number(data.nps)) : "—"}</div>
     </div>
     <div style="flex:1">
-      <div class="row"><span class="label">Would pay after trial</span><span class="value">${String(data.pay_intent ?? '—')}</span></div>
-      <div class="row"><span class="label">Price preference</span><span class="value">${String(data.price_preference ?? '—')}</span></div>
-      <div class="row"><span class="label">Call availability</span><span class="value">${String(data.call_ok ?? '—')}</span></div>
+      <div class="row"><span class="label">Would pay after trial</span><span class="value">${String(data.pay_intent ?? "—")}</span></div>
+      <div class="row"><span class="label">Price preference</span><span class="value">${String(data.price_preference ?? "—")}</span></div>
+      <div class="row"><span class="label">Call availability</span><span class="value">${String(data.call_ok ?? "—")}</span></div>
     </div>
   </div>
 </div>
@@ -87,72 +97,90 @@ export async function POST(request: NextRequest) {
   <h2>Feature Ratings</h2>
   <div class="row"><span class="label">Landing page</span><span class="value"><span class="stars">${stars(Number(data.landing_rating ?? 0))}</span> (${String(data.landing_rating ?? 0)}/5)</span></div>
   <div class="row"><span class="label">AI analysis quality</span><span class="value"><span class="stars">${stars(Number(data.ai_rating ?? 0))}</span> (${String(data.ai_rating ?? 0)}/5)</span></div>
-  <div class="row"><span class="label">Navigation ease</span><span class="value">${String(data.nav_ease ?? '—')} / 5</span></div>
-  <div class="row"><span class="label">Speed / performance</span><span class="value">${String(data.speed_feel ?? '—')} / 5</span></div>
+  <div class="row"><span class="label">Navigation ease</span><span class="value">${String(data.nav_ease ?? "—")} / 5</span></div>
+  <div class="row"><span class="label">Speed / performance</span><span class="value">${String(data.speed_feel ?? "—")} / 5</span></div>
 </div>
 <div class="card">
   <h2>Feature Journey</h2>
-  <div class="row"><span class="label">First impression</span><span class="value">${String(data.first_action ?? '—')}</span></div>
-  <div class="row"><span class="label">CSV upload</span><span class="value">${String(data.csv_upload ?? '—')}</span></div>
-  <div class="row"><span class="label">DNA score</span><span class="value">${String(data.dna_score ?? '—')}</span></div>
-  <div class="row"><span class="label">Swarm analysis</span><span class="value">${String(data.swarm ?? '—')}</span></div>
-  <div class="row"><span class="label">Market regime</span><span class="value">${String(data.regime ?? '—')}</span></div>
-  <div class="row"><span class="label">Comparison to current tools</span><span class="value">${String(data.compare ?? '—')}</span></div>
+  <div class="row"><span class="label">First impression</span><span class="value">${String(data.first_action ?? "—")}</span></div>
+  <div class="row"><span class="label">CSV upload</span><span class="value">${String(data.csv_upload ?? "—")}</span></div>
+  <div class="row"><span class="label">DNA score</span><span class="value">${String(data.dna_score ?? "—")}</span></div>
+  <div class="row"><span class="label">Swarm analysis</span><span class="value">${String(data.swarm ?? "—")}</span></div>
+  <div class="row"><span class="label">Market regime</span><span class="value">${String(data.regime ?? "—")}</span></div>
+  <div class="row"><span class="label">Comparison to current tools</span><span class="value">${String(data.compare ?? "—")}</span></div>
 </div>
 <div class="card">
   <h2>What was confusing</h2>
-  ${(String(data.confusing_parts ?? '')).split(', ').filter(Boolean).map((p) => `<span class="pill">${p}</span>`).join('') || '<span style="color:#9CA3AF;font-size:13px">Nothing selected</span>'}
+  ${
+    String(data.confusing_parts ?? "")
+      .split(", ")
+      .filter(Boolean)
+      .map((p) => `<span class="pill">${p}</span>`)
+      .join("") ||
+    '<span style="color:#9CA3AF;font-size:13px">Nothing selected</span>'
+  }
 </div>
 <div class="card">
   <h2>Most valuable features</h2>
-  ${(String(data.valuable_features ?? '')).split(', ').filter(Boolean).map((p) => `<span class="pill">${p}</span>`).join('') || '<span style="color:#9CA3AF;font-size:13px">Nothing selected</span>'}
+  ${
+    String(data.valuable_features ?? "")
+      .split(", ")
+      .filter(Boolean)
+      .map((p) => `<span class="pill">${p}</span>`)
+      .join("") ||
+    '<span style="color:#9CA3AF;font-size:13px">Nothing selected</span>'
+  }
 </div>
-${data.bugs ? `<div class="card"><h2>Bugs &amp; errors reported</h2><div class="open-answer">${String(data.bugs)}</div></div>` : ''}
-${data.fix_priority ? `<div class="card"><h2>Most important thing to fix</h2><div class="open-answer">${String(data.fix_priority)}</div></div>` : ''}
-${data.impressive ? `<div class="card"><h2>Most impressive thing</h2><div class="open-answer">${String(data.impressive)}</div></div>` : ''}
-${data.first_impression ? `<div class="card"><h2>First dashboard impression</h2><div class="open-answer">${String(data.first_impression)}</div></div>` : ''}
-${data.missing ? `<div class="card"><h2>What's missing</h2><div class="open-answer">${String(data.missing)}</div></div>` : ''}
-${data.ux_change ? `<div class="card"><h2>UX change they'd make</h2><div class="open-answer">${String(data.ux_change)}</div></div>` : ''}
-${data.other ? `<div class="card"><h2>Other notes</h2><div class="open-answer">${String(data.other)}</div></div>` : ''}
+${data.bugs ? `<div class="card"><h2>Bugs &amp; errors reported</h2><div class="open-answer">${String(data.bugs)}</div></div>` : ""}
+${data.fix_priority ? `<div class="card"><h2>Most important thing to fix</h2><div class="open-answer">${String(data.fix_priority)}</div></div>` : ""}
+${data.impressive ? `<div class="card"><h2>Most impressive thing</h2><div class="open-answer">${String(data.impressive)}</div></div>` : ""}
+${data.first_impression ? `<div class="card"><h2>First dashboard impression</h2><div class="open-answer">${String(data.first_impression)}</div></div>` : ""}
+${data.missing ? `<div class="card"><h2>What's missing</h2><div class="open-answer">${String(data.missing)}</div></div>` : ""}
+${data.ux_change ? `<div class="card"><h2>UX change they'd make</h2><div class="open-answer">${String(data.ux_change)}</div></div>` : ""}
+${data.other ? `<div class="card"><h2>Other notes</h2><div class="open-answer">${String(data.other)}</div></div>` : ""}
 <div class="footer">
   Submitted via NeuFin Beta Feedback Form ·
   ${new Date(String(data.submitted_at ?? Date.now())).toISOString()} ·
-  Source: ${String(data.source ?? 'Not specified')}
+  Source: ${String(data.source ?? "Not specified")}
 </div>
 </body>
-</html>`
+</html>`;
 
-    const fromEmail = process.env.FEEDBACK_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'
+    const fromEmail =
+      process.env.FEEDBACK_FROM_EMAIL ||
+      process.env.RESEND_FROM_EMAIL ||
+      "onboarding@resend.dev";
     const emailResult = await resend.emails.send({
       from: `NeuFin Feedback <${fromEmail}>`,
-      to: ['info@neufin.ai'],
-      replyTo: String(data.email || 'info@neufin.ai'),
-      subject: `[Beta Feedback] ${String(data.name)} · NPS ${String(data.nps ?? '?')} · ${String(data.pay_intent || 'Undecided')}`,
+      to: ["info@neufin.ai"],
+      replyTo: String(data.email || "info@neufin.ai"),
+      subject: `[Beta Feedback] ${String(data.name)} · NPS ${String(data.nps ?? "?")} · ${String(data.pay_intent || "Undecided")}`,
       html: emailHtml,
-    })
+    });
 
     if (emailResult.error) {
-      console.error('[feedback] Resend error:', {
+      console.error("[feedback] Resend error:", {
         error: emailResult.error,
         fromEmail,
-        to: 'info@neufin.ai',
-      })
+        to: "info@neufin.ai",
+      });
       return NextResponse.json(
         {
-          error: 'Failed to send feedback email',
-          detail: 'Email delivery failed. Verify RESEND_API_KEY and FEEDBACK_FROM_EMAIL domain settings.',
+          error: "Failed to send feedback email",
+          detail:
+            "Email delivery failed. Verify RESEND_API_KEY and FEEDBACK_FROM_EMAIL domain settings.",
         },
         { status: 500 },
-      )
+      );
     }
 
     try {
-      const { createClient } = await import('@supabase/supabase-js')
+      const { createClient } = await import("@supabase/supabase-js");
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      )
-      await supabase.from('beta_feedback').insert({
+      );
+      await supabase.from("beta_feedback").insert({
         name: data.name,
         email: data.email,
         role: data.role,
@@ -172,14 +200,17 @@ ${data.other ? `<div class="card"><h2>Other notes</h2><div class="open-answer">$
         call_requested: data.call_ok,
         raw_data: data,
         submitted_at: data.submitted_at || new Date().toISOString(),
-      })
+      });
     } catch (dbErr) {
-      console.error('[feedback] Supabase insert failed (non-fatal):', dbErr)
+      console.error("[feedback] Supabase insert failed (non-fatal):", dbErr);
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('[feedback] Unhandled error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error("[feedback] Unhandled error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

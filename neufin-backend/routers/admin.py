@@ -72,9 +72,7 @@ def _trial_end_iso(trial_started_at: str | None) -> datetime.datetime | None:
     if not trial_started_at:
         return None
     try:
-        started = datetime.datetime.fromisoformat(
-            trial_started_at.replace("Z", "+00:00")
-        )
+        started = datetime.datetime.fromisoformat(trial_started_at.replace("Z", "+00:00"))
         return started + datetime.timedelta(days=14)
     except Exception:
         return None
@@ -108,12 +106,7 @@ def _count_profiles_since(since_iso: str) -> int:
 
 def _count_table_since(table: str, since_iso: str, date_col: str = "created_at") -> int:
     try:
-        r = (
-            supabase.table(table)
-            .select("id", count="exact")
-            .gte(date_col, since_iso)
-            .execute()
-        )
+        r = supabase.table(table).select("id", count="exact").gte(date_col, since_iso).execute()
         return int(r.count or 0)
     except Exception:
         return 0
@@ -156,9 +149,7 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
     now = datetime.datetime.now(datetime.UTC)
     d30 = (now - datetime.timedelta(days=30)).isoformat()
     d60 = (now - datetime.timedelta(days=60)).isoformat()
-    month_start = datetime.datetime(
-        now.year, now.month, 1, tzinfo=datetime.UTC
-    ).isoformat()
+    month_start = datetime.datetime(now.year, now.month, 1, tzinfo=datetime.UTC).isoformat()
 
     total_users = _count_profiles_where([])
     trials = _count_profiles_where([("subscription_status", "trial")])
@@ -200,9 +191,7 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
         try:
             reports_month += _count_table_since(tbl, month_start)
         except Exception as exc:
-            logger.debug(
-                "admin.dashboard.reports_month_table", table=tbl, error=str(exc)
-            )
+            logger.debug("admin.dashboard.reports_month_table", table=tbl, error=str(exc))
             continue
 
     # Sparklines (14d new users + dna_scores as activity proxy)
@@ -235,9 +224,7 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
             },
             "analyses_this_month": {
                 "value": analyses_month,
-                "delta_pct": _delta_pct(
-                    float(d30_dna), float(max(analyses_prev_30, 1))
-                ),
+                "delta_pct": _delta_pct(float(d30_dna), float(max(analyses_prev_30, 1))),
                 "sparkline": spark_dna,
             },
             "reports_generated_this_month": {
@@ -307,10 +294,7 @@ async def list_users(
     report_counts: dict[str, int] = {}
     try:
         dna_result = (
-            supabase.table("dna_scores")
-            .select("user_id")
-            .in_("user_id", user_ids)
-            .execute()
+            supabase.table("dna_scores").select("user_id").in_("user_id", user_ids).execute()
         )
         for row in dna_result.data or []:
             uid = row["user_id"]
@@ -340,10 +324,7 @@ async def list_users(
             {
                 "id": tid,
                 "email": p.get("email") or "",
-                "name": p.get("advisor_name")
-                or p.get("display_name")
-                or p.get("email")
-                or "",
+                "name": p.get("advisor_name") or p.get("display_name") or p.get("email") or "",
                 "firm_name": p.get("firm_name"),
                 "plan": p.get("subscription_tier") or "—",
                 "status": p.get("subscription_status"),
@@ -456,9 +437,7 @@ async def resend_onboarding(
             body=resp.text[:200],
         )
     except Exception as exc:
-        logger.warning(
-            "admin.resend_onboarding.failed", user_id=user_id, error=str(exc)
-        )
+        logger.warning("admin.resend_onboarding.failed", user_id=user_id, error=str(exc))
 
     logger.info("admin.resend_onboarding.queued", user_id=user_id)
     return {"ok": True, "queued": True}
@@ -510,29 +489,19 @@ async def admin_reset_password_link(
 ):
     """Return a one-time Supabase recovery link for the user (admin tooling)."""
     try:
-        pr = (
-            supabase.table("user_profiles")
-            .select("email")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
+        pr = supabase.table("user_profiles").select("email").eq("id", user_id).single().execute()
         email = (pr.data or {}).get("email")
     except Exception as exc:
         raise HTTPException(404, "User not found") from exc
     if not email:
         raise HTTPException(404, "No email on profile")
     try:
-        link = supabase.auth.admin.generate_link(
-            {"type": "recovery", "email": str(email)}
-        )
+        link = supabase.auth.admin.generate_link({"type": "recovery", "email": str(email)})
         props = getattr(link, "properties", None) or {}
         if isinstance(props, dict):
             action_link = props.get("action_link") or props.get("href")
         else:
-            action_link = getattr(props, "action_link", None) or getattr(
-                props, "href", None
-            )
+            action_link = getattr(props, "action_link", None) or getattr(props, "href", None)
         return {"ok": True, "action_link": action_link}
     except Exception as exc:
         logger.warning("admin.reset_password.failed", user_id=user_id, error=str(exc))
@@ -570,9 +539,7 @@ async def delete_user(user_id: str, _admin: JWTUser = Depends(get_admin_user)):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(
-            "admin.delete_user.request_failed", user_id=user_id, error=str(exc)
-        )
+        logger.error("admin.delete_user.request_failed", user_id=user_id, error=str(exc))
         raise HTTPException(500, f"Failed to delete user: {exc}") from exc
 
     try:
@@ -631,9 +598,7 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
         except Exception as exc:
             logger.warning("admin.partners.profiles_failed", error=str(exc))
 
-    since_30 = (
-        datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=30)
-    ).date()
+    since_30 = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=30)).date()
     usage_by_key: dict[str, int] = {}
     try:
         usage_res = (
@@ -662,9 +627,7 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
         health = "RED"
         if last_used:
             try:
-                lu_dt = datetime.datetime.fromisoformat(
-                    str(last_used).replace("Z", "+00:00")
-                )
+                lu_dt = datetime.datetime.fromisoformat(str(last_used).replace("Z", "+00:00"))
                 if lu_dt.tzinfo is None:
                     lu_dt = lu_dt.replace(tzinfo=datetime.UTC)
                 age = datetime.datetime.now(datetime.UTC) - lu_dt
@@ -749,9 +712,7 @@ async def partner_usage_detail(
         if kid in per_key:
             per_key[kid][d] = per_key[kid].get(d, 0) + c
 
-    daily_series = [
-        {"date": d, "calls": daily_totals[d]} for d in sorted(daily_totals.keys())
-    ]
+    daily_series = [{"date": d, "calls": daily_totals[d]} for d in sorted(daily_totals.keys())]
 
     key_payload = []
     for k in keys:
@@ -1097,9 +1058,7 @@ def _swarm_row_successful(row: dict) -> bool:
 
 
 def _swarm_agent_success_7d() -> dict[str, Any]:
-    since = (
-        datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=7)
-    ).isoformat()
+    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=7)).isoformat()
     try:
         r = (
             supabase.table("swarm_reports")
@@ -1122,9 +1081,7 @@ def _swarm_agent_success_7d() -> dict[str, Any]:
 
 def _analytics_error_hint_24h() -> dict[str, Any]:
     """Heuristic: fraction of recent analytics event names that look like failures."""
-    since = (
-        datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=24)
-    ).isoformat()
+    since = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=24)).isoformat()
     try:
         r = (
             supabase.table("analytics_events")
@@ -1249,9 +1206,9 @@ async def set_api_key_rate_limit(
     _admin: JWTUser = Depends(get_admin_user),
 ):
     try:
-        supabase.table("api_keys").update(
-            {"rate_limit_per_day": body.rate_limit_daily}
-        ).eq("id", key_id).execute()
+        supabase.table("api_keys").update({"rate_limit_per_day": body.rate_limit_daily}).eq(
+            "id", key_id
+        ).execute()
     except Exception as exc:
         raise HTTPException(500, str(exc)) from exc
     return {"ok": True, "key_id": key_id, "rate_limit_per_day": body.rate_limit_daily}

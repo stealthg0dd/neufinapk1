@@ -13,20 +13,20 @@ const nextConfig = {
 
   // Required for the production Docker image (copies only what node server.js needs).
   // Has no effect on `next dev` — safe to leave on at all times.
-  output: 'standalone',
+  output: "standalone",
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
       },
       {
-        protocol: 'https',
-        hostname: '**.googleusercontent.com',
+        protocol: "https",
+        hostname: "**.googleusercontent.com",
       },
       {
-        protocol: 'https',
-        hostname: 'avatars.githubusercontent.com',
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
       },
     ],
   },
@@ -37,10 +37,11 @@ const nextConfig = {
       ...(config.ignoreWarnings || []),
       {
         module: /@opentelemetry\/instrumentation/,
-        message: /Critical dependency: the request of a dependency is an expression/,
+        message:
+          /Critical dependency: the request of a dependency is an expression/,
       },
-    ]
-    return config
+    ];
+    return config;
   },
 
   // Proxy /api/* to Railway only when no local App Router handler exists.
@@ -54,33 +55,39 @@ const nextConfig = {
     const railwayBase =
       process.env.RAILWAY_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
-      'https://neufin101-production.up.railway.app'
+      "https://neufin101-production.up.railway.app";
     return {
       fallback: [
         {
-          source: '/api/:path*',
+          source: "/api/:path*",
           destination: `${railwayBase}/api/:path*`,
         },
       ],
-    }
+    };
   },
 
   // Security & CORS response headers for direct cross-origin calls
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
-          { key: 'X-Content-Type-Options',       value: 'nosniff' },
-          { key: 'X-Frame-Options',              value: 'DENY' },
-          { key: 'Referrer-Policy',              value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy',           value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'X-DNS-Prefetch-Control',       value: 'on' },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          { key: "X-DNS-Prefetch-Control", value: "on" },
           // HSTS: enforce HTTPS for 1 year, include subdomains
-          { key: 'Strict-Transport-Security',    value: 'max-age=31536000; includeSubDomains; preload' },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains; preload",
+          },
           // CSP: allow self + Supabase + Sentry + PostHog + Stripe + Google (OAuth/fonts)
           {
-            key: 'Content-Security-Policy',
+            key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://apis.google.com https://us.posthog.com",
@@ -94,20 +101,20 @@ const nextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "upgrade-insecure-requests",
-            ].join('; '),
+            ].join("; "),
           },
         ],
       },
-    ]
+    ];
   },
-}
+};
 
 // Wrap with Sentry only when SENTRY_DSN is set — avoids build failures in
 // environments that haven't configured Sentry yet.
 if (process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN) {
-  const { withSentryConfig } = require('@sentry/nextjs')
+  const { withSentryConfig } = require("@sentry/nextjs");
   module.exports = withSentryConfig(nextConfig, {
-    org:     process.env.SENTRY_ORG,
+    org: process.env.SENTRY_ORG,
     project: process.env.SENTRY_PROJECT,
 
     // Upload source maps only in CI to keep local builds fast.
@@ -117,12 +124,11 @@ if (process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN) {
     disableLogger: true,
 
     // Tunnel Sentry requests through /monitoring to bypass ad-blockers.
-    tunnelRoute: '/monitoring',
+    tunnelRoute: "/monitoring",
 
     // Route browser profiling to the Sentry CDN for better performance.
     automaticVercelMonitors: true,
-  })
+  });
 } else {
-  module.exports = nextConfig
+  module.exports = nextConfig;
 }
-

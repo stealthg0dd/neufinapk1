@@ -27,9 +27,7 @@ def fetch_user_profile(user_id: str) -> dict:
     try:
         result = (
             supabase.table("user_profiles")
-            .select(
-                "id, email, trial_started_at, subscription_status, subscription_tier"
-            )
+            .select("id, email, trial_started_at, subscription_status, subscription_tier")
             .eq("id", user_id)
             .single()
             .execute()
@@ -261,11 +259,7 @@ async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
     """
     try:
         result = (
-            supabase.table("user_profiles")
-            .select("is_admin")
-            .eq("id", user.id)
-            .limit(1)
-            .execute()
+            supabase.table("user_profiles").select("is_admin").eq("id", user.id).limit(1).execute()
         )
         raw = result.data[0].get("is_admin") if result.data else None
         is_admin = _truthy_is_admin(raw)

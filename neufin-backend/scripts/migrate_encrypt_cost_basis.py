@@ -95,8 +95,7 @@ def run(dry_run: bool = False) -> None:
         f"\n[migrate] Done.\n"
         f"  Encrypted : {encrypted}\n"
         f"  Skipped   : {skipped}  (already encrypted)\n"
-        f"  Errors    : {errors}\n"
-        + ("[dry-run mode — no writes made]" if dry_run else "")
+        f"  Errors    : {errors}\n" + ("[dry-run mode — no writes made]" if dry_run else "")
     )
 
     if errors:

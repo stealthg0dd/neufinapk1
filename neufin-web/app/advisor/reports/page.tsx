@@ -1,65 +1,74 @@
-'use client'
-export const dynamic = 'force-dynamic'
+"use client";
+export const dynamic = "force-dynamic";
 
-import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import { useAuth } from '@/lib/auth-context'
-import { apiGet } from '@/lib/api-client'
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth-context";
+import { apiGet } from "@/lib/api-client";
 
 interface ClientReport {
-  id: string
-  client_id?: string
-  client_name?: string
-  portfolio_id: string
-  pdf_url: string | null
-  is_paid: boolean
-  created_at: string
-  plan_type?: string
+  id: string;
+  client_id?: string;
+  client_name?: string;
+  portfolio_id: string;
+  pdf_url: string | null;
+  is_paid: boolean;
+  created_at: string;
+  plan_type?: string;
 }
 
 function fmt(iso: string) {
-  return new Date(iso).toLocaleDateString('en-SG', { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString("en-SG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
-function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />;
 }
 
 export default function AdvisorReportsPage() {
-  const { user } = useAuth()
-  const [reports, setReports] = useState<ClientReport[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [usedThisMonth, setUsedThisMonth] = useState(0)
-  const REPORT_LIMIT = 10
+  const { user } = useAuth();
+  const [reports, setReports] = useState<ClientReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [usedThisMonth, setUsedThisMonth] = useState(0);
+  const REPORT_LIMIT = 10;
 
   const load = useCallback(async () => {
     if (!user) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const data = await apiGet<{ reports?: ClientReport[] }>(`/api/reports/advisor/${user.id}`, {
-        cache: 'no-store',
-      })
-      const allReports: ClientReport[] = data.reports ?? []
-      setReports(allReports)
-      const thisMonth = new Date().toISOString().slice(0, 7)
-      setUsedThisMonth(allReports.filter((r) => r.created_at.startsWith(thisMonth)).length)
+      const data = await apiGet<{ reports?: ClientReport[] }>(
+        `/api/reports/advisor/${user.id}`,
+        {
+          cache: "no-store",
+        },
+      );
+      const allReports: ClientReport[] = data.reports ?? [];
+      setReports(allReports);
+      const thisMonth = new Date().toISOString().slice(0, 7);
+      setUsedThisMonth(
+        allReports.filter((r) => r.created_at.startsWith(thisMonth)).length,
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [user])
+  }, [user]);
 
   useEffect(() => {
-    load()
-  }, [load])
+    load();
+  }, [load]);
 
-  const usagePct = Math.min(100, (usedThisMonth / REPORT_LIMIT) * 100)
+  const usagePct = Math.min(100, (usedThisMonth / REPORT_LIMIT) * 100);
 
   if (loading) {
     return (
@@ -72,7 +81,7 @@ export default function AdvisorReportsPage() {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -106,24 +115,34 @@ export default function AdvisorReportsPage() {
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-medium text-navy">Reports This Month</p>
             <p className="text-sm font-bold">
-              <span className={usedThisMonth >= REPORT_LIMIT ? 'text-red-700' : 'text-navy'}>{usedThisMonth}</span>
+              <span
+                className={
+                  usedThisMonth >= REPORT_LIMIT ? "text-red-700" : "text-navy"
+                }
+              >
+                {usedThisMonth}
+              </span>
               <span className="text-muted2">/{REPORT_LIMIT}</span>
             </p>
           </div>
           <div className="h-2 w-full rounded-full bg-surface-3">
             <div
               className={`h-2 rounded-full transition-all duration-700 ${
-                usagePct >= 100 ? 'bg-red-500' : usagePct >= 80 ? 'bg-amber-500' : 'bg-primary'
+                usagePct >= 100
+                  ? "bg-red-500"
+                  : usagePct >= 80
+                    ? "bg-amber-500"
+                    : "bg-primary"
               }`}
               style={{ width: `${usagePct}%` }}
             />
           </div>
           {usedThisMonth >= REPORT_LIMIT && (
             <p className="mt-2 text-xs text-red-700">
-              Monthly limit reached.{' '}
+              Monthly limit reached.{" "}
               <Link href="/pricing" className="underline">
                 Upgrade to Enterprise
-              </Link>{' '}
+              </Link>{" "}
               for unlimited reports.
             </p>
           )}
@@ -145,7 +164,10 @@ export default function AdvisorReportsPage() {
           {reports.length === 0 ? (
             <div className="p-12 text-center">
               <p className="text-sm text-muted2">No reports generated yet.</p>
-              <Link href="/advisor/dashboard" className="mt-3 inline-block text-sm text-primary hover:text-primary-dark">
+              <Link
+                href="/advisor/dashboard"
+                className="mt-3 inline-block text-sm text-primary hover:text-primary-dark"
+              >
                 Go to dashboard to generate your first report →
               </Link>
             </div>
@@ -158,7 +180,8 @@ export default function AdvisorReportsPage() {
                 >
                   <div className="space-y-0.5">
                     <p className="text-sm font-medium text-navy">
-                      {r.client_name ?? `Portfolio ${r.portfolio_id.slice(0, 8)}…`}
+                      {r.client_name ??
+                        `Portfolio ${r.portfolio_id.slice(0, 8)}…`}
                     </p>
                     <p className="text-xs text-muted2">{fmt(r.created_at)}</p>
                   </div>
@@ -192,5 +215,5 @@ export default function AdvisorReportsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

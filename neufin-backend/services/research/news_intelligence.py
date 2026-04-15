@@ -135,9 +135,7 @@ def _get_embedding_sync(text: str) -> list[float] | None:
         from openai import OpenAI
 
         client = OpenAI(api_key=settings.OPENAI_KEY)
-        resp = client.embeddings.create(
-            model="text-embedding-3-small", input=text[:8000]
-        )
+        resp = client.embeddings.create(model="text-embedding-3-small", input=text[:8000])
         return resp.data[0].embedding
     except Exception as exc:
         logger.warning("news_intelligence.embedding_failed", error=str(exc))

@@ -32,19 +32,14 @@ def canonical_portfolio_headlines(
         v = float(p.get("value") or p.get("current_value") or 0)
         if v <= 0:
             sh = float(p.get("shares") or 0)
-            px = float(
-                p.get("price") or p.get("current_price") or p.get("last_price") or 0
-            )
+            px = float(p.get("price") or p.get("current_price") or p.get("last_price") or 0)
             v = sh * px
         sum_positions += max(0.0, v)
 
     tv_stored = float(portfolio_data.get("total_value") or m.get("total_value") or 0)
     if sum_positions > 1.0:
         total_value = sum_positions
-        if (
-            tv_stored > 1.0
-            and abs(sum_positions - tv_stored) / max(tv_stored, 1.0) > 0.02
-        ):
+        if tv_stored > 1.0 and abs(sum_positions - tv_stored) / max(tv_stored, 1.0) > 0.02:
             sources_note = "AUM reconciled from position marks vs. stored total."
         else:
             sources_note = "AUM from position marks."

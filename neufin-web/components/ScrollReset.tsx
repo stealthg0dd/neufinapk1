@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 /**
  * Disables browser scroll-restoration and forces the window to the top
@@ -14,18 +14,18 @@ import { usePathname } from 'next/navigation'
  * call scrollIntoView or anchor-navigate on mount.
  */
 export function ScrollReset() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   useEffect(() => {
     // Disable browser scroll restoration so Back/Forward navigation
     // doesn't remember position and jump users mid-page.
-    if (typeof window !== 'undefined' && history.scrollRestoration) {
-      history.scrollRestoration = 'manual'
+    if (typeof window !== "undefined" && history.scrollRestoration) {
+      history.scrollRestoration = "manual";
     }
     // Force scroll to top on every navigation.
     // 'instant' avoids a visual flash that 'smooth' would cause.
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
-  }, [pathname])
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [pathname]);
 
-  return null
+  return null;
 }

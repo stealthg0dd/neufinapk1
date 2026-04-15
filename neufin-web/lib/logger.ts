@@ -38,14 +38,20 @@ function makeConsoleLogger(bindings: LogEntry = {}): Logger {
   const emit =
     (level: LogLevel, consoleFn: (...a: unknown[]) => void) =>
     (obj: LogEntry, msg: string) => {
-      consoleFn({ level, msg, ...bindings, ...obj, time: new Date().toISOString() });
+      consoleFn({
+        level,
+        msg,
+        ...bindings,
+        ...obj,
+        time: new Date().toISOString(),
+      });
     };
 
   return {
     trace: emit("trace", console.debug),
     debug: emit("debug", console.debug),
-    info:  emit("info",  console.info),
-    warn:  emit("warn",  console.warn),
+    info: emit("info", console.info),
+    warn: emit("warn", console.warn),
     error: emit("error", console.error),
     fatal: emit("fatal", console.error),
     child: (extra) => makeConsoleLogger({ ...bindings, ...extra }),
@@ -62,20 +68,22 @@ function makeServerLogger(): Logger {
   const isProd = process.env.NODE_ENV === "production";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pinoFn = ((pino as any).default ?? pino) as (opts: unknown) => import("pino").Logger;
+  const pinoFn = ((pino as any).default ?? pino) as (
+    opts: unknown,
+  ) => import("pino").Logger;
   const instance = pinoFn({
-    level:      process.env.LOG_LEVEL ?? "info",
+    level: process.env.LOG_LEVEL ?? "info",
     // In production emit compact JSON; in dev use pino-pretty for readability.
-    transport:  isProd
+    transport: isProd
       ? undefined
       : { target: "pino-pretty", options: { colorize: true } },
     base: {
       service: "neufin-web",
-      env:     process.env.NEXT_PUBLIC_APP_ENV ?? "production",
+      env: process.env.NEXT_PUBLIC_APP_ENV ?? "production",
     },
     redact: {
       // Never log raw auth tokens or PII fields
-      paths:  ["req.headers.authorization", "*.token", "*.password", "*.secret"],
+      paths: ["req.headers.authorization", "*.token", "*.password", "*.secret"],
       censor: "[REDACTED]",
     },
   });

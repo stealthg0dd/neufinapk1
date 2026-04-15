@@ -1,39 +1,42 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
-import { FadeIn } from '@/components/ui/FadeIn'
-import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
-import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
-import { getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
+import { FadeIn } from "@/components/ui/FadeIn";
+import { apiFetch, apiGet, apiPost } from "@/lib/api-client";
+import { stripeSuccessUrlReports } from "@/lib/stripe-checkout-urls";
+import {
+  getStoredReportTheme,
+  type ReportTheme,
+} from "@/components/dashboard/ReportThemeModal";
 
 interface ReportRecord {
-  id: string
-  portfolio_id: string | null
-  portfolio_name?: string | null
-  pdf_url: string | null
-  is_paid: boolean
-  created_at: string
-  dna_score?: number | null
+  id: string;
+  portfolio_id: string | null;
+  portfolio_name?: string | null;
+  pdf_url: string | null;
+  is_paid: boolean;
+  created_at: string;
+  dna_score?: number | null;
 }
 
 export default function DashboardReportsPage() {
-  const [reports, setReports] = useState<ReportRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [generating, setGenerating] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [reports, setReports] = useState<ReportRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    void loadReports()
-  }, [])
+    void loadReports();
+  }, []);
 
   async function loadReports() {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
-      const data = await apiGet<ReportRecord[] | { reports?: ReportRecord[]; history?: ReportRecord[] }>(
-        '/api/vault/history'
-      )
+      const data = await apiGet<
+        ReportRecord[] | { reports?: ReportRecord[]; history?: ReportRecord[] }
+      >("/api/vault/history");
       setReports(
         Array.isArray(data)
           ? data
@@ -41,207 +44,232 @@ export default function DashboardReportsPage() {
             ? (data as { history: ReportRecord[] }).history
             : Array.isArray((data as { reports?: ReportRecord[] }).reports)
               ? (data as { reports: ReportRecord[] }).reports
-              : []
-      )
+              : [],
+      );
     } catch (err) {
-      console.error('[reports] Failed to load:', err)
-      setError('Failed to load reports. Check your connection and try again.')
+      console.error("[reports] Failed to load:", err);
+      setError("Failed to load reports. Check your connection and try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   async function downloadReport(report: ReportRecord, theme?: ReportTheme) {
     // Already have a URL — open directly
     if (report.pdf_url) {
-      window.open(report.pdf_url, '_blank')
-      return
+      window.open(report.pdf_url, "_blank");
+      return;
     }
 
     if (!report.portfolio_id) {
-      alert('No portfolio linked to this report.')
-      return
+      alert("No portfolio linked to this report.");
+      return;
     }
 
-    const resolvedTheme = theme ?? getStoredReportTheme()
+    const resolvedTheme = theme ?? getStoredReportTheme();
 
-    setGenerating(report.id)
+    setGenerating(report.id);
     try {
       // Check subscription gate first
-      const statusRes = await apiGet<{ plan: string; status?: string }>('/api/subscription/status')
+      const statusRes = await apiGet<{ plan: string; status?: string }>(
+        "/api/subscription/status",
+      );
       const canGenerate =
-        statusRes.plan === 'advisor' ||
-        statusRes.plan === 'enterprise' ||
-        statusRes.status === 'trial'
+        statusRes.plan === "advisor" ||
+        statusRes.plan === "enterprise" ||
+        statusRes.status === "trial";
 
       if (!canGenerate) {
-        const origin = window.location.origin
+        const origin = window.location.origin;
         const { checkout_url } = await apiPost<{ checkout_url: string }>(
-          '/api/reports/checkout',
+          "/api/reports/checkout",
           {
-            plan: 'single',
+            plan: "single",
             portfolio_id: report.portfolio_id,
             success_url: stripeSuccessUrlReports(origin),
             cancel_url: `${origin}/dashboard/reports`,
-          }
-        )
-        window.location.href = checkout_url
-        return
+          },
+        );
+        window.location.href = checkout_url;
+        return;
       }
 
-      const res = await apiFetch('/api/reports/generate', {
-        method: 'POST',
-        body: JSON.stringify({ portfolio_id: report.portfolio_id, inline_pdf: false, theme: resolvedTheme }),
-      })
+      const res = await apiFetch("/api/reports/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          portfolio_id: report.portfolio_id,
+          inline_pdf: false,
+          theme: resolvedTheme,
+        }),
+      });
 
-      const data = await res.json() as {
-        pdf_url?: string | null
-        pdf_base64?: string | null
-        filename?: string | null
-        checkout_url?: string | null
-      }
+      const data = (await res.json()) as {
+        pdf_url?: string | null;
+        pdf_base64?: string | null;
+        filename?: string | null;
+        checkout_url?: string | null;
+      };
 
       if (data.checkout_url) {
-        window.location.href = data.checkout_url
-        return
+        window.location.href = data.checkout_url;
+        return;
       }
 
       if (data.pdf_url) {
-        window.open(data.pdf_url, '_blank')
-        void loadReports() // refresh list so the new URL appears
-        return
+        window.open(data.pdf_url, "_blank");
+        void loadReports(); // refresh list so the new URL appears
+        return;
       }
 
       if (data.pdf_base64) {
-        const bytes = Uint8Array.from(atob(data.pdf_base64), c => c.charCodeAt(0))
-        const blob = new Blob([bytes], { type: 'application/pdf' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = data.filename || `neufin-report-${report.id.slice(0, 8)}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-        return
+        const bytes = Uint8Array.from(atob(data.pdf_base64), (c) =>
+          c.charCodeAt(0),
+        );
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download =
+          data.filename || `neufin-report-${report.id.slice(0, 8)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
       }
     } catch (err) {
-      console.error('[reports] download failed:', err)
+      console.error("[reports] download failed:", err);
     } finally {
-      setGenerating(null)
+      setGenerating(null);
     }
   }
 
   return (
     <FadeIn>
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <div className="mb-6 flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">IC Reports &amp; Memos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Generate and manage institutional-grade portfolio reports.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/dashboard/reports/preview"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition duration-200 ease-out hover:border-gray-400 hover:bg-gray-50 active:scale-[0.99]"
-          >
-            HTML print preview
-          </Link>
-          <Link
-            href="/dashboard/portfolio"
-            className="rounded-lg border border-gray-300 bg-[#1EB8CC] px-3 py-2 text-xs font-medium text-white shadow-sm transition duration-200 ease-out hover:bg-[#189fb2] hover:shadow-md active:scale-[0.99]"
-          >
-            Generate New Report
-          </Link>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-4 rounded-lg border border-risk/40 bg-risk/10 px-4 py-3 text-sm text-risk">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex min-h-[120px] items-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading reports…
-        </div>
-      ) : reports.length > 0 ? (
-        <div className="space-y-3">
-          {reports.map((r) => (
-            <div
-              key={r.id}
-              className="grid gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md md:grid-cols-[2fr_1fr_1fr_1fr_1fr] motion-reduce:hover:translate-y-0"
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">
+              IC Reports &amp; Memos
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Generate and manage institutional-grade portfolio reports.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/reports/preview"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition duration-200 ease-out hover:border-gray-400 hover:bg-gray-50 active:scale-[0.99]"
             >
-              <div>
-                <p className="text-sm font-medium text-foreground">{r.portfolio_name || 'Portfolio'}</p>
-                <p className="font-mono text-sm text-muted-foreground">
-                  {r.portfolio_id || r.id}
-                  {!r.portfolio_id && (
-                    <span className="ml-1 text-amber-500/80">(link a portfolio via analysis)</span>
-                  )}
-                </p>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {r.created_at
-                  ? new Date(r.created_at).toLocaleDateString('en-SG', { dateStyle: 'medium' })
-                  : '—'}
-              </div>
-              <div className="text-xs text-muted-foreground">DNA {r.dna_score ?? '—'}</div>
-              <div>
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-sm font-medium ${
-                    r.is_paid ? 'bg-emerald-500/15 text-emerald-300' : 'bg-shell-subtle/15 text-shell-fg/90'
-                  }`}
-                >
-                  {r.is_paid ? 'Paid' : 'Free'}
-                </span>
-              </div>
-              <div>
-                {r.pdf_url ? (
-                  <a
-                    href={r.pdf_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Download PDF
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={generating === r.id || !r.portfolio_id}
-                    onClick={() => void downloadReport(r)}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {generating === r.id ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Generating…
-                      </>
-                    ) : (
-                      'Generate Report'
+              HTML print preview
+            </Link>
+            <Link
+              href="/dashboard/portfolio"
+              className="rounded-lg border border-gray-300 bg-[#1EB8CC] px-3 py-2 text-xs font-medium text-white shadow-sm transition duration-200 ease-out hover:bg-[#189fb2] hover:shadow-md active:scale-[0.99]"
+            >
+              Generate New Report
+            </Link>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-risk/40 bg-risk/10 px-4 py-3 text-sm text-risk">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex min-h-[120px] items-center gap-2 py-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading reports…
+          </div>
+        ) : reports.length > 0 ? (
+          <div className="space-y-3">
+            {reports.map((r) => (
+              <div
+                key={r.id}
+                className="grid gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md md:grid-cols-[2fr_1fr_1fr_1fr_1fr] motion-reduce:hover:translate-y-0"
+              >
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {r.portfolio_name || "Portfolio"}
+                  </p>
+                  <p className="font-mono text-sm text-muted-foreground">
+                    {r.portfolio_id || r.id}
+                    {!r.portfolio_id && (
+                      <span className="ml-1 text-amber-500/80">
+                        (link a portfolio via analysis)
+                      </span>
                     )}
-                  </button>
-                )}
+                  </p>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {r.created_at
+                    ? new Date(r.created_at).toLocaleDateString("en-SG", {
+                        dateStyle: "medium",
+                      })
+                    : "—"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  DNA {r.dna_score ?? "—"}
+                </div>
+                <div>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-sm font-medium ${
+                      r.is_paid
+                        ? "bg-emerald-500/15 text-emerald-300"
+                        : "bg-shell-subtle/15 text-shell-fg/90"
+                    }`}
+                  >
+                    {r.is_paid ? "Paid" : "Free"}
+                  </span>
+                </div>
+                <div>
+                  {r.pdf_url ? (
+                    <a
+                      href={r.pdf_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Download PDF
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={generating === r.id || !r.portfolio_id}
+                      onClick={() => void downloadReport(r)}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {generating === r.id ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          Generating…
+                        </>
+                      ) : (
+                        "Generate Report"
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6">
-          <p className="text-sm text-muted-foreground">
-            No reports yet. Run your first portfolio analysis to generate an IC-grade report.
-          </p>
-          <Link href="/dashboard/portfolio" className="mt-3 inline-block text-xs text-primary hover:underline">
-            Go to Portfolio →
-          </Link>
-        </div>
-      )}
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6">
+            <p className="text-sm text-muted-foreground">
+              No reports yet. Run your first portfolio analysis to generate an
+              IC-grade report.
+            </p>
+            <Link
+              href="/dashboard/portfolio"
+              className="mt-3 inline-block text-xs text-primary hover:underline"
+            >
+              Go to Portfolio →
+            </Link>
+          </div>
+        )}
       </div>
     </FadeIn>
-  )
+  );
 }

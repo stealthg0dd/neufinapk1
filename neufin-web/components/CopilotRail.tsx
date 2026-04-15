@@ -1,68 +1,89 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useState } from 'react'
-import { Brain, X } from 'lucide-react'
-import AgentChat from '@/components/AgentChat'
-import SwarmTerminal from '@/components/SwarmTerminal'
-import { apiGet } from '@/lib/api-client'
+import { useCallback, useEffect, useState } from "react";
+import { Brain, X } from "lucide-react";
+import AgentChat from "@/components/AgentChat";
+import SwarmTerminal from "@/components/SwarmTerminal";
+import { apiGet } from "@/lib/api-client";
 
 const RAIL_AGENT_DOTS = [
-  'Strategist',
-  'Quant',
-  'Tax',
-  'Critic',
-  'Synthesizer',
-  'Router',
-  'System',
-] as const
+  "Strategist",
+  "Quant",
+  "Tax",
+  "Critic",
+  "Synthesizer",
+  "Router",
+  "System",
+] as const;
 
 const QUICK_PROMPTS = [
-  'Summarize portfolio risk',
-  'Generate IC memo',
-  'Detect bias patterns',
-] as const
+  "Summarize portfolio risk",
+  "Generate IC memo",
+  "Detect bias patterns",
+] as const;
 
 type MetricPosition = {
-  symbol: string
-  shares: number
-  current_price: number
-  current_value: number
-  weight: number
-}
+  symbol: string;
+  shares: number;
+  current_price: number;
+  current_value: number;
+  weight: number;
+};
 
 type PortfolioMetrics = {
-  total_value: number
-  positions: MetricPosition[]
-}
+  total_value: number;
+  positions: MetricPosition[];
+};
 
-export function CopilotRail({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CopilotRail({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const [positions, setPositions] = useState<
-    { symbol: string; shares: number; price: number; value: number; weight: number }[]
-  >([])
-  const [totalValue, setTotalValue] = useState(0)
-  const [chatBusy, setChatBusy] = useState(false)
-  const [quickFill, setQuickFill] = useState<{ id: number; text: string } | null>(null)
+    {
+      symbol: string;
+      shares: number;
+      price: number;
+      value: number;
+      weight: number;
+    }[]
+  >([]);
+  const [totalValue, setTotalValue] = useState(0);
+  const [chatBusy, setChatBusy] = useState(false);
+  const [quickFill, setQuickFill] = useState<{
+    id: number;
+    text: string;
+  } | null>(null);
 
-  const onQuickFillConsumed = useCallback(() => setQuickFill(null), [])
+  const onQuickFillConsumed = useCallback(() => setQuickFill(null), []);
 
   useEffect(() => {
-    if (!open) return
-    let cancelled = false
+    if (!open) return;
+    let cancelled = false;
     void (async () => {
       try {
-        const list = await apiGet<Array<{ portfolio_id: string }>>('/api/portfolio/list', { cache: 'no-store' })
+        const list = await apiGet<Array<{ portfolio_id: string }>>(
+          "/api/portfolio/list",
+          { cache: "no-store" },
+        );
         if (cancelled || !Array.isArray(list) || list.length === 0) {
           if (!cancelled) {
-            setPositions([])
-            setTotalValue(0)
+            setPositions([]);
+            setTotalValue(0);
           }
-          return
+          return;
         }
-        const m = await apiGet<PortfolioMetrics>(`/api/portfolio/${list[0].portfolio_id}/metrics`, {
-          cache: 'no-store',
-        })
-        if (cancelled) return
-        setTotalValue(m.total_value ?? 0)
+        const m = await apiGet<PortfolioMetrics>(
+          `/api/portfolio/${list[0].portfolio_id}/metrics`,
+          {
+            cache: "no-store",
+          },
+        );
+        if (cancelled) return;
+        setTotalValue(m.total_value ?? 0);
         setPositions(
           (m.positions ?? []).map((p) => ({
             symbol: p.symbol,
@@ -71,29 +92,33 @@ export function CopilotRail({ open, onClose }: { open: boolean; onClose: () => v
             value: p.current_value,
             weight: p.weight,
           })),
-        )
+        );
       } catch {
         if (!cancelled) {
-          setPositions([])
-          setTotalValue(0)
+          setPositions([]);
+          setTotalValue(0);
         }
       }
-    })()
+    })();
     return () => {
-      cancelled = true
-    }
-  }, [open])
+      cancelled = true;
+    };
+  }, [open]);
 
   return (
     <aside
       aria-hidden={!open}
       className={`fixed right-0 top-11 bottom-0 z-40 flex w-80 flex-col border-l border-border/60 bg-copilot transition-transform duration-300 ease-in-out ${
-        open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
+        open ? "translate-x-0" : "pointer-events-none translate-x-full"
       }`}
     >
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-border/40 px-4">
         <div className="flex items-center gap-2">
-          <Brain className="h-3.5 w-3.5 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+          <Brain
+            className="h-3.5 w-3.5 shrink-0 text-accent"
+            strokeWidth={2}
+            aria-hidden
+          />
           <span className="font-mono text-sm uppercase tracking-widest text-muted-foreground">
             NEUFIN COPILOT
           </span>
@@ -111,20 +136,22 @@ export function CopilotRail({ open, onClose }: { open: boolean; onClose: () => v
       <div className="shrink-0 border-b border-border/40 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           {RAIL_AGENT_DOTS.map((name) => {
-            const running = chatBusy && name === 'Synthesizer'
+            const running = chatBusy && name === "Synthesizer";
             const dotClass = running
-              ? 'bg-primary animate-pulse'
-              : 'bg-muted-foreground/30'
+              ? "bg-primary animate-pulse"
+              : "bg-muted-foreground/30";
             return (
               <span
                 key={name}
                 title={name}
                 className={`h-1.5 w-1.5 rounded-full ${dotClass}`}
               />
-            )
+            );
           })}
         </div>
-        <p className="mt-1.5 font-mono text-sm text-muted-foreground/60">7 agents active</p>
+        <p className="mt-1.5 font-mono text-sm text-muted-foreground/60">
+          7 agents active
+        </p>
       </div>
 
       <div className="shrink-0 border-b border-border/40 px-2 py-2">
@@ -149,7 +176,9 @@ export function CopilotRail({ open, onClose }: { open: boolean; onClose: () => v
       </div>
 
       <div className="shrink-0 border-t border-border/40 px-4 py-3">
-        <p className="mb-2 font-mono text-sm uppercase text-muted-foreground/50">Quick prompts</p>
+        <p className="mb-2 font-mono text-sm uppercase text-muted-foreground/50">
+          Quick prompts
+        </p>
         <div className="flex flex-wrap gap-2">
           {QUICK_PROMPTS.map((label) => (
             <button
@@ -164,5 +193,5 @@ export function CopilotRail({ open, onClose }: { open: boolean; onClose: () => v
         </div>
       </div>
     </aside>
-  )
+  );
 }

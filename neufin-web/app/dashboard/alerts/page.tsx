@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 export default function DashboardAlertsPage() {
   return (
@@ -13,5 +13,5 @@ export default function DashboardAlertsPage() {
         This module is being built. Available in the next release.
       </p>
     </div>
-  )
+  );
 }

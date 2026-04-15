@@ -1,13 +1,16 @@
-import React from 'react'
-import { AlertTriangle, X } from 'lucide-react'
+import React from "react";
+import { AlertTriangle, X } from "lucide-react";
 
 interface PriceWarningProps {
-  failedTickers: string[]
-  onDismiss: () => void
+  failedTickers: string[];
+  onDismiss: () => void;
 }
 
-export const PriceWarningBanner: React.FC<PriceWarningProps> = ({ failedTickers, onDismiss }) => {
-  if (failedTickers.length === 0) return null
+export const PriceWarningBanner: React.FC<PriceWarningProps> = ({
+  failedTickers,
+  onDismiss,
+}) => {
+  if (failedTickers.length === 0) return null;
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-md animate-in fade-in slide-in-from-bottom-4">
@@ -17,11 +20,13 @@ export const PriceWarningBanner: React.FC<PriceWarningProps> = ({ failedTickers,
         </div>
 
         <div className="flex-1">
-          <h4 className="text-sm font-bold text-amber-100">Market Data Latency</h4>
+          <h4 className="text-sm font-bold text-amber-100">
+            Market Data Latency
+          </h4>
           <p className="text-xs text-amber-200/80 leading-relaxed mt-1">
-            Real-time verification failed for:{' '}
+            Real-time verification failed for:{" "}
             <span className="font-mono font-bold text-amber-400">
-              {failedTickers.join(', ')}
+              {failedTickers.join(", ")}
             </span>
             . Using last-known close prices.
           </p>
@@ -36,5 +41,5 @@ export const PriceWarningBanner: React.FC<PriceWarningProps> = ({ failedTickers,
         </button>
       </div>
     </div>
-  )
-}
+  );
+};

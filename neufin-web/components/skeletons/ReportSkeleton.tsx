@@ -2,10 +2,12 @@
 export default function ReportSkeleton() {
   return (
     <div className="max-w-3xl mx-auto w-full px-6 py-section space-y-4">
-
       {/* Hero score circle + type badge */}
       <div className="card text-center space-y-4 py-6">
-        <div className="shimmer rounded-full mx-auto" style={{ width: 180, height: 180 }} />
+        <div
+          className="shimmer rounded-full mx-auto"
+          style={{ width: 180, height: 180 }}
+        />
         <div className="shimmer h-4 w-32 rounded mx-auto" />
         <div className="shimmer h-7 w-48 rounded-full mx-auto" />
         <div className="shimmer h-4 w-56 rounded mx-auto" />
@@ -58,5 +60,5 @@ export default function ReportSkeleton() {
         ))}
       </div>
     </div>
-  )
+  );
 }

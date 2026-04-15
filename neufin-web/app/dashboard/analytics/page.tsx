@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 export default function DashboardAnalyticsPage() {
   return (
@@ -13,5 +13,5 @@ export default function DashboardAnalyticsPage() {
         This module is being built. Available in the next release.
       </p>
     </div>
-  )
+  );
 }

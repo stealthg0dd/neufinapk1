@@ -1,4 +1,4 @@
-import { GlassCard } from '@/components/ui/GlassCard'
+import { GlassCard } from "@/components/ui/GlassCard";
 
 export function HeroPortfolioDemo() {
   return (
@@ -11,7 +11,9 @@ export function HeroPortfolioDemo() {
         <span className="font-sans text-6xl tabular-nums text-navy animate-[pulse_2.2s_ease-out_1] md:text-7xl">
           78
         </span>
-        <span className="text-xl text-[var(--text-muted)] mb-2 font-mono">/100</span>
+        <span className="text-xl text-[var(--text-muted)] mb-2 font-mono">
+          /100
+        </span>
       </div>
       <div className="h-1.5 rounded-full bg-[var(--surface-3)] overflow-hidden mb-6">
         <div className="h-full w-0 animate-[grow-score_2.2s_cubic-bezier(0.22,1,0.36,1)_forwards] rounded-full bg-gradient-to-r from-primary to-primary-dark" />
@@ -31,5 +33,5 @@ export function HeroPortfolioDemo() {
         </span>
       </div>
     </GlassCard>
-  )
+  );
 }

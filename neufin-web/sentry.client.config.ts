@@ -13,7 +13,7 @@ function scrubObject(obj: unknown): unknown {
       Object.entries(obj as Record<string, unknown>).map(([k, v]) => [
         k,
         _SENSITIVE.has(k.toLowerCase()) ? "[REDACTED]" : scrubObject(v),
-      ])
+      ]),
     );
   }
   if (Array.isArray(obj)) return obj.map(scrubObject);
@@ -26,7 +26,7 @@ Sentry.init({
   // Trace a random 10 % of navigations/requests in production.
   // Set NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE=1.0 in staging.
   tracesSampleRate: parseFloat(
-    process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? "0.1"
+    process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? "0.1",
   ),
 
   // Record 10 % of sessions for Session Replay (increases when an error occurs).
@@ -53,8 +53,10 @@ Sentry.init({
   },
 
   beforeSend(event) {
-    if (event.request) event.request = scrubObject(event.request) as typeof event.request;
-    if (event.extra)   event.extra   = scrubObject(event.extra)   as typeof event.extra;
+    if (event.request)
+      event.request = scrubObject(event.request) as typeof event.request;
+    if (event.extra)
+      event.extra = scrubObject(event.extra) as typeof event.extra;
     return event;
   },
 });

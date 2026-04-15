@@ -1,1 +1,1 @@
-export { default } from '../../swarm/page'
+export { default } from "../../swarm/page";

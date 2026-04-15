@@ -108,9 +108,7 @@ async def get_api_key_usage(user: JWTUser = Depends(get_current_user)):
     month_start = datetime.datetime(now.year, now.month, 1).date()
     seven_days_ago = (now - datetime.timedelta(days=6)).date()
     try:
-        keys_res = (
-            supabase.table("api_keys").select("id").eq("user_id", user.id).execute()
-        )
+        keys_res = supabase.table("api_keys").select("id").eq("user_id", user.id).execute()
         key_ids = [k["id"] for k in (keys_res.data or []) if k.get("id")]
         if not key_ids:
             return {"monthly_calls_by_key": {}, "last_7_days": []}
@@ -151,9 +149,7 @@ async def get_api_key_usage(user: JWTUser = Depends(get_current_user)):
 
 
 @router.post("/keys", status_code=201)
-async def create_api_key(
-    body: CreateKeyRequest, user: JWTUser = Depends(get_current_user)
-):
+async def create_api_key(body: CreateKeyRequest, user: JWTUser = Depends(get_current_user)):
     """
     Generate a new API key.
     The raw key is returned only once — store it securely.
@@ -286,9 +282,9 @@ async def check_api_key(request: Request) -> JWTUser | None:
             raise HTTPException(429, "API rate limit exceeded. Resets at midnight UTC.")
 
         if usage_result.data:
-            supabase.table("api_keys_daily_usage").update(
-                {"calls": current_calls + 1}
-            ).eq("key_id", key_id).eq("date", today).execute()
+            supabase.table("api_keys_daily_usage").update({"calls": current_calls + 1}).eq(
+                "key_id", key_id
+            ).eq("date", today).execute()
         else:
             supabase.table("api_keys_daily_usage").insert(
                 {"key_id": key_id, "date": today, "calls": 1}

@@ -62,9 +62,7 @@ def _increment_field(user_id: str, field: str) -> int:
             on_conflict="user_id,month_year",
         ).execute()
     except Exception as e:
-        logger.warning(
-            "usage_tracker.increment_failed", user_id=user_id, field=field, error=str(e)
-        )
+        logger.warning("usage_tracker.increment_failed", user_id=user_id, field=field, error=str(e))
     return new_val
 
 

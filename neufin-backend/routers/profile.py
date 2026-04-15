@@ -117,9 +117,7 @@ async def complete_onboarding(
             _advisors_merge(uid, patch)
         except Exception as exc:
             logger.error("profile.complete_onboarding_advisor_failed", error=str(exc))
-            raise HTTPException(
-                status_code=500, detail="Could not save advisor branding"
-            ) from exc
+            raise HTTPException(status_code=500, detail="Could not save advisor branding") from exc
 
     logger.info("profile.onboarding_complete", user_id=uid)
     return {"ok": True, "onboarding_completed": True}
@@ -243,9 +241,7 @@ async def update_branding(
         return {"ok": True}
     except Exception as exc:
         logger.error("profile.branding_error", error=str(exc))
-        raise HTTPException(
-            status_code=500, detail="Could not save branding settings."
-        ) from exc
+        raise HTTPException(status_code=500, detail="Could not save branding settings.") from exc
 
 
 @router.post("/logo")
