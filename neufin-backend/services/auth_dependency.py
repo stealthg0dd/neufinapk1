@@ -247,7 +247,7 @@ def _truthy_is_admin(val) -> bool:
     """Treat DB / JSON variants as admin (bool, int, string)."""
     if val is True:
         return True
-    if isinstance(val, (int, float)) and val:
+    if isinstance(val, int | float) and val:
         return True
     if isinstance(val, str) and val.strip().lower() in ("true", "1", "yes", "t"):
         return True
