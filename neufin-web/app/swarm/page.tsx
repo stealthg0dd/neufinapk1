@@ -15,6 +15,7 @@ import {
   type SwarmObservabilityPayload,
   type SwarmSourcesPayload,
 } from '@/components/swarm/SwarmSourcesPanel'
+import FinancialModelSelector from '@/components/dashboard/FinancialModelSelector'
 import { useNeufinAnalytics, perfTimer, captureSentrySlowOp } from '@/lib/analytics'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { PriceWarningBanner } from '@/components/PriceWarningBanner'
@@ -1157,6 +1158,10 @@ export default function SwarmPage() {
           </button>
         </div>
       </nav>
+
+      <div className="max-w-[1600px] mx-auto px-4 pt-2">
+        <FinancialModelSelector />
+      </div>
 
       {/* Main 3-column layout */}
       <div className="max-w-[1600px] mx-auto px-4 py-5 grid grid-cols-1 xl:grid-cols-12 gap-4">

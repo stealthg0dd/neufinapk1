@@ -26,7 +26,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon }
 const NAV_OVERVIEW: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/portfolio', label: 'Portfolio', icon: PieChart },
-  { href: '/swarm', label: 'Swarm IC', icon: Bot },
+  { href: '/dashboard/swarm', label: 'Swarm IC', icon: Bot },
 ]
 
 const NAV_INSIGHTS: NavItem[] = [

@@ -260,7 +260,7 @@ export default function DashboardPage() {
             Run the 7-agent swarm on your portfolio for regime-adjusted signals, tax context, and an IC-grade memo.
           </p>
           <Link
-            href="/swarm"
+            href="/dashboard/swarm"
             className="inline-block rounded-lg border border-primary/30 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-primary/15"
           >
             Run Swarm IC →

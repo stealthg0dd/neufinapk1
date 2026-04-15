@@ -71,7 +71,7 @@ export function SwarmBriefingPreview({ swarmReport }: Props) {
       )}
 
       <Link
-        href="/swarm"
+        href="/dashboard/swarm"
         style={{
           fontSize: 11, color: '#1EB8CC', fontWeight: 600, textDecoration: 'none',
         }}
