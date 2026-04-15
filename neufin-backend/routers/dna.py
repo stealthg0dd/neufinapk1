@@ -1,7 +1,7 @@
 import io
+import json
 import time
 import uuid
-import json
 
 import pandas as pd
 import structlog
