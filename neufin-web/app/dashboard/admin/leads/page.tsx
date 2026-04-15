@@ -55,16 +55,16 @@ const COLUMNS: { key: string; label: string; color: string }[] = [
 ]
 
 const PLAN_BADGE: Record<string, string> = {
-  advisor:    "bg-purple-500/20 text-purple-300",
-  enterprise: "bg-primary/20 text-primary",
-  retail:     "bg-emerald-500/20 text-emerald-300",
+  advisor:    "bg-purple-100 text-purple-800 border border-purple-200",
+  enterprise: "bg-primary-light text-primary-dark border border-primary/25",
+  retail:     "bg-emerald-50 text-emerald-800 border border-emerald-200",
 }
 
 const AUM_COLORS: Record<string, string> = {
-  ">200M":    "text-yellow-400",
+  ">200M":    "text-amber-700",
   "50-200M":  "text-primary",
-  "10-50M":   "text-shell-fg/90",
-  "<10M":     "text-shell-subtle",
+  "10-50M":   "text-navy",
+  "<10M":     "text-muted2",
 }
 
 function fmt(iso: string) {
@@ -72,7 +72,7 @@ function fmt(iso: string) {
 }
 
 function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-shell-raised ${className}`} />
+  return <div className={`animate-pulse rounded bg-slate-200 ${className}`} />
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,53 +107,57 @@ function LeadModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-shell-border bg-shell p-6 space-y-5 shadow-2xl"
+        className="w-full max-w-lg space-y-5 rounded-2xl border border-border bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold text-shell-fg">{lead.name}</h2>
-            <p className="text-sm text-shell-muted">{lead.company ?? "—"} · {lead.role ?? "—"}</p>
+            <h2 className="text-lg font-bold text-navy">{lead.name}</h2>
+            <p className="text-sm text-muted2">{lead.company ?? "—"} · {lead.role ?? "—"}</p>
           </div>
-          <button onClick={onClose} className="text-shell-subtle hover:text-shell-fg/90 text-xl leading-none">×</button>
+          <button type="button" onClick={onClose} className="text-xl leading-none text-muted2 hover:text-navy">
+            ×
+          </button>
         </div>
 
         {/* Details grid */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
-            <p className="text-xs text-shell-subtle mb-0.5">Email</p>
+            <p className="mb-0.5 text-xs text-muted2">Email</p>
             <a href={`mailto:${lead.email}`} className="text-primary hover:underline truncate block">{lead.email}</a>
           </div>
           <div>
-            <p className="text-xs text-shell-subtle mb-0.5">AUM</p>
-            <p className={`font-medium ${AUM_COLORS[lead.aum_range ?? ""] ?? "text-shell-fg/90"}`}>{lead.aum_range ?? "—"}</p>
+            <p className="mb-0.5 text-xs text-muted2">AUM</p>
+            <p className={`font-medium ${AUM_COLORS[lead.aum_range ?? ""] ?? "text-navy"}`}>{lead.aum_range ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-shell-subtle mb-0.5">Source</p>
-            <p className="text-shell-fg/90">{lead.source ?? "—"}</p>
+            <p className="mb-0.5 text-xs text-muted2">Source</p>
+            <p className="text-navy">{lead.source ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-shell-subtle mb-0.5">Interested Plan</p>
-            <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE[lead.interested_plan ?? ""] ?? "bg-shell-raised text-shell-fg/90"}`}>
+            <p className="mb-0.5 text-xs text-muted2">Interested Plan</p>
+            <span
+              className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${PLAN_BADGE[lead.interested_plan ?? ""] ?? "border border-border bg-surface-2 text-navy"}`}
+            >
               {lead.interested_plan ?? "—"}
             </span>
           </div>
           <div>
-            <p className="text-xs text-shell-subtle mb-0.5">Created</p>
-            <p className="text-shell-fg/90">{fmt(lead.created_at)}</p>
+            <p className="mb-0.5 text-xs text-muted2">Created</p>
+            <p className="text-navy">{fmt(lead.created_at)}</p>
           </div>
           {lead.contacted_at && (
             <div>
-              <p className="text-xs text-shell-subtle mb-0.5">Contacted</p>
-              <p className="text-shell-fg/90">{fmt(lead.contacted_at)}</p>
+              <p className="mb-0.5 text-xs text-muted2">Contacted</p>
+              <p className="text-navy">{fmt(lead.contacted_at)}</p>
             </div>
           )}
         </div>
 
         {/* Status selector */}
         <div>
-          <p className="text-xs text-shell-subtle mb-1.5">Status</p>
+          <p className="mb-1.5 text-xs text-muted2">Status</p>
           <div className="flex flex-wrap gap-2">
             {COLUMNS.map((col) => (
               <button
@@ -161,8 +165,8 @@ function LeadModal({
                 onClick={() => setStatus(col.key)}
                 className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
                   status === col.key
-                    ? "bg-primary border-primary text-white"
-                    : "border-shell-border text-shell-muted hover:border-shell-muted"
+                    ? "border-primary bg-primary text-white"
+                    : "border-border text-muted2 hover:border-primary/40"
                 }`}
               >
                 {col.label}
@@ -173,12 +177,12 @@ function LeadModal({
 
         {/* Notes */}
         <div>
-          <p className="text-xs text-shell-subtle mb-1.5">Notes</p>
+          <p className="mb-1.5 text-xs text-muted2">Notes</p>
           <textarea
             rows={3}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full rounded-lg border border-shell-border bg-shell-raised px-3 py-2 text-sm text-shell-fg placeholder:text-shell-subtle focus:border-primary focus:outline-none resize-none"
+            className="input-base resize-none text-sm"
             placeholder="Internal notes..."
           />
         </div>
@@ -187,7 +191,7 @@ function LeadModal({
         <div className="flex items-center justify-between gap-3">
           <a
             href={`mailto:${lead.email}`}
-            className="rounded-lg border border-shell-border px-4 py-2 text-sm text-shell-fg/90 hover:border-shell-muted transition-colors"
+            className="rounded-lg border border-border px-4 py-2 text-sm text-navy transition-colors hover:border-primary/40"
           >
             Send Email
           </a>
@@ -255,7 +259,7 @@ export default function LeadsAdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-shell-deep p-6 max-w-full space-y-6">
+      <div className="min-h-screen max-w-full space-y-6 bg-transparent p-6">
         <Skeleton className="h-8 w-64" />
         <div className="flex gap-4 overflow-x-auto pb-4">
           {COLUMNS.map((c) => (
@@ -271,27 +275,36 @@ export default function LeadsAdminPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-shell-deep p-6 max-w-7xl mx-auto">
-        <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-6">
-          <p className="font-semibold text-red-400">Could not load leads</p>
-          <p className="text-sm text-red-400/70 mt-1">{error}</p>
-          <button onClick={load} className="mt-4 text-xs text-red-400 border border-red-500/30 rounded-md px-3 py-1.5 hover:bg-red-500/10">Retry</button>
+      <div className="mx-auto min-h-screen max-w-7xl bg-transparent p-6">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+          <p className="font-semibold text-red-800">Could not load leads</p>
+          <p className="mt-1 text-sm text-red-700">{error}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="mt-4 rounded-md border border-red-300 px-3 py-1.5 text-xs text-red-800 hover:bg-red-100"
+          >
+            Retry
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-shell-deep text-shell-fg">
-      <div className="px-4 py-6 space-y-6">
-
+    <div className="min-h-screen bg-transparent text-navy">
+      <div className="space-y-6 px-4 py-6">
         {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Lead Pipeline</h1>
-            <p className="text-sm text-shell-muted mt-0.5">B2B sales management</p>
+            <p className="mt-0.5 text-sm text-muted2">B2B sales management</p>
           </div>
-          <button onClick={load} className="rounded-lg border border-shell-border px-3 py-1.5 text-xs text-shell-fg/90 hover:border-shell-muted">
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs text-navy hover:border-primary/40"
+          >
             Refresh
           </button>
         </div>
@@ -299,23 +312,23 @@ export default function LeadsAdminPage() {
         {/* Stats bar */}
         {stats && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-shell-border bg-shell p-4 text-center">
-              <p className="text-2xl font-bold text-shell-fg">{stats.total}</p>
-              <p className="text-xs text-shell-subtle mt-0.5">Total Leads</p>
+            <div className="data-card rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold text-navy">{stats.total}</p>
+              <p className="mt-0.5 text-xs text-muted2">Total Leads</p>
             </div>
-            <div className="rounded-xl border border-shell-border bg-shell p-4 text-center">
+            <div className="data-card rounded-xl p-4 text-center">
               <p className="text-2xl font-bold text-primary">{stats.this_week}</p>
-              <p className="text-xs text-shell-subtle mt-0.5">This Week</p>
+              <p className="mt-0.5 text-xs text-muted2">This Week</p>
             </div>
-            <div className="rounded-xl border border-shell-border bg-shell p-4 text-center">
-              <p className="text-2xl font-bold text-emerald-400">
+            <div className="data-card rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold text-emerald-700">
                 {stats.conversion_rate?.toFixed(1) ?? "0"}%
               </p>
-              <p className="text-xs text-shell-subtle mt-0.5">Conversion Rate</p>
+              <p className="mt-0.5 text-xs text-muted2">Conversion Rate</p>
             </div>
-            <div className="rounded-xl border border-shell-border bg-shell p-4 text-center">
-              <p className="text-2xl font-bold text-yellow-400">{stats.won_this_month ?? 0}</p>
-              <p className="text-xs text-shell-subtle mt-0.5">Won This Month</p>
+            <div className="data-card rounded-xl p-4 text-center">
+              <p className="text-2xl font-bold text-amber-700">{stats.won_this_month ?? 0}</p>
+              <p className="mt-0.5 text-xs text-muted2">Won This Month</p>
             </div>
           </div>
         )}
@@ -327,12 +340,12 @@ export default function LeadsAdminPage() {
             return (
               <div
                 key={col.key}
-                className={`min-w-[240px] max-w-[280px] flex-shrink-0 rounded-xl border-t-2 border border-shell-border bg-shell/60 ${col.color}`}
+                className={`min-w-[240px] max-w-[280px] flex-shrink-0 rounded-xl border border-border border-t-2 bg-white ${col.color}`}
               >
                 {/* Column header */}
-                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-shell-fg">{col.label}</h3>
-                  <span className="rounded-full bg-shell-raised px-2 py-0.5 text-xs text-shell-muted font-medium">
+                <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                  <h3 className="text-sm font-semibold text-navy">{col.label}</h3>
+                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted2">
                     {colLeads.length}
                   </span>
                 </div>
@@ -340,7 +353,7 @@ export default function LeadsAdminPage() {
                 {/* Cards */}
                 <div className="px-3 pb-3 space-y-2">
                   {colLeads.length === 0 && (
-                    <div className="rounded-lg border border-dashed border-shell-border p-4 text-center text-xs text-shell-subtle">
+                    <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted2">
                       No leads
                     </div>
                   )}
@@ -348,30 +361,32 @@ export default function LeadsAdminPage() {
                     <button
                       key={lead.id}
                       onClick={() => setSelected(lead)}
-                      className="w-full text-left rounded-lg border border-shell-border bg-shell p-3 hover:border-shell-muted hover:bg-shell-raised/80 transition-colors space-y-2"
+                      className="w-full space-y-2 rounded-lg border border-border bg-surface-2 p-3 text-left transition-colors hover:border-primary/30 hover:bg-white"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium text-shell-fg leading-tight">{lead.name}</p>
+                        <p className="text-sm font-medium leading-tight text-navy">{lead.name}</p>
                         {lead.aum_range && (
-                          <span className={`text-xs font-medium whitespace-nowrap flex-shrink-0 ${AUM_COLORS[lead.aum_range] ?? "text-shell-subtle"}`}>
+                          <span
+                            className={`flex-shrink-0 whitespace-nowrap text-xs font-medium ${AUM_COLORS[lead.aum_range] ?? "text-muted2"}`}
+                          >
                             {lead.aum_range}
                           </span>
                         )}
                       </div>
-                      {lead.company && (
-                        <p className="text-xs text-shell-muted truncate">{lead.company}</p>
-                      )}
+                      {lead.company && <p className="truncate text-xs text-muted2">{lead.company}</p>}
                       <div className="flex items-center justify-between">
                         {lead.interested_plan ? (
-                          <span className={`rounded-full px-2 py-0.5 text-sm font-medium ${PLAN_BADGE[lead.interested_plan] ?? "bg-shell-raised text-shell-muted"}`}>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-sm font-medium ${PLAN_BADGE[lead.interested_plan] ?? "bg-surface-2 text-muted2"}`}
+                          >
                             {lead.interested_plan}
                           </span>
-                        ) : <span />}
-                        <span className="text-sm text-shell-subtle">{fmt(lead.created_at)}</span>
+                        ) : (
+                          <span />
+                        )}
+                        <span className="text-sm text-muted2">{fmt(lead.created_at)}</span>
                       </div>
-                      {lead.source && (
-                        <p className="text-sm text-shell-subtle">via {lead.source.replace(/_/g, " ")}</p>
-                      )}
+                      {lead.source && <p className="text-sm text-muted2">via {lead.source.replace(/_/g, " ")}</p>}
                     </button>
                   ))}
                 </div>

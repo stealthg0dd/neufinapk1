@@ -14,7 +14,7 @@ import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
 const AGENTS = [
-  { value: 'general',   label: 'General',    fullLabel: 'General Agent',        emoji: '🤖', color: 'text-primary',   accent: 'border-blue-400/60',  ring: 'ring-primary/30'  },
+  { value: 'general',   label: 'General',    fullLabel: 'General Agent',        emoji: '🤖', color: 'text-primary',   accent: 'border-primary/50',  ring: 'ring-primary/30'  },
   { value: 'quant',     label: 'Quant',      fullLabel: 'Quant Agent',           emoji: '📊', color: 'text-amber-400',  accent: 'border-amber-400/60', ring: 'ring-amber-400/30' },
   { value: 'macro',     label: 'Macro',      fullLabel: 'Macro Strategist',      emoji: '🌐', color: 'text-emerald-400',accent: 'border-emerald-400/60',ring: 'ring-emerald-400/30'},
   { value: 'technical', label: 'Technical',  fullLabel: 'Technical Analyst',     emoji: '📈', color: 'text-purple-400', accent: 'border-purple-400/60', ring: 'ring-purple-400/30'},
@@ -208,7 +208,7 @@ export default function GlobalChatWidget() {
                       <span className="animate-pulse inline-block">●</span>{' '}Thinking…
                     </div>
                   ) : msg.role === 'user' ? (
-                    <div className="bg-gradient-to-br from-blue-600/30 to-purple-600/20 border border-white/10 rounded-[12px_4px_12px_12px] px-3 py-2 text-[#e0e0e0] text-sm leading-relaxed">
+                    <div className="rounded-[12px_4px_12px_12px] border border-white/10 bg-gradient-to-br from-primary/35 to-violet-600/20 px-3 py-2 text-sm leading-relaxed text-[#e0e0e0]">
                       {msg.text}
                     </div>
                   ) : (
@@ -283,9 +283,9 @@ export default function GlobalChatWidget() {
         aria-label={open ? 'Close market chat' : 'Open market chat'}
         className="
           w-[52px] h-[52px] rounded-full
-          bg-gradient-to-br from-blue-600 to-violet-600
+          bg-gradient-to-br from-primary to-violet-600
           border border-white/15
-          shadow-[0_4px_24px_rgba(37,99,235,0.45)]
+          shadow-[0_4px_24px_rgba(30,184,204,0.45)]
           flex items-center justify-center
           text-white text-xl
           hover:scale-105 active:scale-95
