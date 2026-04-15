@@ -135,7 +135,7 @@ export default function GlobalChatWidget() {
             <div className="flex items-center gap-2.5">
               <span className="text-lg">{currentAgent.emoji}</span>
               <div>
-                <p className="text-white text-[13px] font-semibold leading-tight">Neufin Market Intel</p>
+                <p className="text-white text-sm font-semibold leading-tight">Neufin Market Intel</p>
                 <p className={`text-sm tracking-widest uppercase ${currentAgent.color}`}>
                   {currentAgent.fullLabel}
                 </p>
@@ -263,7 +263,7 @@ export default function GlobalChatWidget() {
               onClick={() => send(input)}
               disabled={loading || !input.trim()}
               className={`
-                shrink-0 w-8 h-8 rounded-lg text-[13px] font-bold
+                shrink-0 w-8 h-8 rounded-lg text-sm font-bold
                 flex items-center justify-center transition-all
                 ${input.trim() && !loading
                   ? `bg-white/10 border ${currentAgent.accent} ${currentAgent.color} hover:bg-white/15`

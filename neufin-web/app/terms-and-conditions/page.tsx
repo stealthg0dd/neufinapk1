@@ -35,7 +35,7 @@ export default function TermsPage() {
           <Link href="/" className="font-mono text-sm font-bold tracking-wider text-foreground">
             NEUFIN
           </Link>
-          <nav className="flex items-center gap-6 text-[13px] text-muted-foreground">
+          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="/" className="transition-colors hover:text-foreground">Home</Link>
             <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
             <Link href="/partners" className="transition-colors hover:text-foreground">Partners</Link>
@@ -45,7 +45,7 @@ export default function TermsPage() {
 
       {/* ── Notice banner ── */}
       <div className="border-b border-primary/20 bg-primary/5 py-3 text-center">
-        <p className="text-[13px] text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           These Terms were last updated on{' '}
           <span className="font-semibold text-foreground">April 11, 2026</span>.
         </p>
@@ -65,7 +65,7 @@ export default function TermsPage() {
                   <a
                     key={s.id}
                     href={`#${s.id}`}
-                    className="block rounded-md px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                    className="block rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                   >
                     {s.title}
                   </a>

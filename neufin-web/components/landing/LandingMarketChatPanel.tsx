@@ -176,12 +176,12 @@ export default function LandingMarketChatPanel() {
                       <span className="animate-pulse">●</span> Thinking…
                     </div>
                   ) : msg.role === 'user' ? (
-                    <div className="rounded-2xl rounded-br-sm border border-primary/25 bg-primary/10 px-3 py-2 text-[13px] leading-relaxed text-foreground">
+                    <div className="rounded-2xl rounded-br-sm border border-primary/25 bg-primary/10 px-3 py-2 text-sm leading-relaxed text-foreground">
                       {msg.text}
                     </div>
                   ) : (
                     <>
-                      <div className="rounded-2xl rounded-bl-sm border border-border bg-surface-2 px-3 py-2 text-[13px] leading-relaxed text-foreground/95">
+                      <div className="rounded-2xl rounded-bl-sm border border-border bg-surface-2 px-3 py-2 text-sm leading-relaxed text-foreground/95">
                         {msg.text}
                       </div>
                       {msg.keyNumbers && Object.keys(msg.keyNumbers).length > 0 && (

@@ -448,7 +448,7 @@ function QuantAnalysisCard({ data }: { data: Record<string, any> }) {
                 return (
                   <div
                     key={j}
-                    className="aspect-square flex items-center justify-center rounded-sm text-[7px] font-mono cursor-default"
+                    className="aspect-square flex cursor-default items-center justify-center rounded-sm font-mono text-xs"
                     style={{ background: bg, color: text }}
                     title={`${rowSym} × ${colSym}: ρ=${v.toFixed(2)}`}
                   >

@@ -102,7 +102,7 @@ export function TrialStatusBanner() {
   }
 
   return (
-    <div className="mb-4 flex max-h-10 min-h-10 items-center justify-between gap-3 border-b border-primary/25 bg-[#E0F7FA] px-4 text-[13px] text-[#0F172A]">
+    <div className="mb-4 flex max-h-10 min-h-10 items-center justify-between gap-3 border-b border-primary/25 bg-[#E0F7FA] px-4 text-sm text-[#0F172A]">
       <p className="min-w-0 truncate">
         <span className="font-medium">Trial active</span>
         <span className="text-[var(--muted)]"> — {banner.days} days remaining · </span>

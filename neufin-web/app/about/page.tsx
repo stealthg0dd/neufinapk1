@@ -141,7 +141,7 @@ export default function AboutPage() {
                   </div>
                   <h3 className="text-xl font-bold text-foreground">{f.name}</h3>
                   <p className="mb-3 mt-0.5 font-mono text-sm uppercase tracking-widest text-primary">{f.title}</p>
-                  <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">{f.bio}</p>
+                  <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{f.bio}</p>
                   <div className="flex flex-wrap justify-center gap-1.5">
                     {f.tags.map((tag) => (
                       <span key={tag} className="rounded bg-surface-2 px-2 py-0.5 font-mono text-sm text-muted-foreground">

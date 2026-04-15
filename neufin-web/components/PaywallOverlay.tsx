@@ -47,7 +47,7 @@ export default function PaywallOverlay({
 
           <ul className="mt-5 space-y-2.5">
             {FEATURES.map((line) => (
-              <li key={line} className="flex gap-2 text-[13px] leading-snug text-[#374151]">
+              <li key={line} className="flex gap-2 text-sm leading-snug text-[#374151]">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary-dark" strokeWidth={2} aria-hidden />
                 <span>{line}</span>
               </li>
@@ -63,7 +63,7 @@ export default function PaywallOverlay({
             type="button"
             onClick={onUnlock}
             disabled={loading}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-wait disabled:opacity-70"
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-wait disabled:opacity-70"
           >
             {loading ? (
               <>

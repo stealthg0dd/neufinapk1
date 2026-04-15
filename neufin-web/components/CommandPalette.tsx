@@ -219,14 +219,14 @@ export default function CommandPalette({
 
           {/* ── Input row ──────────────────────────────────────────────────── */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-[#222]">
-            <span className="text-[#FFB900] text-[13px] select-none shrink-0">$</span>
+            <span className="text-[#FFB900] text-sm select-none shrink-0">$</span>
             <input
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask your portfolio anything... (⏎ to send)"
-              className="flex-1 bg-transparent text-[13px] text-white placeholder-[#444] outline-none caret-[#FFB900]"
+              className="flex-1 bg-transparent text-sm text-white placeholder-[#444] outline-none caret-[#FFB900]"
               disabled={loading}
             />
             {agentMeta && !loading && (

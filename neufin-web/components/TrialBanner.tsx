@@ -25,7 +25,7 @@ export default function TrialBanner({ status, daysRemaining }: TrialBannerProps)
   }
   if (status === 'trial' && daysRemaining !== undefined && daysRemaining <= 3) {
     return (
-      <div className="flex max-h-10 min-h-10 w-full items-center justify-center border-b border-primary/25 bg-[#E0F7FA] px-4 text-[13px] text-[#0F172A]">
+      <div className="flex max-h-10 min-h-10 w-full items-center justify-center border-b border-primary/25 bg-[#E0F7FA] px-4 text-sm text-[#0F172A]">
         <span className="font-medium">Trial active</span>
         <span className="mx-1 text-[var(--muted)]">—</span>
         <span>
