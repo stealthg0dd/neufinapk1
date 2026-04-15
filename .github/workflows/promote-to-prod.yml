@@ -35,21 +35,27 @@ jobs:
       - name: Create promotion PR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
         run: |
+          COMMIT_LOG=$(git log origin/main..origin/develop --oneline | head -20)
+          {
+            echo "## Production Promotion"
+            echo ""
+            echo "**Triggered by:** ${ACTOR}"
+            echo "**Release notes:** ${RELEASE_NOTES}"
+            echo ""
+            echo "### What this promotes"
+            echo "${COMMIT_LOG}"
+            echo ""
+            echo "---"
+            echo "CI must pass before merging. Review and merge this PR to deploy to production."
+          } > /tmp/pr-body.md
           gh pr create \
             --base main \
             --head develop \
             --title "chore(release): promote develop to production" \
-            --body "## Production Promotion
-
-**Triggered by:** ${{ github.actor }}
-**Release notes:** ${{ github.event.inputs.release_notes }}
-
-### What this promotes
-$(git log origin/main..origin/develop --oneline | head -20)
-
----
-CI must pass before merging. Review and merge this PR to deploy to production." \
+            --body-file /tmp/pr-body.md \
             --label "release" \
             --no-maintainer-edit \
           || echo "PR already exists or develop is up to date"
