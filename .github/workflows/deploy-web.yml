@@ -35,14 +35,18 @@ jobs:
 
       - name: Readiness check
         run: |
-          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
-            ${{ steps.env.outputs.url }} || echo "000")
-          echo "Status: $STATUS"
+          # Use a public JSON route (middleware does not gate /api/*). Do not use curl -f
+          # inside $(...) with `|| echo 000` — on HTTP errors curl -f still prints the code to
+          # stdout then fails, and the shell concatenates `401` + `000` → `401000`.
+          BASE="${{ steps.env.outputs.url }}"
+          URL="${BASE%/}/api/market/ticker"
+          STATUS=$(curl -sS -L -o /dev/null -w "%{http_code}" "$URL") || STATUS="000"
+          echo "Status: $STATUS (GET $URL)"
           if [ "$STATUS" != "200" ]; then
             echo "Web readiness check failed"
             exit 1
           fi
-          echo "Web deploy confirmed at ${{ steps.env.outputs.url }}"
+          echo "Web deploy confirmed at $BASE"
 
       - name: Create Sentry release
         if: github.ref_name == 'main'
