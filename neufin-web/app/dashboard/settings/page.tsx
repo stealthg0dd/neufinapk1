@@ -393,10 +393,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-section flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Account Settings</h1>
-        <p className="text-sm text-shell-subtle mt-1">{user.email}</p>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-section">
+      <div className="section-header">
+        <div>
+          <h1>Account Settings</h1>
+          <p>{user.email}</p>
+        </div>
       </div>
 
       {/* Profile */}

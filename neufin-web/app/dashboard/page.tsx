@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Loader2, PieChart } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { usePortfolioData } from '@/hooks/usePortfolioData'
+import { GraphicPlaceholder } from '@/components/GraphicPlaceholder'
 import type { RegimeData } from '@/hooks/usePortfolioData'
 import { SwarmBriefingPreview } from '@/components/dashboard/SwarmBriefingPreview'
 import ResearchFeedClient from '@/components/dashboard/ResearchFeedClient'
@@ -47,17 +48,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: 320,
-          gap: 10,
-          color: '#64748B',
-          fontSize: 13,
-        }}
-      >
+      <div className="flex min-h-[320px] items-center justify-center gap-2.5 text-sm text-[#64748B]">
         <Loader2 className="h-4 w-4 animate-spin" />
         Loading your portfolio intelligence…
       </div>
@@ -84,7 +75,42 @@ export default function DashboardPage() {
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <h1 className="mb-5 text-xl font-semibold leading-tight text-[#0F172A]">Dashboard</h1>
+      <div className="section-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Portfolio intelligence, DNA score, and research in one place.</p>
+        </div>
+      </div>
+
+      {!hasPortfolio && (
+        <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white">
+          <div className="grid min-h-[280px] grid-cols-1 gap-0 lg:grid-cols-2">
+            <div className="flex flex-col justify-center p-8">
+              <div className="badge badge-info mb-4">Get Started</div>
+              <h2 className="mb-3 text-[22px] font-bold tracking-tight text-[#0F172A]">
+                Analyze your first portfolio
+              </h2>
+              <p className="mb-6 text-[15px] leading-relaxed text-[#475569]">
+                Upload a CSV with your holdings. Seven AI agents will deliver a complete Investment Committee briefing in
+                under 60 seconds.
+              </p>
+              <Link href="/dashboard/portfolio" className="btn-primary self-start">
+                Upload Portfolio
+              </Link>
+            </div>
+            <div className="relative hidden min-h-[280px] overflow-hidden bg-gradient-to-br from-[#E0F7FA] to-[#F0FDF4] lg:block">
+              <GraphicPlaceholder
+                src="/graphics/ic-report-preview.png"
+                alt="IC Report Preview"
+                fill
+                sizes="(min-width: 1024px) 40vw, 100vw"
+                className="opacity-90"
+                label="IC Report — Add ic-report-preview.png to public/graphics/"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero summary */}
       <section className="card-elevated grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -237,24 +263,6 @@ export default function DashboardPage() {
       <section className="min-w-0">
         <ResearchFeedClient limit={5} />
       </section>
-
-      {!hasPortfolio && (
-        <section className="rounded-xl border border-dashed border-[#CBD5E1] bg-white px-5 py-section text-center shadow-sm">
-          <div className="mb-3 flex justify-center">
-            <PieChart className="h-10 w-10 text-primary-dark" aria-hidden />
-          </div>
-          <p className="text-sm font-medium text-slate-900">Start your first analysis</p>
-          <p className="mt-1.5 text-xs text-slate-600">
-            Upload a CSV with your holdings to generate an IC-grade portfolio report
-          </p>
-          <Link
-            href="/dashboard/portfolio"
-            className="mt-5 inline-block rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-white hover:bg-primary-dark"
-          >
-            Upload portfolio →
-          </Link>
-        </section>
-      )}
 
       <section className="flex flex-col flex-wrap justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
         <div>

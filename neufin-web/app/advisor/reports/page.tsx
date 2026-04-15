@@ -79,12 +79,12 @@ export default function AdvisorReportsPage() {
     <div className="min-h-screen bg-app py-6 text-navy">
       <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-0">
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="section-header">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-navy">Client Reports</h1>
-            <p className="mt-0.5 text-sm text-muted2">White-label PDF reports for all clients</p>
+            <h1>Client Reports</h1>
+            <p>White-label PDF reports for all clients</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/advisor/dashboard"
               className="rounded-lg border border-border px-3 py-1.5 text-xs text-navy transition-colors hover:border-primary/40"

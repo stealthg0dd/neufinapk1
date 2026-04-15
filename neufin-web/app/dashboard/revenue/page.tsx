@@ -206,16 +206,18 @@ export default function RevenuePage() {
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
 
         {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="section-header">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Revenue Command Centre</h1>
-            <p className="text-sm text-[#64748B] mt-0.5">{month} · Stripe + Supabase</p>
+            <h1>Revenue Command Centre</h1>
+            <p>
+              {month} · Stripe + Supabase
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard/admin/leads" className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 hover:border-[#94A3B8] transition-colors">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/dashboard/admin/leads" className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 transition-colors hover:border-[#94A3B8]">
               Leads →
             </Link>
-            <button onClick={load} className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 hover:border-[#94A3B8] transition-colors">
+            <button type="button" onClick={load} className="rounded-lg border border-[#E2E8F0] px-3 py-1.5 text-xs text-navy/90 transition-colors hover:border-[#94A3B8]">
               Refresh
             </button>
           </div>

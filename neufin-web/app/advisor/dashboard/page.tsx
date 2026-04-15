@@ -139,11 +139,16 @@ export default function AdvisorDashboardPage() {
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-section md:px-0">
 
         {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-          <h1 className="mb-1 text-2xl font-bold text-navy">
-            {profile?.firm_name ? `${profile.firm_name} Dashboard` : 'Advisor Dashboard'}
-          </h1>
-          <p className="text-sm text-muted2">Manage client reports and track your referral performance.</p>
+        <motion.div
+          className="section-header"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+        >
+          <div>
+            <h1>{profile?.firm_name ? `${profile.firm_name} Dashboard` : 'Advisor Dashboard'}</h1>
+            <p>Manage client reports and track your referral performance.</p>
+          </div>
         </motion.div>
 
         {/* Stats row */}

@@ -232,12 +232,12 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
+        <div className="section-header">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">User Admin</h1>
-            <p className="text-sm text-[#64748B] mt-0.5">Internal ops panel · advisor or admin</p>
+            <h1>User Admin</h1>
+            <p>Internal ops panel · advisor or admin</p>
           </div>
-          <div className="text-xs text-amber-400 border border-amber-500/30 rounded-lg px-3 py-1.5 bg-amber-500/10">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-800">
             Internal use only — not visible to regular users
           </div>
         </div>
