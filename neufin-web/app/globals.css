@@ -834,6 +834,16 @@ span:not(.badge):not(.chip) {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
+/* Landing hero — refined glass floating badges */
+.hero-float-badge {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(30, 184, 204, 0.2);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
 /* ── Premium data card (dashboard KPI tiles) ── */
 .data-card {
   background: #ffffff;

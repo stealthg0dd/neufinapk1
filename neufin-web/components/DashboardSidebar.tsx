@@ -185,23 +185,23 @@ export default function DashboardSidebar({ user, embedded = false }: { user: Use
   return (
     <aside className={rootClass} aria-label={embedded ? undefined : 'Main navigation'}>
       {!embedded && (
-        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-[#F1F5F9] bg-gradient-to-r from-white to-[#F8FAFC] px-5">
-          <Image src="/logo-icon.png" alt="" width={28} height={28} className="h-7 w-7 rounded-sm" />
-          <Image src="/logo.png" alt="NeuFin" width={100} height={28} className="h-7 w-auto" />
+        <div className="flex h-16 shrink-0 items-center justify-center gap-3 border-b border-[#F1F5F9] bg-gradient-to-r from-white to-[#F8FAFC] px-5">
+          <Image src="/logo-icon.png" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-sm" />
+          <Image src="/logo.png" alt="NeuFin" width={100} height={28} className="h-7 w-auto max-w-[140px] shrink-0 object-contain object-left" />
         </div>
       )}
 
       {sidebarDnaScore != null && (
         <div className="mx-3 mb-2 mt-4 rounded-xl border border-[#1EB8CC]/20 bg-gradient-to-br from-[#E0F7FA] to-[#F0FDF4] p-3">
           <p className="mb-1 text-xs font-bold uppercase tracking-widest text-[#1EB8CC]">Portfolio Health</p>
-          <div className="flex items-center justify-between">
-            <span className="text-[22px] font-bold tracking-tight text-[#0F172A]">{sidebarDnaScore}</span>
-            <span className="badge badge-success text-xs">Active</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[22px] font-bold tabular-nums tracking-tight text-[#0F172A]">{sidebarDnaScore}</span>
+            <span className="badge badge-success shrink-0 text-xs">Active</span>
           </div>
-          <div className="mt-2 h-1 rounded-full bg-[#E2E8F0]">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
             <div
-              className="h-1 rounded-full bg-[#1EB8CC] transition-all duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, sidebarDnaScore))}%` }}
+              className="h-1.5 min-w-[4px] rounded-full bg-[#1EB8CC] transition-all duration-500"
+              style={{ width: `${Math.min(100, Math.max(0, Number(sidebarDnaScore)))}%` }}
             />
           </div>
         </div>

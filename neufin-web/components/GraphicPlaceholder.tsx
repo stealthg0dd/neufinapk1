@@ -47,6 +47,7 @@ export function GraphicPlaceholder(props: GraphicPlaceholderProps) {
         fill
         sizes={props.sizes}
         className={className}
+        unoptimized
         onError={() => setError(true)}
         style={{ objectFit: 'cover' }}
       />
@@ -61,6 +62,7 @@ export function GraphicPlaceholder(props: GraphicPlaceholderProps) {
       width={width}
       height={height}
       className={className}
+      unoptimized
       onError={() => setError(true)}
       style={{ objectFit: 'cover' }}
     />
