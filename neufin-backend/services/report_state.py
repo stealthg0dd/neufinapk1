@@ -66,7 +66,11 @@ def build_section_confidence(ctx: dict[str, Any]) -> dict[str, str]:
     swarm = bool(ctx.get("swarm_available"))
     tax = bool(ctx.get("tax_positions"))
 
-    base_exec = CONF_HIGH if st == REPORT_FINAL else CONF_MEDIUM if st == REPORT_REVIEW else CONF_LOW
+    base_exec = (
+        CONF_HIGH
+        if st == REPORT_FINAL
+        else CONF_MEDIUM if st == REPORT_REVIEW else CONF_LOW
+    )
     risk = CONF_HIGH if swarm else CONF_MEDIUM if st != REPORT_DRAFT else CONF_LOW
     scenario = CONF_HIGH if swarm else CONF_LOW
     tax_c = CONF_HIGH if tax else CONF_MEDIUM

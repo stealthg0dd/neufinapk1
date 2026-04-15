@@ -753,7 +753,9 @@ def _build_report_context(
         hhi = hhi_from_canon
     else:
         hhi_raw = float(
-            (d.get("score_breakdown") or {}).get("hhi_concentration") or m.get("hhi") or 0
+            (d.get("score_breakdown") or {}).get("hhi_concentration")
+            or m.get("hhi")
+            or 0
         )
         hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
 
@@ -1297,7 +1299,11 @@ def build_swarm_ic_export_pdf(swarm_row: dict) -> bytes:
             bits.append(f"Weighted beta: {wb}")
         if sh is not None:
             bits.append(f"Sharpe ratio: {sh}")
-        summary = "; ".join(bits) if bits else "Quantitative detail available in the NeuFin app."
+        summary = (
+            "; ".join(bits)
+            if bits
+            else "Quantitative detail available in the NeuFin app."
+        )
         story.append(Paragraph(_xml(summary), st["body"]))
         story.append(Spacer(1, 8))
 
@@ -2272,9 +2278,7 @@ def _page_behavioral_dna(
 def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> list:
     items: list = []
     items.extend(
-        _ic_body_section_header(
-            "4", "RISK ANALYSIS", "Macro & regime", pal, st, cw
-        )
+        _ic_body_section_header("4", "RISK ANALYSIS", "Macro & regime", pal, st, cw)
     )
 
     regime = ctx["regime_label"] or "Pending IC Analysis"
@@ -2826,7 +2830,9 @@ def _page_stress_testing(
                 return False
             return abs(v) <= 200
 
-        stress_raw = [r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)]
+        stress_raw = [
+            r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)
+        ]
 
         if not stress_raw:
             items.append(
