@@ -8,6 +8,7 @@ import { Check } from 'lucide-react'
 import type { MarketRegime, ResearchNote } from '@/lib/api'
 import { GraphicPlaceholder } from '@/components/GraphicPlaceholder'
 import SwarmHeroTerminal from '@/components/landing/SwarmHeroTerminal'
+import LandingSwarmChatDock from '@/components/landing/LandingSwarmChatDock'
 
 const SWARM_AGENTS = [
   {
@@ -240,15 +241,19 @@ export default function HomeLandingPage({
         {/* Hero */}
         <section className="relative flex min-h-screen items-center overflow-hidden bg-white pt-16">
           <div
-            className="pointer-events-none absolute right-1/4 top-1/4 h-[600px] w-[600px] rounded-full bg-[#1EB8CC]/5 blur-3xl"
+            className="landing-animated-grid pointer-events-none absolute inset-0 z-0 opacity-[0.32]"
             aria-hidden
           />
           <div
-            className="pointer-events-none absolute bottom-1/4 left-1/4 h-[400px] w-[400px] rounded-full bg-[#8B5CF6]/4 blur-3xl"
+            className="pointer-events-none absolute right-1/4 top-1/4 z-0 h-[600px] w-[600px] rounded-full bg-[#1EB8CC]/5 blur-3xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute bottom-1/4 left-1/4 z-0 h-[400px] w-[400px] rounded-full bg-[#8B5CF6]/4 blur-3xl"
             aria-hidden
           />
 
-          <div className="relative mx-auto max-w-7xl px-6 py-24">
+          <div className="relative z-10 mx-auto max-w-7xl px-6 py-24">
             <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
               <div className="min-w-0 max-w-4xl">
               <motion.div
@@ -347,6 +352,10 @@ export default function HomeLandingPage({
                 {/* Swarm terminal — original hero right column (dark live demo) */}
                 <div className="relative w-full max-w-lg">
                   <div
+                    className="pointer-events-none absolute -left-24 top-1/2 z-0 h-56 w-56 -translate-y-1/2 rounded-full bg-[#1EB8CC]/12 blur-3xl"
+                    aria-hidden
+                  />
+                  <div
                     className="pointer-events-none absolute -inset-4 -z-10 scale-95 rounded-3xl bg-[#1EB8CC]/15 blur-3xl"
                     aria-hidden
                   />
@@ -393,8 +402,12 @@ export default function HomeLandingPage({
         </section>
 
         {/* Metrics */}
-        <section className="border-y border-[#E2E8F0] bg-[#F8FAFC] py-12">
-          <div className="mx-auto max-w-7xl px-6">
+        <section className="relative overflow-hidden border-y border-[#E2E8F0] bg-[#F8FAFC] py-12">
+          <div
+            className="landing-animated-grid pointer-events-none absolute inset-0 opacity-[0.22]"
+            aria-hidden
+          />
+          <div className="relative z-10 mx-auto max-w-7xl px-6">
             <div className="grid grid-cols-2 gap-8 lg:grid-cols-4">
               {(
                 [
@@ -425,16 +438,23 @@ export default function HomeLandingPage({
         {/* Seven agents */}
         <section className="relative bg-white py-24" id="demo">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <GraphicPlaceholder
-              src="/graphics/ai-agents-visualization.png"
-              alt=""
-              width={500}
-              height={500}
-              className="absolute right-0 top-1/2 w-[500px] -translate-y-1/2 rounded-3xl opacity-10"
-              label="Agent visualization — Add ai-agents-visualization.png to public/graphics/"
-            />
+            <div className="absolute inset-0 flex items-center justify-center px-4 py-8">
+              <div className="relative h-[min(72vh,820px)] w-full max-w-6xl opacity-[0.15]">
+                <GraphicPlaceholder
+                  src="/graphics/ai-agents-visualization.png"
+                  alt=""
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 72rem"
+                  objectFit="contain"
+                  className="object-contain"
+                  label="Agent visualization — Add ai-agents-visualization.png to public/graphics/"
+                />
+              </div>
+            </div>
           </div>
-          <div className="relative mx-auto max-w-7xl px-6">
+          <div className="pointer-events-none absolute left-[6%] top-[28%] z-0 h-44 w-44 rounded-full bg-[#1EB8CC]/10 blur-3xl" aria-hidden />
+          <div className="pointer-events-none absolute bottom-[18%] right-[8%] z-0 h-40 w-40 rounded-full bg-[#1EB8CC]/8 blur-3xl" aria-hidden />
+          <div className="relative z-10 mx-auto max-w-7xl px-6">
             <div className="mb-16 text-center">
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
@@ -475,8 +495,12 @@ export default function HomeLandingPage({
                   viewport={{ once: true }}
                   transition={{ duration: 0.45, delay: i * 0.07 }}
                   whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  className="cursor-default rounded-2xl border border-[#E2E8F0] bg-white p-6 transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
+                  className="relative cursor-default overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-6 transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
                 >
+                  <div
+                    className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                    aria-hidden
+                  />
                   <div
                     className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl text-sm font-black tracking-wide text-white"
                     style={{ background: a.color }}
@@ -501,8 +525,12 @@ export default function HomeLandingPage({
                   viewport={{ once: true }}
                   transition={{ duration: 0.45, delay: (i + 4) * 0.07 }}
                   whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  className="cursor-default rounded-2xl border border-[#E2E8F0] bg-white p-6 transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
+                  className="relative cursor-default overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-6 transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
                 >
+                  <div
+                    className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                    aria-hidden
+                  />
                   <div
                     className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl text-sm font-black text-white"
                     style={{ background: a.color }}
@@ -533,41 +561,43 @@ export default function HomeLandingPage({
         </section>
 
         {/* Value proposition */}
-        <section className="bg-[#F8FAFC] py-24">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="grid grid-cols-1 items-center gap-20 lg:grid-cols-2">
+        <section className="relative overflow-hidden bg-[#F8FAFC] py-24">
+          <div className="pointer-events-none absolute -left-16 top-24 h-64 w-64 rounded-full bg-[#1EB8CC]/8 blur-3xl" aria-hidden />
+          <div className="pointer-events-none absolute bottom-16 right-0 h-52 w-52 rounded-full bg-[#1EB8CC]/6 blur-3xl" aria-hidden />
+          <div className="relative z-10 mx-auto max-w-7xl px-6">
+            <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2 lg:gap-20">
               <motion.div
                 initial={{ opacity: 0, x: -24 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.55 }}
+                className="relative"
               >
+                <div
+                  className="pointer-events-none absolute -right-4 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-[#1EB8CC]/8 blur-3xl"
+                  aria-hidden
+                />
                 <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-[#1EB8CC]">For Advisors</p>
                 <h2
                   className="mb-6 font-bold leading-tight tracking-tight text-[#0F172A]"
                   style={{ fontSize: 'clamp(24px, 2.8vw, 36px)' }}
                 >
-                  Stop spending 3 hours on a report your client reads in 3 minutes.
+                  IC-grade client intelligence without the manual report grind.
                 </h2>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {(
                     [
-                      [
-                        '3 hours building a quarterly report manually',
-                        'IC-grade brief in 60 seconds, white-labeled with your branding',
-                      ],
-                      [
-                        'No explanation when clients ask why they underperformed',
-                        'Behavioral bias detection with quantified dollar impact per position',
-                      ],
-                      [
-                        'Robo-advisors at 0.25% AUM undercutting your fee',
-                        'Demonstrate IC-level analysis that justifies your 1% advisory fee',
-                      ],
+                      'IC-grade brief in 60 seconds, white-labeled with your branding',
+                      'Behavioral bias detection with quantified dollar impact per position',
+                      'Demonstrate IC-level analysis that justifies your advisory fee',
                     ] as const
-                  ).map(([prob, sol], i) => (
-                    <div key={i} className="flex gap-4 rounded-xl border border-[#E2E8F0] bg-white p-5">
-                      <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#22C55E]">
+                  ).map((line, i) => (
+                    <div key={i} className="relative flex gap-4 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-5">
+                      <div
+                        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                        aria-hidden
+                      />
+                      <div className="relative mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#22C55E]">
                         <svg className="h-3.5 w-3.5 text-white" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
                           <path
                             fillRule="evenodd"
@@ -576,10 +606,7 @@ export default function HomeLandingPage({
                           />
                         </svg>
                       </div>
-                      <div>
-                        <p className="mb-1 text-sm text-[#94A3B8] line-through">{prob}</p>
-                        <p className="text-[14px] font-medium text-[#0F172A]">{sol}</p>
-                      </div>
+                      <p className="relative text-[15px] font-medium leading-relaxed text-[#0F172A]">{line}</p>
                     </div>
                   ))}
                 </div>
@@ -590,33 +617,33 @@ export default function HomeLandingPage({
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.55, delay: 0.1 }}
+                className="relative"
               >
+                <div
+                  className="pointer-events-none absolute -left-8 top-1/3 h-44 w-44 -translate-y-1/2 rounded-full bg-[#8B5CF6]/10 blur-3xl"
+                  aria-hidden
+                />
                 <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-[#8B5CF6]">For Platforms</p>
                 <h2
                   className="mb-6 font-bold leading-tight tracking-tight text-[#0F172A]"
                   style={{ fontSize: 'clamp(24px, 2.8vw, 36px)' }}
                 >
-                  One weekend integration, not six months of engineering.
+                  Behavioral intelligence through your stack — without a six-month build.
                 </h2>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {(
                     [
-                      [
-                        '6–12 months to build behavioral intelligence in-house',
-                        'REST API integration in a single weekend — 3 endpoints',
-                      ],
-                      [
-                        '$200K+ in development before your first client',
-                        'DNA score and 47 bias flags per portfolio, out of the box',
-                      ],
-                      [
-                        'Client churn spikes 15–25% in every market correction',
-                        'Churn risk detected before clients panic-sell — automated',
-                      ],
+                      'REST API integration in a single weekend — 3 endpoints',
+                      'DNA score and 47 bias flags per portfolio, out of the box',
+                      'Churn risk detected before clients panic-sell — automated',
                     ] as const
-                  ).map(([prob, sol], i) => (
-                    <div key={i} className="flex gap-4 rounded-xl border border-[#E2E8F0] bg-white p-5">
-                      <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8B5CF6]">
+                  ).map((line, i) => (
+                    <div key={i} className="relative flex gap-4 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-5">
+                      <div
+                        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                        aria-hidden
+                      />
+                      <div className="relative mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8B5CF6]">
                         <svg className="h-3.5 w-3.5 text-white" fill="currentColor" viewBox="0 0 20 20" aria-hidden>
                           <path
                             fillRule="evenodd"
@@ -625,10 +652,7 @@ export default function HomeLandingPage({
                           />
                         </svg>
                       </div>
-                      <div>
-                        <p className="mb-1 text-sm text-[#94A3B8] line-through">{prob}</p>
-                        <p className="text-[14px] font-medium text-[#0F172A]">{sol}</p>
-                      </div>
+                      <p className="relative text-[15px] font-medium leading-relaxed text-[#0F172A]">{line}</p>
                     </div>
                   ))}
                 </div>
@@ -899,6 +923,8 @@ export default function HomeLandingPage({
           </div>
         </div>
       </footer>
+
+      <LandingSwarmChatDock />
     </div>
   )
 }

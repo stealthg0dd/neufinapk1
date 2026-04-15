@@ -8,6 +8,8 @@ type Base = {
   alt: string
   className?: string
   label: string
+  /** Defaults to cover; use contain for large background watermarks. */
+  objectFit?: 'cover' | 'contain'
 }
 
 type GraphicPlaceholderProps =
@@ -16,7 +18,7 @@ type GraphicPlaceholderProps =
 
 export function GraphicPlaceholder(props: GraphicPlaceholderProps) {
   const [error, setError] = useState(false)
-  const { src, alt, className = '', label } = props
+  const { src, alt, className = '', label, objectFit = 'cover' } = props
 
   if (error) {
     if ('fill' in props && props.fill) {
@@ -49,7 +51,7 @@ export function GraphicPlaceholder(props: GraphicPlaceholderProps) {
         className={className}
         unoptimized
         onError={() => setError(true)}
-        style={{ objectFit: 'cover' }}
+        style={{ objectFit }}
       />
     )
   }
@@ -64,7 +66,7 @@ export function GraphicPlaceholder(props: GraphicPlaceholderProps) {
       className={className}
       unoptimized
       onError={() => setError(true)}
-      style={{ objectFit: 'cover' }}
+      style={{ objectFit }}
     />
   )
 }

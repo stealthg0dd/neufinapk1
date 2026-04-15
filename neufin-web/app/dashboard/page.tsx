@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 import { usePortfolioData } from '@/hooks/usePortfolioData'
 import { GraphicPlaceholder } from '@/components/GraphicPlaceholder'
@@ -99,14 +100,21 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="relative hidden min-h-[280px] overflow-hidden bg-gradient-to-br from-[#E0F7FA] to-[#F0FDF4] lg:block">
-              <GraphicPlaceholder
-                src="/graphics/ic-report-preview.png"
-                alt="IC Report Preview"
-                fill
-                sizes="(min-width: 1024px) 40vw, 100vw"
-                className="opacity-90"
-                label="IC Report — Add ic-report-preview.png to public/graphics/"
-              />
+              <motion.div
+                className="absolute inset-0"
+                initial={{ opacity: 0, x: 28 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <GraphicPlaceholder
+                  src="/graphics/ic-report-preview.png"
+                  alt="IC Report Preview"
+                  fill
+                  sizes="(min-width: 1024px) 40vw, 100vw"
+                  className="opacity-90"
+                  label="IC Report — Add ic-report-preview.png to public/graphics/"
+                />
+              </motion.div>
             </div>
           </div>
         </div>
