@@ -216,7 +216,7 @@ def _portfolio_weights_valid(weights: dict[str, float]) -> tuple[bool, str]:
     """Return (ok, reason). Invalid weights must not produce numeric scenario outputs."""
     if not weights:
         return False, "empty"
-    for sym, w in weights.items():
+    for _sym, w in weights.items():
         try:
             wf = float(w)
         except (TypeError, ValueError):
