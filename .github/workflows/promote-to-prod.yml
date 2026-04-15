@@ -1,23 +1,55 @@
 name: Promote Develop to Production
-on:
-  workflow_dispatch: # Manual trigger
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+on:
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'What is being promoted? (brief description)'
+        required: true
+        type: string
 
 jobs:
-  promote:
+  open-promotion-pr:
+    name: Open promotion PR
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
-          token: ${{ secrets.GH_AGENT_TOKEN }}
           fetch-depth: 0
-      - name: Merge Develop
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check develop is ahead of main
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git fetch origin develop
-          git merge origin/develop --no-ff -X theirs -m "chore: promote develop to production"
-          git push origin main
+          git fetch origin main develop
+          BEHIND=$(git rev-list --count origin/main..origin/develop)
+          if [ "$BEHIND" = "0" ]; then
+            echo "develop is already up to date with main. Nothing to promote."
+            exit 0
+          fi
+          echo "develop is $BEHIND commit(s) ahead of main. Proceeding."
+
+      - name: Create promotion PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head develop \
+            --title "chore(release): promote develop to production" \
+            --body "## Production Promotion
+
+**Triggered by:** ${{ github.actor }}
+**Release notes:** ${{ github.event.inputs.release_notes }}
+
+### What this promotes
+$(git log origin/main..origin/develop --oneline | head -20)
+
+---
+CI must pass before merging. Review and merge this PR to deploy to production." \
+            --label "release" \
+            --no-maintainer-edit \
+          || echo "PR already exists or develop is up to date"
