@@ -78,12 +78,12 @@ export default function AdvisorCTA({ refToken }: Props) {
             )}
             <div className="min-w-0">
               <p className="text-white font-semibold text-sm truncate">{profile.advisor_name}</p>
-              <p className="text-gray-400 text-xs truncate">{profile.firm_name}</p>
+              <p className="text-shell-muted text-xs truncate">{profile.firm_name}</p>
             </div>
           </div>
 
           {/* Value prop */}
-          <p className="text-gray-400 text-sm leading-relaxed">
+          <p className="text-shell-muted text-sm leading-relaxed">
             You were referred by <span className="text-white font-medium">{profile.advisor_name}</span>.
             Want a professional advisor to walk you through your results and build a personalised investment plan?
           </p>
@@ -108,7 +108,7 @@ export default function AdvisorCTA({ refToken }: Props) {
             </div>
           )}
 
-          <p className="text-xs text-center text-gray-600">
+          <p className="text-xs text-center text-shell-subtle">
             No obligation · {profile.firm_name || 'Independent Advisor'}
           </p>
         </motion.div>

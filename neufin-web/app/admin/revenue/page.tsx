@@ -107,7 +107,7 @@ export default function AdminRevenuePage() {
         <div className="h-64 rounded-xl border border-zinc-800 p-4 bg-zinc-900/20">
           <p className="text-xs text-zinc-500 mb-2">MRR by price id (top slices)</p>
           {pieData.length === 0 ? (
-            <p className="text-sm text-zinc-500 py-8 text-center">No subscription price breakdown.</p>
+            <p className="text-sm text-zinc-500 py-6 text-center">No subscription price breakdown.</p>
           ) : (
             <ResponsiveContainer width="100%" height="90%">
               <PieChart>

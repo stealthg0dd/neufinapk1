@@ -59,7 +59,7 @@ const ENDPOINTS: Endpoint[] = [
 
 const METHOD_COLORS: Record<string, string> = {
   GET: 'bg-emerald-500/20 text-emerald-400',
-  POST: 'bg-blue-500/20 text-blue-400',
+  POST: 'bg-primary/20 text-primary',
   DELETE: 'bg-red-500/20 text-red-400',
   PATCH: 'bg-yellow-500/20 text-yellow-400',
 }
@@ -252,49 +252,61 @@ export default function DeveloperDocsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <nav className="sticky top-0 z-10 border-b border-gray-800/60 bg-gray-950/90 backdrop-blur-sm">
+    <div className="min-h-screen bg-app text-navy">
+      <nav className="sticky top-0 z-10 border-b border-border bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-4">
-            <Link href="/developer" className="text-gray-400 hover:text-gray-100 text-sm">Developer</Link>
-            <span className="text-gray-700">/</span>
-            <span className="text-sm text-gray-200">Docs</span>
+            <Link href="/developer" className="text-sm text-muted2 transition-colors hover:text-navy">
+              Developer
+            </Link>
+            <span className="text-border">/</span>
+            <span className="text-sm font-medium text-navy">Docs</span>
           </div>
-          <Link href="/developer/keys" className="rounded-lg border border-gray-700 px-3 py-1.5 text-xs text-gray-300 hover:border-gray-500">
+          <Link
+            href="/developer/keys"
+            className="rounded-lg border border-border px-3 py-1.5 text-xs text-slate2 transition-colors hover:border-primary hover:text-primary-dark"
+          >
             My API Keys
           </Link>
         </div>
       </nav>
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
-        <h1 className="text-3xl font-bold">NeuFin API documentation</h1>
-        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <h2 className="text-lg font-semibold">1) Authentication</h2>
-          <p className="mt-2 text-sm text-gray-400">Base URL: <code>{'https://neufin101-production.up.railway.app'}</code></p>
-          <p className="text-sm text-gray-400">Auth: Bearer token in Authorization header.</p>
-          <p className="text-sm text-gray-400">Getting started: create account → Developer → copy API key.</p>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">Authorization: Bearer nf_live_sk_xxxxxxxxxxxx</pre>
+      <div className="mx-auto max-w-6xl space-y-6 px-6 py-section">
+        <h1 className="text-3xl font-bold text-navy">NeuFin API documentation</h1>
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy">1) Authentication</h2>
+          <p className="mt-2 text-sm text-slate2">
+            Base URL: <code className="rounded bg-surface-2 px-1 font-mono text-sm">{'https://neufin101-production.up.railway.app'}</code>
+          </p>
+          <p className="text-sm text-slate2">Auth: Bearer token in Authorization header.</p>
+          <p className="text-sm text-slate2">Getting started: create account → Developer → copy API key.</p>
+          <pre className="mt-2 rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">
+            Authorization: Bearer nf_live_sk_xxxxxxxxxxxx
+          </pre>
         </section>
-        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <h2 className="text-lg font-semibold">2) POST /api/swarm/analyze</h2>
-          <p className="text-sm text-gray-400">Submit a portfolio for 7-agent IC analysis. Returns immediately with job_id. Poll /status/{'{job_id}'} for progress.</p>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy">2) POST /api/swarm/analyze</h2>
+          <p className="text-sm text-slate2">
+            Submit a portfolio for 7-agent IC analysis. Returns immediately with job_id. Poll /status/{'{job_id}'} for
+            progress.
+          </p>
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">{`{
   "positions": [
     {"symbol": "AAPL", "shares": 100, "cost_basis": 150.00},
     {"symbol": "NVDA", "shares": 50, "cost_basis": 400.00}
   ],
   "total_value": 35000
 }`}</pre>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+          <pre className="mt-2 rounded-lg border border-shell-border bg-black/40 p-3 text-xs">{`{
   "job_id": "8f2a4b1c-...",
   "status": "queued",
   "poll_url": "/api/swarm/status/8f2a4b1c-...",
   "estimated_seconds": 75
 }`}</pre>
         </section>
-        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <h2 className="text-lg font-semibold">3) GET /api/swarm/status/{'{job_id}'}</h2>
-          <p className="text-sm text-gray-400">Poll every 3s to track agent progress and get results.</p>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy">3) GET /api/swarm/status/{'{job_id}'}</h2>
+          <p className="text-sm text-slate2">Poll every 3s to track agent progress and get results.</p>
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">{`{
   "job_id": "8f2a4b1c-...",
   "status": "running",
   "progress_pct": 57,
@@ -304,10 +316,10 @@ export default function DeveloperDocsPage() {
   ]
 }`}</pre>
         </section>
-        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <h2 className="text-lg font-semibold">4) GET /api/swarm/result/{'{job_id}'}</h2>
-          <p className="text-sm text-gray-400">Fetch full IC briefing when status == complete.</p>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy">4) GET /api/swarm/result/{'{job_id}'}</h2>
+          <p className="text-sm text-slate2">Fetch full IC briefing when status == complete.</p>
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">{`{
   "ic_briefing": {
     "portfolio_analyst": {...},
     "macro_strategist": {...},
@@ -319,10 +331,10 @@ export default function DeveloperDocsPage() {
   }
 }`}</pre>
         </section>
-        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <h2 className="text-lg font-semibold">5) GET /api/research/regime</h2>
-          <p className="text-sm text-gray-400">Get current macro regime classification.</p>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">{`{
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy">5) GET /api/research/regime</h2>
+          <p className="text-sm text-slate2">Get current macro regime classification.</p>
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">{`{
   "regime": "risk_off",
   "confidence": 0.82,
   "signals": ["vix_elevated", "yield_curve_inverted"],
@@ -330,35 +342,70 @@ export default function DeveloperDocsPage() {
   "updated_at": "2026-04-10T08:00:00Z"
 }`}</pre>
         </section>
-        <section className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-          <h2 className="text-lg font-semibold">6) GET /api/portfolio/chart/{'{ticker}'}</h2>
-          <p className="text-sm text-gray-400">OHLCV chart data for candlestick rendering.</p>
-          <p className="text-sm text-gray-400">Params: period = 1mo | 3mo | 6mo | 1y | 3y</p>
-          <pre className="mt-2 rounded-lg border border-gray-800 bg-black/40 p-3 text-xs">[{`{"date":"2026-04-01","open":181.2,"high":184.3,"low":179.5,"close":183.7,"volume":61439200}`}]
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-navy">6) GET /api/portfolio/chart/{'{ticker}'}</h2>
+          <p className="text-sm text-slate2">OHLCV chart data for candlestick rendering.</p>
+          <p className="text-sm text-slate2">Params: period = 1mo | 3mo | 6mo | 1y | 3y</p>
+          <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">
+            [{`{"date":"2026-04-01","open":181.2,"high":184.3,"low":179.5,"close":183.7,"volume":61439200}`}]
           </pre>
         </section>
-        <section className="rounded-xl border border-gray-700 bg-black/40 p-4">
-          <h2 className="mb-3 text-lg font-semibold">Sandbox</h2>
+        <section className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-lg font-semibold text-navy">Sandbox</h2>
           <div className="mb-3">
-            <input value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="nf_live_sk_..." className="w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm" />
+            <input
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="nf_live_sk_..."
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-navy placeholder:text-muted2"
+            />
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
-              <select value={endpoint} onChange={(e) => setEndpoint(e.target.value as 'swarm' | 'regime' | 'chart')} className="mb-2 w-full rounded border border-gray-700 bg-gray-900 px-3 py-2 text-sm">
+              <select
+                value={endpoint}
+                onChange={(e) => setEndpoint(e.target.value as 'swarm' | 'regime' | 'chart')}
+                className="mb-2 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-navy"
+              >
                 <option value="swarm">POST /api/swarm/analyze</option>
                 <option value="regime">GET /api/research/regime</option>
                 <option value="chart">GET /api/portfolio/chart/{'{ticker}'}</option>
               </select>
-              <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} className="w-full rounded border border-gray-700 bg-black/50 p-3 font-mono text-xs" />
-              <div className="mt-2 flex gap-2">
-                <button onClick={() => void sendRequest()} className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold">Send Request →</button>
-                <button onClick={() => void navigator.clipboard.writeText(curl)} className="rounded border border-gray-700 px-4 py-2 text-sm">Copy as curl</button>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={12}
+                className="w-full rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2"
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void sendRequest()}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+                >
+                  Send Request →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard.writeText(curl)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm text-slate2 hover:border-primary hover:text-primary-dark"
+                >
+                  Copy as curl
+                </button>
               </div>
             </div>
             <div>
-              <p className="mb-2 text-xs text-gray-400">HTTP {status ?? '—'} · {elapsedMs ?? '—'} ms</p>
-              <pre className="max-h-[320px] overflow-auto rounded border border-gray-800 bg-black/50 p-3 text-xs">{JSON.stringify(response, null, 2)}</pre>
-              {agentTrace.length > 0 && <pre className="mt-2 max-h-[200px] overflow-auto rounded border border-gray-800 bg-black/50 p-3 text-xs">{JSON.stringify(agentTrace, null, 2)}</pre>}
+              <p className="mb-2 text-sm text-muted2">
+                HTTP {status ?? '—'} · {elapsedMs ?? '—'} ms
+              </p>
+              <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">
+                {JSON.stringify(response, null, 2)}
+              </pre>
+              {agentTrace.length > 0 && (
+                <pre className="mt-2 max-h-[200px] overflow-auto rounded-lg border border-border bg-surface-2 p-3 font-mono text-sm text-slate2">
+                  {JSON.stringify(agentTrace, null, 2)}
+                </pre>
+              )}
             </div>
           </div>
         </section>

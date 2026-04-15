@@ -16,10 +16,10 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-5 text-center px-6">
+    <div className="min-h-screen bg-shell-deep flex flex-col items-center justify-center gap-5 text-center px-6">
       <div className="text-5xl">⚠️</div>
       <h1 className="text-2xl font-bold text-white">Something went wrong</h1>
-      <p className="text-gray-500 text-sm max-w-xs">
+      <p className="text-shell-subtle text-sm max-w-xs">
         An unexpected error occurred. This may be a temporary issue — please try again.
       </p>
       <div className="flex gap-3">
@@ -31,7 +31,7 @@ export default function Error({
         </Link>
       </div>
       {error.digest && (
-        <p className="text-xs text-gray-700 font-mono mt-2">Error ID: {error.digest}</p>
+        <p className="text-sm text-shell-subtle font-mono mt-2">Error ID: {error.digest}</p>
       )}
     </div>
   )

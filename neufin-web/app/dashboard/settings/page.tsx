@@ -11,7 +11,7 @@ import { apiFetch, apiGet } from '@/lib/api-client'
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="glass-card-dark rounded-xl p-6">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">{title}</h2>
+      <h2 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">{title}</h2>
       {children}
     </div>
   )
@@ -21,10 +21,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500">{label}</label>
+      <label className="text-xs text-shell-subtle">{label}</label>
       <input
         {...props}
-        className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-shell border border-shell-border rounded-lg px-3 py-2 text-sm text-shell-fg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 disabled:opacity-50 disabled:cursor-not-allowed"
       />
     </div>
   )
@@ -35,21 +35,21 @@ function DeleteModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel:
   const [input, setInput] = useState('')
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-gray-900 border border-red-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
+      <div className="bg-shell border border-red-700 rounded-xl p-6 w-full max-w-sm shadow-xl">
         <h3 className="text-lg font-bold text-red-400 mb-2">Delete Account</h3>
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-shell-muted mb-4">
           This permanently deletes your account and all data. Type <span className="font-mono text-red-400">DELETE</span> to confirm.
         </p>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="DELETE"
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500/50 mb-4"
+          className="w-full bg-shell-raised border border-shell-border rounded-lg px-3 py-2 text-sm text-shell-fg focus:outline-none focus:ring-2 focus:ring-red-500/50 mb-4"
         />
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 py-2 rounded-lg border border-gray-700 text-sm text-gray-400 hover:bg-gray-800 transition-colors"
+            className="flex-1 py-2 rounded-lg border border-shell-border text-sm text-shell-muted hover:bg-shell-raised transition-colors"
           >
             Cancel
           </button>
@@ -187,8 +187,8 @@ function BrandingSection() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500 py-2">
-        <div className="w-4 h-4 border-2 border-gray-600 border-t-gray-400 rounded-full animate-spin" />
+      <div className="flex items-center gap-2 text-sm text-shell-subtle py-2">
+        <div className="w-4 h-4 border-2 border-shell-border border-t-shell-muted rounded-full animate-spin" />
         Loading branding…
       </div>
     )
@@ -209,17 +209,17 @@ function BrandingSection() {
             <div className="text-[#1EB8CC] font-bold text-sm">{(firmName || 'NeuFin').slice(0, 2).toUpperCase()}</div>
           )}
           <div className="flex-1">
-            <div className="text-[9px] text-[#64748B] uppercase tracking-widest">Portfolio Intelligence Report</div>
+            <div className="text-sm text-[#64748B] uppercase tracking-widest">Portfolio Intelligence Report</div>
             <div className="text-xs font-semibold text-[#F0F4FF]">{wlEnabled && firmName ? firmName : 'NeuFin Intelligence'}</div>
           </div>
           <div className="text-right">
-            <div className="text-[9px] text-[#64748B]">Prepared by</div>
-            <div className="text-[10px] text-[#CBD5E1]">{wlEnabled && advisorName ? advisorName : 'NeuFin Intelligence'}</div>
+            <div className="text-sm text-[#64748B]">Prepared by</div>
+            <div className="text-sm text-[#CBD5E1]">{wlEnabled && advisorName ? advisorName : 'NeuFin Intelligence'}</div>
           </div>
         </div>
         <div className="bg-[#0D1118] px-4 py-1.5 flex items-center justify-between">
-          <div className="text-[9px] text-[#2A3550]">RESTRICTED</div>
-          <div className="text-[9px] text-[#2A3550]">
+          <div className="text-sm text-[#2A3550]">RESTRICTED</div>
+          <div className="text-sm text-[#2A3550]">
             {wlEnabled && firmName ? `${firmName} · Confidential` : 'Powered by NeuFin Intelligence'}
           </div>
         </div>
@@ -227,14 +227,14 @@ function BrandingSection() {
 
       {!editing ? (
         <div className="flex items-center gap-3">
-          <div className="text-sm text-gray-400 flex-1">
+          <div className="text-sm text-shell-muted flex-1">
             {config?.white_label_enabled
               ? <span className="text-green-400">White-label active — <strong className="text-white">{config.firm_name || 'Your firm'}</strong></span>
               : 'Using NeuFin Intelligence branding'}
           </div>
           <button
             onClick={() => setEditing(true)}
-            className="py-1.5 px-4 rounded-lg border border-gray-700 text-sm text-gray-300 hover:bg-gray-800 transition-colors"
+            className="py-1.5 px-4 rounded-lg border border-shell-border text-sm text-shell-fg/90 hover:bg-shell-raised transition-colors"
           >
             Edit Branding
           </button>
@@ -386,16 +386,16 @@ export default function SettingsPage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-6 h-6 border-2 border-blue-500/40 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6">
+    <div className="max-w-2xl mx-auto px-4 py-section flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Account Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">{user.email}</p>
+        <p className="text-sm text-shell-subtle mt-1">{user.email}</p>
       </div>
 
       {/* Profile */}
@@ -428,7 +428,7 @@ export default function SettingsPage() {
 
       {/* Report Branding */}
       <Section title="Report Branding">
-        <p className="text-xs text-gray-500 mb-4">
+        <p className="text-xs text-shell-subtle mb-4">
           Customize how your NeuFin PDF reports appear. Advisors and B2B partners can white-label reports with their firm&apos;s logo and colors.
         </p>
         <BrandingSection />
@@ -465,7 +465,7 @@ export default function SettingsPage() {
 
       {/* Danger Zone */}
       <Section title="Danger Zone">
-        <p className="text-sm text-gray-400 mb-4">
+        <p className="text-sm text-shell-muted mb-4">
           Deleting your account is permanent and cannot be undone. All portfolios, scores, and reports will be removed.
         </p>
         {deleteError && <p className="text-xs text-red-400 mb-3">{deleteError}</p>}

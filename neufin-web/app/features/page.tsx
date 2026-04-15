@@ -104,31 +104,31 @@ export default function FeaturesPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
 
-      <div className="min-h-screen bg-gray-950 text-gray-100">
+      <div className="min-h-screen bg-shell-deep text-shell-fg">
         {/* Nav */}
-        <nav className="border-b border-gray-800/60 sticky top-0 z-10 bg-gray-950/90 backdrop-blur-sm">
+        <nav className="border-b border-shell-border/60 sticky top-0 z-10 bg-shell-deep/90 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold text-gradient">NeuFin</Link>
             <div className="flex items-center gap-3">
-              <Link href="/blog" className="text-sm text-gray-400 hover:text-gray-100 transition-colors">Blog</Link>
-              <Link href="/research" className="text-sm text-gray-400 hover:text-gray-100 transition-colors">Research</Link>
+              <Link href="/blog" className="text-sm text-shell-muted hover:text-shell-fg transition-colors">Blog</Link>
+              <Link href="/research" className="text-sm text-shell-muted hover:text-shell-fg transition-colors">Research</Link>
               <Link href="/pricing" className="btn-primary py-2 text-sm">See Pricing</Link>
             </div>
           </div>
         </nav>
 
-        <div className="max-w-6xl mx-auto px-6 py-16">
+        <div className="max-w-6xl mx-auto px-6 py-section">
 
           {/* Hero */}
           <div className="text-center mb-16">
-            <span className="badge bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-4">
+            <span className="badge bg-primary/10 text-primary border border-primary/20 mb-4">
               Built for Singapore CFOs & Wealth Managers
             </span>
             <h1 className="text-4xl md:text-5xl font-extrabold mb-6 leading-tight">
               Detect Cognitive Biases in{' '}
               <span className="text-gradient">Every Financial Decision</span>
             </h1>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+            <p className="text-lg text-shell-muted max-w-2xl mx-auto">
               NeuFin, founded 2025 in Singapore, analyses your investment portfolio via
               Plaid API and detects six behavioral biases costing Singapore SMEs an
               estimated 12–18% in annual returns. Results in under 10 seconds.
@@ -150,8 +150,8 @@ export default function FeaturesPage() {
               {features.map((f) => (
                 <div key={f.title} className="card space-y-3">
                   <span className="text-3xl">{f.icon}</span>
-                  <h3 className="font-semibold text-lg text-gray-100">{f.title}</h3>
-                  <p className="text-sm text-gray-400 leading-relaxed">{f.description}</p>
+                  <h3 className="font-semibold text-lg text-shell-fg">{f.title}</h3>
+                  <p className="text-sm text-shell-muted leading-relaxed">{f.description}</p>
                 </div>
               ))}
             </div>
@@ -160,7 +160,7 @@ export default function FeaturesPage() {
           {/* Bias explainer */}
           <section className="card mb-20">
             <h2 className="text-xl font-bold mb-4">The 6 Biases NeuFin Detects</h2>
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-shell-muted text-sm mb-6">
               Based on research by Daniel Kahneman (Nobel Prize 2002), Richard Thaler (Nobel
               Prize 2017), and NeuFin&apos;s own analysis of Singapore SME portfolios.
             </p>
@@ -173,9 +173,9 @@ export default function FeaturesPage() {
                 ['Overconfidence Bias', 'Excessive trading frequency and high portfolio concentration relative to benchmark.'],
                 ['Herding Bias', 'Following institutional flows or trending assets without independent analysis.'],
               ].map(([name, desc]) => (
-                <div key={name} className="rounded-lg bg-gray-800/40 p-4">
-                  <p className="font-semibold text-sm text-gray-200 mb-1">{name}</p>
-                  <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+                <div key={name} className="rounded-lg bg-shell-raised/40 p-4">
+                  <p className="font-semibold text-sm text-shell-fg mb-1">{name}</p>
+                  <p className="text-xs text-shell-muted leading-relaxed">{desc}</p>
                 </div>
               ))}
             </div>
@@ -186,18 +186,18 @@ export default function FeaturesPage() {
             <h2 className="text-2xl font-bold text-center mb-10">Frequently Asked Questions</h2>
             <div className="space-y-6 max-w-3xl mx-auto">
               {FAQS.map(({ q, a }) => (
-                <div key={q} className="border-b border-gray-800 pb-6">
-                  <h3 className="font-semibold text-gray-100 mb-2">{q}</h3>
-                  <p className="text-sm text-gray-400 leading-relaxed">{a}</p>
+                <div key={q} className="border-b border-shell-border pb-6">
+                  <h3 className="font-semibold text-shell-fg mb-2">{q}</h3>
+                  <p className="text-sm text-shell-muted leading-relaxed">{a}</p>
                 </div>
               ))}
             </div>
           </section>
 
           {/* CTA */}
-          <section className="text-center rounded-2xl border border-blue-500/20 bg-blue-500/5 p-12">
+          <section className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
             <h2 className="text-2xl font-bold mb-3">Ready to Find Your Behavioral Blind Spots?</h2>
-            <p className="text-gray-400 mb-6">
+            <p className="text-shell-muted mb-6">
               Upload your portfolio CSV and get your Investor DNA Score in under 10 seconds.
               No account required. Free to start.
             </p>

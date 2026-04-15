@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
+import { FadeIn } from '@/components/ui/FadeIn'
 import { apiFetch, apiGet, apiPost } from '@/lib/api-client'
 import { stripeSuccessUrlReports } from '@/lib/stripe-checkout-urls'
 import { getStoredReportTheme, type ReportTheme } from '@/components/dashboard/ReportThemeModal'
@@ -132,7 +133,8 @@ export default function DashboardReportsPage() {
   }
 
   return (
-    <div className="rounded-xl border border-border/50 bg-surface p-6">
+    <FadeIn>
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-foreground">IC Reports &amp; Memos</h1>
@@ -140,12 +142,20 @@ export default function DashboardReportsPage() {
             Generate and manage institutional-grade portfolio reports.
           </p>
         </div>
-        <Link
-          href="/dashboard/portfolio"
-          className="rounded-md border border-primary/35 bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20"
-        >
-          Generate New Report
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/reports/preview"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-sm transition duration-200 ease-out hover:border-gray-400 hover:bg-gray-50 active:scale-[0.99]"
+          >
+            HTML print preview
+          </Link>
+          <Link
+            href="/dashboard/portfolio"
+            className="rounded-lg border border-gray-300 bg-[#1EB8CC] px-3 py-2 text-xs font-medium text-white shadow-sm transition duration-200 ease-out hover:bg-[#189fb2] hover:shadow-md active:scale-[0.99]"
+          >
+            Generate New Report
+          </Link>
+        </div>
       </div>
 
       {error && (
@@ -155,7 +165,7 @@ export default function DashboardReportsPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
+        <div className="flex min-h-[120px] items-center gap-2 py-6 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading reports…
         </div>
@@ -164,11 +174,11 @@ export default function DashboardReportsPage() {
           {reports.map((r) => (
             <div
               key={r.id}
-              className="grid gap-3 rounded-lg border border-border/40 bg-background/40 px-4 py-3 md:grid-cols-[2fr_1fr_1fr_1fr_1fr]"
+              className="grid gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md md:grid-cols-[2fr_1fr_1fr_1fr_1fr] motion-reduce:hover:translate-y-0"
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{r.portfolio_name || 'Portfolio'}</p>
-                <p className="font-mono text-[10px] text-muted-foreground">
+                <p className="font-mono text-sm text-muted-foreground">
                   {r.portfolio_id || r.id}
                   {!r.portfolio_id && (
                     <span className="ml-1 text-amber-500/80">(link a portfolio via analysis)</span>
@@ -183,8 +193,8 @@ export default function DashboardReportsPage() {
               <div className="text-xs text-muted-foreground">DNA {r.dna_score ?? '—'}</div>
               <div>
                 <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                    r.is_paid ? 'bg-emerald-500/15 text-emerald-300' : 'bg-gray-500/15 text-gray-300'
+                  className={`inline-flex rounded-full px-2 py-0.5 text-sm font-medium ${
+                    r.is_paid ? 'bg-emerald-500/15 text-emerald-300' : 'bg-shell-subtle/15 text-shell-fg/90'
                   }`}
                 >
                   {r.is_paid ? 'Paid' : 'Free'}
@@ -222,7 +232,7 @@ export default function DashboardReportsPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-border/40 bg-background/40 px-4 py-6">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-6">
           <p className="text-sm text-muted-foreground">
             No reports yet. Run your first portfolio analysis to generate an IC-grade report.
           </p>
@@ -231,6 +241,7 @@ export default function DashboardReportsPage() {
           </Link>
         </div>
       )}
-    </div>
+      </div>
+    </FadeIn>
   )
 }

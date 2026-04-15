@@ -22,7 +22,7 @@ const REF_STORAGE_KEY = 'ref_token'
 
 
 const TYPE_COLORS: Record<string, string> = {
-  'Diversified Strategist': 'bg-blue-500/15 text-blue-300 border-blue-500/30',
+  'Diversified Strategist': 'bg-primary/15 text-primary border-primary/30',
   'Conviction Growth':      'bg-purple-500/15 text-purple-300 border-purple-500/30',
   'Momentum Trader':        'bg-yellow-500/15 text-yellow-300 border-yellow-500/30',
   'Defensive Allocator':    'bg-green-500/15 text-green-300 border-green-500/30',
@@ -85,7 +85,7 @@ function ScoreCircle({ score }: { score: number }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className="text-4xl font-extrabold" style={{ color }}>{score}</span>
-        <span className="text-xs text-gray-500 uppercase tracking-widest">DNA Score</span>
+        <span className="text-xs text-gray-300 uppercase tracking-widest">DNA Score</span>
       </div>
     </div>
   )
@@ -227,12 +227,12 @@ export default function ResultsContent() {
   if (!result) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       </div>
     )
   }
 
-  const typeClass = TYPE_COLORS[result.investor_type] || 'bg-gray-700 text-gray-300 border-gray-600'
+  const typeClass = TYPE_COLORS[result.investor_type] || 'bg-shell-raised text-shell-fg/90 border-shell-border'
 
   // Price warnings from backend (stale/alias/unresolvable tickers)
   const priceWarnings: string[] = result.warnings ?? []
@@ -273,9 +273,9 @@ export default function ResultsContent() {
         )}
 
         {/* Nav */}
-        <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+        <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-            <button onClick={startOver} className="text-gray-400 hover:text-white text-sm transition-colors">
+            <button onClick={startOver} className="text-shell-muted hover:text-white text-sm transition-colors">
               ← New analysis
             </button>
             <span className="text-xl font-bold text-gradient">Neufin</span>
@@ -305,15 +305,15 @@ export default function ResultsContent() {
         {!user && (
           <div className="bg-blue-950/60 border-b border-blue-800/40">
             <div className="max-w-4xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
-              <p className="text-xs text-blue-300">Sign in to save your DNA score across devices</p>
-              <Link href="/auth" className="text-xs font-semibold text-blue-400 hover:text-blue-300 whitespace-nowrap">
+              <p className="text-xs text-primary">Sign in to save your DNA score across devices</p>
+              <Link href="/auth" className="text-xs font-semibold text-primary hover:text-primary whitespace-nowrap">
                 Sign in to save →
               </Link>
             </div>
           </div>
         )}
 
-        <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
+        <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-section">
           <motion.div
             variants={stagger}
             initial="hidden"
@@ -332,7 +332,7 @@ export default function ResultsContent() {
                   {result.investor_type}
                 </span>
               </div>
-              <p className="text-gray-400 text-sm mt-3">
+              <p className="text-shell-muted text-sm mt-3">
                 Portfolio value:&nbsp;
                 <span className="text-white font-semibold">{usd(result.total_value)}</span>
                 &nbsp;·&nbsp;
@@ -346,11 +346,11 @@ export default function ResultsContent() {
             {/* ── Overview cards ─────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="grid grid-cols-2 gap-4">
               <div className="card text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Value</p>
+                <p className="text-xs text-shell-subtle uppercase tracking-wide mb-1">Total Value</p>
                 <p className="text-2xl font-bold text-white">{usd(result.total_value)}</p>
               </div>
               <div className="card text-center">
-                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Positions</p>
+                <p className="text-xs text-shell-subtle uppercase tracking-wide mb-1">Positions</p>
                 <p className="text-2xl font-bold text-white">{result.num_positions}</p>
               </div>
             </motion.div>
@@ -366,7 +366,7 @@ export default function ResultsContent() {
                       initial={{ opacity: 0, x: -16 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
-                      className="flex gap-2 text-sm text-gray-300"
+                      className="flex gap-2 text-sm text-shell-fg/90"
                     >
                       <span className="text-green-500 mt-0.5 shrink-0">✓</span>{s}
                     </motion.li>
@@ -382,7 +382,7 @@ export default function ResultsContent() {
                       initial={{ opacity: 0, x: 16 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
-                      className="flex gap-2 text-sm text-gray-300"
+                      className="flex gap-2 text-sm text-shell-fg/90"
                     >
                       <span className="text-red-500 mt-0.5 shrink-0">!</span>{w}
                     </motion.li>
@@ -393,20 +393,20 @@ export default function ResultsContent() {
 
             {/* ── Action plan ────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="card border-blue-800/40 bg-blue-950/20">
-              <h3 className="text-sm font-semibold text-blue-400 uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
-              <p className="text-gray-200 leading-relaxed">{result.recommendation}</p>
+              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">🎯 Your Neufin Action Plan</h3>
+              <p className="text-shell-fg leading-relaxed">{result.recommendation}</p>
             </motion.div>
 
             {/* ── Holdings table ─────────────────────────────────────────── */}
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Holdings</h3>
+                <h3 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-4">Holdings</h3>
 
                 {/* Desktop table */}
                 <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-gray-500 uppercase tracking-wide border-b border-gray-800">
+                      <tr className="text-xs text-shell-subtle uppercase tracking-wide border-b border-shell-border">
                         <th className="text-left pb-2 pr-4">Symbol</th>
                         <th className="text-right pb-2 px-4">Shares</th>
                         <th className="text-right pb-2 px-4">Price</th>
@@ -414,24 +414,24 @@ export default function ResultsContent() {
                         <th className="text-left pb-2 pl-4">Weight</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-800/60">
+                    <tbody className="divide-y divide-shell-border/60">
                       {result.positions.map((p) => (
-                        <tr key={p.symbol} className="hover:bg-gray-800/30 transition-colors">
+                        <tr key={p.symbol} className="hover:bg-shell-raised/30 transition-colors">
                           <td className="py-2.5 pr-4 font-mono font-bold text-white">{p.symbol}</td>
-                          <td className="py-2.5 px-4 text-right text-gray-300">
+                          <td className="py-2.5 px-4 text-right text-shell-fg/90">
                             {new Intl.NumberFormat('en-US').format(p.shares)}
                           </td>
-                          <td className="py-2.5 px-4 text-right text-gray-300">{usdFull(p.price)}</td>
+                          <td className="py-2.5 px-4 text-right text-shell-fg/90">{usdFull(p.price)}</td>
                           <td className="py-2.5 px-4 text-right text-white font-medium">{usd(p.value)}</td>
                           <td className="py-2.5 pl-4">
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden min-w-[64px]">
+                              <div className="flex-1 h-1.5 bg-shell-raised rounded-full overflow-hidden min-w-[64px]">
                                 <div
-                                  className="h-full bg-blue-500 rounded-full"
+                                  className="h-full bg-primary rounded-full"
                                   style={{ width: `${Math.min(p.weight, 100)}%` }}
                                 />
                               </div>
-                              <span className="text-gray-400 text-xs w-10 text-right shrink-0">
+                              <span className="text-shell-muted text-xs w-10 text-right shrink-0">
                                 {pct(p.weight)}
                               </span>
                             </div>
@@ -445,20 +445,20 @@ export default function ResultsContent() {
                 {/* Mobile cards */}
                 <div className="sm:hidden space-y-3">
                   {result.positions.map((p) => (
-                    <div key={p.symbol} className="flex items-center justify-between py-2 border-b border-gray-800/60 last:border-0">
+                    <div key={p.symbol} className="flex items-center justify-between py-2 border-b border-shell-border/60 last:border-0">
                       <div>
                         <p className="font-mono font-bold text-white">{p.symbol}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-shell-subtle mt-0.5">
                           {new Intl.NumberFormat('en-US').format(p.shares)} shares · {usdFull(p.price)}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-white">{usd(p.value)}</p>
                         <div className="flex items-center gap-1.5 justify-end mt-1">
-                          <div className="w-12 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
+                          <div className="w-12 h-1.5 bg-shell-raised rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(p.weight, 100)}%` }} />
                           </div>
-                          <span className="text-xs text-gray-400">{pct(p.weight)}</span>
+                          <span className="text-xs text-shell-muted">{pct(p.weight)}</span>
                         </div>
                       </div>
                     </div>
@@ -471,7 +471,7 @@ export default function ResultsContent() {
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-shell-muted uppercase tracking-wide">
                     Allocation Overview
                   </h3>
                   {result.max_position_pct > 40 && (
@@ -519,7 +519,7 @@ export default function ResultsContent() {
               {/* Start Over */}
               <button
                 onClick={startOver}
-                className="flex items-center justify-center gap-2 py-3 text-sm rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+                className="flex items-center justify-center gap-2 py-3 text-sm rounded-lg border border-shell-border text-shell-muted hover:text-white hover:border-shell-muted transition-colors"
               >
                 ↩ Start Over
               </button>
@@ -527,7 +527,7 @@ export default function ResultsContent() {
 
             {/* ── Share panel ─────────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="card">
-              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Share your result</h3>
+              <h3 className="text-sm font-semibold text-shell-muted uppercase tracking-wide mb-3">Share your result</h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   onClick={copyShare}
@@ -564,13 +564,13 @@ export default function ResultsContent() {
             {referralUrl && (
               <motion.div variants={fadeUp} className="card border-purple-800/30 bg-purple-950/20">
                 <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wide mb-1">🎁 Your referral link</h3>
-                <p className="text-xs text-gray-500 mb-3">
+                <p className="text-xs text-shell-subtle mb-3">
                   Share this link — friends get 20% off their first report, and you build your Neufin reputation.
                 </p>
                 <div className="flex gap-2">
                   <input
                     readOnly value={referralUrl}
-                    className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono"
+                    className="flex-1 bg-shell border border-shell-border rounded-lg px-3 py-2 text-xs text-shell-fg/90 font-mono"
                   />
                   <button
                     onClick={() => { navigator.clipboard.writeText(referralUrl); track('referral_link_copied') }}
@@ -601,7 +601,7 @@ export default function ResultsContent() {
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
                       <h2 className="text-lg font-bold text-white">Unlock Your Full Report</h2>
-                      <p className="text-gray-500 text-xs mt-0.5">AI-generated · 10-page PDF · one-time $29</p>
+                      <p className="text-shell-subtle text-xs mt-0.5">AI-generated · 10-page PDF · one-time $29</p>
                     </div>
                     <span className="text-2xl shrink-0">📄</span>
                   </div>
@@ -617,15 +617,15 @@ export default function ResultsContent() {
                       <li key={label} className="flex items-start gap-3">
                         <span className="text-base shrink-0 mt-0.5">{icon}</span>
                         <div>
-                          <p className="text-sm font-semibold text-gray-200">{label}</p>
-                          <p className="text-xs text-gray-500">{sub}</p>
+                          <p className="text-sm font-semibold text-shell-fg">{label}</p>
+                          <p className="text-xs text-shell-subtle">{sub}</p>
                         </div>
                       </li>
                     ))}
                   </ul>
 
                   {fulfillLoading ? (
-                    <div className="flex items-center justify-center gap-2 text-sm text-blue-400 py-3">
+                    <div className="flex items-center justify-center gap-2 text-sm text-primary py-3">
                       <span className="inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
                       Generating your report…
                     </div>
@@ -653,12 +653,12 @@ export default function ResultsContent() {
                     </p>
                   )}
 
-                  <p className="text-center text-xs text-gray-600 mt-3">
+                  <p className="text-center text-xs text-shell-subtle mt-3">
                     Secured by Stripe · instant delivery · no subscription
                   </p>
 
                   {/* Free unlock via referrals */}
-                  <div className="mt-3 pt-3 border-t border-gray-800/60 text-center">
+                  <div className="mt-3 pt-3 border-t border-shell-border/60 text-center">
                     <Link
                       href="/referrals"
                       className="text-xs text-purple-400 hover:text-purple-300 transition-colors"

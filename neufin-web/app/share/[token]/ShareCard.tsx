@@ -71,48 +71,48 @@ export default function ShareCard({ data }: { data: DNAShare }) {
       {/* ── Trophy card ───────────────────────────────────────────── */}
       <motion.div
         variants={fadeUp}
-        className="w-full rounded-2xl border border-gray-800 overflow-hidden"
+        className="w-full rounded-2xl border border-shell-border overflow-hidden"
         style={{
           background: `radial-gradient(ellipse at top left, ${cfg.color}18 0%, transparent 60%), #0d1117`,
         }}
       >
         {/* Header */}
-        <div className="px-8 pt-8 pb-4 flex items-center justify-between border-b border-gray-800/60">
+        <div className="px-8 pt-6 pb-4 flex items-center justify-between border-b border-shell-border/60">
           <span className="text-sm font-bold text-gradient tracking-wide">Neufin Investor DNA</span>
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-shell-subtle">
             {new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
           </span>
         </div>
 
         {/* Score + type */}
-        <div className="px-8 py-8 flex flex-col sm:flex-row items-center gap-8">
+        <div className="px-8 py-6 flex flex-col sm:flex-row items-center gap-8">
           <div className="relative shrink-0">
             <ScoreArc score={data.dna_score} />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-3xl font-extrabold" style={{ color: scoreColor }}>
                 {data.dna_score}
               </span>
-              <span className="text-xs text-gray-500 uppercase tracking-wider">/100</span>
+              <span className="text-xs text-shell-subtle uppercase tracking-wider">/100</span>
             </div>
           </div>
           <div className="text-center sm:text-left">
             <div className="text-3xl mb-2">{cfg.emoji}</div>
             <h1 className="text-2xl font-bold text-white leading-tight">{data.investor_type}</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-shell-subtle mt-1">
               {(data.view_count ?? 0).toLocaleString()} investors have viewed this
             </p>
           </div>
         </div>
 
         {/* Strengths + weaknesses */}
-        <div className="px-8 pb-8 grid sm:grid-cols-2 gap-6">
+        <div className="px-8 pb-6 grid sm:grid-cols-2 gap-6">
           <div>
             <h3 className="text-xs font-semibold text-green-400 uppercase tracking-wide mb-3">
               💪 Strengths
             </h3>
             <ul className="space-y-2">
               {data.strengths.map((s, i) => (
-                <li key={i} className="flex gap-2 text-sm text-gray-300">
+                <li key={i} className="flex gap-2 text-sm text-shell-fg/90">
                   <span className="text-green-500 shrink-0 mt-0.5">✓</span>
                   {s}
                 </li>
@@ -125,7 +125,7 @@ export default function ShareCard({ data }: { data: DNAShare }) {
             </h3>
             <ul className="space-y-2">
               {data.weaknesses.map((w, i) => (
-                <li key={i} className="flex gap-2 text-sm text-gray-300">
+                <li key={i} className="flex gap-2 text-sm text-shell-fg/90">
                   <span className="text-amber-500 shrink-0 mt-0.5">!</span>
                   {w}
                 </li>
@@ -145,13 +145,13 @@ export default function ShareCard({ data }: { data: DNAShare }) {
           >
             🎯 AI Recommendation
           </p>
-          <p className="text-sm text-gray-300 leading-relaxed">{data.recommendation}</p>
+          <p className="text-sm text-shell-fg/90 leading-relaxed">{data.recommendation}</p>
         </div>
 
         {/* Card footer */}
-        <div className="px-8 py-4 border-t border-gray-800/60 flex items-center justify-between">
-          <span className="text-xs text-gray-600">neufin.app</span>
-          <span className="text-xs text-gray-600 font-mono">{data.share_token}</span>
+        <div className="px-8 py-4 border-t border-shell-border/60 flex items-center justify-between">
+          <span className="text-xs text-shell-subtle">neufin.app</span>
+          <span className="text-xs text-shell-subtle font-mono">{data.share_token}</span>
         </div>
       </motion.div>
 
@@ -188,11 +188,11 @@ export default function ShareCard({ data }: { data: DNAShare }) {
       {/* ── Referral ───────────────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="w-full card border-purple-800/30 bg-purple-950/20">
         <p className="text-sm font-semibold text-purple-300 mb-1">🎁 Refer a friend — they get 20% off</p>
-        <p className="text-xs text-gray-500 mb-3">
+        <p className="text-xs text-shell-subtle mb-3">
           Share your link. Anyone who buys an Advisor Report through it gets 20% off automatically.
         </p>
         <div className="flex gap-2">
-          <code className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 truncate font-mono">
+          <code className="flex-1 bg-shell border border-shell-border rounded-lg px-3 py-2 text-xs text-shell-fg/90 truncate font-mono">
             {referralUrl}
           </code>
           <CopyButton url={referralUrl} />
@@ -204,8 +204,8 @@ export default function ShareCard({ data }: { data: DNAShare }) {
         variants={fadeUp}
         className="w-full card text-center border-blue-800/30 bg-gradient-to-br from-blue-950/40 to-purple-950/30"
       >
-        <p className="text-gray-300 font-semibold mb-1">What&apos;s your Investor DNA?</p>
-        <p className="text-gray-500 text-sm mb-4">
+        <p className="text-shell-fg/90 font-semibold mb-1">What&apos;s your Investor DNA?</p>
+        <p className="text-shell-subtle text-sm mb-4">
           Upload your portfolio CSV — your analysis is ready in under 10 seconds.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -225,7 +225,7 @@ export default function ShareCard({ data }: { data: DNAShare }) {
 
       {/* ── Value prop ─────────────────────────────────────────────── */}
       <motion.div variants={fadeUp} className="w-full pb-6">
-        <div className="border-t border-gray-800/60 pt-6 grid sm:grid-cols-3 gap-4 text-center">
+        <div className="border-t border-shell-border/60 pt-6 grid sm:grid-cols-3 gap-4 text-center">
           {[
             { icon: '🧬', title: 'AI-Powered DNA', body: 'Scans your portfolio for hidden risks and diversification gaps.' },
             { icon: '⚡', title: 'Instant Analysis', body: 'Upload a CSV — your full DNA report is ready in seconds.' },
@@ -233,8 +233,8 @@ export default function ShareCard({ data }: { data: DNAShare }) {
           ].map(({ icon, title, body }) => (
             <div key={title} className="space-y-1">
               <div className="text-2xl">{icon}</div>
-              <p className="text-sm font-semibold text-gray-300">{title}</p>
-              <p className="text-xs text-gray-600">{body}</p>
+              <p className="text-sm font-semibold text-shell-fg/90">{title}</p>
+              <p className="text-xs text-shell-subtle">{body}</p>
             </div>
           ))}
         </div>

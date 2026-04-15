@@ -95,8 +95,8 @@ export default function SocialProof() {
             transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
             className="
               pointer-events-auto
-              max-w-xs bg-gray-900/95 backdrop-blur-sm
-              border border-gray-700/60 rounded-xl
+              max-w-xs bg-shell/95 backdrop-blur-sm
+              border border-shell-border/60 rounded-xl
               px-4 py-3 shadow-2xl
               flex items-start gap-3
             "
@@ -107,7 +107,7 @@ export default function SocialProof() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
             </span>
 
-            <p className="text-xs text-gray-300 leading-relaxed">{message}</p>
+            <p className="text-xs text-shell-fg/90 leading-relaxed">{message}</p>
           </motion.div>
         )}
       </AnimatePresence>

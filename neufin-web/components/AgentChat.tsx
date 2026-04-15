@@ -7,26 +7,26 @@
  * Displays the routed agent name, thinking steps, answer, key numbers,
  * and recommended action.
  *
- * Design: terminal style — #0D0D0D bg, #FFB900 amber, Fira Code.
+ * Design: dark analysis panel — compact monospace, readable 12px+ body.
  */
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { apiFetch } from '@/lib/api-client'
 
 const MONO = "'Fira Code','JetBrains Mono','Courier New',monospace"
-const A    = '#FFB900'
-const G    = '#00FF00'
-const R    = '#FF4444'
-const DIM  = '#444'
-const BODY = '#C8C8C8'
+const A = '#F5A623'
+const G = '#22c55e'
+const R = '#ef4444'
+const DIM = '#64748b'
+const BODY = '#e2e8f0'
 
 // Agent colour map (mirrors SwarmTerminal)
 const AGENT_COLORS: Record<string, string> = {
   tax:        '#34d399',
-  quant:      A,
+  quant:      '#1EB8CC',
   macro:      '#60a5fa',
   strategist: '#60a5fa',
-  synthesis:  '#c084fc',
+  synthesis:  '#94a3b8',
   default:    BODY,
 }
 
@@ -188,11 +188,11 @@ export default function AgentChat({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: A, fontSize: 10, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase' }}>
+            <span style={{ color: A, fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
               Managing Director
             </span>
-            <span style={{ color: DIM, fontSize: 9 }}>|</span>
-            <span style={{ color: DIM, fontSize: 9, textTransform: 'uppercase', letterSpacing: 1 }}>
+            <span style={{ color: DIM, fontSize: 12 }}>|</span>
+            <span style={{ color: DIM, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               IC Q&amp;A
             </span>
           </div>
@@ -226,7 +226,7 @@ export default function AgentChat({
               onClick={() => send(s)}
               style={{
                 background: 'transparent', border: `1px solid #2a2a2a`,
-                color: '#666', fontSize: 9, padding: '3px 8px',
+                color: '#94a3b8', fontSize: 12, padding: '4px 10px',
                 cursor: 'pointer', fontFamily: MONO,
                 textAlign: 'left', textTransform: 'none', letterSpacing: 0,
               }}
@@ -251,18 +251,18 @@ export default function AgentChat({
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', justifyContent: 'flex-end' }}>
                 <div style={{
                   background: '#161616', border: `1px solid #2a2a2a`,
-                  color: BODY, fontSize: 10, padding: '6px 10px', maxWidth: '85%',
+                  color: BODY, fontSize: 13, padding: '8px 12px', maxWidth: '85%',
                   lineHeight: 1.6,
                 }}>
                   {msg.text}
                 </div>
-                <span style={{ color: DIM, fontSize: 9, marginTop: 2, flexShrink: 0 }}>YOU</span>
+                <span style={{ color: DIM, fontSize: 11, marginTop: 2, flexShrink: 0 }}>You</span>
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <span style={{
                   color: AGENT_COLORS[msg.agent ?? 'default'] ?? BODY,
-                  fontSize: 8, fontWeight: 700, marginTop: 3, flexShrink: 0,
+                  fontSize: 11, fontWeight: 700, marginTop: 3, flexShrink: 0,
                   border: `1px solid ${(AGENT_COLORS[msg.agent ?? 'default'] ?? BODY)}40`,
                   padding: '1px 4px', textTransform: 'uppercase', letterSpacing: 1,
                 }}>
@@ -270,13 +270,11 @@ export default function AgentChat({
                 </span>
 
                 {msg.loading ? (
-                  <span style={{ color: A, fontSize: 10 }}>
-                    <span style={{ animation: 'pulse 1s infinite' }}>●</span> Analysing...
-                  </span>
+                  <span style={{ color: A, fontSize: 12 }}>Analysing…</span>
                 ) : (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {/* Answer */}
-                    <p style={{ color: BODY, fontSize: 10, lineHeight: 1.7, margin: 0 }}>
+                    <p style={{ color: BODY, fontSize: 13, lineHeight: 1.65, margin: 0 }}>
                       {msg.text}
                     </p>
 
@@ -288,8 +286,8 @@ export default function AgentChat({
                       }}>
                         {Object.entries(msg.keyNumbers).map(([k, v]) => (
                           <div key={k} style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                            <span style={{ color: DIM, fontSize: 8, textTransform: 'uppercase', letterSpacing: 1 }}>{k}:</span>
-                            <span style={{ color: A, fontSize: 10, fontWeight: 700 }}>{String(v)}</span>
+                            <span style={{ color: DIM, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.06 }}>{k}:</span>
+                            <span style={{ color: A, fontSize: 12, fontWeight: 700 }}>{String(v)}</span>
                           </div>
                         ))}
                       </div>
@@ -299,21 +297,21 @@ export default function AgentChat({
                     {msg.action && (
                       <div style={{
                         borderLeft: `2px solid ${G}`, paddingLeft: 8,
-                        color: G, fontSize: 9,
+                        color: G, fontSize: 12,
                       }}>
-                        ▶ {msg.action}
+                        Action: {msg.action}
                       </div>
                     )}
 
                     {/* Thinking steps (collapsed by default, toggle on click) */}
                     {msg.steps && msg.steps.length > 0 && (
                       <details style={{ cursor: 'pointer' }}>
-                        <summary style={{ color: DIM, fontSize: 8, letterSpacing: 1, textTransform: 'uppercase', listStyle: 'none' }}>
-                          ▸ {msg.steps.length} thinking steps
+                        <summary style={{ color: DIM, fontSize: 11, letterSpacing: 0.06, textTransform: 'uppercase', listStyle: 'none' }}>
+                          {msg.steps.length} thinking steps
                         </summary>
                         <div style={{ paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
                           {msg.steps.map((s, i) => (
-                            <div key={i} style={{ color: '#555', fontSize: 8, lineHeight: 1.5 }}>
+                            <div key={i} style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.5 }}>
                               {s}
                             </div>
                           ))}
@@ -354,7 +352,7 @@ export default function AgentChat({
           style={{
             background: 'transparent', border: `1px solid ${input.trim() && !loading ? A : '#333'}`,
             color: input.trim() && !loading ? A : '#333',
-            fontSize: 9, padding: '3px 8px', cursor: 'pointer', fontFamily: MONO,
+            fontSize: 12, padding: '4px 10px', cursor: 'pointer', fontFamily: MONO,
             textTransform: 'uppercase', letterSpacing: 1, transition: 'all 0.15s',
           }}
         >

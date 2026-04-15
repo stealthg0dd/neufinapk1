@@ -77,31 +77,31 @@ export default function ReportSuccessPage() {
   }, [reportId])
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-950">
-      <nav className="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-10">
+    <div className="min-h-screen flex flex-col bg-shell-deep">
+      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-gradient">Neufin</Link>
-          <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors">
+          <Link href="/dashboard" className="text-shell-muted hover:text-white text-sm transition-colors">
             Return to Dashboard
           </Link>
         </div>
       </nav>
 
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
+      <main className="flex-1 flex items-center justify-center px-6 py-section">
         <div className="w-full max-w-md space-y-4">
           {(reportStatus === 'pending' || reportStatus === 'generating') && (
             <div className="card space-y-5 text-center">
               <h1 className="text-2xl font-bold text-white">Generating your IC report...</h1>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-shell-muted">
                 This takes 60-90 seconds for full institutional analysis.
               </p>
-              <div className="h-2 w-full overflow-hidden rounded bg-gray-800">
+              <div className="h-2 w-full overflow-hidden rounded bg-shell-raised">
                 <div
                   className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 transition-all duration-500"
                   style={{ width: `${Math.min(95, Math.round((attempts / MAX_ATTEMPTS) * 100))}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-600">Attempt {attempts} / {MAX_ATTEMPTS}</p>
+              <p className="text-xs text-shell-subtle">Attempt {attempts} / {MAX_ATTEMPTS}</p>
             </div>
           )}
 
@@ -138,7 +138,7 @@ export default function ReportSuccessPage() {
           {reportStatus === 'timeout' && (
             <div className="card space-y-4 text-center">
               <h1 className="text-xl font-bold text-white">Still generating - this is taking longer than usual</h1>
-              <p className="text-sm text-gray-400">Your report will be emailed to you when ready.</p>
+              <p className="text-sm text-shell-muted">Your report will be emailed to you when ready.</p>
               <Link href="/dashboard" className="btn-outline block w-full py-3 text-center">
                 Return to Dashboard
               </Link>

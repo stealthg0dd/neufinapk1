@@ -1,12 +1,12 @@
 import type { Metadata } from 'next'
-import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import RootProviders from '@/app/components/RootProviders'
 import AuthDebugBoot from '@/app/components/AuthDebugBoot'
 import { AuthDebugPanel } from '@/components/AuthDebugPanel'
 import { ScrollReset } from '@/components/ScrollReset'
 
-const spaceGrotesk = Space_Grotesk({
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
   weight: ['400', '500', '600', '700'],
@@ -126,10 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <html
-      lang="en"
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
-    >
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -148,7 +145,10 @@ gtag('config', 'G-Z2E03GFJP3');`,
         {/* next/font serves locally; keep only app-critical origins */}
         <link rel="preconnect" href="https://gpczchjipalfgkfqamcu.supabase.co" />
       </head>
-      <body className="min-h-screen antialiased font-sans" suppressHydrationWarning>
+      <body
+        className="min-h-screen bg-app antialiased font-sans text-navy"
+        suppressHydrationWarning
+      >
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"

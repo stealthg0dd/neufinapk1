@@ -52,8 +52,8 @@ export function AuthScreen({ initialMode }: { initialMode: 'login' | 'signup' })
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[var(--canvas)] flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-[var(--amber)]/30 border-t-[var(--amber)] rounded-full animate-spin" />
+        <div className="min-h-screen bg-app flex items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
         </div>
       }
     >
@@ -154,17 +154,17 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
 
   if (sent) {
     return (
-      <div className="min-h-screen bg-[var(--canvas)] flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-app flex flex-col items-center justify-center p-6">
         <GlassCard className="w-full max-w-md p-8 text-center space-y-4">
           <div className="text-4xl" aria-hidden>
             ✉️
           </div>
-          <h1 className="font-display text-2xl text-[var(--text-primary)]">Check your email</h1>
+          <h1 className="font-sans text-2xl text-[var(--text-primary)]">Check your email</h1>
           <p className="text-sm text-[var(--text-secondary)]">
             We sent a confirmation link to {email}. Confirm then sign in.
           </p>
           {hasPending && (
-            <p className="text-xs text-[var(--blue)] bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2">
+            <p className="text-xs text-primary bg-[var(--surface-2)] border border-[var(--border)] rounded-lg px-3 py-2">
               Your portfolio analysis will link to your account when you confirm.
             </p>
           )}
@@ -185,7 +185,7 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--canvas)] flex flex-col items-center justify-center p-6 neufin-grid-bg">
+    <div className="min-h-screen bg-app flex flex-col items-center justify-center p-6 neufin-grid-bg">
       <motion.div
         layout
         className="w-full max-w-md"
@@ -195,7 +195,7 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
       >
         <GlassCard className="p-8 space-y-6">
           <div className="text-center space-y-2">
-            <Link href="/" className="inline-block font-display text-2xl text-[var(--amber)] tracking-tight">
+            <Link href="/" className="inline-block font-sans text-2xl text-primary tracking-tight">
               NeuFin
             </Link>
             <h1 className="text-xl font-semibold text-[var(--text-primary)]">
@@ -214,10 +214,10 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
             disabled={loading}
             whileHover={{ scale: 0.98 }}
             whileTap={{ scale: 0.96 }}
-            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-lg bg-white text-gray-900 font-semibold text-sm disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-lg bg-white text-navy font-semibold text-sm disabled:opacity-50"
           >
             {loading ? (
-              <span className="w-4 h-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-shell-muted border-t-navy rounded-full animate-spin" />
             ) : (
               <GoogleIcon />
             )}
@@ -277,10 +277,10 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
                 type="submit"
                 disabled={loading}
                 whileTap={{ scale: 0.99 }}
-                className="w-full py-3 rounded-lg bg-[var(--amber)] text-[var(--canvas)] font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-3 rounded-lg bg-primary text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {loading ? (
-                  <span className="w-4 h-4 border-2 border-[var(--canvas)]/30 border-t-[var(--canvas)] rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : mode === 'login' ? (
                   'Sign in'
                 ) : (
@@ -294,14 +294,14 @@ function AuthScreenInner({ initialMode }: { initialMode: 'login' | 'signup' }) {
             {mode === 'login' ? (
               <>
                 Don&apos;t have an account?{' '}
-                <Link href={`/signup${next !== '/dashboard' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-[var(--amber)] font-medium hover:underline">
+                <Link href={`/signup${next !== '/dashboard' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-primary font-medium hover:underline">
                   Sign up
                 </Link>
               </>
             ) : (
               <>
                 Already have an account?{' '}
-                <Link href={`/login${next !== '/dashboard' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-[var(--amber)] font-medium hover:underline">
+                <Link href={`/login${next !== '/dashboard' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-primary font-medium hover:underline">
                   Sign in
                 </Link>
               </>

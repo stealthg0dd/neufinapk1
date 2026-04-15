@@ -136,7 +136,7 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
               setSelectedTicker(p.symbol)
               void loadTicker(p.symbol, timeframe)
             }}
-            className={`shrink-0 rounded-full border px-3 py-1.5 font-mono text-[11px] ${
+            className={`shrink-0 rounded-full border px-3 py-1.5 font-mono text-sm ${
               selectedTicker === p.symbol
                 ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-300'
                 : 'border-border bg-surface-2 text-muted-foreground'
@@ -156,7 +156,7 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
               setTimeframe(tf)
               if (selectedTicker) void loadTicker(selectedTicker, tf)
             }}
-            className={`rounded px-2 py-1 font-mono text-[11px] ${
+            className={`rounded px-2 py-1 font-mono text-sm ${
               timeframe === tf ? 'bg-primary/15 text-primary' : 'text-muted-foreground'
             }`}
           >
@@ -208,7 +208,7 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
 function Metric({ title, value }: { title: string; value: string }) {
   return (
     <div className="rounded-lg border border-border/60 bg-surface-2 p-3">
-      <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">{title}</p>
+      <p className="text-sm font-mono uppercase tracking-widest text-muted-foreground/70">{title}</p>
       <p className="mt-1 font-mono text-base font-semibold text-foreground">{value}</p>
     </div>
   )
