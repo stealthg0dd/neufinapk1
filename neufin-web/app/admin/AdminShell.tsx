@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import clsx from 'clsx'
+import { Menu, X } from 'lucide-react'
 
 const LINKS = [
   { href: '/admin', label: 'Overview' },
@@ -15,35 +17,95 @@ const LINKS = [
   { href: '/admin/system', label: 'System' },
 ]
 
+function AdminNavLinks({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string
+  onNavigate?: () => void
+}) {
+  return (
+    <nav className="flex flex-col gap-0.5">
+      {LINKS.map(({ href, label }) => {
+        const active = pathname === href || (href !== '/admin' && pathname.startsWith(href))
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onNavigate}
+            className={clsx(
+              'rounded-lg px-3 py-2 text-sm transition-colors',
+              active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200',
+            )}
+          >
+            {label}
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
 export default function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!mobileOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex">
-      <aside className="w-56 shrink-0 border-r border-zinc-800/80 p-4 flex flex-col gap-6">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row">
+      <header className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3 md:hidden">
+        <p className="text-sm font-semibold text-zinc-100">NeuFin Admin</p>
+        <button
+          type="button"
+          className="rounded-md p-2 text-zinc-300 hover:bg-zinc-900 hover:text-white"
+          aria-label="Open menu"
+          onClick={() => setMobileOpen(true)}
+        >
+          <Menu className="h-5 w-5" strokeWidth={1.5} />
+        </button>
+      </header>
+
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-50 flex md:hidden" role="dialog" aria-modal="true" aria-label="Admin navigation">
+          <button type="button" className="absolute inset-0 bg-black/60" aria-label="Close menu" onClick={() => setMobileOpen(false)} />
+          <aside className="relative z-10 flex h-full w-[min(260px,88vw)] flex-col gap-6 border-r border-zinc-800/80 bg-zinc-950 p-4">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="rounded-md p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white"
+                aria-label="Close menu"
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="h-5 w-5" strokeWidth={1.5} />
+              </button>
+            </div>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest text-zinc-500">NeuFin</p>
+              <p className="text-sm font-semibold text-zinc-100">Admin</p>
+            </div>
+            <AdminNavLinks pathname={pathname} onNavigate={() => setMobileOpen(false)} />
+          </aside>
+        </div>
+      ) : null}
+
+      <aside className="hidden w-56 shrink-0 flex-col gap-6 border-r border-zinc-800/80 p-4 md:flex">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-widest text-zinc-500">
-            NeuFin
-          </p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-zinc-500">NeuFin</p>
           <p className="text-sm font-semibold text-zinc-100">Admin</p>
         </div>
-        <nav className="flex flex-col gap-0.5">
-          {LINKS.map(({ href, label }) => {
-            const active = pathname === href || (href !== '/admin' && pathname.startsWith(href))
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={clsx(
-                  'rounded-lg px-3 py-2 text-sm transition-colors',
-                  active ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200',
-                )}
-              >
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
+        <AdminNavLinks pathname={pathname} />
       </aside>
       <main className="flex-1 min-w-0 overflow-auto">{children}</main>
     </div>

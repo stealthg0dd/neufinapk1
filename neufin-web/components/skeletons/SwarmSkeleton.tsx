@@ -15,7 +15,7 @@ export default function SwarmSkeleton() {
       {/* 6 agent cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="glass-card-dark rounded-xl p-5 space-y-3">
+          <div key={i} className="data-card border border-[#E2E8F0] rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="shimmer h-4 w-28 rounded" />
               <div className="shimmer h-5 w-12 rounded-full" />
@@ -35,7 +35,7 @@ export default function SwarmSkeleton() {
       </div>
 
       {/* Consensus bar */}
-      <div className="glass-card-dark rounded-xl p-5 space-y-3">
+      <div className="data-card border border-[#E2E8F0] rounded-xl p-5 space-y-3">
         <div className="shimmer h-4 w-40 rounded" />
         <div className="shimmer h-8 w-full rounded-lg" />
         <div className="grid grid-cols-3 gap-4">
