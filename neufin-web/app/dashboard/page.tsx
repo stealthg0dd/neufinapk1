@@ -107,54 +107,81 @@ export default function DashboardPage() {
             label: "Strategic Risk Budget",
             value:
               latestDna?.weighted_beta != null
-                ? `${latestDna.weighted_beta.toFixed(2)} beta`
+                ? `${latestDna.weighted_beta.toFixed(2)} β vs SPY 1.00`
                 : "Awaiting beta",
             tone: "text-[#0F172A]",
+            sub: "Weighted portfolio beta",
           },
           {
             label: "Regime Priority",
             value: formatRegimeLabel(regime),
             tone: "text-[#0B5561]",
+            sub:
+              (regime as { confidence?: number } | null)?.confidence != null
+                ? `${Math.round(((regime as { confidence?: number }).confidence ?? 0) * 100)}% confidence`
+                : "Portfolio-derived classification",
           },
           {
             label: "Capital at Review",
             value: positionsCount != null ? `${positionsCount} positions` : "—",
             tone: "text-[#0F172A]",
+            sub:
+              latestPortfolio?.total_value != null
+                ? `$${Number(latestPortfolio.total_value).toLocaleString()} AUM`
+                : "Upload portfolio for AUM",
           },
         ]
       : dashboardMode === "trader"
         ? [
             {
-              label: "Execution Focus",
-              value: "Intraday volatility and correlation shocks",
-              tone: "text-[#7C2D12]",
-            },
-            {
               label: "Signal Priority",
-              value: swarmReport?.headline || "Awaiting quant signal",
+              value: swarmReport?.headline ?? "Awaiting quant signal",
               tone: "text-[#0F172A]",
+              sub: "Latest Swarm IC headline",
             },
             {
-              label: "Quick Action",
-              value: "Open Quant Dashboard for live paths",
+              label: "Execution Focus",
+              value:
+                latestDna?.weighted_beta != null
+                  ? `Beta ${latestDna.weighted_beta.toFixed(2)} — intraday risk`
+                  : "Run analysis for beta",
+              tone: "text-[#7C2D12]",
+              sub: "Monitor correlation shocks",
+            },
+            {
+              label: "Quant Console",
+              value: "Open Quant Dashboard →",
               tone: "text-[#0B5561]",
+              sub: "Live paths, factor decomp, VaR",
             },
           ]
         : [
             {
               label: "Client Narrative",
-              value: latestDna?.recommendation || "Portfolio recommendation pending",
+              value:
+                latestDna?.recommendation ??
+                "Portfolio recommendation pending",
               tone: "text-[#0F172A]",
+              sub: "From Behavioral DNA analysis",
             },
             {
-              label: "Advisor Priority",
-              value: "Tax positioning and regime communication",
+              label: "Harvest Opportunity",
+              value:
+                (latestDna as { tax_analysis?: { total_harvest_opp?: number } } | null)
+                  ?.tax_analysis?.total_harvest_opp != null
+                  ? `$${Number(
+                      (latestDna as { tax_analysis?: { total_harvest_opp?: number } })
+                        .tax_analysis!.total_harvest_opp!,
+                    ).toLocaleString()} harvestable`
+                  : "Upload cost basis",
               tone: "text-[#0B5561]",
+              sub: "Tax-loss harvesting estimate",
             },
             {
               label: "Memo Readiness",
               value: swarmReport ? "Swarm insights available" : "Run swarm for memo",
-              tone: "text-[#7C2D12]",
+              tone: swarmReport ? "text-emerald-700" : "text-[#7C2D12]",
+              sub: "IC report generation ready",
             },
           ];
 
@@ -185,6 +212,9 @@ export default function DashboardPage() {
                 {w.label}
               </p>
               <p className={`mt-1 text-sm font-semibold ${w.tone}`}>{w.value}</p>
+              {w.sub && (
+                <p className="mt-0.5 text-xs text-[#94A3B8]">{w.sub}</p>
+              )}
             </div>
           ))}
         </section>

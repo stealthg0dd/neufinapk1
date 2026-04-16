@@ -15,6 +15,12 @@ const MODE_LABELS: Record<DashboardMode, string> = {
   advisor: "Advisor Mode",
 };
 
+const MODE_DESCRIPTIONS: Record<DashboardMode, string> = {
+  cio: "Risk budget · Regime · Institutional metrics",
+  trader: "Signal feed · Alpha · Execution metrics",
+  advisor: "Client narrative · Tax harvest · Memo readiness",
+};
+
 export default function DashboardModeControls({
   advancedQuantMode,
   dashboardMode,
@@ -58,13 +64,23 @@ export default function DashboardModeControls({
                 type="button"
                 onClick={() => onModeChange(mode)}
                 className={[
-                  "rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
+                  "rounded-lg border px-3 py-2 text-left transition",
                   active
-                    ? "border-[#1EB8CC] bg-[#E0F7FA] text-[#0B5561]"
-                    : "border-[#D1D5DB] bg-white text-[#334155] hover:border-[#94A3B8]",
+                    ? "border-[#1EB8CC] bg-[#E0F7FA]"
+                    : "border-[#D1D5DB] bg-white hover:border-[#94A3B8]",
                 ].join(" ")}
               >
-                {MODE_LABELS[mode]}
+                <p
+                  className={[
+                    "text-xs font-semibold",
+                    active ? "text-[#0B5561]" : "text-[#334155]",
+                  ].join(" ")}
+                >
+                  {MODE_LABELS[mode]}
+                </p>
+                <p className="mt-0.5 text-[11px] text-[#94A3B8]">
+                  {MODE_DESCRIPTIONS[mode]}
+                </p>
               </button>
             );
           })}
