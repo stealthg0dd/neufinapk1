@@ -67,7 +67,7 @@ async def generate_dna_score(
             f"modes: {quant_result.get('modes_requested') or modes}\n"
             f"alpha_score: {quant_result.get('alpha_score')}\n"
             f"risk_adjusted_metrics: {quant_result.get('risk_adjusted_metrics')}\n"
-            f"forecast: {quant_result.get('forecast')}\n"
+            f"forecast_outputs: {quant_result.get('forecast_outputs') or quant_result.get('forecast')}\n"
             f"regime_context: {quant_result.get('regime_context')}\n"
             "Blend this into DNA scoring and recommendations."
         )
@@ -95,6 +95,23 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
 
+    applied_modifier = 0.0
+    if quant_result:
+        try:
+            applied_modifier = max(
+                -15.0, min(15.0, float(quant_result.get("composite_dna_modifier") or 0.0))
+            )
+        except (TypeError, ValueError):
+            applied_modifier = 0.0
+
+    try:
+        base_dna_score = float(analysis.get("dna_score"))
+    except (TypeError, ValueError, AttributeError):
+        raise HTTPException(status_code=502, detail="AI DNA score response was invalid.") from None
+
+    final_dna_score = int(round(max(0.0, min(100.0, base_dna_score + applied_modifier))))
+    analysis["dna_score"] = final_dna_score
+
     share_token = str(uuid.uuid4())[:8]
 
     try:
@@ -102,7 +119,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
             supabase.table("dna_scores")
             .insert(
                 {
-                    "dna_score": analysis["dna_score"],
+                    "dna_score": final_dna_score,
                     "investor_type": analysis["investor_type"],
                     "strengths": analysis["strengths"],
                     "weaknesses": analysis["weaknesses"],
@@ -126,6 +143,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
         "metrics": metrics,
         "quant_analysis": quant_result,
         "quant_modes": modes,
+        "composite_dna_modifier_applied": applied_modifier,
     }
 
 

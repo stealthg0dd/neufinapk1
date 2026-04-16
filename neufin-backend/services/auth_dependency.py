@@ -254,25 +254,40 @@ def _truthy_is_admin(val) -> bool:
     return False
 
 
+def _has_admin_access(row: dict | None, email: str | None, admin_emails: frozenset[str]) -> bool:
+    role = str((row or {}).get("role") or "").strip().lower()
+    normalized_email = str(email or "").strip().lower()
+    return (
+        _truthy_is_admin((row or {}).get("is_admin"))
+        or role == "admin"
+        or (normalized_email and normalized_email in admin_emails)
+    )
+
+
 async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
     """
-    FastAPI dependency that requires a valid JWT AND is_admin=true in user_profiles.
-    Returns HTTP 403 if the user is not an admin.
+    FastAPI dependency that requires a valid JWT AND admin access in user_profiles.
+    Falls back to ADMIN_EMAILS env var allowlist before raising 403.
     """
+    from core.config import settings  # local import avoids circular
+
+    # Fast path: email allowlist from env var (overrides DB state)
+    if user.email and user.email.strip().lower() in settings.admin_emails_set:
+        return user
+
     try:
         result = (
             supabase.table("user_profiles")
-            .select("is_admin")
+            .select("is_admin, role")
             .eq("id", user.id)
             .limit(1)
             .execute()
         )
-        raw = result.data[0].get("is_admin") if result.data else None
-        is_admin = _truthy_is_admin(raw)
+        row = result.data[0] if result.data else {}
     except Exception:
-        is_admin = False
+        row = {}
 
-    if not is_admin:
+    if not _has_admin_access(row, user.email, settings.admin_emails_set):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required.",
@@ -282,8 +297,15 @@ async def get_admin_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
 
 async def get_ops_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
     """
-    Internal ops: advisors OR is_admin (for legacy /dashboard/admin + shared list APIs).
+    Internal ops: advisors OR admins (for legacy /dashboard/admin + shared list APIs).
+    Falls back to ADMIN_EMAILS env var allowlist before raising 403.
     """
+    from core.config import settings  # local import avoids circular
+
+    # Fast path: email allowlist from env var
+    if user.email and user.email.strip().lower() in settings.admin_emails_set:
+        return user
+
     try:
         result = (
             supabase.table("user_profiles")
@@ -296,7 +318,7 @@ async def get_ops_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
     except Exception:
         row = {}
     role = (row.get("role") or "").strip().lower()
-    if _truthy_is_admin(row.get("is_admin")) or role == "advisor":
+    if _has_admin_access(row, user.email, settings.admin_emails_set) or role == "advisor":
         return user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

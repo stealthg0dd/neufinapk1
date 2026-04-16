@@ -826,7 +826,9 @@ def _build_report_context(
         quant_modes_selected = []
     quant_model_contrib = quant_blob.get(
         "model_contribution_summary"
-    ) or quant_model_blob.get("model_contribution_breakdown")
+    ) or quant_model_blob.get("model_contribution") or quant_model_blob.get(
+        "model_contribution_breakdown"
+    )
     if not isinstance(quant_model_contrib, dict):
         quant_model_contrib = {}
     quant_alpha_risk = quant_blob.get("alpha_risk_tradeoffs") or quant_model_blob.get(
@@ -835,7 +837,9 @@ def _build_report_context(
     if not isinstance(quant_alpha_risk, dict):
         quant_alpha_risk = {}
     quant_scenarios = quant_blob.get("scenario_implications") or {
-        "forecast": quant_model_blob.get("forecast") or {},
+        "forecast": quant_model_blob.get("forecast_outputs")
+        or quant_model_blob.get("forecast")
+        or {},
         "stress": quant_model_blob.get("stress") or {},
         "regime_context": quant_model_blob.get("regime_context") or {},
     }
@@ -3267,8 +3271,8 @@ def _page_quant_model_outputs(
     items.extend(
         _ic_body_section_header(
             "6",
-            str(labels.get("quant_model_outputs") or "QUANT MODEL OUTPUTS"),
-            "Factor decomposition · risk metrics · scenario implications",
+            str(labels.get("quant_model_outputs") or "QUANT INTELLIGENCE SUMMARY"),
+            "Selected objectives · model contribution · scenario implications",
             pal,
             st,
             cw,
@@ -3279,19 +3283,30 @@ def _page_quant_model_outputs(
     q_contrib = ctx.get("quant_model_contribution_summary") or {}
     q_tradeoffs = ctx.get("quant_alpha_risk_tradeoffs") or {}
     q_scen = ctx.get("quant_scenario_implications") or {}
+    if not q_modes:
+        return []
+
+    objective_labels = {
+        "alpha": "Alpha capture and stock selection",
+        "risk": "Downside protection and drawdown control",
+        "forecast": "Forward return and volatility outlook",
+        "macro": "Macro regime positioning",
+        "institutional": "Institutional blended allocation overlay",
+        "allocation": "Macro regime positioning",
+        "trading": "Tactical alpha and short-horizon timing",
+    }
 
     # ── Selected modes banner ─────────────────────────────────────────────────
-    modes_text = (
-        ", ".join(str(m).upper() for m in q_modes)
-        if q_modes
-        else "Default (no overlay modes selected)"
+    modes_text = ", ".join(
+        objective_labels.get(str(mode).lower(), str(mode).replace("_", " ").title())
+        for mode in q_modes
     )
     items.append(
         Table(
             [
                 [
                     Paragraph(
-                        f"<b>Active Quant Modes:</b> {_xml(modes_text)}",
+                        f"<b>Selected Financial Objectives:</b> {_xml(modes_text)}",
                         ParagraphStyle(
                             "qm_modes_" + pal["theme"],
                             fontName="Helvetica",
@@ -3365,7 +3380,7 @@ def _page_quant_model_outputs(
                 plt.close(fig)
                 buf.seek(0)
                 chart_img = Image(buf, width=cw, height=110)
-                items.append(Paragraph("FACTOR CONTRIBUTION BREAKDOWN", st["h3"]))
+                items.append(Paragraph("MODEL CONTRIBUTION BREAKDOWN", st["h3"]))
                 items.append(chart_img)
                 items.append(Spacer(1, 10))
         except Exception as e:
@@ -3374,7 +3389,7 @@ def _page_quant_model_outputs(
     # ── Model contribution table (text fallback / always shown) ──────────────
     if q_contrib:
         items.append(Paragraph("MODEL CONTRIBUTION SUMMARY", st["h3"]))
-        contrib_rows = [["Factor / Model Layer", "Contribution Weight"]]
+        contrib_rows = [["Objective / Signal Layer", "Contribution Weight"]]
         for k, v in q_contrib.items():
             try:
                 pct = f"{round(float(v) * 100, 1)}%"
@@ -3399,9 +3414,12 @@ def _page_quant_model_outputs(
 
     # ── Alpha vs risk tradeoffs ───────────────────────────────────────────────
     items.append(Paragraph("ALPHA vs RISK TRADEOFFS", st["h3"]))
-    alpha_val = q_tradeoffs.get("sharpe_proxy")
-    vol_val = q_tradeoffs.get("volatility_annualized_proxy")
-    dd_val = q_tradeoffs.get("max_drawdown_proxy")
+    alpha_val = q_tradeoffs.get("sharpe") or q_tradeoffs.get("sharpe_proxy")
+    vol_val = q_tradeoffs.get("volatility") or q_tradeoffs.get(
+        "volatility_annualized_proxy"
+    )
+    dd_val = q_tradeoffs.get("max_drawdown") or q_tradeoffs.get("max_drawdown_proxy")
+    sortino_val = q_tradeoffs.get("sortino")
 
     def _fmt_proxy(v: Any, pct: bool = False) -> str:
         if v is None:
@@ -3413,32 +3431,31 @@ def _page_quant_model_outputs(
             return str(v)
 
     tradeoff_rows = [
-        ["Metric", "Proxy Value", "Interpretation"],
+        ["Alpha objective", "Risk implication"],
         [
-            "Sharpe Proxy",
-            _fmt_proxy(alpha_val),
-            "≥ 1.0 = strong risk-adjusted return",
+            "Improve risk-adjusted upside capture",
+            f"Sharpe: {_fmt_proxy(alpha_val)} | Sortino: {_fmt_proxy(sortino_val)}",
         ],
         [
-            "Annualised Volatility",
-            _fmt_proxy(vol_val, pct=True),
-            "< 15% = institutional target",
+            "Keep realised volatility inside mandate",
+            f"Volatility: {_fmt_proxy(vol_val, pct=True)} annualised",
         ],
         [
-            "Max Drawdown Proxy",
-            _fmt_proxy(dd_val, pct=True),
-            "< 20% = acceptable downside",
+            "Preserve capital through adverse regimes",
+            f"Max drawdown: {_fmt_proxy(dd_val, pct=True)}",
         ],
     ]
-    items.append(
-        Table(tradeoff_rows, colWidths=[130, 100, cw - 230], style=_tbl_std(pal))
-    )
+    items.append(Table(tradeoff_rows, colWidths=[cw * 0.45, cw * 0.55], style=_tbl_std(pal)))
     items.append(Spacer(1, 10))
 
     # ── Scenario implications ─────────────────────────────────────────────────
     items.append(Paragraph("SCENARIO IMPLICATIONS", st["h3"]))
     forecast = (
-        q_scen.get("forecast") if isinstance(q_scen.get("forecast"), dict) else {}
+        q_scen.get("forecast_outputs")
+        if isinstance(q_scen.get("forecast_outputs"), dict)
+        else q_scen.get("forecast")
+        if isinstance(q_scen.get("forecast"), dict)
+        else {}
     ) or {}
     stress = (
         q_scen.get("stress") if isinstance(q_scen.get("stress"), dict) else {}
@@ -3452,14 +3469,14 @@ def _page_quant_model_outputs(
     scen_rows = [
         ["Dimension", "Value", "Notes"],
         [
-            "Forecast Horizon",
-            f"{forecast.get('horizon_days', 'n/a')} days",
-            "Quant model look-ahead window",
+            "Price Direction Confidence",
+            f"{forecast.get('price_direction_confidence', 'n/a')}%",
+            "Confidence in directional bias",
         ],
         [
-            "Volatility Shift",
-            f"{forecast.get('volatility_shift_pct_vs_baseline', 'n/a')}%",
-            "vs baseline assumption",
+            "Volatility Forecast",
+            forecast.get("volatility_forecast", "n/a"),
+            "Projected realised volatility regime",
         ],
         [
             "Stress Scenarios",
@@ -3926,14 +3943,15 @@ def _build_pdf_sync(
         elems.append(PageBreak())
 
     # Order: §2 executive → §3 snapshot → §4 risk (macro, correlation) →
-    # §5 behavioral → §6 quant model outputs → §7 scenarios →
+    # §5 quant intelligence → §6 behavioral → §7 scenarios →
     # §8 recommendations (tax, alpha, directives) → §9 appendix
     _add_page(_page_executive_memo, ctx, extra, pal, st, cw)
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
     _add_page(_page_macro_regime, ctx, extra, pal, st, cw)
     _add_page(_page_risk_correlation, ctx, extra, pal, st, cw)
+    if ctx.get("quant_modes_selected"):
+        _add_page(_page_quant_model_outputs, ctx, extra, pal, st, cw)
     _add_page(_page_behavioral_dna, ctx, extra, pal, st, cw)
-    _add_page(_page_quant_model_outputs, ctx, extra, pal, st, cw)
     _add_page(_page_stress_testing, ctx, extra, pal, st, cw)
     _add_page(_page_tax_optimization, ctx, extra, pal, st, cw)
     _add_page(_page_alpha_opportunities, ctx, extra, pal, st, cw)

@@ -72,6 +72,22 @@ const ADMIN_ONLY_PREFIXES = ["/admin"];
 // ── Advisor-only paths — require valid session AND advisor role ────────────
 const ADVISOR_ONLY_PREFIXES = ["/dashboard/admin", "/dashboard/revenue"];
 
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+function isTruthyAdmin(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "t"].includes(value.trim().toLowerCase());
+  }
+  return false;
+}
+
 function isJwtExpired(token: string): boolean {
   try {
     const [, payload] = token.split(".");
@@ -131,12 +147,12 @@ async function hasAdminRole(token: string): Promise<boolean> {
       cache: "no-store",
     });
     if (!userRes.ok) return false;
-    const userJson = (await userRes.json()) as { id?: string };
+    const userJson = (await userRes.json()) as { id?: string; email?: string };
     const userId = userJson.id;
     if (!userId) return false;
 
     const profileRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=is_admin&limit=1`,
+      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=is_admin,role&limit=1`,
       {
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -146,8 +162,17 @@ async function hasAdminRole(token: string): Promise<boolean> {
       },
     );
     if (!profileRes.ok) return false;
-    const profiles = (await profileRes.json()) as { is_admin?: boolean }[];
-    return profiles[0]?.is_admin === true;
+    const profiles = (await profileRes.json()) as {
+      is_admin?: boolean | number | string;
+      role?: string;
+    }[];
+    const row = profiles[0];
+    const email = String(userJson.email ?? "").toLowerCase();
+    return (
+      isTruthyAdmin(row?.is_admin) ||
+      String(row?.role ?? "").toLowerCase() === "admin" ||
+      ADMIN_EMAILS.has(email)
+    );
   } catch (error) {
     log("error", "middleware.admin_check_error", error);
     return false;
@@ -180,12 +205,12 @@ async function hasAdvisorOrAdminAccess(token: string): Promise<boolean> {
     if (!profileRes.ok) return false;
     const profiles = (await profileRes.json()) as {
       role?: string;
-      is_admin?: boolean;
+      is_admin?: boolean | number | string;
     }[];
     const row = profiles[0];
     if (!row) return false;
     const role = (row.role ?? "").toLowerCase();
-    if (row.is_admin === true) return true;
+    if (isTruthyAdmin(row.is_admin)) return true;
     return role === "advisor" || role === "admin";
   } catch (error) {
     log("error", "middleware.advisor_check_error", error);

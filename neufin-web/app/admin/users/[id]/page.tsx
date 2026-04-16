@@ -17,6 +17,8 @@ type UserDetail = {
   created_at?: string | null;
   last_sign_in_at?: string | null;
   role?: string | null;
+  dna_score_count?: number;
+  reports_purchased?: number;
 };
 
 export default function AdminUserDetailPage() {
@@ -98,6 +100,10 @@ export default function AdminUserDetailPage() {
         <dd>{u.role || "—"}</dd>
         <dt className="text-zinc-500">Trial ends</dt>
         <dd>{u.trial_ends_at || "—"}</dd>
+        <dt className="text-zinc-500">DNA analyses</dt>
+        <dd>{u.dna_score_count ?? 0}</dd>
+        <dt className="text-zinc-500">Paid reports</dt>
+        <dd>{u.reports_purchased ?? 0}</dd>
       </dl>
 
       {msg && <p className="text-sm text-zinc-300">{msg}</p>}
@@ -122,13 +128,25 @@ export default function AdminUserDetailPage() {
           onClick={() =>
             doAction("Upgrade to unlimited", async () => {
               await apiPost(`/api/admin/users/${id}/plan`, {
-                subscription_tier: "unlimited",
+                subscription_tier: "enterprise",
                 subscription_status: "active",
               });
             })
           }
         >
-          Upgrade plan → unlimited / active
+          Upgrade plan → enterprise / active
+        </button>
+        <button
+          type="button"
+          disabled={!!busy}
+          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50"
+          onClick={() =>
+            doAction("Resend onboarding", async () => {
+              await apiPost(`/api/admin/users/${id}/resend-onboarding`, {});
+            })
+          }
+        >
+          Resend onboarding email
         </button>
         <button
           type="button"
@@ -157,12 +175,34 @@ export default function AdminUserDetailPage() {
           disabled={!!busy}
           className="rounded-lg border border-amber-700/50 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50 text-amber-200"
           onClick={() =>
-            doAction("Suspend", async () => {
-              await apiPost(`/api/admin/users/${id}/suspend`, {});
+            doAction(
+              u.subscription_status === "suspended" ? "Unsuspend" : "Suspend",
+              async () => {
+                await apiPost(`/api/admin/users/${id}/suspend`, {
+                  unsuspend: u.subscription_status === "suspended",
+                });
+              },
+            )
+          }
+        >
+          {u.subscription_status === "suspended"
+            ? "Unsuspend account"
+            : "Suspend account"}
+        </button>
+        <button
+          type="button"
+          disabled={!!busy}
+          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50"
+          onClick={() =>
+            doAction("Set expired", async () => {
+              await apiPost(`/api/admin/users/${id}/plan`, {
+                subscription_status: "expired",
+                subscription_tier: "free",
+              });
             })
           }
         >
-          Suspend account
+          Set plan → free / expired
         </button>
         <button
           type="button"

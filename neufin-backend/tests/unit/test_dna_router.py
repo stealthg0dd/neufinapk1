@@ -66,6 +66,50 @@ class TestGenerateDNA:
         assert "dna_score" in data
         assert "share_token" in data
 
+    @patch("routers.dna.calculate_portfolio_metrics", return_value=MOCK_METRICS)
+    @patch(
+        "routers.dna.analyze_financial_modes",
+        new_callable=AsyncMock,
+        return_value={
+            "composite_dna_modifier": 22.0,
+            "forecast_outputs": {"price_direction_confidence": 61},
+        },
+    )
+    @patch(
+        "routers.dna.get_ai_analysis",
+        new_callable=AsyncMock,
+        return_value=None,
+    )
+    @patch("routers.dna.supabase")
+    def test_caps_quant_dna_modifier_at_15_points(
+        self, mock_db, mock_ai, mock_quant, mock_calc, client
+    ):
+        mock_ai.return_value = {
+            "dna_score": 50,
+            "investor_type": "Balanced Growth",
+            "strengths": ["Diversified sectors"],
+            "weaknesses": ["High beta"],
+            "recommendation": "Consider TLT.",
+        }
+        mock_db.table.return_value.insert.return_value.execute.return_value = MagicMock(
+            data=[{"id": "test-uuid", "share_token": "abc12345"}]
+        )
+
+        response = client.post(
+            "/api/dna/generate",
+            data={"quant_modes": '["institutional"]'},
+            files={"file": ("portfolio.csv", io.BytesIO(VALID_CSV), "text/csv")},
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["quant_modes"] == ["institutional"]
+        assert body["composite_dna_modifier_applied"] == 15.0
+        assert body["dna_score"] == 65
+        insert_payload = mock_db.table.return_value.insert.call_args.args[0]
+        assert insert_payload["dna_score"] == 65
+        mock_quant.assert_awaited_once()
+
     def test_rejects_non_csv(self, client):
         response = client.post(
             "/api/dna/generate",

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 
@@ -64,6 +65,15 @@ function MetricCard({
   );
 }
 
+const QUICK_LINKS = [
+  { href: "/admin/users", label: "Users", hint: "Subscriptions and access" },
+  { href: "/admin/partners", label: "Partners", hint: "API customers and keys" },
+  { href: "/admin/api-keys", label: "API Keys", hint: "Issue, revoke, rate limit" },
+  { href: "/admin/reports", label: "Reports", hint: "Advisor and swarm output" },
+  { href: "/admin/system", label: "System", hint: "Ops health and latency" },
+  { href: "/admin/revenue", label: "Revenue", hint: "Stripe read-only metrics" },
+];
+
 export default function AdminOverviewPage() {
   const [data, setData] = useState<{
     cards: Record<string, Card & { subtitle?: string }>;
@@ -119,7 +129,7 @@ export default function AdminOverviewPage() {
           Live metrics from Supabase via the API (admin only).
         </p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard title="Total Users" card={c.total_users} color="#60a5fa" />
         <MetricCard
           title="Active Trials"
@@ -132,8 +142,23 @@ export default function AdminOverviewPage() {
           color="#34d399"
         />
         <MetricCard
+          title="Expired Users"
+          card={c.expired_users}
+          color="#fbbf24"
+        />
+        <MetricCard
+          title="Suspended Users"
+          card={c.suspended_users}
+          color="#f87171"
+        />
+        <MetricCard
           title="API Partners"
           card={c.api_partners}
+          color="#22d3ee"
+        />
+        <MetricCard
+          title="Active API Keys"
+          card={c.active_api_keys}
           color="#fbbf24"
         />
         <MetricCard
@@ -146,6 +171,29 @@ export default function AdminOverviewPage() {
           card={c.reports_generated_this_month}
           color="#94a3b8"
         />
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+            Quick actions
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Jump directly into the operational surfaces most likely to need attention.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {QUICK_LINKS.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition hover:border-zinc-700 hover:bg-zinc-900/70"
+            >
+              <div className="text-sm font-medium text-white">{link.label}</div>
+              <div className="mt-1 text-sm text-zinc-500">{link.hint}</div>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

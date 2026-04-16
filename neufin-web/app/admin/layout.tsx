@@ -4,6 +4,24 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import AdminShell from "./AdminShell";
 
+function isTruthyAdmin(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "t"].includes(value.trim().toLowerCase());
+  }
+  return false;
+}
+
+function adminEmailSet(): Set<string> {
+  return new Set(
+    (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 export default async function AdminLayout({
   children,
 }: {
@@ -32,11 +50,17 @@ export default async function AdminLayout({
 
   const { data: profile, error: profErr } = await sb
     .from("user_profiles")
-    .select("is_admin")
+    .select("is_admin, role")
     .eq("id", user.id)
     .single();
 
-  if (profErr || profile?.is_admin !== true) {
+  const role = String(profile?.role ?? "").toLowerCase();
+  const emailAllowed = adminEmailSet().has(String(user.email ?? "").toLowerCase());
+
+  if (
+    profErr ||
+    (!isTruthyAdmin(profile?.is_admin) && role !== "admin" && !emailAllowed)
+  ) {
     redirect("/dashboard");
   }
 

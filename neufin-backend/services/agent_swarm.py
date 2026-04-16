@@ -111,6 +111,7 @@ class SwarmState(TypedDict):
     # ── Input (caller must provide) ────────────────────────────────────────────
     ticker_data: list[dict]  # [{symbol, shares, price, value, weight, cost_basis?}]
     total_value: float
+    external_quant_intelligence: dict
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
     macro_context: str  # Strategist: regime + news summary
@@ -1286,6 +1287,7 @@ async def synthesizer_node(state: SwarmState) -> dict:
     mkt_regime = state.get("market_regime", {})
     sentinel = state.get("risk_sentinel_output", {})
     alpha = state.get("alpha_opportunities", {})
+    external_quant = state.get("external_quant_intelligence", {})
 
     tax_pts = tax.get("tax_pts", 10.0)
     hhi_pts = risk.get("hhi_pts", 0.0)
@@ -1324,6 +1326,7 @@ async def synthesizer_node(state: SwarmState) -> dict:
             "dna_score": dna_score,
             "score_breakdown": score_breakdown,
         },
+        "external_quant_intelligence": external_quant,
         "market_regime_agent": mkt_regime,
         "quant_agent": {
             "hhi_concentration_score": hhi_pts,
@@ -1526,6 +1529,13 @@ Return ONLY valid JSON matching this exact schema:
             )[:5]
         ],
     }
+    if isinstance(external_quant, dict) and external_quant:
+        thesis["quant_analysis"]["pre_swarm_quant_model"] = external_quant
+        thesis["quant_analysis"]["model_contribution_summary"] = (
+            external_quant.get("model_contribution")
+            or external_quant.get("model_contribution_breakdown")
+            or {}
+        )
 
     _liability = tax.get("total_liability") or 0
     thesis["tax_report"] = {
@@ -1688,6 +1698,7 @@ async def run_swarm(
     ticker_data: list[dict] | dict,
     total_value: float,
     job_id: str | None = None,
+    external_quant_intelligence: dict | None = None,
 ) -> dict:
     """
     Primary entry point: run the full 7-agent swarm and return the final state.
@@ -1750,6 +1761,7 @@ async def run_swarm(
     initial: dict = {
         "ticker_data": normalized_ticker_data,
         "total_value": total_value,
+        "external_quant_intelligence": external_quant_intelligence or {},
         "macro_context": "",
         "market_regime": {},
         "risk_metrics": {},

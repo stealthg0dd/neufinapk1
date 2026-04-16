@@ -8,15 +8,17 @@ import CandlestickChart, {
 import type { CandleData } from "@/lib/api";
 import { apiGet } from "@/lib/api-client";
 
-type Timeframe = "1M" | "3M" | "6M" | "1Y" | "3Y";
-const TIMEFRAMES: Timeframe[] = ["1M", "3M", "6M", "1Y", "3Y"];
+type Timeframe = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "5Y";
+const TIMEFRAMES: Timeframe[] = ["1D", "1W", "1M", "3M", "6M", "1Y", "5Y"];
 
 const periodMap: Record<Timeframe, string> = {
+  "1D": "1d",
+  "1W": "1w",
   "1M": "1mo",
   "3M": "3mo",
   "6M": "6mo",
   "1Y": "1y",
-  "3Y": "3y",
+  "5Y": "5y",
 };
 
 export interface ChartLabProps {
@@ -92,7 +94,8 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
     const out: QuantOverlaySignal[] = [];
     const qa = (swarmResult as any)?.quant_analysis;
     const qm = qa?.quant_model || (swarmResult as any)?.quant_model;
-    const forecast = qm?.forecast || qa?.scenario_implications?.forecast;
+    const forecast =
+      qm?.forecast_outputs || qm?.forecast || qa?.scenario_implications?.forecast;
     const regime =
       qm?.regime_context || qa?.scenario_implications?.regime_context;
 
@@ -116,12 +119,19 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
     }
 
     const volShift = Number(forecast?.volatility_shift_pct_vs_baseline);
-    if (Number.isFinite(volShift) && Math.abs(volShift) >= 5) {
+    const volatilityForecast = String(forecast?.volatility_forecast || "").toLowerCase();
+    if (
+      (Number.isFinite(volShift) && Math.abs(volShift) >= 5) ||
+      volatilityForecast.includes("elevated") ||
+      volatilityForecast.includes("high")
+    ) {
       out.push({
         time: prevTime,
         type: "volatility_spike",
-        strength: Math.abs(volShift),
-        label: `Vol spike ${volShift > 0 ? "+" : ""}${volShift}%`,
+        strength: Number.isFinite(volShift) ? Math.abs(volShift) : 8,
+        label: Number.isFinite(volShift)
+          ? `Vol spike ${volShift > 0 ? "+" : ""}${volShift}%`
+          : `Volatility ${forecast?.volatility_forecast ?? "elevated"}`,
       });
     }
 
