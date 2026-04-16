@@ -88,8 +88,8 @@ async def get_behavioral_drift(
         logger.error("risk.behavioral_drift.error", error=str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Behavioral drift analysis failed: {str(e)}",
-        )
+            detail=f"Behavioral drift analysis failed: {e!s}",
+        ) from None
 
 
 @router.post("/behavioral-drift")
@@ -127,8 +127,8 @@ async def analyze_behavioral_drift(
         logger.error("risk.behavioral_drift.error", error=str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Behavioral drift analysis failed: {str(e)}",
-        )
+            detail=f"Behavioral drift analysis failed: {e!s}",
+        ) from None
 
 
 @router.get("/cross-portfolio")
@@ -158,8 +158,8 @@ async def get_cross_portfolio(
         logger.error("risk.cross_portfolio.error", error=str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Cross-portfolio analysis failed: {str(e)}",
-        )
+            detail=f"Cross-portfolio analysis failed: {e!s}",
+        ) from None
 
 
 @router.post("/cross-portfolio")
@@ -196,8 +196,8 @@ async def analyze_cross_portfolio_endpoint(
         logger.error("risk.cross_portfolio.error", error=str(e))
         raise HTTPException(
             status_code=500,
-            detail=f"Cross-portfolio analysis failed: {str(e)}",
-        )
+            detail=f"Cross-portfolio analysis failed: {e!s}",
+        ) from None
 
 
 @router.get("/health")

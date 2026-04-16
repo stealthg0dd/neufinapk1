@@ -16,7 +16,6 @@ analyze_cross_portfolio(user_id, portfolios, market_data) -> dict
 
 from __future__ import annotations
 
-import math
 from typing import Any
 
 import numpy as np

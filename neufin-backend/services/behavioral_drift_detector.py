@@ -12,8 +12,7 @@ detect_behavioral_drift(user_id, portfolio_history, documented_risk_profile) -> 
 
 from __future__ import annotations
 
-import math
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import structlog
