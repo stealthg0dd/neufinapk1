@@ -165,7 +165,7 @@ class Settings(BaseSettings):
 
     # ── Admin access control ─────────────────────────────────────────────────
     ADMIN_EMAILS: str = Field(
-        default="",
+        default="stealthgodd@gmail.com,info@neufin.ai",
         description=(
             "Comma-separated list of email addresses that always have is_admin access, "
             "regardless of the user_profiles.is_admin DB column. "
