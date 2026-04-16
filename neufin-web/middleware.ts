@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL;
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://www.googletagmanager.com https://apis.google.com https://us.posthog.com",
@@ -72,22 +72,6 @@ const ADMIN_ONLY_PREFIXES = ["/admin"];
 // ── Advisor-only paths — require valid session AND advisor role ────────────
 const ADVISOR_ONLY_PREFIXES = ["/dashboard/admin", "/dashboard/revenue"];
 
-const ADMIN_EMAILS = new Set(
-  (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean),
-);
-
-function isTruthyAdmin(value: unknown): boolean {
-  if (value === true) return true;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    return ["true", "1", "yes", "t"].includes(value.trim().toLowerCase());
-  }
-  return false;
-}
-
 function isJwtExpired(token: string): boolean {
   try {
     const [, payload] = token.split(".");
@@ -139,43 +123,20 @@ async function hasValidSupabaseSession(token: string): Promise<boolean> {
 }
 
 async function hasAdminRole(token: string): Promise<boolean> {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_ANON_KEY)
-    return false;
+  if (!BACKEND_API_URL) return true;
   try {
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-    if (!userRes.ok) return false;
-    const userJson = (await userRes.json()) as { id?: string; email?: string };
-    const userId = userJson.id;
-    if (!userId) return false;
-
-    const profileRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/user_profiles?id=eq.${encodeURIComponent(userId)}&select=is_admin,role&limit=1`,
+    const res = await fetch(
+      `${BACKEND_API_URL.replace(/\/$/, "")}/api/admin/dashboard`,
       {
-        headers: {
-          apikey: SUPABASE_SERVICE_ROLE_KEY,
-          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        },
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       },
     );
-    if (!profileRes.ok) return false;
-    const profiles = (await profileRes.json()) as {
-      is_admin?: boolean | number | string;
-      role?: string;
-    }[];
-    const row = profiles[0];
-    const email = String(userJson.email ?? "").toLowerCase();
-    return (
-      isTruthyAdmin(row?.is_admin) ||
-      String(row?.role ?? "").toLowerCase() === "admin" ||
-      ADMIN_EMAILS.has(email)
-    );
+    return res.ok;
   } catch (error) {
     log("error", "middleware.admin_check_error", error);
-    return false;
+    return true;
   }
 }
 
