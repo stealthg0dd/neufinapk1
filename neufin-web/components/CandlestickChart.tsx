@@ -27,6 +27,12 @@ type IndicatorState = {
   vwap: boolean;
 };
 
+type QuantOverlayState = {
+  buySellZones: boolean;
+  volatilitySpikes: boolean;
+  regimeShifts: boolean;
+};
+
 interface Props {
   data: CandleData[];
   symbol: string;
@@ -38,6 +44,27 @@ interface Props {
   onTimeframeChange?: (timeframe: string) => void;
   indicators?: Partial<IndicatorState>;
   showControls?: boolean;
+}
+
+function downsampleCandles(rows: CandleData[], maxPoints: number): CandleData[] {
+  if (rows.length <= maxPoints) return rows;
+  const bucketSize = Math.ceil(rows.length / maxPoints);
+  const out: CandleData[] = [];
+  for (let i = 0; i < rows.length; i += bucketSize) {
+    const bucket = rows.slice(i, i + bucketSize);
+    if (!bucket.length) continue;
+    const first = bucket[0];
+    const last = bucket[bucket.length - 1];
+    out.push({
+      time: last.time,
+      open: first.open,
+      high: Math.max(...bucket.map((item) => item.high)),
+      low: Math.min(...bucket.map((item) => item.low)),
+      close: last.close,
+      volume: bucket.reduce((sum, item) => sum + item.volume, 0),
+    });
+  }
+  return out;
 }
 
 function ema(values: number[], period: number): number[] {
@@ -87,10 +114,34 @@ export default function CandlestickChart({
     vwap: true,
     ...(indicators || {}),
   });
+  const [quantOverlayState, setQuantOverlayState] = useState<QuantOverlayState>({
+    buySellZones: true,
+    volatilitySpikes: true,
+    regimeShifts: true,
+  });
+
+  const renderData = useMemo(() => {
+    const maxPoints = timeframe === "5Y" ? 520 : timeframe === "1Y" ? 700 : 1000;
+    return downsampleCandles(data, maxPoints);
+  }, [data, timeframe]);
+
+  const visibleQuantSignals = useMemo(
+    () =>
+      quantSignals.filter((signal) => {
+        if (signal.type === "buy_zone" || signal.type === "sell_zone") {
+          return quantOverlayState.buySellZones;
+        }
+        if (signal.type === "volatility_spike") {
+          return quantOverlayState.volatilitySpikes;
+        }
+        return quantOverlayState.regimeShifts;
+      }),
+    [quantOverlayState, quantSignals],
+  );
 
   const computed = useMemo(() => {
-    const close = data.map((d) => d.close);
-    const typical = data.map((d) => (d.high + d.low + d.close) / 3);
+    const close = renderData.map((d) => d.close);
+    const typical = renderData.map((d) => (d.high + d.low + d.close) / 3);
 
     // Bollinger(20, 2)
     const bbMid = sma(close, 20);
@@ -112,11 +163,11 @@ export default function CandlestickChart({
     const vwap: number[] = [];
     let cumPV = 0;
     let cumV = 0;
-    for (let i = 0; i < data.length; i += 1) {
-      cumPV += typical[i] * data[i].volume;
-      cumV += data[i].volume;
-      vwap.push(cumV > 0 ? cumPV / cumV : typical[i]);
-    }
+      for (let i = 0; i < renderData.length; i += 1) {
+        cumPV += typical[i] * renderData[i].volume;
+        cumV += renderData[i].volume;
+        vwap.push(cumV > 0 ? cumPV / cumV : typical[i]);
+      }
 
     // RSI(14)
     const rsi: number[] = [];
@@ -152,10 +203,15 @@ export default function CandlestickChart({
     const signal = ema(macd, 9);
 
     return { bbMid, bbUpper, bbLower, vwap, rsi, macd, signal };
-  }, [data]);
+  }, [renderData]);
 
   useEffect(() => {
-    if (!containerRef.current || !data.length) return;
+    setWindowStartPct(0);
+    setWindowEndPct(100);
+  }, [symbol, timeframe]);
+
+  useEffect(() => {
+    if (!containerRef.current || !renderData.length) return;
 
     let chart: ReturnType<(typeof import("lightweight-charts"))["createChart"]>;
 
@@ -227,7 +283,7 @@ export default function CandlestickChart({
 
       // lightweight-charts expects time as 'YYYY-MM-DD' or UTCTimestamp
       candleSeries.setData(
-        data.map((d) => ({
+        renderData.map((d) => ({
           time: d.time as import("lightweight-charts").Time,
           open: d.open,
           high: d.high,
@@ -236,7 +292,7 @@ export default function CandlestickChart({
         })),
       );
       volumeSeries.setData(
-        data.map((d) => ({
+        renderData.map((d) => ({
           time: d.time as import("lightweight-charts").Time,
           value: d.volume,
           color:
@@ -254,7 +310,7 @@ export default function CandlestickChart({
         );
       }
 
-      const overlayMarkers = quantSignals.map((s) => {
+      const overlayMarkers = visibleQuantSignals.map((s) => {
         const kind = s.type;
         if (kind === "buy_zone") {
           return {
@@ -303,7 +359,7 @@ export default function CandlestickChart({
       }
 
       const lineData = (arr: number[]) =>
-        data.map((d, i) => ({
+        renderData.map((d, i) => ({
           time: d.time as import("lightweight-charts").Time,
           value: Number.isFinite(arr[i]) ? Number(arr[i].toFixed(4)) : 0,
         }));
@@ -373,12 +429,13 @@ export default function CandlestickChart({
 
       chart.timeScale().fitContent();
 
-      if (data.length > 20) {
-        const start = Math.floor((windowStartPct / 100) * (data.length - 1));
-        const end = Math.floor((windowEndPct / 100) * (data.length - 1));
+      if (renderData.length > 20) {
+        const start = Math.floor((windowStartPct / 100) * (renderData.length - 1));
+        const end = Math.floor((windowEndPct / 100) * (renderData.length - 1));
         const startTime =
-          data[Math.max(0, Math.min(start, data.length - 1))]?.time;
-        const endTime = data[Math.max(0, Math.min(end, data.length - 1))]?.time;
+          renderData[Math.max(0, Math.min(start, renderData.length - 1))]?.time;
+        const endTime =
+          renderData[Math.max(0, Math.min(end, renderData.length - 1))]?.time;
         if (startTime && endTime) {
           chart.timeScale().setVisibleRange({
             from: startTime as import("lightweight-charts").Time,
@@ -414,20 +471,20 @@ export default function CandlestickChart({
     computed.rsi,
     computed.signal,
     computed.vwap,
-    data,
+    renderData,
     height,
     localIndicators.bollinger,
     localIndicators.macd,
     localIndicators.rsi,
     localIndicators.vwap,
     markers,
-    quantSignals,
+    visibleQuantSignals,
     symbol,
     windowEndPct,
     windowStartPct,
   ]);
 
-  if (!data.length) {
+  if (!renderData.length) {
     return (
       <div
         style={{ height }}
@@ -454,23 +511,95 @@ export default function CandlestickChart({
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-1.5 text-xs">
-            {(["rsi", "macd", "bollinger", "vwap"] as const).map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() =>
-                  setLocalIndicators((prev) => ({
-                    ...prev,
-                    [name]: !prev[name],
-                  }))
-                }
-                className={`rounded border px-2 py-1 font-mono ${localIndicators[name] ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-300" : "border-border text-muted-foreground"}`}
-              >
-                {name.toUpperCase()}
-              </button>
-            ))}
+          <button
+            type="button"
+            onClick={() => {
+              setWindowStartPct(0);
+              setWindowEndPct(100);
+            }}
+            className="rounded border border-border px-2 py-1 font-mono text-xs text-muted-foreground"
+          >
+            Reset Zoom
+          </button>
+        </div>
+      )}
+
+      {showControls && (
+        <div className="mb-3 grid gap-2 lg:grid-cols-2">
+          <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1EB8CC]">
+              Technical Overlays
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-slate-200">
+              {(["rsi", "macd", "bollinger", "vwap"] as const).map((name) => (
+                <label key={name} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={localIndicators[name]}
+                    onChange={() =>
+                      setLocalIndicators((prev) => ({
+                        ...prev,
+                        [name]: !prev[name],
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-500 bg-slate-950 accent-[#1EB8CC]"
+                  />
+                  <span>{name.toUpperCase()}</span>
+                </label>
+              ))}
+            </div>
           </div>
+          {quantSignals.length > 0 && (
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-3">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1EB8CC]">
+                Quant Signal Overlays
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-xs text-slate-200">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={quantOverlayState.buySellZones}
+                    onChange={() =>
+                      setQuantOverlayState((prev) => ({
+                        ...prev,
+                        buySellZones: !prev.buySellZones,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-500 bg-slate-950 accent-[#1EB8CC]"
+                  />
+                  <span>Buy/Sell signal zones</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={quantOverlayState.volatilitySpikes}
+                    onChange={() =>
+                      setQuantOverlayState((prev) => ({
+                        ...prev,
+                        volatilitySpikes: !prev.volatilitySpikes,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-500 bg-slate-950 accent-[#1EB8CC]"
+                  />
+                  <span>Volatility spike markers</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={quantOverlayState.regimeShifts}
+                    onChange={() =>
+                      setQuantOverlayState((prev) => ({
+                        ...prev,
+                        regimeShifts: !prev.regimeShifts,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-500 bg-slate-950 accent-[#1EB8CC]"
+                  />
+                  <span>Regime shift markers</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

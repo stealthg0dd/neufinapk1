@@ -163,6 +163,23 @@ class Settings(BaseSettings):
         description='Log format: "json" (production) | "console" (development).',
     )
 
+    # ── Admin access control ─────────────────────────────────────────────────
+    ADMIN_EMAILS: str = Field(
+        default="",
+        description=(
+            "Comma-separated list of email addresses that always have is_admin access, "
+            "regardless of the user_profiles.is_admin DB column. "
+            "E.g. admin@neufin.ai,varun@neufin.ai"
+        ),
+    )
+
+    @property
+    def admin_emails_set(self) -> frozenset[str]:
+        """Lowercased, stripped frozenset of admin emails for O(1) lookup."""
+        return frozenset(
+            e.strip().lower() for e in self.ADMIN_EMAILS.split(",") if e.strip()
+        )
+
     # ── Deployment environment (required at startup) ──────────────────────────
     ENVIRONMENT: str = Field(
         default="production",

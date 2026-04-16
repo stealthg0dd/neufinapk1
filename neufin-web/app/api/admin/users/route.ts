@@ -11,6 +11,16 @@ export const dynamic = "force-dynamic";
 
 const BACKEND = () => process.env.NEXT_PUBLIC_API_URL ?? "";
 
+function extractBearerToken(req: NextRequest): string {
+  const auth = req.headers.get("authorization")?.trim();
+  if (auth) return auth;
+  const cookieToken = req.cookies.get("neufin-auth")?.value?.trim();
+  if (!cookieToken) return "";
+  return cookieToken.startsWith("Bearer ")
+    ? cookieToken
+    : `Bearer ${cookieToken}`;
+}
+
 export interface UserAdminRow {
   id: string;
   email: string;
@@ -54,7 +64,7 @@ export async function GET(req: NextRequest) {
     );
   }
   const qs = req.nextUrl.search;
-  const auth = req.headers.get("authorization") ?? "";
+  const auth = extractBearerToken(req);
   const res = await fetch(`${base.replace(/\/$/, "")}/api/admin/users${qs}`, {
     method: "GET",
     headers: { authorization: auth },

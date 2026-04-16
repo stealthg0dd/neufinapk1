@@ -554,9 +554,17 @@ async def get_user_portfolios(user_id: str, user: JWTUser = Depends(get_current_
 @router.get("/chart/{symbol}")
 async def get_stock_chart(symbol: str, period: str = "3mo"):
     """Return OHLCV candlestick data for a symbol (lightweight-charts format)."""
-    period_days = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365, "3y": 1095}.get(
-        period, 90
-    )
+    normalized_period = str(period or "3mo").strip().lower()
+    period_days = {
+        "1d": 2,
+        "1w": 7,
+        "1mo": 30,
+        "3mo": 90,
+        "6mo": 180,
+        "1y": 365,
+        "3y": 1095,
+        "5y": 1825,
+    }.get(normalized_period, 90)
     candle = _candle(symbol.upper(), period_days)
     if not candle or not candle.get("c"):
         raise HTTPException(status_code=404, detail=f"No data for {symbol}")
@@ -580,7 +588,7 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
             strict=True,
         )
     ]
-    return {"symbol": symbol.upper(), "period": period, "data": data}
+    return {"symbol": symbol.upper(), "period": normalized_period, "data": data}
 
 
 @router.post("/risk-report")

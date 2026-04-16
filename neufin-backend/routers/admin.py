@@ -61,6 +61,10 @@ class PlanChangeRequest(BaseModel):
     subscription_status: str | None = None
 
 
+class SuspendUserRequest(BaseModel):
+    unsuspend: bool = False
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -163,6 +167,8 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
     total_users = _count_profiles_where([])
     trials = _count_profiles_where([("subscription_status", "trial")])
     paying = _count_profiles_where([("subscription_status", "active")])
+    expired = _count_profiles_where([("subscription_status", "expired")])
+    suspended = _count_profiles_where([("subscription_status", "suspended")])
 
     new_users_30 = _count_profiles_since(d30)
     new_users_prev_30 = 0
@@ -189,6 +195,17 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
     except Exception as exc:
         logger.debug("admin.dashboard.api_partner_ids", error=str(exc))
     api_partners = len(api_partner_ids)
+    active_api_keys = 0
+    try:
+        r = (
+            supabase.table("api_keys")
+            .select("id", count="exact")
+            .eq("is_active", True)
+            .execute()
+        )
+        active_api_keys = int(r.count or 0)
+    except Exception as exc:
+        logger.debug("admin.dashboard.active_api_keys", error=str(exc))
 
     analyses_month = _count_table_since("dna_scores", month_start)
     d30_dna = _count_table_since("dna_scores", d30)
@@ -196,9 +213,13 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
     analyses_prev_30 = max(0, d60_dna - d30_dna)
 
     reports_month = 0
+    reports_7d = 0
     for tbl in ("advisor_reports", "swarm_reports"):
         try:
             reports_month += _count_table_since(tbl, month_start)
+            reports_7d += _count_table_since(
+                tbl, (now - datetime.timedelta(days=7)).isoformat()
+            )
         except Exception as exc:
             logger.debug(
                 "admin.dashboard.reports_month_table", table=tbl, error=str(exc)
@@ -228,8 +249,23 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
                 "delta_pct": None,
                 "sparkline": spark_users,
             },
+            "expired_users": {
+                "value": expired,
+                "delta_pct": None,
+                "sparkline": spark_users,
+            },
+            "suspended_users": {
+                "value": suspended,
+                "delta_pct": None,
+                "sparkline": spark_users,
+            },
             "api_partners": {
                 "value": api_partners,
+                "delta_pct": None,
+                "sparkline": [0] * 14,
+            },
+            "active_api_keys": {
+                "value": active_api_keys,
                 "delta_pct": None,
                 "sparkline": [0] * 14,
             },
@@ -242,6 +278,7 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
             },
             "reports_generated_this_month": {
                 "value": reports_month,
+                "subtitle": f"{reports_7d} in last 7d",
                 "delta_pct": None,
                 "sparkline": spark_dna,
             },
@@ -249,6 +286,8 @@ async def admin_dashboard(_user: JWTUser = Depends(get_admin_user)):
         "sql_hints": {
             "trials": trials,
             "paying": paying,
+            "expired": expired,
+            "suspended": suspended,
             "new_users_30d": new_users_30,
         },
     }
@@ -387,6 +426,33 @@ async def get_user_detail(
     if not p.get("id"):
         raise HTTPException(404, "User not found")
     trial_end = _trial_end_iso(p.get("trial_started_at"))
+    dna_score_count = 0
+    reports_purchased = 0
+    try:
+        dna_result = (
+            supabase.table("dna_scores")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        dna_score_count = int(dna_result.count or 0)
+    except Exception as exc:
+        logger.debug(
+            "admin.user_detail.dna_count_failed", user_id=user_id, error=str(exc)
+        )
+    try:
+        reports_result = (
+            supabase.table("advisor_reports")
+            .select("id", count="exact")
+            .eq("advisor_id", user_id)
+            .eq("is_paid", True)
+            .execute()
+        )
+        reports_purchased = int(reports_result.count or 0)
+    except Exception as exc:
+        logger.debug(
+            "admin.user_detail.report_count_failed", user_id=user_id, error=str(exc)
+        )
     return {
         "id": p["id"],
         "email": p.get("email") or "",
@@ -399,6 +465,8 @@ async def get_user_detail(
         "created_at": p.get("created_at"),
         "last_sign_in_at": p.get("last_sign_in_at"),
         "role": p.get("role"),
+        "dna_score_count": dna_score_count,
+        "reports_purchased": reports_purchased,
     }
 
 
@@ -491,16 +559,44 @@ async def change_user_plan(
 @router.post("/api/admin/users/{user_id}/suspend")
 async def suspend_user(
     user_id: str,
+    body: SuspendUserRequest,
     _admin: JWTUser = Depends(get_admin_user),
 ):
     try:
-        supabase.table("user_profiles").update({"subscription_status": "suspended"}).eq(
-            "id", user_id
-        ).execute()
+        profile_result = (
+            supabase.table("user_profiles")
+            .select("subscription_tier, trial_started_at")
+            .eq("id", user_id)
+            .single()
+            .execute()
+        )
+        profile = profile_result.data or {}
+    except Exception as exc:
+        raise HTTPException(404, "User not found") from exc
+
+    status_value = "suspended"
+    if body.unsuspend:
+        trial_end = _trial_end_iso(profile.get("trial_started_at"))
+        now = datetime.datetime.now(datetime.UTC)
+        if trial_end and now < trial_end:
+            status_value = "trial"
+        elif str(profile.get("subscription_tier") or "").strip().lower() in {
+            "retail",
+            "advisor",
+            "enterprise",
+            "unlimited",
+        }:
+            status_value = "active"
+        else:
+            status_value = "expired"
+    try:
+        supabase.table("user_profiles").update(
+            {"subscription_status": status_value}
+        ).eq("id", user_id).execute()
     except Exception as exc:
         raise HTTPException(500, f"Failed to suspend: {exc}") from exc
     invalidate_subscription_cache(user_id)
-    return {"ok": True, "subscription_status": "suspended"}
+    return {"ok": True, "subscription_status": status_value}
 
 
 @router.post("/api/admin/users/{user_id}/reset-password")
@@ -687,8 +783,10 @@ async def list_partners(_admin: JWTUser = Depends(get_admin_user)):
                 "mrr_usd": None,
                 "status": p.get("subscription_status"),
                 "integration_health": health,
+                "last_used_at": last_used,
                 "stripe_customer_id": p.get("stripe_customer_id"),
                 "active_keys": sum(1 for k in partner_keys if k.get("is_active")),
+                "total_keys": len(partner_keys),
             }
         )
 

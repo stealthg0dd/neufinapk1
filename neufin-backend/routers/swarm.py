@@ -66,7 +66,7 @@ from services.market_cache import (  # noqa: E402
     update_swarm_job,
 )
 from services.pdf_generator import build_swarm_ic_export_pdf  # noqa: E402
-from services.quant_model_engine import analyze_financial_modes  # noqa: E402
+from services.quant_model_engine import run_models  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
 
@@ -367,17 +367,22 @@ async def _run_swarm_background(
 
         # Prepare ticker data exactly as before
         ticker_data = {p["symbol"]: p for p in positions}
+        modes = _normalize_quant_modes(quant_modes)
+        quant_result = {}
+        if modes:
+            quant_result = await run_models(
+                {"id": session_id, "positions": positions},
+                modes,
+            )
 
         # Run swarm — now passes job_id for live trace updates
         result = await run_swarm(
             ticker_data=ticker_data,
             total_value=total_value,
             job_id=job_id,
+            external_quant_intelligence=_build_swarm_quant_context(quant_result, modes),
         )
-
-        modes = _normalize_quant_modes(quant_modes)
         if modes:
-            quant_result = await analyze_financial_modes(session_id, positions, modes)
             result = _merge_quant_model_outputs(result, quant_result, modes)
 
         # Persist to Supabase (existing _persist_swarm_result)
@@ -503,12 +508,19 @@ async def analyze_with_swarm_sync(
         require_active_subscription(user)
 
     ticker_data = [p.model_dump() for p in body.positions]
-    result = await run_swarm(ticker_data=ticker_data, total_value=body.total_value)
     modes = _normalize_quant_modes(body.quant_modes)
+    quant_result = {}
     if modes:
-        quant_result = await analyze_financial_modes(
-            body.session_id or str(uuid.uuid4()), ticker_data, modes
+        quant_result = await run_models(
+            {"id": body.session_id or str(uuid.uuid4()), "positions": ticker_data},
+            modes,
         )
+    result = await run_swarm(
+        ticker_data=ticker_data,
+        total_value=body.total_value,
+        external_quant_intelligence=_build_swarm_quant_context(quant_result, modes),
+    )
+    if modes:
         result = _merge_quant_model_outputs(result, quant_result, modes)
     report_id = await _persist_swarm_result(str(uuid.uuid4()), body.user_id, result)
     thesis = result.get("investment_thesis", {})
@@ -553,6 +565,24 @@ def _normalize_quant_modes(raw: list[str] | None) -> list[str]:
         seen.add(key)
         out.append(key)
     return out
+
+
+def _build_swarm_quant_context(quant_result: dict, quant_modes: list[str]) -> dict:
+    if not quant_modes or not quant_result:
+        return {}
+    return {
+        "quant_modes": quant_modes,
+        "alpha_score": quant_result.get("alpha_score"),
+        "risk_adjusted_metrics": quant_result.get("risk_adjusted_metrics") or {},
+        "forecast_outputs": quant_result.get("forecast_outputs")
+        or quant_result.get("forecast")
+        or {},
+        "regime_context": quant_result.get("regime_context") or {},
+        "model_contribution": quant_result.get("model_contribution")
+        or quant_result.get("model_contribution_breakdown")
+        or {},
+        "composite_dna_modifier": quant_result.get("composite_dna_modifier"),
+    }
 
 
 def _merge_quant_model_outputs(
