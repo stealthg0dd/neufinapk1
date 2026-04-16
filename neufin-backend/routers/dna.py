@@ -109,7 +109,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     except (TypeError, ValueError, AttributeError):
         raise HTTPException(status_code=502, detail="AI DNA score response was invalid.") from None
 
-    final_dna_score = int(round(max(0.0, min(100.0, base_dna_score + applied_modifier))))
+    final_dna_score = round(max(0.0, min(100.0, base_dna_score + applied_modifier)))
     analysis["dna_score"] = final_dna_score
 
     share_token = str(uuid.uuid4())[:8]
