@@ -7,6 +7,7 @@ import { apiFetch, apiGet, apiPost } from "@/lib/api-client";
 import { stripeSuccessUrlReports } from "@/lib/stripe-checkout-urls";
 import {
   getStoredReportTheme,
+  getStoredReportMode,
   type ReportTheme,
 } from "@/components/dashboard/ReportThemeModal";
 
@@ -53,6 +54,7 @@ export function GenerateIcReportButton({
             portfolio_id: portfolioId,
             advisor_name: "NeuFin",
             theme: resolvedTheme,
+            report_mode: getStoredReportMode(),
           }),
         });
         if (!res.ok) {

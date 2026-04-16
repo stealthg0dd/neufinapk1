@@ -8,7 +8,7 @@ Bank-grade IC PDF, 11 pages, two themes.
 Orchestration
 ─────────────
   generate_advisor_report()  async orchestrator (logo fetch, swarm norm)
-      └── _build_pdf_sync()  sync builder (11 page functions, no I/O)
+      └── _build_pdf_sync()  sync builder (12 page functions, no I/O)
 
 All page-builder functions are pure:
   _page_N(ctx, extra, pal, st, cw) -> list[Flowable]
@@ -3255,6 +3255,239 @@ def _page_alpha_opportunities(
     return items
 
 
+# ─── PAGE 8b — QUANT MODEL OUTPUTS (standalone) ─────────────────────────────
+
+
+def _page_quant_model_outputs(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    """Dedicated IC-grade page for quantitative model outputs and analytics."""
+    items: list = []
+    labels = ctx.get("section_labels") or {}
+    items.extend(
+        _ic_body_section_header(
+            "6",
+            str(labels.get("quant_model_outputs") or "QUANT MODEL OUTPUTS"),
+            "Factor decomposition · risk metrics · scenario implications",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    q_modes = ctx.get("quant_modes_selected") or []
+    q_contrib = ctx.get("quant_model_contribution_summary") or {}
+    q_tradeoffs = ctx.get("quant_alpha_risk_tradeoffs") or {}
+    q_scen = ctx.get("quant_scenario_implications") or {}
+
+    # ── Selected modes banner ─────────────────────────────────────────────────
+    modes_text = (
+        ", ".join(str(m).upper() for m in q_modes)
+        if q_modes
+        else "Default (no overlay modes selected)"
+    )
+    items.append(
+        Table(
+            [
+                [
+                    Paragraph(
+                        f"<b>Active Quant Modes:</b> {_xml(modes_text)}",
+                        ParagraphStyle(
+                            "qm_modes_" + pal["theme"],
+                            fontName="Helvetica",
+                            fontSize=9,
+                            textColor=pal["text_pri"],
+                            leading=13,
+                        ),
+                    )
+                ]
+            ],
+            colWidths=[cw],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                    ("BOX", (0, 0), (-1, -1), 1, ACCENT_TEAL),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("TOPPADDING", (0, 0), (-1, -1), 8),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ]
+            ),
+        )
+    )
+    items.append(Spacer(1, 10))
+
+    # ── Factor / model contribution chart (via matplotlib bar chart) ──────────
+    if HAS_MPL and q_contrib:
+        try:
+            labels_fc = list(q_contrib.keys())[:8]
+            vals_fc = []
+            for k in labels_fc:
+                try:
+                    vals_fc.append(round(float(q_contrib[k]) * 100, 2))
+                except (TypeError, ValueError):
+                    vals_fc.append(0.0)
+
+            if labels_fc and any(v != 0 for v in vals_fc):
+                fig, ax = plt.subplots(figsize=(6.5, 2.4))
+                bg = pal["bg_hex"]
+                fig.patch.set_facecolor(bg)
+                ax.set_facecolor(bg)
+                bar_colors = [
+                    "#1EB8CC",
+                    "#0EA5E9",
+                    "#6366F1",
+                    "#8B5CF6",
+                    "#10B981",
+                    "#F59E0B",
+                    "#EF4444",
+                    "#EC4899",
+                ]
+                ax.barh(
+                    labels_fc,
+                    vals_fc,
+                    color=bar_colors[: len(labels_fc)],
+                    height=0.6,
+                )
+                ax.set_xlabel("Contribution %", fontsize=8, color=pal["mut_hex"])
+                ax.tick_params(labelsize=8, colors=pal["text_hex"])
+                for spine in ax.spines.values():
+                    spine.set_edgecolor(_hex(pal["border"]))
+                ax.set_facecolor(bg)
+                fig.patch.set_facecolor(bg)
+                buf = io.BytesIO()
+                fig.savefig(
+                    buf,
+                    format="png",
+                    dpi=140,
+                    bbox_inches="tight",
+                    facecolor=bg,
+                )
+                plt.close(fig)
+                buf.seek(0)
+                chart_img = Image(buf, width=cw, height=110)
+                items.append(Paragraph("FACTOR CONTRIBUTION BREAKDOWN", st["h3"]))
+                items.append(chart_img)
+                items.append(Spacer(1, 10))
+        except Exception as e:
+            logger.warning("pdf.quant_contrib_chart_failed", error=str(e))
+
+    # ── Model contribution table (text fallback / always shown) ──────────────
+    if q_contrib:
+        items.append(Paragraph("MODEL CONTRIBUTION SUMMARY", st["h3"]))
+        contrib_rows = [["Factor / Model Layer", "Contribution Weight"]]
+        for k, v in q_contrib.items():
+            try:
+                pct = f"{round(float(v) * 100, 1)}%"
+            except (TypeError, ValueError):
+                pct = str(v)
+            contrib_rows.append([_xml(str(k)), pct])
+        items.append(
+            Table(contrib_rows, colWidths=[cw * 0.65, cw * 0.35], style=_tbl_std(pal))
+        )
+        items.append(Spacer(1, 10))
+    else:
+        items.append(
+            _amber_banner_table(
+                "Model contribution summary unavailable. "
+                "Run quant analysis with at least one mode to populate factor weights.",
+                pal,
+                st,
+                cw,
+            )
+        )
+        items.append(Spacer(1, 10))
+
+    # ── Alpha vs risk tradeoffs ───────────────────────────────────────────────
+    items.append(Paragraph("ALPHA vs RISK TRADEOFFS", st["h3"]))
+    alpha_val = q_tradeoffs.get("sharpe_proxy")
+    vol_val = q_tradeoffs.get("volatility_annualized_proxy")
+    dd_val = q_tradeoffs.get("max_drawdown_proxy")
+
+    def _fmt_proxy(v: Any, pct: bool = False) -> str:
+        if v is None:
+            return "n/a"
+        try:
+            f = float(v)
+            return f"{f * 100:.1f}%" if pct else f"{f:.3f}"
+        except (TypeError, ValueError):
+            return str(v)
+
+    tradeoff_rows = [
+        ["Metric", "Proxy Value", "Interpretation"],
+        [
+            "Sharpe Proxy",
+            _fmt_proxy(alpha_val),
+            "≥ 1.0 = strong risk-adjusted return",
+        ],
+        [
+            "Annualised Volatility",
+            _fmt_proxy(vol_val, pct=True),
+            "< 15% = institutional target",
+        ],
+        [
+            "Max Drawdown Proxy",
+            _fmt_proxy(dd_val, pct=True),
+            "< 20% = acceptable downside",
+        ],
+    ]
+    items.append(
+        Table(tradeoff_rows, colWidths=[130, 100, cw - 230], style=_tbl_std(pal))
+    )
+    items.append(Spacer(1, 10))
+
+    # ── Scenario implications ─────────────────────────────────────────────────
+    items.append(Paragraph("SCENARIO IMPLICATIONS", st["h3"]))
+    forecast = (
+        q_scen.get("forecast") if isinstance(q_scen.get("forecast"), dict) else {}
+    ) or {}
+    stress = (
+        q_scen.get("stress") if isinstance(q_scen.get("stress"), dict) else {}
+    ) or {}
+    regime_ctx = (
+        q_scen.get("regime_context")
+        if isinstance(q_scen.get("regime_context"), dict)
+        else {}
+    ) or {}
+
+    scen_rows = [
+        ["Dimension", "Value", "Notes"],
+        [
+            "Forecast Horizon",
+            f"{forecast.get('horizon_days', 'n/a')} days",
+            "Quant model look-ahead window",
+        ],
+        [
+            "Volatility Shift",
+            f"{forecast.get('volatility_shift_pct_vs_baseline', 'n/a')}%",
+            "vs baseline assumption",
+        ],
+        [
+            "Stress Scenarios",
+            str(stress.get("scenarios_sampled", "n/a")),
+            "Monte Carlo paths sampled",
+        ],
+        [
+            "Regime Context",
+            _xml(str(regime_ctx.get("label", "n/a"))[:50]),
+            f"Conf: {regime_ctx.get('confidence', 'n/a')}",
+        ],
+    ]
+    items.append(Table(scen_rows, colWidths=[130, 120, cw - 250], style=_tbl_std(pal)))
+
+    if not q_contrib and not q_tradeoffs and not any([forecast, stress, regime_ctx]):
+        items.append(Spacer(1, 8))
+        items.append(
+            Paragraph(
+                "Full quant model output requires the Swarm IC analysis to be run "
+                "with at least one quantitative mode selected (institutional, trading, "
+                "alpha, macro, allocation, forecast, or risk).",
+                st["muted"],
+            )
+        )
+
+    return items
+
+
 # ─── PAGE 10 — 90-DAY DIRECTIVES ──────────────────────────────────────────────
 
 
@@ -3693,12 +3926,14 @@ def _build_pdf_sync(
         elems.append(PageBreak())
 
     # Order: §2 executive → §3 snapshot → §4 risk (macro, correlation) →
-    # §5 behavioral → §6 scenarios → §7 recommendations (tax, alpha, directives) → §8 appendix
+    # §5 behavioral → §6 quant model outputs → §7 scenarios →
+    # §8 recommendations (tax, alpha, directives) → §9 appendix
     _add_page(_page_executive_memo, ctx, extra, pal, st, cw)
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
     _add_page(_page_macro_regime, ctx, extra, pal, st, cw)
     _add_page(_page_risk_correlation, ctx, extra, pal, st, cw)
     _add_page(_page_behavioral_dna, ctx, extra, pal, st, cw)
+    _add_page(_page_quant_model_outputs, ctx, extra, pal, st, cw)
     _add_page(_page_stress_testing, ctx, extra, pal, st, cw)
     _add_page(_page_tax_optimization, ctx, extra, pal, st, cw)
     _add_page(_page_alpha_opportunities, ctx, extra, pal, st, cw)
