@@ -1,25 +1,35 @@
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import AdminShell from "./AdminShell";
 
-function isTruthyAdmin(value: unknown): boolean {
-  if (value === true) return true;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value === "string") {
-    return ["true", "1", "yes", "t"].includes(value.trim().toLowerCase());
-  }
-  return false;
+function backendBase(): string {
+  return process.env.NEXT_PUBLIC_API_URL ?? "";
 }
 
-function adminEmailSet(): Set<string> {
-  return new Set(
-    (process.env.ADMIN_EMAILS ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean),
-  );
+async function checkAdminAccess(token: string): Promise<"ok" | "unauthorized" | "forbidden"> {
+  const base = backendBase().trim().replace(/\/$/, "");
+  if (!base) {
+    return "ok";
+  }
+
+  try {
+    const response = await fetch(`${base}/api/admin/dashboard`, {
+      method: "GET",
+      headers: {
+        Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (response.status === 401) return "unauthorized";
+    if (response.status === 403) return "forbidden";
+    if (response.ok) return "ok";
+  } catch {
+    return "ok";
+  }
+
+  return "ok";
 }
 
 export default async function AdminLayout({
@@ -33,34 +43,11 @@ export default async function AdminLayout({
     redirect("/login?next=/admin");
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
-    redirect("/dashboard");
-  }
-
-  const sb = createClient(url, serviceKey);
-  const {
-    data: { user },
-    error: authErr,
-  } = await sb.auth.getUser(token);
-  if (authErr || !user) {
+  const access = await checkAdminAccess(token);
+  if (access === "unauthorized") {
     redirect("/login?next=/admin");
   }
-
-  const { data: profile, error: profErr } = await sb
-    .from("user_profiles")
-    .select("is_admin, role")
-    .eq("id", user.id)
-    .single();
-
-  const role = String(profile?.role ?? "").toLowerCase();
-  const emailAllowed = adminEmailSet().has(String(user.email ?? "").toLowerCase());
-
-  if (
-    profErr ||
-    (!isTruthyAdmin(profile?.is_admin) && role !== "admin" && !emailAllowed)
-  ) {
+  if (access === "forbidden") {
     redirect("/dashboard");
   }
 
