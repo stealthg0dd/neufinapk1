@@ -105,14 +105,18 @@ async def analyze_quant(
             )
         except Exception as exc:
             logger.warning("quant_analyze.positions_failed", error=str(exc))
-            raise HTTPException(status_code=503, detail="Could not load positions") from exc
+            raise HTTPException(
+                status_code=503, detail="Could not load positions"
+            ) from exc
         positions = _normalize_db_positions(list(pos_res.data or []))
 
     if not positions:
         raise HTTPException(status_code=400, detail="Portfolio has no positions")
 
     try:
-        result = await analyze_financial_modes(body.portfolio_id, positions, requested_modes)
+        result = await analyze_financial_modes(
+            body.portfolio_id, positions, requested_modes
+        )
     except Exception as exc:
         logger.exception("quant_analyze.engine_failed", error=str(exc))
         raise HTTPException(status_code=500, detail="Analysis failed") from exc

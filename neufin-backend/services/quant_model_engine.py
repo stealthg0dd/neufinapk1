@@ -58,7 +58,9 @@ def _normalize_modes(modes: list[str] | None) -> list[str]:
 def _normalize_positions(positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for position in positions or []:
-        symbol = str(position.get("symbol") or position.get("ticker") or "").strip().upper()
+        symbol = (
+            str(position.get("symbol") or position.get("ticker") or "").strip().upper()
+        )
         if not symbol:
             continue
         raw_weight = position.get("weight")
@@ -193,7 +195,9 @@ def _recent_sentiment_score(symbols: list[str]) -> float:
     return round(_clamp(50.0 + float(np.mean(scores)) * 40.0, 0.0, 100.0), 2)
 
 
-async def _build_risk_report(symbols: list[str], weights: dict[str, float]) -> tuple[dict[str, Any] | None, str | None]:
+async def _build_risk_report(
+    symbols: list[str], weights: dict[str, float]
+) -> tuple[dict[str, Any] | None, str | None]:
     if len(symbols) < 2:
         return None, "risk_engine unavailable: need at least 2 symbols"
     from services.risk_engine import build_risk_report
@@ -209,7 +213,9 @@ async def _build_risk_report(symbols: list[str], weights: dict[str, float]) -> t
     )
 
 
-async def _compute_factor_metrics(symbols: list[str], weights: dict[str, float]) -> tuple[list[dict[str, Any]] | None, str | None]:
+async def _compute_factor_metrics(
+    symbols: list[str], weights: dict[str, float]
+) -> tuple[list[dict[str, Any]] | None, str | None]:
     if not symbols:
         return None, "factor metrics unavailable: no symbols"
     from services.stress_tester import compute_factor_metrics
@@ -225,7 +231,9 @@ async def _compute_factor_metrics(symbols: list[str], weights: dict[str, float])
     )
 
 
-async def _run_stress(symbols: list[str], weights: dict[str, float]) -> tuple[list[dict[str, Any]] | None, str | None]:
+async def _run_stress(
+    symbols: list[str], weights: dict[str, float]
+) -> tuple[list[dict[str, Any]] | None, str | None]:
     if len(symbols) < 2:
         return None, "stress_tester unavailable: need at least 2 symbols"
     from services.stress_tester import run_stress_tests
@@ -335,7 +343,11 @@ async def _run_risk_mode(
         _clamp(0.10 + avg_corr * 0.18 + concentration_hhi * 0.35, 0.04, 0.95), 4
     )
     max_drawdown = round(
-        _clamp(abs(worst_case) / 100.0 if worst_case else 0.06 + avg_corr * 0.08, 0.01, 0.95),
+        _clamp(
+            abs(worst_case) / 100.0 if worst_case else 0.06 + avg_corr * 0.08,
+            0.01,
+            0.95,
+        ),
         4,
     )
     sharpe = round(
@@ -365,12 +377,14 @@ async def _run_risk_mode(
                     _clamp(100.0 - concentration_hhi * 100.0, 0.0, 100.0), 2
                 ),
             },
-            "stress": {
-                "scenarios_sampled": len(stress_rows or []),
-                "weakest_impacts": weakest_scenarios[:4],
-            }
-            if stress_rows
-            else None,
+            "stress": (
+                {
+                    "scenarios_sampled": len(stress_rows or []),
+                    "weakest_impacts": weakest_scenarios[:4],
+                }
+                if stress_rows
+                else None
+            ),
             "risk_report": report,
             "concentration_hhi": concentration_hhi,
         },
@@ -423,15 +437,21 @@ async def _run_forecast_mode(
             warnings.append(warning)
             continue
         if series is None or len(series) < 8:
-            warnings.append(f"forecast unavailable for {row['symbol']}: insufficient data")
+            warnings.append(
+                f"forecast unavailable for {row['symbol']}: insufficient data"
+            )
             continue
-        slope, volatility = _portfolio_trend_strength(np.asarray(series.tail(30), dtype=float))
+        slope, volatility = _portfolio_trend_strength(
+            np.asarray(series.tail(30), dtype=float)
+        )
         trend_scores.append(slope * float(row["weight"]))
         vol_scores.append(volatility * float(row["weight"]))
 
     trend = float(sum(trend_scores))
     volatility_forecast = round(_clamp(sum(vol_scores) or 0.18, 0.0, 1.25), 4)
-    price_direction = "up" if trend > 0.0005 else "down" if trend < -0.0005 else "neutral"
+    price_direction = (
+        "up" if trend > 0.0005 else "down" if trend < -0.0005 else "neutral"
+    )
     direction_confidence = round(
         _clamp(50.0 + trend * 6000.0 - volatility_forecast * 10.0, 1.0, 99.0), 2
     )
@@ -482,13 +502,21 @@ async def _run_macro_mode() -> tuple[dict[str, Any], list[str]]:
     }
 
     macro_tasks = [
-        _timeboxed_coro("macro_watcher_vix", macro_watcher.fetch_fred_series("VIXCLS", 4), 0.4),
-        _timeboxed_coro("macro_watcher_cpi", macro_watcher.fetch_fred_series("CPIAUCSL", 4), 0.4),
-        _timeboxed_coro("macro_watcher_unrate", macro_watcher.fetch_fred_series("UNRATE", 4), 0.4),
+        _timeboxed_coro(
+            "macro_watcher_vix", macro_watcher.fetch_fred_series("VIXCLS", 4), 0.4
+        ),
+        _timeboxed_coro(
+            "macro_watcher_cpi", macro_watcher.fetch_fred_series("CPIAUCSL", 4), 0.4
+        ),
+        _timeboxed_coro(
+            "macro_watcher_unrate", macro_watcher.fetch_fred_series("UNRATE", 4), 0.4
+        ),
     ]
     results = await asyncio.gather(*macro_tasks)
     signal_snapshot: dict[str, float] = {}
-    for key, (payload, warning) in zip(("vix", "cpi", "unemployment"), results, strict=False):
+    for key, (payload, warning) in zip(
+        ("vix", "cpi", "unemployment"), results, strict=False
+    ):
         if warning:
             warnings.append(warning)
             continue
@@ -545,7 +573,9 @@ async def run_models(
         return {}
 
     if isinstance(portfolio, dict):
-        portfolio_id = str(portfolio.get("id") or portfolio.get("portfolio_id") or "portfolio")
+        portfolio_id = str(
+            portfolio.get("id") or portfolio.get("portfolio_id") or "portfolio"
+        )
         resolved_positions = positions or list(portfolio.get("positions") or [])
     else:
         portfolio_id = str(portfolio)
@@ -579,7 +609,9 @@ async def analyze_financial_modes(
 
     warnings: list[str] = []
     risk_report, risk_warning = await _build_risk_report(symbols, weights)
-    if risk_warning and any(mode in normalized_modes for mode in ("alpha", "risk", "institutional")):
+    if risk_warning and any(
+        mode in normalized_modes for mode in ("alpha", "risk", "institutional")
+    ):
         warnings.append(risk_warning)
 
     alpha_task = (
@@ -618,15 +650,18 @@ async def analyze_financial_modes(
     macro_payload = macro_out[0]
 
     alpha_score = float(alpha_payload.get("alpha_score") or 50.0)
-    risk_metrics = risk_payload.get("risk_adjusted_metrics") or _default_result(
-        portfolio_id, normalized_modes
-    )["risk_adjusted_metrics"]
-    forecast_outputs = forecast_payload.get("forecast_outputs") or _default_result(
-        portfolio_id, normalized_modes
-    )["forecast_outputs"]
-    regime_context = macro_payload.get("regime_context") or _default_result(
-        portfolio_id, normalized_modes
-    )["regime_context"]
+    risk_metrics = (
+        risk_payload.get("risk_adjusted_metrics")
+        or _default_result(portfolio_id, normalized_modes)["risk_adjusted_metrics"]
+    )
+    forecast_outputs = (
+        forecast_payload.get("forecast_outputs")
+        or _default_result(portfolio_id, normalized_modes)["forecast_outputs"]
+    )
+    regime_context = (
+        macro_payload.get("regime_context")
+        or _default_result(portfolio_id, normalized_modes)["regime_context"]
+    )
 
     forecast_alias = {
         **forecast_outputs,
@@ -647,8 +682,12 @@ async def analyze_financial_modes(
             "risk": _clamp(
                 (1.0 - float(risk_metrics.get("volatility") or 0.0)) * 100.0, 0.0, 100.0
             ),
-            "forecast": float(forecast_outputs.get("price_direction_confidence") or 50.0),
-            "macro": _clamp(float(regime_context.get("confidence") or 0.0) * 100.0, 0.0, 100.0),
+            "forecast": float(
+                forecast_outputs.get("price_direction_confidence") or 50.0
+            ),
+            "macro": _clamp(
+                float(regime_context.get("confidence") or 0.0) * 100.0, 0.0, 100.0
+            ),
         }
         ensemble_score = (
             ensemble_inputs["alpha"] * 0.35

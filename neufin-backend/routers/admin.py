@@ -437,7 +437,9 @@ async def get_user_detail(
         )
         dna_score_count = int(dna_result.count or 0)
     except Exception as exc:
-        logger.debug("admin.user_detail.dna_count_failed", user_id=user_id, error=str(exc))
+        logger.debug(
+            "admin.user_detail.dna_count_failed", user_id=user_id, error=str(exc)
+        )
     try:
         reports_result = (
             supabase.table("advisor_reports")
@@ -588,9 +590,9 @@ async def suspend_user(
         else:
             status_value = "expired"
     try:
-        supabase.table("user_profiles").update({"subscription_status": status_value}).eq(
-            "id", user_id
-        ).execute()
+        supabase.table("user_profiles").update(
+            {"subscription_status": status_value}
+        ).eq("id", user_id).execute()
     except Exception as exc:
         raise HTTPException(500, f"Failed to suspend: {exc}") from exc
     invalidate_subscription_cache(user_id)

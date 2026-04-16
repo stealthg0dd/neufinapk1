@@ -824,10 +824,10 @@ def _build_report_context(
     )
     if not isinstance(quant_modes_selected, list):
         quant_modes_selected = []
-    quant_model_contrib = quant_blob.get(
-        "model_contribution_summary"
-    ) or quant_model_blob.get("model_contribution") or quant_model_blob.get(
-        "model_contribution_breakdown"
+    quant_model_contrib = (
+        quant_blob.get("model_contribution_summary")
+        or quant_model_blob.get("model_contribution")
+        or quant_model_blob.get("model_contribution_breakdown")
     )
     if not isinstance(quant_model_contrib, dict):
         quant_model_contrib = {}
@@ -3445,7 +3445,9 @@ def _page_quant_model_outputs(
             f"Max drawdown: {_fmt_proxy(dd_val, pct=True)}",
         ],
     ]
-    items.append(Table(tradeoff_rows, colWidths=[cw * 0.45, cw * 0.55], style=_tbl_std(pal)))
+    items.append(
+        Table(tradeoff_rows, colWidths=[cw * 0.45, cw * 0.55], style=_tbl_std(pal))
+    )
     items.append(Spacer(1, 10))
 
     # ── Scenario implications ─────────────────────────────────────────────────
@@ -3453,9 +3455,7 @@ def _page_quant_model_outputs(
     forecast = (
         q_scen.get("forecast_outputs")
         if isinstance(q_scen.get("forecast_outputs"), dict)
-        else q_scen.get("forecast")
-        if isinstance(q_scen.get("forecast"), dict)
-        else {}
+        else q_scen.get("forecast") if isinstance(q_scen.get("forecast"), dict) else {}
     ) or {}
     stress = (
         q_scen.get("stress") if isinstance(q_scen.get("stress"), dict) else {}

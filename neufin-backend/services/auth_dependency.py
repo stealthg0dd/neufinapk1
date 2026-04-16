@@ -254,7 +254,9 @@ def _truthy_is_admin(val) -> bool:
     return False
 
 
-def _has_admin_access(row: dict | None, email: str | None, admin_emails: frozenset[str]) -> bool:
+def _has_admin_access(
+    row: dict | None, email: str | None, admin_emails: frozenset[str]
+) -> bool:
     role = str((row or {}).get("role") or "").strip().lower()
     normalized_email = str(email or "").strip().lower()
     return (
@@ -318,7 +320,10 @@ async def get_ops_user(user: JWTUser = Depends(get_current_user)) -> JWTUser:
     except Exception:
         row = {}
     role = (row.get("role") or "").strip().lower()
-    if _has_admin_access(row, user.email, settings.admin_emails_set) or role == "advisor":
+    if (
+        _has_admin_access(row, user.email, settings.admin_emails_set)
+        or role == "advisor"
+    ):
         return user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

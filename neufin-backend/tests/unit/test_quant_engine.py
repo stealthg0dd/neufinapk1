@@ -170,7 +170,11 @@ def test_quant_route_skips_when_no_modes(client):
     with patch("routers.quant.supabase") as mock_supabase:
         response = client.post(
             "/api/quant/analyze",
-            json={"portfolio_id": "portfolio-1", "financial_modes": [], "positions": []},
+            json={
+                "portfolio_id": "portfolio-1",
+                "financial_modes": [],
+                "positions": [],
+            },
         )
 
     assert response.status_code == 200

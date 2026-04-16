@@ -99,7 +99,8 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     if quant_result:
         try:
             applied_modifier = max(
-                -15.0, min(15.0, float(quant_result.get("composite_dna_modifier") or 0.0))
+                -15.0,
+                min(15.0, float(quant_result.get("composite_dna_modifier") or 0.0)),
             )
         except (TypeError, ValueError):
             applied_modifier = 0.0
@@ -107,7 +108,9 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     try:
         base_dna_score = float(analysis.get("dna_score"))
     except (TypeError, ValueError, AttributeError):
-        raise HTTPException(status_code=502, detail="AI DNA score response was invalid.") from None
+        raise HTTPException(
+            status_code=502, detail="AI DNA score response was invalid."
+        ) from None
 
     final_dna_score = round(max(0.0, min(100.0, base_dna_score + applied_modifier)))
     analysis["dna_score"] = final_dna_score
