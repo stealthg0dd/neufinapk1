@@ -14,7 +14,7 @@ async function checkAdminAccess(token: string): Promise<"ok" | "unauthorized" | 
   }
 
   try {
-    const response = await fetch(`${base}/api/admin/dashboard`, {
+    const response = await fetch(`${base}/api/admin/access`, {
       method: "GET",
       headers: {
         Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,

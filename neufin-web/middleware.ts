@@ -126,10 +126,12 @@ async function hasAdminRole(token: string): Promise<boolean> {
   if (!BACKEND_API_URL) return true;
   try {
     const res = await fetch(
-      `${BACKEND_API_URL.replace(/\/$/, "")}/api/admin/dashboard`,
+      `${BACKEND_API_URL.replace(/\/$/, "")}/api/admin/access`,
       {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}`,
+        },
         cache: "no-store",
       },
     );
