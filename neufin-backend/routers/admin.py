@@ -7,6 +7,7 @@ Ops (advisor OR is_admin):
   POST /api/admin/users/{user_id}/resend-onboarding
 
 Admin only (is_admin):
+  GET  /api/admin/access
   GET  /api/admin/dashboard
   POST /api/admin/users/{user_id}/plan
   POST /api/admin/users/{user_id}/suspend
@@ -153,6 +154,11 @@ def _delta_pct(current: float, previous: float) -> float | None:
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/admin/access")
+async def admin_access(_user: JWTUser = Depends(get_admin_user)):
+    return {"ok": True}
 
 
 @router.get("/api/admin/dashboard")
