@@ -3472,13 +3472,9 @@ def _page_quant_model_outputs(
             f"Conf: {regime_ctx.get('confidence', 'n/a')}",
         ],
     ]
-    items.append(
-        Table(scen_rows, colWidths=[130, 120, cw - 250], style=_tbl_std(pal))
-    )
+    items.append(Table(scen_rows, colWidths=[130, 120, cw - 250], style=_tbl_std(pal)))
 
-    if not q_contrib and not q_tradeoffs and not any(
-        [forecast, stress, regime_ctx]
-    ):
+    if not q_contrib and not q_tradeoffs and not any([forecast, stress, regime_ctx]):
         items.append(Spacer(1, 8))
         items.append(
             Paragraph(
