@@ -49,6 +49,7 @@ from reportlab.platypus import (
 )
 
 from services.calculator import canonical_metrics_for_institutional_report
+from services.fx_format import format_pdf_market_value_cell
 from services.report_state import (
     REPORT_DRAFT,
     REPORT_FINAL,
@@ -2195,11 +2196,16 @@ def _page_portfolio_snapshot(
                 if dc_f is None
                 else (ACCENT_GREEN if dc_f >= 0 else ACCENT_RED)
             )
+            if not val:
+                mv_cell = "—"
+            else:
+                mv_raw = format_pdf_market_value_cell(pos)
+                mv_cell = Paragraph(_xml(mv_raw), st["body"])
             hold.append(
                 [
                     sym,
                     f"{w_pct:.1f}%",
-                    f"${val:,.0f}" if val else "—",
+                    mv_cell,
                     str(int(pos.get("shares") or 0)) or "—",
                     f"{beta_p:.2f}" if beta_p else "—",
                     Paragraph(

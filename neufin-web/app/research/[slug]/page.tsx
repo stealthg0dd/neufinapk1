@@ -19,8 +19,11 @@ function regimeBadge(regime: string | null | undefined) {
     recession_risk: "Recession risk",
   };
   const k = regime.toLowerCase();
+  const mapped =
+    k in m ? m[k as keyof typeof m] : undefined;
   return (
-    m[k] || regime.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    mapped ||
+    regime.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
   );
 }
 
@@ -300,7 +303,7 @@ export default async function ResearchArticlePage({
 
           {/* Full markdown content (prose path) */}
           {!s && (
-            <div className="prose prose-slate max-w-none prose-p:text-gray-700 prose-headings:text-gray-900 prose-a:text-primary prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100 prose-pre:bg-gray-900 prose-pre:text-gray-100">
+            <div className="prose prose-neutral dark:prose-invert max-w-none prose-p:text-muted-foreground prose-headings:text-foreground prose-li:text-muted-foreground prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-code:bg-surface-2 prose-pre:bg-surface-2 prose-pre:text-foreground">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeRaw, rehypeSanitize]}
@@ -316,7 +319,7 @@ export default async function ResearchArticlePage({
               <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
                 Full analysis
               </summary>
-              <div className="prose prose-slate mt-4 max-w-none prose-p:text-gray-700 prose-headings:text-gray-900 prose-a:text-primary prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100">
+              <div className="prose prose-neutral dark:prose-invert mt-4 max-w-none prose-p:text-muted-foreground prose-headings:text-foreground prose-li:text-muted-foreground prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-code:bg-surface-2">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeRaw, rehypeSanitize]}

@@ -12,23 +12,36 @@ import structlog
 from dotenv import load_dotenv
 
 from core.config import settings
-from services.market_currency import (
-    SUFFIX_CURRENCY as _SUFFIX_CURRENCY,
-    finnhub_symbol,
-    infer_native_currency,
-    is_international_listed,
-)
-from services.market_resolver import persist_resolution_best_effort, resolve_security
+from services.fx_format import indicative_sgd_suffix
 from services.market_cache import (
     TICKER_ALIASES,
     PriceResult,
     get_ticker_price_cache,
     upsert_ticker_price_cache,
 )
+from services.market_currency import SUFFIX_CURRENCY as _SUFFIX_CURRENCY
+from services.market_resolver import persist_resolution_best_effort, resolve_security
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
 logger = structlog.get_logger("neufin.calculator")
+
+
+def _enrich_positions_fx_hint(records: list[dict]) -> list[dict]:
+    """Optional indicative SGD line per position (display-only; gated by settings)."""
+    out: list[dict] = []
+    for r in records:
+        row = dict(r)
+        try:
+            val = float(row.get("current_value") or 0)
+        except (TypeError, ValueError):
+            val = 0.0
+        ccy = str(row.get("native_currency") or "USD")
+        hint = indicative_sgd_suffix(val, ccy)
+        if hint:
+            row["fx_indicative_sgd"] = hint
+        out.append(row)
+    return out
 
 
 def _records_nan_to_none(rows: list[dict]) -> list[dict]:
@@ -389,6 +402,46 @@ def _av_single(sym: str) -> float | None:
         return None
 
 
+def _itick_single(sym: str) -> float | None:
+    """iTick quote for .VN / .L when env-gated; returns None on failure."""
+    if not settings.ENABLE_ITICK_VN_FALLBACK or not settings.ITICK_API_KEY:
+        return None
+    u = sym.upper()
+    if not (u.endswith(".VN") or u.endswith(".L")):
+        return None
+    try:
+        r = requests.get(
+            "https://api.itick.org/v1/quote",
+            params={"code": sym},
+            headers={"Authorization": f"Bearer {settings.ITICK_API_KEY}"},
+            timeout=6.0,
+        )
+        if r.status_code != 200:
+            return None
+        body = r.json()
+        p = body.get("data") if isinstance(body.get("data"), dict) else body
+        if not isinstance(p, dict):
+            return None
+        raw = p.get("price") or p.get("last") or p.get("close") or 0
+        try:
+            price = float(raw)
+        except (TypeError, ValueError):
+            return None
+        return price if price > 0 else None
+    except Exception as e:
+        logger.debug("price.itick_failed", symbol=sym, error=str(e))
+        return None
+
+
+def _itick_batch(symbols: list[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for sym in symbols:
+        px = _itick_single(sym)
+        if px and px > 0:
+            out[sym] = px
+    return out
+
+
 # ── Batch spot-price fetcher (public) ─────────────────────────────────────────
 def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
     """
@@ -469,14 +522,20 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                         if sym in remaining:
                             remaining.remove(sym)
                 except Exception as e:
-                    logger.warning("price.av_future_error", symbol=sym, error=str(e))
+                    logger.warning(
+                        "price.av_future_error", symbol=sym, error=str(e)
+                    )
+
+    # 8. iTick — optional .VN / .L fallback (# SEA-TICKER-FIX, env-gated)
+    if remaining and settings.ENABLE_ITICK_VN_FALLBACK and settings.ITICK_API_KEY:
+        _merge(_itick_batch([s for s in remaining if s.upper().endswith((".VN", ".L"))]))
 
     if remaining:
         logger.warning(
             "price.resolution_failure",
             symbols=remaining,
             resolved=list(results.keys()),
-            providers_tried="polygon,yfinance,fmp,twelvedata,marketstack,finnhub,alphavantage",
+            providers_tried="polygon,yfinance,fmp,twelvedata,marketstack,finnhub,alphavantage,itick",
         )
         results["__failed__"] = [*remaining]  # type: ignore[assignment]
 
@@ -503,7 +562,7 @@ def fetch_spot_price(sym: str) -> float:
     return result.price if result.price is not None else 0.0
 
 
-def get_price_with_fallback(sym: str) -> "PriceResult":
+def get_price_with_fallback(sym: str) -> PriceResult:
     """
     Full price resolution waterfall returning a PriceResult — never raises.
 
@@ -730,7 +789,7 @@ def fetch_beta(sym: str) -> float:
 
 
 # ── Scoring components ─────────────────────────────────────────────────────────
-def _hhi_score(weights: "pd.Series") -> float:
+def _hhi_score(weights: pd.Series) -> float:
     """
     HHI-based concentration score (0-25 pts).
     Lower HHI (more diversified) → higher score.
@@ -769,7 +828,7 @@ def _beta_score(weighted_beta: float) -> float:
     return round(score, 2)
 
 
-def _tax_alpha_score(df: "pd.DataFrame") -> float:
+def _tax_alpha_score(df: pd.DataFrame) -> float:
     """
     Tax alpha component (0-20 pts).
 
@@ -808,7 +867,7 @@ def _tax_alpha_score(df: "pd.DataFrame") -> float:
 
 
 # ── Tax impact analysis ────────────────────────────────────────────────────────
-def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
+def get_tax_impact_analysis(df: pd.DataFrame) -> dict:
     """
     Per-position tax liability and harvest-credit analysis at 20% LT CGT rate.
 
@@ -882,7 +941,7 @@ def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
 
 
 # ── Tax-neutral pair matchmaking ───────────────────────────────────────────────
-def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
+def get_tax_neutral_pairs(df: pd.DataFrame) -> list[dict]:
     """
     For the top-2 gainer positions, find the exact loser shares to sell to
     achieve a $0 net tax outcome.
@@ -986,7 +1045,7 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
 
 
 # ── History helpers (used by portfolio metrics) ────────────────────────────────
-def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series | None":
+def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> pd.Series | None:
     """Fetch daily close prices for one symbol. Returns None on failure."""
     if FINNHUB_API_KEY:
         try:
@@ -1217,7 +1276,9 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
-        "positions": _records_nan_to_none(positions_out.to_dict("records")),
+        "positions": _enrich_positions_fx_hint(
+            _records_nan_to_none(positions_out.to_dict("records"))
+        ),
     }
     if price_warnings:
         result["warnings"] = price_warnings

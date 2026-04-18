@@ -53,6 +53,18 @@ function safeParseJson(raw: string): Record<string, unknown> | null {
       ? (parsed as Record<string, unknown>)
       : null;
   } catch {
+    // Near-JSON: trim trailing prose after the closing `}` (LLM chatter)
+    const end = cleaned.lastIndexOf("}");
+    if (end > 1) {
+      try {
+        const parsed = JSON.parse(cleaned.slice(0, end + 1));
+        return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }

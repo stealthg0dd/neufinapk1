@@ -18,8 +18,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
-
 import stripe
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,11 +31,15 @@ from config import (
     STRIPE_SECRET_KEY,
 )
 from database import claim_guest_data, supabase
-from services.auth_dependency import get_current_user
-from services.auth_dependency import get_subscription_status as get_sub_status
+from services.auth_dependency import (
+    get_current_user,
+    get_subscription_status as get_sub_status,
+)
 from services.jwt_auth import JWTUser
 
 logger = structlog.get_logger("neufin.vault")
+
+UTC = timezone.utc  # noqa: UP017  # Py3.9 compat (datetime.UTC is 3.11+)
 
 # ── Subscription plan definitions ─────────────────────────────────────────────
 # stripe_price_id values are populated after running scripts/setup_stripe_products.py

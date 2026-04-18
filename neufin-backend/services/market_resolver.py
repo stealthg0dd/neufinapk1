@@ -8,11 +8,16 @@ and metadata. Falls back to suffix-based logic from market_currency for unknowns
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+import structlog
+
 from services.market_currency import (
     SUFFIX_CURRENCY,
     finnhub_symbol,
     infer_native_currency,
 )
+
+logger = structlog.get_logger("neufin.market_resolver")
 
 
 @dataclass(frozen=True)
@@ -149,5 +154,9 @@ def persist_resolution_best_effort(meta: SecurityMetadata) -> None:
             },
             on_conflict="raw_symbol",
         ).execute()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug(
+            "symbol_resolution.persist_failed",
+            symbol=meta.normalized_symbol,
+            error=str(exc),
+        )

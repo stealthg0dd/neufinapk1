@@ -21,8 +21,6 @@ import hashlib
 import re
 from datetime import datetime, timezone
 
-UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
-
 import feedparser
 import httpx
 import structlog
@@ -30,6 +28,8 @@ import structlog
 from core.config import settings
 from database import supabase
 from services.ai_router import get_ai_analysis
+
+UTC = timezone.utc  # noqa: UP017  # Py3.9 compat (datetime.UTC is 3.11+)
 
 logger = structlog.get_logger("neufin.news_intelligence")
 

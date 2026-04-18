@@ -315,6 +315,20 @@ class Settings(BaseSettings):
         ),
     )
 
+    # ── SEA / FX / optional quote fallback (# SEA-TICKER-FIX) ─────────────────
+    FX_DISPLAY_ENABLE: bool = Field(
+        default=True,
+        description="Show indicative SGD conversion next to native CCY in PDF/Swarm when FX API succeeds.",
+    )
+    ENABLE_ITICK_VN_FALLBACK: bool = Field(
+        default=False,
+        description="When True and ITICK_API_KEY is set, try iTick for .VN/.L after Yahoo fails.",
+    )
+    ITICK_API_KEY: str | None = Field(
+        default=None,
+        description="Optional iTick API bearer token for VN/international quote fallback.",
+    )
+
     # ── Git / deployment metadata ─────────────────────────────────────────────
     GIT_COMMIT_SHA: str = Field(
         default="unknown",

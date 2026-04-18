@@ -248,6 +248,8 @@ export interface Position {
   value: number;
   weight: number;
   native_currency?: string;
+  /** Indicative SGD line from API when FX display is enabled, e.g. "(≈ S$1,234.56)" */
+  fx_indicative_sgd?: string;
   /** SEA-TICKER-FIX: resolver metadata when present */
   market_code?: string;
   provider_ticker?: string;
@@ -428,6 +430,8 @@ export async function createCheckoutSession(
         price: p.price,
         value: p.value,
         weight: p.weight,
+        native_currency: p.native_currency,
+        fx_indicative_sgd: p.fx_indicative_sgd,
       }))
     : undefined;
   // Prefer the stored portfolio_id (correct portfolios table UUID) over

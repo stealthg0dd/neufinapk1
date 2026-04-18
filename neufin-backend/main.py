@@ -119,6 +119,7 @@ from services.calculator import (  # noqa: E402
     get_price_with_fallback,
     get_tax_impact_analysis,
 )
+from services.fx_format import indicative_sgd_suffix  # noqa: E402
 from services.market_resolver import resolve_security  # noqa: E402
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
@@ -1002,7 +1003,7 @@ async def analyze_dna(
     )
     failed_tickers: list[str] = []
     price_map: dict[str, float] = {}
-    for sym, result in zip(symbols, price_results):
+    for sym, result in zip(symbols, price_results, strict=True):
         if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
             failed_tickers.append(sym)
         elif isinstance(result, Exception):
@@ -1010,7 +1011,7 @@ async def analyze_dna(
             failed_tickers.append(sym)
         elif getattr(result, "status", None) == "unresolvable" or (
             getattr(result, "price", None) is None
-            or (isinstance(result.price, (int, float)) and float(result.price) <= 0)
+            or (isinstance(result.price, int | float) and float(result.price) <= 0)
         ):
             failed_tickers.append(sym)
         else:
@@ -1056,7 +1057,9 @@ async def analyze_dna(
         if total_value > 0
         else df["symbol"].tolist()[:5]
     )
-    weights_dict = dict(zip(df["symbol"].tolist(), df["weight"].tolist()))
+    weights_dict = dict(
+        zip(df["symbol"].tolist(), df["weight"].tolist(), strict=True)
+    )
     corr_matrix = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
     clusters = find_correlation_clusters(corr_matrix, weights_dict)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
@@ -1123,19 +1126,21 @@ Return ONLY valid JSON:
         )
         # # SEA-TICKER-FIX: align DNA response with MarketResolver metadata
         _m = resolve_security(str(row["symbol"]))
-        positions_out.append(
-            {
-                "symbol": row["symbol"],
-                "shares": row["shares"],
-                "native_currency": _m.native_currency,
-                "market_code": _m.market,
-                "provider_ticker": _m.provider_ticker,
-                "benchmark": _m.benchmark,
-                "price": row["current_price"],
-                "value": row["value"],
-                "weight": weight,
-            }
-        )
+        pos = {
+            "symbol": row["symbol"],
+            "shares": row["shares"],
+            "native_currency": _m.native_currency,
+            "market_code": _m.market,
+            "provider_ticker": _m.provider_ticker,
+            "benchmark": _m.benchmark,
+            "price": row["current_price"],
+            "value": row["value"],
+            "weight": weight,
+        }
+        fx_hint = indicative_sgd_suffix(float(row["value"]), _m.native_currency)
+        if fx_hint:
+            pos["fx_indicative_sgd"] = fx_hint
+        positions_out.append(pos)
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
     logger.info(
