@@ -43,7 +43,7 @@ export function BrandLogo({
       width={160}
       height={40}
       className={[sizeCls, darkCls, className].filter(Boolean).join(" ")}
-      priority={priority ?? size === "lg" || size === "xl"}
+      priority={priority ?? (size === "lg" || size === "xl")}
     />
   );
 
