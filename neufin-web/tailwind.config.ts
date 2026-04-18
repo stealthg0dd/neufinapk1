@@ -89,6 +89,20 @@ const config: Config = {
           foreground: "#ffffff",
         },
         ring: t.primary,
+        /** Landing / marketing — mirrors `app/globals.css` marketing tokens */
+        lp: {
+          fg: "var(--text-primary)",
+          body: "var(--text-body)",
+          muted: "var(--readable-muted)",
+          "on-dark": "var(--text-on-dark)",
+          "on-dark-muted": "var(--text-on-dark-muted)",
+          "on-accent": "var(--text-on-accent)",
+          border: "var(--border-subtle)",
+          card: "var(--bg-card)",
+          elevated: "var(--bg-elevated)",
+          accent: "var(--primary)",
+          "accent-soft": "var(--accent-soft)",
+        },
       },
       borderRadius: {
         sm: "6px",

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
@@ -9,6 +8,7 @@ import type { MarketRegime, ResearchNote } from "@/lib/api";
 import { GraphicPlaceholder } from "@/components/GraphicPlaceholder";
 import SwarmHeroTerminal from "@/components/landing/SwarmHeroTerminal";
 import LandingSwarmChatDock from "@/components/landing/LandingSwarmChatDock";
+import NeuFinLogo from "@/components/landing/NeuFinLogo";
 
 const SWARM_AGENTS = [
   {
@@ -207,47 +207,40 @@ export default function HomeLandingPage({
   ] as const;
 
   return (
-    <div className="flex min-h-screen flex-col bg-white text-[#334155]">
+    <div className="flex min-h-screen flex-col bg-white text-slate2">
       <nav
-        className={`fixed inset-x-0 top-0 z-50 h-16 transition-all duration-300 ${
+        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
           scrolled
-            ? "border-b border-[#E2E8F0] bg-white shadow-sm"
-            : "bg-white/80 backdrop-blur-md"
+            ? "border-b border-lp-border bg-white shadow-sm"
+            : "border-b border-transparent bg-white/85 backdrop-blur-md"
         }`}
       >
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
-          <Link href="/" className="flex-shrink-0 flex-none">
-            <Image
-              src="/logo.png"
-              alt="NeuFin"
-              width={160}
-              height={40}
-              className="h-12 w-auto"
-              priority
-            />
+        <div className="mx-auto flex min-h-[4rem] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:min-h-[4.25rem]">
+          <Link
+            href="/"
+            className="flex flex-shrink-0 flex-none items-center py-1"
+          >
+            <NeuFinLogo variant="header" priority />
           </Link>
           <div className="hidden items-center gap-8 md:flex">
             {navLinks.map(({ label, href }) => (
               <Link
                 key={label}
                 href={href}
-                className="text-sm font-medium text-[#475569] transition-colors hover:text-[#1EB8CC]"
+                className="text-sm font-medium text-foreground/80 transition-colors hover:text-primary"
               >
                 {label}
               </Link>
             ))}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/login"
-              className="hidden text-sm font-medium text-[#475569] transition-colors hover:text-[#0F172A] md:block"
+              className="hidden text-sm font-medium text-foreground/80 transition-colors hover:text-foreground md:block"
             >
               Sign In
             </Link>
-            <Link
-              href="/upload"
-              className="rounded-lg bg-[#1EB8CC] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:bg-[#158A99] hover:shadow-md"
-            >
+            <Link href="/upload" className="lp-btn-nav-cta whitespace-nowrap">
               Start Free
             </Link>
           </div>
@@ -277,13 +270,13 @@ export default function HomeLandingPage({
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
-                  className="mb-8 inline-flex items-center gap-2.5 rounded-full border border-[#1EB8CC]/30 bg-[#E0F7FA] px-4 py-2"
+                  className="mb-8 inline-flex items-center gap-2.5 rounded-full border border-primary/30 bg-lp-accent-soft px-4 py-2"
                 >
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1EB8CC] opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#1EB8CC]" />
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
                   </span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-[#1EB8CC]">
+                  <span className="text-xs font-bold uppercase tracking-widest text-primary">
                     Live · Portfolio Intelligence
                   </span>
                 </motion.div>
@@ -292,21 +285,21 @@ export default function HomeLandingPage({
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.1 }}
-                  className="mb-6 font-bold leading-[1.08] tracking-[-0.04em] text-[#0F172A]"
+                  className="mb-6 font-bold leading-[1.08] tracking-[-0.04em] text-foreground"
                   style={{ fontSize: "clamp(40px, 5.5vw, 68px)" }}
                 >
                   7 AI agents.
                   <br />
                   One portfolio.
                   <br />
-                  <span className="text-[#1EB8CC]">60 seconds.</span>
+                  <span className="text-primary">60 seconds.</span>
                 </motion.h1>
 
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
-                  className="mb-10 max-w-xl text-[18px] leading-[1.75] text-[#475569]"
+                  className="mb-10 max-w-xl text-[18px] leading-[1.75] text-slate2"
                 >
                   Upload your portfolio. Our 7-agent AI swarm delivers a
                   complete Investment Committee briefing — behavioral biases,
@@ -320,10 +313,7 @@ export default function HomeLandingPage({
                   transition={{ duration: 0.5, delay: 0.3 }}
                   className="mb-14 flex flex-wrap gap-4"
                 >
-                  <Link
-                    href="/upload"
-                    className="group inline-flex items-center gap-2 rounded-xl bg-[#1EB8CC] px-8 py-4 text-[15px] font-semibold text-white shadow-[0_4px_24px_rgba(30,184,204,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#158A99] hover:shadow-[0_6px_32px_rgba(30,184,204,0.5)]"
-                  >
+                  <Link href="/upload" className="group lp-btn-primary shadow-[0_4px_24px_rgba(30,184,204,0.35)] hover:shadow-[0_6px_32px_rgba(30,184,204,0.45)]">
                     Analyze My Portfolio Free
                     <svg
                       className="h-4 w-4 transition-transform group-hover:translate-x-1"
@@ -340,10 +330,7 @@ export default function HomeLandingPage({
                       />
                     </svg>
                   </Link>
-                  <Link
-                    href="#demo"
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#E2E8F0] bg-white px-8 py-4 text-[15px] font-semibold text-[#334155] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#1EB8CC] hover:text-[#1EB8CC]"
-                  >
+                  <Link href="#demo" className="lp-btn-secondary">
                     Watch 60-second demo
                   </Link>
                 </motion.div>
@@ -352,7 +339,7 @@ export default function HomeLandingPage({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.5, delay: 0.45 }}
-                  className="flex flex-wrap items-center gap-6 text-sm text-[#64748B]"
+                  className="flex flex-wrap items-center gap-6 text-sm text-lp-muted"
                 >
                   {[
                     "14-day free trial",
@@ -408,10 +395,10 @@ export default function HomeLandingPage({
                         </svg>
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-[#0F172A]">
+                        <p className="text-xs font-semibold text-foreground">
                           IC Briefing Ready
                         </p>
-                        <p className="text-xs text-[#475569]">
+                        <p className="text-xs text-slate2">
                           Generated in 58 seconds
                         </p>
                       </div>
@@ -420,7 +407,7 @@ export default function HomeLandingPage({
                   <div className="hero-float-badge absolute -right-3 -top-3 px-3 py-2">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 animate-pulse rounded-full bg-[#F5A623]" />
-                      <p className="text-xs font-semibold text-[#0F172A]">
+                      <p className="text-xs font-semibold text-foreground">
                         Regime: Risk-Off
                       </p>
                       <span className="badge badge-warning text-xs">82%</span>
@@ -444,7 +431,7 @@ export default function HomeLandingPage({
         </section>
 
         {/* Metrics */}
-        <section className="relative overflow-hidden border-y border-[#E2E8F0] bg-[#F8FAFC] py-12">
+        <section className="relative overflow-hidden border-y border-lp-border bg-lp-elevated py-12 md:py-14">
           <div
             className="landing-animated-grid pointer-events-none absolute inset-0 opacity-[0.22]"
             aria-hidden
@@ -467,10 +454,10 @@ export default function HomeLandingPage({
                   transition={{ duration: 0.4, delay: i * 0.08 }}
                   className="text-center"
                 >
-                  <div className="mb-2 text-[44px] font-bold leading-none tracking-tight text-[#0F172A]">
+                  <div className="mb-2 text-[44px] font-bold leading-none tracking-tight text-foreground">
                     <CountUp end={s.value} suffix={s.suffix} />
                   </div>
-                  <div className="text-[14px] font-medium text-[#64748B]">
+                  <div className="text-[14px] font-medium text-lp-muted">
                     {s.label}
                   </div>
                 </motion.div>
@@ -480,7 +467,7 @@ export default function HomeLandingPage({
         </section>
 
         {/* Seven agents */}
-        <section className="relative bg-white py-24" id="demo">
+        <section className="relative bg-white py-24 md:py-28" id="demo">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute inset-0 flex items-center justify-center px-4 py-8">
               <div className="relative h-[min(72vh,820px)] w-full max-w-6xl opacity-[0.15]">
@@ -510,7 +497,7 @@ export default function HomeLandingPage({
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-[#1EB8CC]"
+                className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-primary"
               >
                 Agentic AI System
               </motion.p>
@@ -519,7 +506,7 @@ export default function HomeLandingPage({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.08 }}
-                className="mb-4 font-bold leading-tight tracking-tight text-[#0F172A]"
+                className="mb-4 font-bold leading-tight tracking-tight text-foreground"
                 style={{ fontSize: "clamp(28px, 3.5vw, 44px)" }}
               >
                 Seven specialists. One Investment Committee.
@@ -529,7 +516,7 @@ export default function HomeLandingPage({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.12 }}
-                className="mx-auto max-w-2xl text-[17px] leading-relaxed text-[#475569]"
+                className="mx-auto max-w-2xl text-[17px] leading-relaxed text-slate2"
               >
                 Most platforms give you data. NeuFin gives you a complete IC —
                 seven agents running simultaneously the moment you upload your
@@ -546,10 +533,10 @@ export default function HomeLandingPage({
                   viewport={{ once: true }}
                   transition={{ duration: 0.45, delay: i * 0.07 }}
                   whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  className="relative cursor-default overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-6 transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
+                  className="relative cursor-default overflow-hidden rounded-2xl border border-lp-border bg-lp-card p-6 shadow-sm transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
                 >
                   <div
-                    className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                    className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-primary/7 blur-2xl"
                     aria-hidden
                   />
                   <div
@@ -558,10 +545,10 @@ export default function HomeLandingPage({
                   >
                     {a.id}
                   </div>
-                  <h3 className="mb-2 text-[15px] font-semibold leading-snug text-[#0F172A]">
+                  <h3 className="mb-2 text-[15px] font-semibold leading-snug text-foreground">
                     {a.name}
                   </h3>
-                  <p className="mb-5 text-sm leading-[1.65] text-[#64748B]">
+                  <p className="mb-5 text-sm leading-[1.65] text-lp-muted">
                     {a.desc}
                   </p>
                   <div className="flex items-center gap-1.5">
@@ -582,10 +569,10 @@ export default function HomeLandingPage({
                   viewport={{ once: true }}
                   transition={{ duration: 0.45, delay: (i + 4) * 0.07 }}
                   whileHover={{ y: -4, transition: { duration: 0.2 } }}
-                  className="relative cursor-default overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white p-6 transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
+                  className="relative cursor-default overflow-hidden rounded-2xl border border-lp-border bg-lp-card p-6 shadow-sm transition-shadow duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)]"
                 >
                   <div
-                    className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                    className="pointer-events-none absolute -right-6 -top-8 h-28 w-28 rounded-full bg-primary/7 blur-2xl"
                     aria-hidden
                   />
                   <div
@@ -594,10 +581,10 @@ export default function HomeLandingPage({
                   >
                     {a.id}
                   </div>
-                  <h3 className="mb-2 text-[15px] font-semibold text-[#0F172A]">
+                  <h3 className="mb-2 text-[15px] font-semibold text-foreground">
                     {a.name}
                   </h3>
-                  <p className="mb-5 text-sm leading-[1.65] text-[#64748B]">
+                  <p className="mb-5 text-sm leading-[1.65] text-lp-muted">
                     {a.desc}
                   </p>
                   <div className="flex items-center gap-1.5">
@@ -611,14 +598,11 @@ export default function HomeLandingPage({
             </div>
 
             <div className="mt-16 text-center">
-              <Link
-                href="/upload"
-                className="inline-flex items-center gap-3 rounded-xl bg-[#0F172A] px-10 py-4 text-[15px] font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1E293B] hover:shadow-xl"
-              >
+              <Link href="/upload" className="lp-btn-dark-fill gap-3">
                 Upload Portfolio — It&apos;s Free
-                <span className="font-bold text-[#1EB8CC]">→</span>
+                <span className="font-bold text-primary">→</span>
               </Link>
-              <p className="mt-3 text-sm text-[#94A3B8]">
+              <p className="mt-3 text-sm text-lp-muted">
                 No account required · Results in 60 seconds
               </p>
             </div>
@@ -626,7 +610,7 @@ export default function HomeLandingPage({
         </section>
 
         {/* Value proposition */}
-        <section className="relative overflow-hidden bg-[#F8FAFC] py-24">
+        <section className="relative overflow-hidden bg-lp-elevated py-24 md:py-28">
           <div
             className="pointer-events-none absolute -left-16 top-24 h-64 w-64 rounded-full bg-[#1EB8CC]/8 blur-3xl"
             aria-hidden
@@ -648,11 +632,11 @@ export default function HomeLandingPage({
                   className="pointer-events-none absolute -right-4 top-1/2 h-48 w-48 -translate-y-1/2 rounded-full bg-[#1EB8CC]/8 blur-3xl"
                   aria-hidden
                 />
-                <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-[#1EB8CC]">
+                <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-primary">
                   For Advisors
                 </p>
                 <h2
-                  className="mb-6 font-bold leading-tight tracking-tight text-[#0F172A]"
+                  className="mb-6 font-bold leading-tight tracking-tight text-foreground"
                   style={{ fontSize: "clamp(24px, 2.8vw, 36px)" }}
                 >
                   IC-grade client intelligence without the manual report grind.
@@ -667,10 +651,10 @@ export default function HomeLandingPage({
                   ).map((line, i) => (
                     <div
                       key={i}
-                      className="relative flex gap-4 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-5"
+                      className="relative flex gap-4 overflow-hidden rounded-xl border border-lp-border bg-lp-card p-5 shadow-sm"
                     >
                       <div
-                        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-primary/7 blur-2xl"
                         aria-hidden
                       />
                       <div className="relative mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#22C55E]">
@@ -687,7 +671,7 @@ export default function HomeLandingPage({
                           />
                         </svg>
                       </div>
-                      <p className="relative text-[15px] font-medium leading-relaxed text-[#0F172A]">
+                      <p className="relative text-[15px] font-medium leading-relaxed text-foreground">
                         {line}
                       </p>
                     </div>
@@ -710,7 +694,7 @@ export default function HomeLandingPage({
                   For Platforms
                 </p>
                 <h2
-                  className="mb-6 font-bold leading-tight tracking-tight text-[#0F172A]"
+                  className="mb-6 font-bold leading-tight tracking-tight text-foreground"
                   style={{ fontSize: "clamp(24px, 2.8vw, 36px)" }}
                 >
                   Behavioral intelligence through your stack — without a
@@ -726,10 +710,10 @@ export default function HomeLandingPage({
                   ).map((line, i) => (
                     <div
                       key={i}
-                      className="relative flex gap-4 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white p-5"
+                      className="relative flex gap-4 overflow-hidden rounded-xl border border-lp-border bg-lp-card p-5 shadow-sm"
                     >
                       <div
-                        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#1EB8CC]/7 blur-2xl"
+                        className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-primary/7 blur-2xl"
                         aria-hidden
                       />
                       <div className="relative mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8B5CF6]">
@@ -746,7 +730,7 @@ export default function HomeLandingPage({
                           />
                         </svg>
                       </div>
-                      <p className="relative text-[15px] font-medium leading-relaxed text-[#0F172A]">
+                      <p className="relative text-[15px] font-medium leading-relaxed text-foreground">
                         {line}
                       </p>
                     </div>
@@ -758,43 +742,45 @@ export default function HomeLandingPage({
         </section>
 
         {/* Pricing — data and hrefs preserved */}
-        <section className="bg-white py-24" id="pricing">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="mb-16 text-center">
+        <section className="bg-white py-24 md:py-28" id="pricing">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="mb-14 text-center md:mb-16">
               <h2
-                className="mb-4 font-bold tracking-tight text-[#0F172A]"
+                className="mb-3 font-bold tracking-tight text-foreground md:mb-4"
                 style={{ fontSize: "clamp(28px, 3vw, 42px)" }}
               >
                 Simple, transparent pricing
               </h2>
-              <p className="text-[17px] text-[#475569]">
+              <p className="mx-auto max-w-2xl text-[17px] leading-relaxed text-slate2">
                 Start free. Scale as your practice grows.
               </p>
             </div>
 
-            <div className="mx-auto grid max-w-5xl grid-cols-1 items-stretch gap-6 md:grid-cols-3">
-              <div className="flex flex-col rounded-2xl border border-[#E2E8F0] bg-white p-8">
-                <div>
-                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#64748B]">
+            <div className="mx-auto grid max-w-5xl grid-cols-1 items-stretch gap-6 md:grid-cols-3 md:gap-7">
+              <div className="flex flex-col rounded-2xl border border-lp-border bg-lp-card p-7 shadow-sm sm:p-8">
+                <div className="flex flex-1 flex-col">
+                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-lp-muted">
                     Free
                   </p>
-                  <div className="mb-2 flex items-baseline gap-1">
-                    <span className="text-[52px] font-bold leading-none tracking-tight text-[#0F172A]">
+                  <div className="mb-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                    <span className="text-[52px] font-bold leading-none tracking-tight text-foreground">
                       $0
                     </span>
-                    <span className="text-sm text-[#64748B]">/month</span>
+                    <span className="text-base font-medium text-slate2">
+                      /month
+                    </span>
                   </div>
-                  <p className="mb-8 text-sm text-[#94A3B8]">
+                  <p className="mb-8 text-sm font-medium text-lp-muted">
                     Start with the basics
                   </p>
                   <ul className="mb-6 flex-1 space-y-3">
                     {FREE_FEATURES.map((f) => (
                       <li
                         key={f}
-                        className="flex gap-2 text-[14px] text-[#334155]"
+                        className="flex gap-2 text-[14px] leading-snug text-slate2"
                       >
                         <Check
-                          className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#22C55E]"
+                          className="mt-0.5 h-[18px] w-[18px] shrink-0 text-positive"
                           strokeWidth={2.25}
                           aria-hidden
                         />
@@ -803,43 +789,42 @@ export default function HomeLandingPage({
                     ))}
                   </ul>
                 </div>
-                <div className="mt-auto pt-6">
-                  <Link
-                    href="/upload"
-                    className="block w-full rounded-xl border-2 border-[#E2E8F0] py-3.5 text-center text-[14px] font-semibold text-[#0F172A] transition-all duration-200 hover:border-[#1EB8CC]"
-                  >
+                <div className="mt-auto border-t border-lp-border/80 pt-6">
+                  <Link href="/upload" className="lp-btn-pricing-outline">
                     Start Free
                   </Link>
                 </div>
               </div>
 
-              <div className="relative flex flex-col rounded-2xl bg-[#0F172A] p-8 shadow-[0_20px_60px_rgba(15,23,42,0.3)] ring-2 ring-[#1EB8CC]">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="rounded-full bg-[#1EB8CC] px-5 py-1.5 text-xs font-bold uppercase tracking-widest text-white shadow-sm">
-                    Most Popular
+              <div className="flex flex-col overflow-hidden rounded-2xl bg-shell shadow-[0_20px_60px_rgba(15,23,42,0.28)] ring-2 ring-primary/80">
+                <div className="shrink-0 bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 text-center sm:py-3">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white">
+                    Most popular
                   </span>
                 </div>
-                <div>
-                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#1EB8CC]">
+                <div className="flex flex-1 flex-col px-7 pb-7 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
+                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-primary">
                     Advisor
                   </p>
-                  <div className="mb-2 flex items-baseline gap-1">
-                    <span className="text-[52px] font-bold leading-none tracking-tight text-white">
+                  <div className="mb-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                    <span className="text-[52px] font-bold leading-none tracking-tight text-lp-on-dark">
                       $299
                     </span>
-                    <span className="text-sm text-slate-400">/month</span>
+                    <span className="text-base font-medium text-lp-on-dark-muted">
+                      /month
+                    </span>
                   </div>
-                  <p className="mb-8 text-sm text-slate-400">
+                  <p className="mb-8 text-sm font-medium leading-relaxed text-lp-on-dark-muted">
                     For professional advisors
                   </p>
                   <ul className="mb-6 flex-1 space-y-3">
                     {ADVISOR_FEATURES.map((f) => (
                       <li
                         key={f}
-                        className="flex gap-2 text-[14px] text-slate-300"
+                        className="flex gap-2 text-[14px] leading-snug text-lp-on-dark-muted"
                       >
                         <Check
-                          className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#1EB8CC]"
+                          className="mt-0.5 h-[18px] w-[18px] shrink-0 text-primary"
                           strokeWidth={2.25}
                           aria-hidden
                         />
@@ -847,42 +832,41 @@ export default function HomeLandingPage({
                       </li>
                     ))}
                   </ul>
-                </div>
-                <div className="mt-auto pt-6">
-                  <Link
-                    href="/pricing"
-                    className="block w-full rounded-xl bg-[#1EB8CC] py-3.5 text-center text-[14px] font-semibold text-white shadow-[0_4px_20px_rgba(30,184,204,0.4)] transition-all duration-200 hover:bg-[#158A99]"
-                  >
-                    Start 14-Day Free Trial
-                  </Link>
+                  <div className="mt-auto border-t border-white/10 pt-6">
+                    <Link href="/pricing" className="lp-btn-pricing-primary shadow-[0_4px_20px_rgba(30,184,204,0.35)] hover:shadow-[0_6px_28px_rgba(30,184,204,0.45)]">
+                      Start 14-Day Free Trial
+                    </Link>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col rounded-2xl border border-[#E2E8F0] bg-white p-8">
-                <div>
-                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-[#64748B]">
+              <div className="flex flex-col rounded-2xl border border-lp-border bg-lp-card p-7 shadow-sm sm:p-8">
+                <div className="flex flex-1 flex-col">
+                  <p className="mb-4 text-xs font-bold uppercase tracking-widest text-lp-muted">
                     Enterprise
                   </p>
-                  <div className="mb-2 flex items-baseline gap-1">
-                    <span className="text-[52px] font-bold leading-none tracking-tight text-[#0F172A]">
+                  <div className="mb-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                    <span className="text-[52px] font-bold leading-none tracking-tight text-foreground">
                       $999
                     </span>
-                    <span className="text-sm text-[#64748B]">/month</span>
+                    <span className="text-base font-medium text-slate2">
+                      /month
+                    </span>
                   </div>
-                  <p className="mb-1 text-sm text-[#94A3B8]">
+                  <p className="mb-1 text-sm font-medium text-lp-muted">
                     For platforms and institutions
                   </p>
-                  <p className="mb-8 text-sm font-medium text-[#1EB8CC]">
+                  <p className="mb-8 text-sm font-semibold text-primary">
                     Custom pricing available
                   </p>
                   <ul className="mb-6 flex-1 space-y-3">
                     {ENTERPRISE_FEATURES.map((f) => (
                       <li
                         key={f}
-                        className="flex gap-2 text-[14px] text-[#334155]"
+                        className="flex gap-2 text-[14px] leading-snug text-slate2"
                       >
                         <Check
-                          className="mt-0.5 h-[18px] w-[18px] shrink-0 text-[#22C55E]"
+                          className="mt-0.5 h-[18px] w-[18px] shrink-0 text-positive"
                           strokeWidth={2.25}
                           aria-hidden
                         />
@@ -891,11 +875,8 @@ export default function HomeLandingPage({
                     ))}
                   </ul>
                 </div>
-                <div className="mt-auto pt-6">
-                  <Link
-                    href="/contact-sales"
-                    className="block w-full rounded-xl bg-[#0F172A] py-3.5 text-center text-[14px] font-semibold text-white transition-all duration-200 hover:bg-[#1E293B]"
-                  >
+                <div className="mt-auto border-t border-lp-border/80 pt-6">
+                  <Link href="/contact-sales" className="lp-btn-pricing-dark">
                     Contact Sales
                   </Link>
                 </div>
@@ -905,50 +886,50 @@ export default function HomeLandingPage({
         </section>
 
         {/* Live market intelligence — regime + research teaser preserved */}
-        <section className="bg-[#0F172A] py-20">
-          <div className="mx-auto max-w-7xl px-6">
+        <section className="bg-shell py-20 md:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <div className="mb-12 text-center">
-              <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-[#1EB8CC]">
+              <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-primary">
                 Live Market Intelligence
               </p>
-              <h2 className="mb-2 text-[30px] font-bold text-white">
+              <h2 className="mb-2 text-[clamp(1.5rem,4vw,1.875rem)] font-bold text-lp-on-dark">
                 Real-time regime monitoring
               </h2>
-              <p className="text-[14px] text-slate-300">
+              <p className="text-[15px] text-lp-on-dark-muted">
                 Our agents monitor 40+ macro signals continuously
               </p>
             </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+              <div className="rounded-2xl border border-white/12 bg-white/[0.07] p-5 shadow-sm shadow-black/20 backdrop-blur-sm">
+                <p className="text-sm font-semibold uppercase tracking-wide text-lp-on-dark-muted">
                   Current regime
                 </p>
                 {regimeLabel ? (
                   <>
-                    <p className="mt-2 text-[20px] font-bold text-white">
+                    <p className="mt-2 text-[20px] font-bold text-lp-on-dark">
                       {regimeLabel}
                     </p>
                     {confPct !== null ? (
-                      <p className="mt-2 text-[14px] text-slate-300">
+                      <p className="mt-2 text-[14px] leading-relaxed text-lp-on-dark-muted">
                         Confidence · {confPct}%
                       </p>
                     ) : (
-                      <p className="mt-2 text-[14px] text-slate-300">
+                      <p className="mt-2 text-[14px] leading-relaxed text-lp-on-dark-muted">
                         Confidence data loading from research desk.
                       </p>
                     )}
                   </>
                 ) : (
-                  <p className="mt-2 text-[14px] text-slate-300">
+                  <p className="mt-2 text-[14px] leading-relaxed text-lp-on-dark-muted">
                     Regime feed connects when market data services are
                     available. Upload a portfolio for full swarm context.
                   </p>
                 )}
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+              <div className="rounded-2xl border border-white/12 bg-white/[0.07] p-5 shadow-sm shadow-black/20 backdrop-blur-sm">
+                <p className="text-sm font-semibold uppercase tracking-wide text-lp-on-dark-muted">
                   Latest research
                 </p>
                 {teaser.length > 0 ? (
@@ -957,19 +938,19 @@ export default function HomeLandingPage({
                       <li key={note.id}>
                         <Link
                           href={`/research/${note.id}`}
-                          className="text-[15px] font-medium text-white transition-colors hover:text-[#1EB8CC]"
+                          className="text-[15px] font-medium text-lp-on-dark transition-colors hover:text-primary"
                         >
                           {note.title ?? "Research note"}
-                          <span className="ml-2 text-slate-300">→</span>
+                          <span className="ml-2 text-lp-on-dark-muted">→</span>
                         </Link>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-4 text-[14px] text-slate-300">
+                  <p className="mt-4 text-[14px] leading-relaxed text-lp-on-dark-muted">
                     <Link
                       href="/research"
-                      className="font-medium text-[#1EB8CC] hover:underline"
+                      className="font-semibold text-primary hover:underline"
                     >
                       Browse the research hub
                     </Link>{" "}
@@ -982,13 +963,13 @@ export default function HomeLandingPage({
         </section>
 
         {/* Regulatory */}
-        <section className="bg-[#F8FAFC] py-20">
-          <div className="mx-auto max-w-7xl px-6">
-            <div className="mb-10 text-center">
-              <h2 className="text-[clamp(22px,2.5vw,28px)] font-bold text-[#0F172A]">
+        <section className="bg-lp-elevated py-20 md:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="mb-10 text-center md:mb-12">
+              <h2 className="text-[clamp(22px,2.5vw,28px)] font-bold text-foreground">
                 Regulatory footprint
               </h2>
-              <p className="mt-2 text-[15px] text-[#64748B]">
+              <p className="mt-2 max-w-2xl mx-auto text-[15px] leading-relaxed text-lp-muted">
                 Entities and posture we disclose to partners and committees.
               </p>
             </div>
@@ -996,10 +977,10 @@ export default function HomeLandingPage({
               {JURISDICTIONS.map((j) => (
                 <div
                   key={j.name}
-                  className="rounded-xl border border-[#E2E8F0] bg-white p-5"
+                  className="rounded-xl border border-lp-border bg-lp-card p-5 shadow-sm"
                 >
                   <div className="mb-3 flex items-center justify-between gap-2">
-                    <p className="text-[15px] font-semibold text-[#0F172A]">
+                    <p className="text-[15px] font-semibold text-foreground">
                       {j.name}
                     </p>
                     <span
@@ -1012,10 +993,10 @@ export default function HomeLandingPage({
                       {j.status === "active" ? "Active" : "Launching"}
                     </span>
                   </div>
-                  <p className="text-sm font-medium text-[#475569]">
+                  <p className="text-sm font-medium text-slate2">
                     {j.entity}
                   </p>
-                  <p className="mt-2 text-sm leading-relaxed text-[#64748B]">
+                  <p className="mt-2 text-sm leading-relaxed text-lp-muted">
                     {j.detail}
                   </p>
                 </div>
@@ -1025,25 +1006,19 @@ export default function HomeLandingPage({
         </section>
       </main>
 
-      <footer className="bg-[#0F172A]">
-        <div className="mx-auto max-w-7xl px-6 py-16">
-          <div className="mb-12 grid grid-cols-2 gap-12 lg:grid-cols-4">
+      <footer className="bg-shell">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 md:py-16">
+          <div className="mb-12 grid grid-cols-2 gap-10 sm:gap-12 lg:grid-cols-4">
             <div className="col-span-2 lg:col-span-1">
-              <Image
-                src="/logo.png"
-                alt="NeuFin"
-                width={160}
-                height={40}
-                className="mb-5 h-12 w-auto brightness-0 invert"
-              />
-              <p className="mb-4 text-sm leading-[1.7] text-slate-400">
+              <NeuFinLogo variant="footer-on-dark" className="mb-5" />
+              <p className="mb-4 text-sm leading-[1.7] text-lp-on-dark-muted">
                 Institutional-grade portfolio intelligence for advisors, IFAs,
                 and wealth platforms. Built for the people who cannot afford to
                 get it wrong.
               </p>
               <a
                 href="mailto:info@neufin.ai"
-                className="text-sm text-[#1EB8CC] hover:underline"
+                className="text-sm font-medium text-primary hover:underline"
               >
                 info@neufin.ai
               </a>
@@ -1080,7 +1055,7 @@ export default function HomeLandingPage({
               ] as const
             ).map((col) => (
               <div key={col.heading}>
-                <p className="mb-5 text-xs font-bold uppercase tracking-widest text-slate-300">
+                <p className="mb-5 text-xs font-bold uppercase tracking-widest text-lp-on-dark-muted">
                   {col.heading}
                 </p>
                 <div className="space-y-3">
@@ -1088,7 +1063,7 @@ export default function HomeLandingPage({
                     <Link
                       key={l}
                       href={href}
-                      className="block text-sm text-slate-300 transition-colors hover:text-white"
+                      className="block text-sm text-lp-on-dark-muted transition-colors hover:text-lp-on-dark"
                     >
                       {l}
                     </Link>
@@ -1099,10 +1074,10 @@ export default function HomeLandingPage({
           </div>
 
           <div className="flex flex-col items-center justify-between gap-5 border-t border-white/10 pt-8 md:flex-row">
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-lp-on-dark-muted">
               © 2026 Neufin OÜ. All rights reserved.
             </p>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
               {[
                 "MAS Aligned",
                 "GDPR Compliant",
@@ -1111,7 +1086,7 @@ export default function HomeLandingPage({
               ].map((b) => (
                 <span
                   key={b}
-                  className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-500"
+                  className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-lp-on-dark-muted"
                 >
                   {b}
                 </span>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
+import NeuFinLogo from "@/components/landing/NeuFinLogo";
 
 export const metadata: Metadata = {
   title: "Features — Behavioral Finance Intelligence Platform",
@@ -108,24 +108,24 @@ export default function FeaturesPage() {
       <div className="min-h-screen bg-shell-deep text-shell-fg">
         {/* Nav */}
         <nav className="border-b border-shell-border/60 sticky top-0 z-10 bg-shell-deep/90 backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <Link href="/" className="shrink-0 flex-none">
-              <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-12 w-auto brightness-0 invert" priority />
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[4rem] flex items-center justify-between gap-3 py-1 md:min-h-[4.25rem]">
+            <Link href="/" className="shrink-0 flex-none py-1">
+              <NeuFinLogo variant="footer-on-dark" priority />
             </Link>
             <div className="flex items-center gap-3">
               <Link
                 href="/blog"
-                className="text-sm text-shell-muted hover:text-shell-fg transition-colors"
+                className="text-sm font-medium text-shell-muted hover:text-shell-fg transition-colors"
               >
                 Blog
               </Link>
               <Link
                 href="/research"
-                className="text-sm text-shell-muted hover:text-shell-fg transition-colors"
+                className="text-sm font-medium text-shell-muted hover:text-shell-fg transition-colors"
               >
                 Research
               </Link>
-              <Link href="/pricing" className="btn-primary py-2 text-sm">
+              <Link href="/pricing" className="btn-primary py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-shell-deep">
                 See Pricing
               </Link>
             </div>
@@ -149,10 +149,10 @@ export default function FeaturesPage() {
               under 10 seconds.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-              <Link href="/upload" className="btn-primary text-base px-8 py-3">
+              <Link href="/upload" className="btn-primary text-base px-8 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-shell-deep">
                 Get My DNA Score — Free
               </Link>
-              <Link href="/pricing" className="btn-outline text-base px-8 py-3">
+              <Link href="/pricing" className="btn-outline-on-dark text-base px-8 py-3">
                 View Pricing
               </Link>
             </div>
@@ -165,12 +165,12 @@ export default function FeaturesPage() {
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((f) => (
-                <div key={f.title} className="card space-y-3">
+                <div key={f.title} className="card space-y-3 border-border">
                   <span className="text-3xl">{f.icon}</span>
-                  <h3 className="font-semibold text-lg text-gray-900">
+                  <h3 className="font-semibold text-lg text-foreground">
                     {f.title}
                   </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
+                  <p className="text-sm text-slate2 leading-relaxed">
                     {f.description}
                   </p>
                 </div>
@@ -179,11 +179,11 @@ export default function FeaturesPage() {
           </section>
 
           {/* Bias explainer */}
-          <section className="card mb-20">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">
+          <section className="card mb-20 border-border">
+            <h2 className="text-xl font-bold mb-4 text-foreground">
               The 6 Biases NeuFin Detects
             </h2>
-            <p className="text-gray-600 text-sm mb-6">
+            <p className="text-slate2 text-sm mb-6">
               Based on research by Daniel Kahneman (Nobel Prize 2002), Richard
               Thaler (Nobel Prize 2017), and NeuFin&apos;s own analysis of
               Singapore SME portfolios.
@@ -215,11 +215,11 @@ export default function FeaturesPage() {
                   "Following institutional flows or trending assets without independent analysis.",
                 ],
               ].map(([name, desc]) => (
-                <div key={name} className="rounded-lg bg-gray-50 border border-gray-200 p-4">
-                  <p className="font-semibold text-sm text-gray-900 mb-1">
+                <div key={name} className="rounded-lg bg-surface-2 border border-border p-4">
+                  <p className="font-semibold text-sm text-foreground mb-1">
                     {name}
                   </p>
-                  <p className="text-xs text-gray-600 leading-relaxed">
+                  <p className="text-xs text-slate2 leading-relaxed">
                     {desc}
                   </p>
                 </div>
@@ -245,19 +245,19 @@ export default function FeaturesPage() {
           </section>
 
           {/* CTA */}
-          <section className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
+          <section className="text-center rounded-2xl border border-white/10 bg-white/[0.06] p-10 sm:p-12 backdrop-blur-sm">
             <h2 className="text-2xl font-bold mb-3 text-shell-fg">
               Ready to Find Your Behavioral Blind Spots?
             </h2>
-            <p className="text-shell-muted mb-6">
+            <p className="text-shell-muted mb-6 max-w-xl mx-auto leading-relaxed">
               Upload your portfolio CSV and get your Investor DNA Score in under
               10 seconds. No account required. Free to start.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/upload" className="btn-primary text-base px-8 py-3">
+              <Link href="/upload" className="btn-primary text-base px-8 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-shell-deep">
                 Start Free Analysis
               </Link>
-              <Link href="/pricing" className="btn-outline text-base px-8 py-3">
+              <Link href="/pricing" className="btn-outline-on-dark text-base px-8 py-3">
                 See Full Pricing
               </Link>
             </div>

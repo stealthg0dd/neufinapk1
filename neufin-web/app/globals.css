@@ -74,6 +74,16 @@
   --text: var(--text-primary);
   --text-2: var(--text-body);
   --canvas: var(--bg);
+
+  /* Marketing / landing — enforced contrast (pairs with `lp-` Tailwind colors) */
+  --text-on-dark: #f8fafc;
+  --text-on-dark-muted: #cbd5e1;
+  --text-on-accent: #ffffff;
+  --accent-soft: #e0f7fa;
+  --border-subtle: #e2e8f0;
+  --bg-elevated: #f8fafc;
+  /** Muted body on white — darker than legacy --subtle for small text AA */
+  --readable-muted: #52607a;
 }
 
 html {
@@ -482,7 +492,34 @@ span:not(.badge):not(.chip) {
       0 0 20px -4px rgba(30, 184, 204, 0.35);
   }
   .btn-outline {
-    @apply border border-border text-foreground font-semibold px-6 py-3 rounded-lg transition-colors hover:border-primary hover:text-primary;
+    @apply inline-flex items-center justify-center border border-border bg-transparent text-foreground font-semibold px-6 py-3 rounded-lg transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  /** Secondary CTA on dark / shell backgrounds (replaces low-contrast `btn-outline` there) */
+  .btn-outline-on-dark {
+    @apply inline-flex items-center justify-center border border-white/20 bg-white/5 text-shell-fg font-semibold px-6 py-3 rounded-lg transition-colors hover:border-primary hover:bg-primary/15 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-shell-deep;
+  }
+
+  /* Landing page — shared CTA density & focus rings */
+  .lp-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 text-[15px] font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+  .lp-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-white px-8 py-4 text-[15px] font-semibold text-slate2 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+  .lp-btn-nav-cta {
+    @apply rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:bg-primary-dark hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+  .lp-btn-dark-fill {
+    @apply inline-flex items-center justify-center gap-3 rounded-xl bg-shell px-10 py-4 text-[15px] font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:bg-shell-raised hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/80 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+  .lp-btn-pricing-primary {
+    @apply block w-full rounded-xl bg-primary py-3.5 text-center text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-shell;
+  }
+  .lp-btn-pricing-outline {
+    @apply block w-full rounded-xl border-2 border-border py-3.5 text-center text-sm font-semibold text-foreground transition-all duration-200 hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+  .lp-btn-pricing-dark {
+    @apply block w-full rounded-xl bg-shell py-3.5 text-center text-sm font-semibold text-white transition-all duration-200 hover:bg-shell-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
   }
   .badge {
     @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;

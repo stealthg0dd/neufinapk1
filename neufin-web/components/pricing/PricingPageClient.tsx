@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import NeuFinLogo from "@/components/landing/NeuFinLogo";
 import { motion } from "framer-motion";
 import { Check, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -109,9 +109,9 @@ export default function PricingPageClient() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg-app)]">
       <nav className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/95 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="shrink-0 flex-none">
-            <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-12 w-auto" priority />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[4rem] flex items-center justify-between gap-3 py-1 md:min-h-[4.25rem]">
+          <Link href="/" className="shrink-0 flex-none py-1">
+            <NeuFinLogo variant="header" priority />
           </Link>
           <div className="flex gap-2">
             <Link href="/upload" className="btn-secondary px-3 py-2 text-sm">
@@ -193,40 +193,44 @@ export default function PricingPageClient() {
           </GlassCard>
 
           {/* Advisor */}
-          <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-white p-7 pt-9 shadow-[var(--shadow-sm)]">
-            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wide text-white shadow-md">
-              Most Popular
-            </span>
-            <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">
-              Advisor
-            </p>
-            <p className="mb-1 font-sans text-5xl font-bold text-primary">
-              ${advDisplay}
-            </p>
-            <p className="mb-6 text-sm text-[var(--slate)]">
-              per month{annual ? ", billed annually" : ""}
-            </p>
-            <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
-              {[
-                "Unlimited analyses",
-                "10 advisor reports / mo",
-                "Multi-client workspace",
-                "API access",
-              ].map((f) => (
-                <li key={f} className="flex gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success2" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            <button
-              type="button"
-              disabled={checkoutLoading}
-              onClick={startAdvisorCheckout}
-              className="w-full rounded-lg bg-primary py-3 text-center text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {checkoutLoading ? "Redirecting…" : "Start 14-Day Free Trial"}
-            </button>
+          <GlassCard className="flex flex-col overflow-hidden rounded-xl border-2 border-primary bg-white p-0 shadow-[var(--shadow-sm)]">
+            <div className="shrink-0 bg-gradient-to-r from-primary to-primary-dark px-3 py-2 text-center sm:py-2.5">
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white">
+                Most popular
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col p-7">
+              <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">
+                Advisor
+              </p>
+              <p className="mb-1 font-sans text-5xl font-bold text-primary">
+                ${advDisplay}
+              </p>
+              <p className="mb-6 text-sm font-medium text-[var(--slate)]">
+                per month{annual ? ", billed annually" : ""}
+              </p>
+              <ul className="mb-6 flex-1 space-y-2 text-sm leading-relaxed text-[var(--slate)]">
+                {[
+                  "Unlimited analyses",
+                  "10 advisor reports / mo",
+                  "Multi-client workspace",
+                  "API access",
+                ].map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-success2" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                disabled={checkoutLoading}
+                onClick={startAdvisorCheckout}
+                className="w-full rounded-lg bg-primary py-3 text-center text-sm font-semibold text-white shadow-md transition hover:bg-primary-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+              >
+                {checkoutLoading ? "Redirecting…" : "Start 14-Day Free Trial"}
+              </button>
+            </div>
           </GlassCard>
 
           {/* Enterprise */}
@@ -289,13 +293,7 @@ export default function PricingPageClient() {
 
       <footer className="border-t border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">
         <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={160}
-            height={40}
-            className="mb-3 h-10 w-auto"
-          />
+          <NeuFinLogo variant="compact" className="mb-3" />
           <span>NeuFin © {new Date().getFullYear()}</span>
         </div>
       </footer>
