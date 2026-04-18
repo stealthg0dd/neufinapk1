@@ -216,13 +216,13 @@ export default function HomeLandingPage({
         }`}
       >
         <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
-          <Link href="/" className="flex-shrink-0">
+          <Link href="/" className="flex-shrink-0 flex-none">
             <Image
               src="/logo.png"
               alt="NeuFin"
               width={160}
               height={40}
-              className="h-10 w-auto"
+              className="h-12 w-auto"
               priority
             />
           </Link>
@@ -1034,7 +1034,7 @@ export default function HomeLandingPage({
                 alt="NeuFin"
                 width={160}
                 height={40}
-                className="mb-5 h-10 w-auto brightness-0 invert"
+                className="mb-5 h-12 w-auto brightness-0 invert"
               />
               <p className="mb-4 text-sm leading-[1.7] text-slate-400">
                 Institutional-grade portfolio intelligence for advisors, IFAs,

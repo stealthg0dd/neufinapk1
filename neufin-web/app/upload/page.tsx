@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useRef, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { analyzeDNA } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -100,7 +101,7 @@ export default function UploadPage() {
       <div className="min-h-screen flex flex-col">
         <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
-            <span className="text-xl font-bold text-gradient">Neufin</span>
+            <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-11 w-auto brightness-0 invert" priority />
           </div>
         </nav>
         <main className="flex-1 flex items-center justify-center p-6">
@@ -165,7 +166,7 @@ export default function UploadPage() {
           >
             ← Back
           </Link>
-          <span className="text-xl font-bold text-gradient">Neufin</span>
+          <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-11 w-auto brightness-0 invert" />
         </div>
       </nav>
 

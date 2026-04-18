@@ -34,9 +34,9 @@ export default function Footer() {
             <Image
               src="/logo.png"
               alt="NeuFin"
-              width={140}
-              height={36}
-              className="h-9 w-auto"
+              width={160}
+              height={40}
+              className="h-10 w-auto"
             />
             <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
               IC-grade portfolio intelligence in about a minute. Built for

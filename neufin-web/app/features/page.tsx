@@ -109,8 +109,8 @@ export default function FeaturesPage() {
         {/* Nav */}
         <nav className="border-b border-shell-border/60 sticky top-0 z-10 bg-shell-deep/90 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <Link href="/">
-              <Image src="/logo.png" alt="NeuFin" width={140} height={36} className="h-9 w-auto brightness-0 invert" />
+            <Link href="/" className="shrink-0 flex-none">
+              <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-12 w-auto brightness-0 invert" priority />
             </Link>
             <div className="flex items-center gap-3">
               <Link

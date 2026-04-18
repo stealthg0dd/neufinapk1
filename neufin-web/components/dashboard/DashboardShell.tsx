@@ -81,9 +81,9 @@ export function DashboardShell({
             onClick={() => setMobileNavOpen(false)}
           />
           <aside className="relative z-10 flex h-full w-72 max-w-[min(18rem,88vw)] flex-col bg-white shadow-2xl">
-            <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-[#E2E8F0] px-5">
+            <div className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-[#E2E8F0] px-5">
               <div className="flex items-center">
-                <BrandLogo variant="sidebar" href="/dashboard" />
+                <BrandLogo size="lg" href="/dashboard" />
               </div>
               <button
                 type="button"
@@ -102,7 +102,7 @@ export function DashboardShell({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 flex-shrink-0 items-center gap-4 border-b border-[#E2E8F0] bg-white px-4 lg:hidden">
+        <header className="flex h-16 flex-shrink-0 items-center gap-4 border-b border-[#E2E8F0] bg-white px-4 lg:hidden">
           <button
             type="button"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-[#334155] transition-colors hover:bg-[#F8FAFC]"
@@ -112,7 +112,7 @@ export function DashboardShell({
             <Menu className="h-5 w-5" strokeWidth={1.5} />
           </button>
           <div className="flex items-center">
-            <BrandLogo variant="sidebar" href="/dashboard" />
+            <BrandLogo size="lg" href="/dashboard" />
           </div>
         </header>
         <CommandBar
