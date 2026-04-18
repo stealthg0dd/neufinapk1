@@ -2,8 +2,8 @@
 
 import { Suspense, useState, useRef, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import { analyzeDNA } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import RefCapture from "@/components/RefCapture";
@@ -98,10 +98,10 @@ export default function UploadPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-shell text-shell-fg">
         <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
-            <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-11 w-auto brightness-0 invert" priority />
+            <BrandLogo variant="shell-inverted" href={null} priority />
           </div>
         </nav>
         <main className="flex-1 flex items-center justify-center p-6">
@@ -154,7 +154,7 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-shell text-shell-fg">
       <Suspense fallback={null}>
         <RefCapture />
       </Suspense>
@@ -166,13 +166,13 @@ export default function UploadPage() {
           >
             ← Back
           </Link>
-          <Image src="/logo.png" alt="NeuFin" width={160} height={40} className="h-11 w-auto brightness-0 invert" />
+          <BrandLogo variant="shell-inverted" href="/" />
         </div>
       </nav>
 
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-xl">
-          <h1 className="text-3xl font-bold mb-2">Upload your portfolio</h1>
+          <h1 className="text-3xl font-bold mb-2 text-shell-fg">Upload your portfolio</h1>
           <p className="text-shell-muted mb-4">
             CSV with columns: <code className="text-primary">symbol</code>,{" "}
             <code className="text-primary">shares</code>, and optional{" "}
@@ -252,19 +252,20 @@ export default function UploadPage() {
             </button>
 
             <button
+              type="button"
               onClick={downloadSample}
-              className="btn-outline w-full text-sm py-3"
+              className="btn-outline-on-dark w-full py-3 text-sm"
             >
               Download sample CSV
             </button>
           </div>
 
           {/* Format hint */}
-          <div className="mt-6 card text-sm">
-            <p className="text-shell-muted font-medium mb-2">
+          <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.06] p-5 text-sm text-shell-fg shadow-sm backdrop-blur-sm">
+            <p className="text-shell-fg/90 font-medium mb-2">
               Expected CSV format:
             </p>
-            <pre className="text-xs text-shell-subtle font-mono leading-relaxed">
+            <pre className="text-xs text-shell-muted font-mono leading-relaxed">
               {SAMPLE_CSV.trim()}
             </pre>
           </div>

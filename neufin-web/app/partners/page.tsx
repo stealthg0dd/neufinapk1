@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 type DemoStatus = "idle" | "analyzing" | "done" | "error";
@@ -486,15 +486,9 @@ export default function PartnersPage() {
             justifyContent: "space-between",
           }}
         >
-          <Link href="/" style={{ textDecoration: "none" }}>
-            <Image
-              src="/logo.png"
-              alt="NeuFin"
-              width={130}
-              height={34}
-              style={{ height: 34, width: "auto" }}
-            />
-          </Link>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <BrandLogo variant="marketing-nav" href="/" />
+          </div>
           <div
             style={{
               display: "flex",
@@ -505,19 +499,19 @@ export default function PartnersPage() {
           >
             <a
               href="#sandbox"
-              style={{ color: "#64748B", textDecoration: "none" }}
+              style={{ color: "var(--readable-muted)", textDecoration: "none" }}
             >
               Live Demo
             </a>
             <a
               href="#pricing"
-              style={{ color: "#64748B", textDecoration: "none" }}
+              style={{ color: "var(--readable-muted)", textDecoration: "none" }}
             >
               Pricing
             </a>
             <a
               href="#integration"
-              style={{ color: "#64748B", textDecoration: "none" }}
+              style={{ color: "var(--readable-muted)", textDecoration: "none" }}
             >
               Docs
             </a>

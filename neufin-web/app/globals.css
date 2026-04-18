@@ -84,6 +84,21 @@
   --bg-elevated: #f8fafc;
   /** Muted body on white — darker than legacy --subtle for small text AA */
   --readable-muted: #52607a;
+
+  /* App-wide semantic UI aliases (use with Tailwind `ui-*` or `text-readable`) */
+  --ui-text-primary: var(--text-primary);
+  --ui-text-secondary: var(--text-body);
+  --ui-text-muted: var(--readable-muted);
+  --ui-text-inverse: var(--shell-fg);
+  --ui-surface-default: var(--surface);
+  --ui-surface-elevated: var(--surface-2);
+  --ui-surface-accent: var(--primary-light);
+  --ui-border-subtle: var(--border-subtle);
+  --ui-border-strong: #cbd5e1;
+  --status-success: var(--success);
+  --status-warning: var(--warning);
+  --status-danger: var(--danger);
+  --status-info: var(--primary);
 }
 
 html {
@@ -159,11 +174,11 @@ span:not(.badge):not(.chip) {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--readable-muted);
 }
 .text-caption {
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  color: var(--readable-muted);
   line-height: 1.5;
 }
 .text-metric {
@@ -183,8 +198,8 @@ span:not(.badge):not(.chip) {
 .card,
 .card-sm,
 .card-elevated {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--ui-surface-default);
+  border: 1px solid var(--ui-border-subtle);
   border-radius: 0.75rem;
   box-shadow: 0 1px 2px 0 rgb(15 23 42 / 0.05);
   transition:
@@ -227,6 +242,12 @@ span:not(.badge):not(.chip) {
 }
 .btn-primary:hover {
   background: var(--primary-dark);
+}
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--primary);
 }
 
 .btn-secondary {

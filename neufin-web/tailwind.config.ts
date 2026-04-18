@@ -103,6 +103,23 @@ const config: Config = {
           accent: "var(--primary)",
           "accent-soft": "var(--accent-soft)",
         },
+        /** Product UI — readable muted body, shells, inverse text */
+        readable: t.readableMuted,
+        ui: {
+          "text-primary": "var(--ui-text-primary)",
+          "text-secondary": "var(--ui-text-secondary)",
+          muted: "var(--ui-text-muted)",
+          inverse: "var(--ui-text-inverse)",
+          surface: "var(--ui-surface-default)",
+          elevated: "var(--ui-surface-elevated)",
+          accent: "var(--ui-surface-accent)",
+          "border-subtle": "var(--ui-border-subtle)",
+          "border-strong": "var(--ui-border-strong)",
+          success: "var(--status-success)",
+          warning: "var(--status-warning)",
+          danger: "var(--status-danger)",
+          info: "var(--status-info)",
+        },
       },
       borderRadius: {
         sm: "6px",

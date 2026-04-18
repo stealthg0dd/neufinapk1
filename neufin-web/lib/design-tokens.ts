@@ -34,3 +34,20 @@ export const designTokens = {
 } as const;
 
 export type DesignTokenKey = keyof typeof designTokens;
+
+/** Semantic names for product UI — mirrors `:root` / Tailwind `ui` colors */
+export const uiTokens = {
+  textPrimary: designTokens.textPrimary,
+  textSecondary: designTokens.textBody,
+  textMuted: designTokens.readableMuted,
+  textInverse: designTokens.shellFg,
+  surfaceDefault: designTokens.surface,
+  surfaceElevated: designTokens.surface2,
+  surfaceAccent: designTokens.primaryLight,
+  borderSubtle: designTokens.border,
+  borderStrong: "#CBD5E1",
+  success: designTokens.success,
+  warning: designTokens.warning,
+  danger: designTokens.danger,
+  info: designTokens.primary,
+} as const;

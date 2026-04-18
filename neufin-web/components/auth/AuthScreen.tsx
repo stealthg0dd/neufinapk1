@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { claimAnonymousRecord } from "@/lib/api";
 import { useNeufinAnalytics } from "@/lib/analytics";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { BrandLogo } from "@/components/BrandLogo";
 
 async function claimPendingRecord(token: string) {
   if (typeof window === "undefined") return;
@@ -210,7 +211,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
               setError("");
               setEmail("");
             }}
-            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+            className="text-sm text-[var(--readable-muted)] hover:text-[var(--text-body)] transition-colors"
           >
             ← Try a different email
           </button>
@@ -229,13 +230,10 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
         transition={{ type: "spring", stiffness: 320, damping: 28 }}
       >
         <GlassCard className="p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <Link
-              href="/"
-              className="inline-block font-sans text-2xl text-primary tracking-tight"
-            >
-              NeuFin
-            </Link>
+          <div className="text-center space-y-3">
+            <div className="flex justify-center">
+              <BrandLogo variant="marketing-compact" href="/" />
+            </div>
             <h1 className="text-xl font-semibold text-[var(--text-primary)]">
               {mode === "login"
                 ? "Sign in to NeuFin"
@@ -264,7 +262,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
             Continue with Google
           </motion.button>
 
-          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+          <div className="flex items-center gap-3 text-xs text-[var(--readable-muted)]">
             <span className="h-px flex-1 bg-[var(--border)]" />
             or continue with email
             <span className="h-px flex-1 bg-[var(--border)]" />
@@ -299,7 +297,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 autoComplete="email"
-                className="w-full rounded-lg bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-amber"
+                className="w-full rounded-lg bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--readable-muted)] focus-amber"
               />
             </div>
             <div>
@@ -320,7 +318,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
                 autoComplete={
                   mode === "login" ? "current-password" : "new-password"
                 }
-                className="w-full rounded-lg bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-amber"
+                className="w-full rounded-lg bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--readable-muted)] focus-amber"
               />
             </div>
 
@@ -344,7 +342,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
 
           <motion.div
             layout
-            className="text-center text-sm text-[var(--text-secondary)]"
+            className="text-center text-sm text-[var(--text-body)]"
           >
             {mode === "login" ? (
               <>
@@ -369,11 +367,11 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
             )}
           </motion.div>
 
-          <p className="text-center text-xs text-[var(--text-muted)]">
+          <p className="text-center text-xs text-[var(--readable-muted)]">
             By continuing you agree to our{" "}
             <Link
               href="/privacy"
-              className="text-[var(--text-secondary)] underline underline-offset-2 hover:text-[var(--text-primary)]"
+              className="text-[var(--text-body)] underline underline-offset-2 hover:text-[var(--text-primary)]"
             >
               Privacy Policy
             </Link>
@@ -383,7 +381,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
         <p className="text-center mt-6">
           <Link
             href="/"
-            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            className="text-sm text-[var(--readable-muted)] hover:text-[var(--text-body)]"
           >
             ← Back to home
           </Link>
