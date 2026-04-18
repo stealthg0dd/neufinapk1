@@ -973,19 +973,19 @@ def _fetch_prices(symbols: list[str], period: str) -> pd.DataFrame:
 # ── Currency detection ────────────────────────────────────────────────────────
 # Maps ticker exchange suffix → ISO 4217 currency code.
 _SUFFIX_CURRENCY: dict[str, str] = {
-    ".SI": "SGD",   # Singapore Exchange
-    ".VN": "VND",   # Vietnam HoSE / HNX
-    ".KL": "MYR",   # Bursa Malaysia
-    ".BK": "THB",   # Thailand SET
-    ".HK": "HKD",   # Hong Kong Stock Exchange
-    ".L": "GBP",    # London Stock Exchange
-    ".AX": "AUD",   # ASX Australia
-    ".T": "JPY",    # Tokyo Stock Exchange
-    ".SS": "CNY",   # Shanghai Stock Exchange
-    ".SZ": "CNY",   # Shenzhen Stock Exchange
-    ".NS": "INR",   # NSE India
-    ".BO": "INR",   # BSE India
-    ".JK": "IDR",   # Indonesia IDX
+    ".SI": "SGD",  # Singapore Exchange
+    ".VN": "VND",  # Vietnam HoSE / HNX
+    ".KL": "MYR",  # Bursa Malaysia
+    ".BK": "THB",  # Thailand SET
+    ".HK": "HKD",  # Hong Kong Stock Exchange
+    ".L": "GBP",  # London Stock Exchange
+    ".AX": "AUD",  # ASX Australia
+    ".T": "JPY",  # Tokyo Stock Exchange
+    ".SS": "CNY",  # Shanghai Stock Exchange
+    ".SZ": "CNY",  # Shenzhen Stock Exchange
+    ".NS": "INR",  # NSE India
+    ".BO": "INR",  # BSE India
+    ".JK": "IDR",  # Indonesia IDX
 }
 
 

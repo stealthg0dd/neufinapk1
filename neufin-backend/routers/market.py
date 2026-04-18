@@ -207,14 +207,14 @@ async def score_trend():
 
 # Yahoo Finance symbols for each display label
 _INDEX_MAP: dict[str, dict] = {
-    "S&P 500":  {"symbol": "^GSPC",    "currency": "USD", "region": "US"},
-    "NASDAQ":   {"symbol": "^IXIC",    "currency": "USD", "region": "US"},
-    "FTSE 100": {"symbol": "^FTSE",    "currency": "GBP", "region": "UK"},
-    "STI":      {"symbol": "^STI",     "currency": "SGD", "region": "SG"},
-    "VNIndex":  {"symbol": "^VNINDEX", "currency": "VND", "region": "VN"},
-    "KLCI":     {"symbol": "^KLSE",    "currency": "MYR", "region": "MY"},
-    "SET":      {"symbol": "^SET.BK",  "currency": "THB", "region": "TH"},
-    "HSI":      {"symbol": "^HSI",     "currency": "HKD", "region": "HK"},
+    "S&P 500": {"symbol": "^GSPC", "currency": "USD", "region": "US"},
+    "NASDAQ": {"symbol": "^IXIC", "currency": "USD", "region": "US"},
+    "FTSE 100": {"symbol": "^FTSE", "currency": "GBP", "region": "UK"},
+    "STI": {"symbol": "^STI", "currency": "SGD", "region": "SG"},
+    "VNIndex": {"symbol": "^VNINDEX", "currency": "VND", "region": "VN"},
+    "KLCI": {"symbol": "^KLSE", "currency": "MYR", "region": "MY"},
+    "SET": {"symbol": "^SET.BK", "currency": "THB", "region": "TH"},
+    "HSI": {"symbol": "^HSI", "currency": "HKD", "region": "HK"},
 }
 
 _INDEX_CACHE_TTL = 300  # 5 minutes
@@ -258,9 +258,7 @@ def _fetch_index_quotes() -> list[dict]:
                     }
                 )
             except Exception as exc:
-                logger.warning(
-                    "market.index_quote_failed", symbol=sym, error=str(exc)
-                )
+                logger.warning("market.index_quote_failed", symbol=sym, error=str(exc))
                 results.append(
                     {
                         "label": label,
@@ -289,6 +287,7 @@ async def market_indices():
         return cached
 
     import asyncio
+
     quotes = await asyncio.to_thread(_fetch_index_quotes)
     payload = {"indices": quotes, "count": len(quotes)}
     _store("market_indices", payload)
