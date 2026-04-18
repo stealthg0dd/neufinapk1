@@ -223,7 +223,7 @@ _INDEX_CACHE_TTL = 300  # 5 minutes
 def _fetch_index_quotes() -> list[dict]:
     """Fetch latest quotes for all tracked indices using yfinance."""
     try:
-        import yfinance as yf  # noqa: PLC0415
+        import yfinance as yf
     except ImportError:
         logger.warning("market.indices_yfinance_missing")
         return []
