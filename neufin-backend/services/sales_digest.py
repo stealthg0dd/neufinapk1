@@ -10,7 +10,9 @@ Can also be triggered on-demand for testing.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
 
 import structlog
 

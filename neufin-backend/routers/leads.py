@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import asyncio
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query

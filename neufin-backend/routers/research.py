@@ -17,7 +17,9 @@ import json
 import math
 import random
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
 from typing import Any
 
 import structlog

@@ -20,7 +20,9 @@ Schedule: every 6 hours via APScheduler.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
 
 import structlog
 

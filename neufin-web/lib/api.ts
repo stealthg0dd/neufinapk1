@@ -227,6 +227,10 @@ export interface DNAAnalysisResponse {
   share_url: string;
   record_id: string | null;
   portfolio_id: string | null;
+  /** True when listing currencies differ across holdings (total is not a single CCY FX total). */
+  multi_currency_portfolio?: boolean;
+  /** ISO 4217 codes present in the upload. */
+  portfolio_currencies?: string[];
   /** Non-blocking warnings: stale prices, alias resolutions, excluded tickers */
   warnings?: string[];
   /** Tickers that could not be priced and were excluded from analysis */
@@ -239,9 +243,15 @@ export type DNAResult = DNAAnalysisResponse;
 export interface Position {
   symbol: string;
   shares: number;
+  /** Last price in the instrument's listing / native currency when known */
   price: number;
   value: number;
   weight: number;
+  native_currency?: string;
+  /** SEA-TICKER-FIX: resolver metadata when present */
+  market_code?: string;
+  provider_ticker?: string;
+  benchmark?: string;
 }
 
 export interface CandleData {

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import io
@@ -114,9 +116,10 @@ from services.calculator import (  # noqa: E402
     _hhi_score,
     _tax_alpha_score,
     fetch_beta,
-    fetch_spot_price,
+    get_price_with_fallback,
     get_tax_impact_analysis,
 )
+from services.market_resolver import resolve_security  # noqa: E402
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,
@@ -992,21 +995,26 @@ async def analyze_dna(
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
     symbols = df["symbol"].str.upper().unique().tolist()
 
-    # ── 5. Price fetching — strict validation (DATA_INTEGRITY_ERROR on 0) ──────
+    # ── 5. Price fetching — treat unresolvable / zero quote as failure, not $0 ───
     price_results = await asyncio.gather(
-        *[asyncio.to_thread(fetch_spot_price, sym) for sym in symbols],
+        *[asyncio.to_thread(get_price_with_fallback, sym) for sym in symbols],
         return_exceptions=True,
     )
     failed_tickers: list[str] = []
     price_map: dict[str, float] = {}
-    for sym, result in zip(symbols, price_results, strict=False):
+    for sym, result in zip(symbols, price_results):
         if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
             failed_tickers.append(sym)
         elif isinstance(result, Exception):
             logger.warning("analyze_dna.price_error", symbol=sym, error=str(result))
             failed_tickers.append(sym)
+        elif getattr(result, "status", None) == "unresolvable" or (
+            getattr(result, "price", None) is None
+            or (isinstance(result.price, (int, float)) and float(result.price) <= 0)
+        ):
+            failed_tickers.append(sym)
         else:
-            price_map[sym] = float(result)
+            price_map[sym] = float(result.price)  # type: ignore[union-attr]
 
     if failed_tickers:
         raise HTTPException(
@@ -1048,7 +1056,7 @@ async def analyze_dna(
         if total_value > 0
         else df["symbol"].tolist()[:5]
     )
-    weights_dict = dict(zip(df["symbol"].tolist(), df["weight"].tolist(), strict=False))
+    weights_dict = dict(zip(df["symbol"].tolist(), df["weight"].tolist()))
     corr_matrix = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
     clusters = find_correlation_clusters(corr_matrix, weights_dict)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
@@ -1062,8 +1070,15 @@ async def analyze_dna(
     }
 
     # ── 7. AI analysis ─────────────────────────────────────────────────────────
+    ccy_set = {resolve_security(s).native_currency for s in df["symbol"].tolist()}
+    multi_ccy = len(ccy_set) > 1
     if prices_available:
         price_note = ""
+        if multi_ccy:
+            price_note = (
+                "\nNote: Holdings use multiple listing currencies "
+                f"({', '.join(sorted(ccy_set))}); totals are not FX-converted to a single currency.\n"
+            )
     else:
         price_note = "\nNote: Live market prices are currently unavailable. Analyze based on share quantities and symbol weights only; do not reference dollar values.\n"
 
@@ -1072,8 +1087,8 @@ async def analyze_dna(
     cluster_narrative = format_clusters_for_ai(clusters)
 
     prompt = f"""You are a behavioral finance expert.{price_note}
-Portfolio: {df[["symbol", "shares", "current_price", "value"]].to_dict(orient="records")}
-Total value: ${total_value:,.2f}
+Portfolio: {df.assign(native_currency=df["symbol"].map(lambda s: resolve_security(s).native_currency))[["symbol", "shares", "native_currency", "current_price", "value"]].to_dict(orient="records")}
+Total value (mixed-currency sum, not FX-adjusted): {total_value:,.2f}
 Max position: {max_pos:.1f}%
 Weighted beta: {weighted_beta:.2f}
 DNA Score: {dna_score}/100
@@ -1106,10 +1121,16 @@ Return ONLY valid JSON:
             if total_value > 0
             else 0.0
         )
+        # # SEA-TICKER-FIX: align DNA response with MarketResolver metadata
+        _m = resolve_security(str(row["symbol"]))
         positions_out.append(
             {
                 "symbol": row["symbol"],
                 "shares": row["shares"],
+                "native_currency": _m.native_currency,
+                "market_code": _m.market,
+                "provider_ticker": _m.provider_ticker,
+                "benchmark": _m.benchmark,
                 "price": row["current_price"],
                 "value": row["value"],
                 "weight": weight,
@@ -1146,17 +1167,30 @@ Return ONLY valid JSON:
             logger.debug("analyze_dna.portfolio_inserted", portfolio_id=portfolio_id)
             for pos in positions_out:
                 try:
-                    supabase.table("portfolio_positions").insert(
-                        {
-                            "portfolio_id": portfolio_id,
-                            "symbol": pos["symbol"],
-                            "shares": pos["shares"],
-                        }
-                    ).execute()
+                    # # SEA-TICKER-FIX: optional columns — omit if migration not applied
+                    row = {
+                        "portfolio_id": portfolio_id,
+                        "symbol": pos["symbol"],
+                        "shares": pos["shares"],
+                        "native_currency": pos.get("native_currency"),
+                        "market_code": pos.get("market_code"),
+                        "provider_ticker": pos.get("provider_ticker"),
+                    }
+                    supabase.table("portfolio_positions").insert(row).execute()
                 except Exception:
-                    logger.warning(
-                        "analyze_dna.position_insert_failed", symbol=pos["symbol"]
-                    )
+                    try:
+                        supabase.table("portfolio_positions").insert(
+                            {
+                                "portfolio_id": portfolio_id,
+                                "symbol": pos["symbol"],
+                                "shares": pos["shares"],
+                            }
+                        ).execute()
+                    except Exception:
+                        logger.warning(
+                            "analyze_dna.position_insert_failed",
+                            symbol=pos["symbol"],
+                        )
         else:
             logger.warning("analyze_dna.portfolio_empty_response")
             portfolio_id = None
@@ -1245,6 +1279,8 @@ Return ONLY valid JSON:
         "dna_score": dna_score,
         "score_breakdown": score_breakdown,
         "total_value": round(total_value, 2),
+        "multi_currency_portfolio": multi_ccy,
+        "portfolio_currencies": sorted(ccy_set),
         "num_positions": len(df),
         "max_position_pct": round(max_pos, 2),
         "weighted_beta": round(weighted_beta, 3),

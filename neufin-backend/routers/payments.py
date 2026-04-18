@@ -12,6 +12,8 @@ POST /api/stripe/webhook    → Stripe event handler
 GET  /api/reports/fulfill   → After payment, generate PDF and return URL
 """
 
+from __future__ import annotations
+
 import asyncio
 import datetime
 

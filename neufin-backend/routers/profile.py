@@ -8,6 +8,8 @@ POST /api/profile/logo                 → upload image → advisors.logo_base64
 POST /api/profile/onboarding           → legacy alias → complete-onboarding
 """
 
+from __future__ import annotations
+
 import base64
 import io
 import uuid

@@ -122,6 +122,20 @@ class TestDNAScoreComponents:
 
 
 class TestPriceFetching:
+    @patch("services.calculator._yfinance_batch")
+    @patch("services.calculator._polygon_batch")
+    def test_yahoo_fills_when_polygon_empty(self, mock_polygon, mock_yfinance):
+        mock_polygon.return_value = {}
+        mock_yfinance.return_value = {"HPG.VN": 22.4, "^FTSE": 7800.0}
+        import services.calculator as calc
+        from services.calculator import _fetch_prices_batch
+
+        calc._BLACKLIST.clear()
+        result = _fetch_prices_batch(["HPG.VN", "^FTSE"])
+        mock_yfinance.assert_called()
+        assert result["HPG.VN"] == pytest.approx(22.4)
+        assert result["^FTSE"] == pytest.approx(7800.0)
+
     @patch("services.calculator._polygon_batch")
     def test_uses_polygon_first(self, mock_polygon):
         mock_polygon.return_value = {"AAPL": 185.0}

@@ -19,7 +19,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import re
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
 
 import feedparser
 import httpx

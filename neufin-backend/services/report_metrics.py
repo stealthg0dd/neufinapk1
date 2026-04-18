@@ -27,16 +27,35 @@ def canonical_portfolio_headlines(
     if not isinstance(m, dict):
         m = {}
 
-    sum_positions = 0.0
-    for p in positions or []:
-        v = float(p.get("value") or p.get("current_value") or 0)
-        if v <= 0:
-            sh = float(p.get("shares") or 0)
-            px = float(
-                p.get("price") or p.get("current_price") or p.get("last_price") or 0
-            )
-            v = sh * px
-        sum_positions += max(0.0, v)
+    def _position_mark(p: dict[str, Any]) -> float:
+        if (p.get("price_status") or "").lower() == "unresolvable":
+            return 0.0
+        raw_v = p.get("value")
+        if raw_v is not None and raw_v != "":
+            try:
+                v = float(raw_v)
+            except (TypeError, ValueError):
+                v = 0.0
+            if v > 0:
+                return v
+        sh_raw = p.get("shares")
+        try:
+            sh = float(sh_raw or 0)
+        except (TypeError, ValueError):
+            sh = 0.0
+        for key in ("native_price", "price", "current_price", "last_price"):
+            px_raw = p.get(key)
+            if px_raw is None or px_raw == "":
+                continue
+            try:
+                px = float(px_raw)
+            except (TypeError, ValueError):
+                continue
+            if px > 0:
+                return max(0.0, sh * px)
+        return 0.0
+
+    sum_positions = sum(_position_mark(p) for p in (positions or []))
 
     tv_stored = float(portfolio_data.get("total_value") or m.get("total_value") or 0)
     if sum_positions > 1.0:

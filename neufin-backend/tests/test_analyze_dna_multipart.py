@@ -23,16 +23,18 @@ def client():
     # Patch heavy dependencies so the test is unit-level and never hits network
     with (
         patch("database.supabase") as mock_supabase,
-        patch("yfinance.download") as mock_yf,
+        patch(
+            "main.get_price_with_fallback",
+        ) as mock_price,
         patch("services.ai_router.get_ai_analysis", new_callable=AsyncMock) as mock_ai,
         patch("services.analytics.track", new_callable=AsyncMock),
     ):
-        # yfinance returns a DataFrame; ["Close"] gives a DataFrame (rows=dates, cols=tickers).
-        # main.py uses isinstance(raw, pd.DataFrame) to detect this case.
-        import pandas as pd
+        from services.market_cache import PriceResult
 
-        mock_close_df = pd.DataFrame([{"AAPL": 180.0, "MSFT": 370.0}])
-        mock_yf.return_value = {"Close": mock_close_df}
+        def _price(sym: str, **_: object) -> PriceResult:
+            return PriceResult(symbol=sym.upper(), price=180.0, status="live")
+
+        mock_price.side_effect = _price
 
         # ai_router returns a fixed analysis dict
         mock_ai.return_value = {

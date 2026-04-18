@@ -14,7 +14,11 @@ GET  /api/plans                  → all subscription plans (public, no auth)
 GET  /api/subscription/status    → current user's plan + monthly usage (auth required)
 """
 
-from datetime import UTC, datetime, timedelta
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc  # Py3.9 — datetime.UTC is 3.11+
 
 import stripe
 import structlog
