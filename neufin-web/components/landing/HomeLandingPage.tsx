@@ -220,9 +220,9 @@ export default function HomeLandingPage({
             <Image
               src="/logo.png"
               alt="NeuFin"
-              width={120}
-              height={32}
-              className="h-8 w-auto"
+              width={160}
+              height={40}
+              className="h-10 w-auto"
               priority
             />
           </Link>
@@ -914,14 +914,14 @@ export default function HomeLandingPage({
               <h2 className="mb-2 text-[30px] font-bold text-white">
                 Real-time regime monitoring
               </h2>
-              <p className="text-[14px] text-slate-400">
+              <p className="text-[14px] text-slate-300">
                 Our agents monitor 40+ macro signals continuously
               </p>
             </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                <p className="text-sm font-semibold uppercase tracking-wide text-slate-300">
                   Current regime
                 </p>
                 {regimeLabel ? (
@@ -948,7 +948,7 @@ export default function HomeLandingPage({
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-5">
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+                <p className="text-sm font-semibold uppercase tracking-wide text-slate-300">
                   Latest research
                 </p>
                 {teaser.length > 0 ? (
@@ -960,7 +960,7 @@ export default function HomeLandingPage({
                           className="text-[15px] font-medium text-white transition-colors hover:text-[#1EB8CC]"
                         >
                           {note.title ?? "Research note"}
-                          <span className="ml-2 text-slate-400">→</span>
+                          <span className="ml-2 text-slate-300">→</span>
                         </Link>
                       </li>
                     ))}
@@ -1032,9 +1032,9 @@ export default function HomeLandingPage({
               <Image
                 src="/logo.png"
                 alt="NeuFin"
-                width={120}
-                height={32}
-                className="mb-5 h-8 w-auto brightness-0 invert"
+                width={160}
+                height={40}
+                className="mb-5 h-10 w-auto brightness-0 invert"
               />
               <p className="mb-4 text-sm leading-[1.7] text-slate-400">
                 Institutional-grade portfolio intelligence for advisors, IFAs,
@@ -1080,7 +1080,7 @@ export default function HomeLandingPage({
               ] as const
             ).map((col) => (
               <div key={col.heading}>
-                <p className="mb-5 text-xs font-bold uppercase tracking-widest text-slate-400">
+                <p className="mb-5 text-xs font-bold uppercase tracking-widest text-slate-300">
                   {col.heading}
                 </p>
                 <div className="space-y-3">
@@ -1088,7 +1088,7 @@ export default function HomeLandingPage({
                     <Link
                       key={l}
                       href={href}
-                      className="block text-sm text-slate-400 transition-colors hover:text-white"
+                      className="block text-sm text-slate-300 transition-colors hover:text-white"
                     >
                       {l}
                     </Link>

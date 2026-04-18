@@ -99,7 +99,7 @@ export default function TermsPage() {
               </p>
             </div>
 
-            <div className="prose prose-invert max-w-none space-y-10 text-[15px] leading-relaxed text-muted-foreground">
+            <div className="prose prose-slate max-w-none space-y-10 text-[15px] leading-relaxed text-gray-700">
               <section id="acceptance">
                 <h2 className="mb-3 text-xl font-semibold text-foreground">
                   1. Acceptance of Terms

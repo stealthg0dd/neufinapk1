@@ -5,6 +5,7 @@ Aggregated, anonymised statistics across all Neufin portfolios.
 
 GET /api/market/health           → platform-wide DNA stats (5-min cache)
 GET /api/market/score-trend      → avg DNA score per day, last 30 days (5-min cache)
+GET /api/market/indices          → live global index quotes (SEA + US, 5-min cache)
 POST /api/analytics/track        → client-side funnel event ingestion
 """
 
@@ -199,6 +200,98 @@ async def score_trend():
 
     payload = {"trend": trend}
     _store("score_trend", payload)
+    return payload
+
+
+# ── Global index quotes (SEA + US) ────────────────────────────────────────────
+
+# Yahoo Finance symbols for each display label
+_INDEX_MAP: dict[str, dict] = {
+    "S&P 500":  {"symbol": "^GSPC",    "currency": "USD", "region": "US"},
+    "NASDAQ":   {"symbol": "^IXIC",    "currency": "USD", "region": "US"},
+    "FTSE 100": {"symbol": "^FTSE",    "currency": "GBP", "region": "UK"},
+    "STI":      {"symbol": "^STI",     "currency": "SGD", "region": "SG"},
+    "VNIndex":  {"symbol": "^VNINDEX", "currency": "VND", "region": "VN"},
+    "KLCI":     {"symbol": "^KLSE",    "currency": "MYR", "region": "MY"},
+    "SET":      {"symbol": "^SET.BK",  "currency": "THB", "region": "TH"},
+    "HSI":      {"symbol": "^HSI",     "currency": "HKD", "region": "HK"},
+}
+
+_INDEX_CACHE_TTL = 300  # 5 minutes
+
+
+def _fetch_index_quotes() -> list[dict]:
+    """Fetch latest quotes for all tracked indices using yfinance."""
+    try:
+        import yfinance as yf  # noqa: PLC0415
+    except ImportError:
+        logger.warning("market.indices_yfinance_missing")
+        return []
+
+    symbols = [v["symbol"] for v in _INDEX_MAP.values()]
+    labels = {v["symbol"]: k for k, v in _INDEX_MAP.items()}
+
+    try:
+        tickers = yf.Tickers(" ".join(symbols))
+        results = []
+        for sym in symbols:
+            label = labels[sym]
+            meta = _INDEX_MAP[label]
+            try:
+                info = tickers.tickers[sym].fast_info
+                price = float(getattr(info, "last_price", None) or 0)
+                prev_close = float(getattr(info, "previous_close", None) or 0)
+                change_pct = (
+                    round((price - prev_close) / prev_close * 100, 2)
+                    if prev_close and prev_close > 0
+                    else None
+                )
+                results.append(
+                    {
+                        "label": label,
+                        "symbol": sym,
+                        "price": round(price, 2) if price > 0 else None,
+                        "change_pct": change_pct,
+                        "currency": meta["currency"],
+                        "region": meta["region"],
+                        "status": "live" if price > 0 else "unavailable",
+                    }
+                )
+            except Exception as exc:
+                logger.warning(
+                    "market.index_quote_failed", symbol=sym, error=str(exc)
+                )
+                results.append(
+                    {
+                        "label": label,
+                        "symbol": sym,
+                        "price": None,
+                        "change_pct": None,
+                        "currency": meta["currency"],
+                        "region": meta["region"],
+                        "status": "unavailable",
+                    }
+                )
+        return results
+    except Exception as exc:
+        logger.warning("market.indices_batch_failed", error=str(exc))
+        return []
+
+
+@router.get("/api/market/indices")
+async def market_indices():
+    """
+    Live quotes for all tracked global indices (US + SEA).
+    Cached for 5 minutes. Falls back to empty list if yfinance unavailable.
+    """
+    hit, cached = _cached("market_indices", ttl=_INDEX_CACHE_TTL)
+    if hit:
+        return cached
+
+    import asyncio
+    quotes = await asyncio.to_thread(_fetch_index_quotes)
+    payload = {"indices": quotes, "count": len(quotes)}
+    _store("market_indices", payload)
     return payload
 
 

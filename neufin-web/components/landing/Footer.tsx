@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const FOOTER_LINKS = {
   Product: [
@@ -30,7 +31,13 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <p className="text-lg font-semibold text-foreground">NeuFin</p>
+            <Image
+              src="/logo.png"
+              alt="NeuFin"
+              width={140}
+              height={36}
+              className="h-9 w-auto"
+            />
             <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
               IC-grade portfolio intelligence in about a minute. Built for
               advisors, wealth platforms, and teams who need committee-ready

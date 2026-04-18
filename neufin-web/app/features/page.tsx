@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 
 export const metadata: Metadata = {
   title: "Features — Behavioral Finance Intelligence Platform",
@@ -108,8 +109,8 @@ export default function FeaturesPage() {
         {/* Nav */}
         <nav className="border-b border-shell-border/60 sticky top-0 z-10 bg-shell-deep/90 backdrop-blur-sm">
           <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold text-gradient">
-              NeuFin
+            <Link href="/">
+              <Image src="/logo.png" alt="NeuFin" width={140} height={36} className="h-9 w-auto brightness-0 invert" />
             </Link>
             <div className="flex items-center gap-3">
               <Link
@@ -159,17 +160,17 @@ export default function FeaturesPage() {
 
           {/* Feature grid */}
           <section className="mb-20">
-            <h2 className="text-2xl font-bold text-center mb-10">
+            <h2 className="text-2xl font-bold text-center mb-10 text-shell-fg">
               Platform Capabilities
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {features.map((f) => (
                 <div key={f.title} className="card space-y-3">
                   <span className="text-3xl">{f.icon}</span>
-                  <h3 className="font-semibold text-lg text-shell-fg">
+                  <h3 className="font-semibold text-lg text-gray-900">
                     {f.title}
                   </h3>
-                  <p className="text-sm text-shell-muted leading-relaxed">
+                  <p className="text-sm text-gray-600 leading-relaxed">
                     {f.description}
                   </p>
                 </div>
@@ -179,10 +180,10 @@ export default function FeaturesPage() {
 
           {/* Bias explainer */}
           <section className="card mb-20">
-            <h2 className="text-xl font-bold mb-4">
+            <h2 className="text-xl font-bold mb-4 text-gray-900">
               The 6 Biases NeuFin Detects
             </h2>
-            <p className="text-shell-muted text-sm mb-6">
+            <p className="text-gray-600 text-sm mb-6">
               Based on research by Daniel Kahneman (Nobel Prize 2002), Richard
               Thaler (Nobel Prize 2017), and NeuFin&apos;s own analysis of
               Singapore SME portfolios.
@@ -214,11 +215,11 @@ export default function FeaturesPage() {
                   "Following institutional flows or trending assets without independent analysis.",
                 ],
               ].map(([name, desc]) => (
-                <div key={name} className="rounded-lg bg-shell-raised/40 p-4">
-                  <p className="font-semibold text-sm text-shell-fg mb-1">
+                <div key={name} className="rounded-lg bg-gray-50 border border-gray-200 p-4">
+                  <p className="font-semibold text-sm text-gray-900 mb-1">
                     {name}
                   </p>
-                  <p className="text-xs text-shell-muted leading-relaxed">
+                  <p className="text-xs text-gray-600 leading-relaxed">
                     {desc}
                   </p>
                 </div>
@@ -228,7 +229,7 @@ export default function FeaturesPage() {
 
           {/* FAQ */}
           <section className="mb-16">
-            <h2 className="text-2xl font-bold text-center mb-10">
+            <h2 className="text-2xl font-bold text-center mb-10 text-shell-fg">
               Frequently Asked Questions
             </h2>
             <div className="space-y-6 max-w-3xl mx-auto">
@@ -245,7 +246,7 @@ export default function FeaturesPage() {
 
           {/* CTA */}
           <section className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
-            <h2 className="text-2xl font-bold mb-3">
+            <h2 className="text-2xl font-bold mb-3 text-shell-fg">
               Ready to Find Your Behavioral Blind Spots?
             </h2>
             <p className="text-shell-muted mb-6">

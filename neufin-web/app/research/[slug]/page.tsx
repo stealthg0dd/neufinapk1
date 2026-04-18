@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import { ShareResearchUrlButton } from "@/components/research/ShareResearchUrlButton";
 
 function regimeBadge(regime: string | null | undefined) {
@@ -23,10 +26,10 @@ function regimeBadge(regime: string | null | undefined) {
 function regimeBadgeClass(regime: string | null | undefined) {
   const k = (regime || "").toLowerCase();
   if (k.includes("risk_on") || k === "recovery")
-    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-200";
+    return "border-emerald-300 bg-emerald-100 text-emerald-700";
   if (k.includes("risk_off") || k.includes("recession"))
-    return "border-red-500/40 bg-red-500/15 text-red-200";
-  return "border-slate-500/40 bg-slate-500/15 text-slate-200";
+    return "border-red-300 bg-red-100 text-red-700";
+  return "border-slate-300 bg-slate-100 text-slate-700";
 }
 
 type RelatedNote = {
@@ -169,8 +172,11 @@ export default async function ResearchArticlePage({
             </div>
           </header>
 
-          <div className="prose prose-invert max-w-none prose-p:text-muted-foreground prose-headings:text-foreground">
-            <ReactMarkdown>
+          <div className="prose prose-slate max-w-none prose-p:text-gray-700 prose-headings:text-gray-900 prose-a:text-primary prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100 prose-pre:bg-gray-900 prose-pre:text-gray-100">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw, rehypeSanitize]}
+            >
               {note.content || note.executive_summary}
             </ReactMarkdown>
           </div>

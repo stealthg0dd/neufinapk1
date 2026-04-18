@@ -157,14 +157,28 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
           email,
           password,
         });
-        if (err) throw err;
+        if (err) {
+          const msg = err.message?.toLowerCase() ?? "";
+          if (msg.includes("email not confirmed") || msg.includes("email_not_confirmed")) {
+            throw new Error(
+              "Please confirm your email before signing in. Check your inbox for the confirmation link.",
+            );
+          }
+          if (msg.includes("invalid login credentials") || msg.includes("invalid_credentials")) {
+            throw new Error("Incorrect email or password. Please try again.");
+          }
+          if (msg.includes("too many requests") || msg.includes("rate_limit")) {
+            throw new Error("Too many sign-in attempts. Please wait a moment and try again.");
+          }
+          throw err;
+        }
         capture("user_logged_in", { method: "email" });
         if (data.session?.access_token)
           await claimPendingRecord(data.session.access_token);
         router.replace(next);
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Authentication failed");
+      setError(e instanceof Error ? e.message : "Authentication failed. Please try again.");
     } finally {
       setLoading(false);
     }

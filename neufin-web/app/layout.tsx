@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import RootProviders from "@/app/components/RootProviders";
 import AuthDebugBoot from "@/app/components/AuthDebugBoot";
 import { AuthDebugPanel } from "@/components/AuthDebugPanel";
 import { ScrollReset } from "@/components/ScrollReset";
+
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID ?? "G-Z2E03GFJP3";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,11 +28,11 @@ export const metadata: Metadata = {
   applicationName: "NeuFin",
   icons: {
     icon: [
+      { url: "/favicon.ico", sizes: "any" },
       { url: "/logo-icon.png", sizes: "32x32", type: "image/png" },
-      { url: "/logo-icon.png", sizes: "16x16", type: "image/png" },
     ],
     apple: [{ url: "/logo-icon.png", sizes: "180x180", type: "image/png" }],
-    shortcut: "/logo-icon.png",
+    shortcut: "/favicon.ico",
   },
   title: {
     default: "NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence",
@@ -174,18 +177,20 @@ export default function RootLayout({
             __html: `if (typeof window !== 'undefined') { if (history.scrollRestoration) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0); }`,
           }}
         />
-        <script
-          async
-          src="https://www.googletagmanager.com/gtag/js?id=G-Z2E03GFJP3"
-        ></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `window.dataLayer = window.dataLayer || [];
+        {GA_ID && (
+          <>
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+              strategy="afterInteractive"
+            />
+            <Script id="gtag-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
-gtag('config', 'G-Z2E03GFJP3');`,
-          }}
-        />
+gtag('config', '${GA_ID}');`}
+            </Script>
+          </>
+        )}
         {/* next/font serves locally; keep only app-critical origins */}
         <link
           rel="preconnect"

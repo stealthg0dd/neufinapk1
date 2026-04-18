@@ -119,9 +119,9 @@ export function CommandBar({
           <Image
             src="/logo.png"
             alt="NeuFin"
-            width={120}
+            width={140}
             height={40}
-            className="hidden h-8 w-auto md:block"
+            className="hidden h-9 w-auto sm:block"
           />
           <span
             className="hidden h-4 w-px shrink-0 bg-border sm:block"

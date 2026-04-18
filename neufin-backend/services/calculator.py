@@ -970,6 +970,41 @@ def _fetch_prices(symbols: list[str], period: str) -> pd.DataFrame:
 
 
 # ── Portfolio metrics (used by routers/portfolio.py) ──────────────────────────
+# ── Currency detection ────────────────────────────────────────────────────────
+# Maps ticker exchange suffix → ISO 4217 currency code.
+_SUFFIX_CURRENCY: dict[str, str] = {
+    ".SI": "SGD",   # Singapore Exchange
+    ".VN": "VND",   # Vietnam HoSE / HNX
+    ".KL": "MYR",   # Bursa Malaysia
+    ".BK": "THB",   # Thailand SET
+    ".HK": "HKD",   # Hong Kong Stock Exchange
+    ".L": "GBP",    # London Stock Exchange
+    ".AX": "AUD",   # ASX Australia
+    ".T": "JPY",    # Tokyo Stock Exchange
+    ".SS": "CNY",   # Shanghai Stock Exchange
+    ".SZ": "CNY",   # Shenzhen Stock Exchange
+    ".NS": "INR",   # NSE India
+    ".BO": "INR",   # BSE India
+    ".JK": "IDR",   # Indonesia IDX
+}
+
+
+def detect_portfolio_currency(symbols: list[str]) -> str:
+    """
+    Infer the dominant currency from ticker exchange suffixes.
+    Returns the currency of the majority of detected symbols, falling back to USD.
+    """
+    counts: dict[str, int] = {}
+    for sym in symbols:
+        for suffix, curr in _SUFFIX_CURRENCY.items():
+            if sym.upper().endswith(suffix.upper()):
+                counts[curr] = counts.get(curr, 0) + 1
+                break
+    if not counts:
+        return "USD"
+    return max(counts, key=lambda c: counts[c])
+
+
 def calculate_portfolio_metrics(positions: list) -> dict:
     """Calculate diversification, concentration, volatility, and returns."""
     df = pd.DataFrame(positions)
@@ -1061,8 +1096,11 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         positions_out["symbol"].map(price_status).fillna("live")
     )
 
+    base_currency = detect_portfolio_currency(symbols)
+
     result = {
         "total_value": float(total_value),
+        "base_currency": base_currency,
         "hhi": round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
         "num_positions": len(df),
         "num_priced": len(resolved),
