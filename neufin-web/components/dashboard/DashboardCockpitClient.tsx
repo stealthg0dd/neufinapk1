@@ -15,7 +15,7 @@ import {
 import { KPICard } from "@/components/ui/KPICard";
 import ResearchFeedClient from "@/components/dashboard/ResearchFeedClient";
 import { usePortfolioDNA } from "@/hooks/usePortfolioDNA";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export type CockpitNote = {
   id: string;
@@ -105,9 +105,24 @@ export default function DashboardCockpitClient({
   researchNotes: CockpitNote[];
 }) {
   const { loading: dnaLoading, score, hasPortfolio } = usePortfolioDNA();
-  const [marketTab, setMarketTab] = useState<
-    "S&P 500" | "NASDAQ" | "STI" | "FTSE"
-  >("S&P 500");
+  type IndexLabel = "S&P 500" | "NASDAQ" | "FTSE 100" | "STI" | "VNIndex" | "KLCI" | "SET" | "HSI";
+  const ALL_TABS: IndexLabel[] = ["S&P 500", "NASDAQ", "FTSE 100", "STI", "VNIndex", "KLCI", "SET", "HSI"];
+  const [marketTab, setMarketTab] = useState<IndexLabel>("S&P 500");
+  const [indexQuotes, setIndexQuotes] = useState<Record<string, { price: number | null; change_pct: number | null; currency: string; status: string }>>({});
+
+  useEffect(() => {
+    fetch("/api/market/indices")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.indices) return;
+        const map: typeof indexQuotes = {};
+        for (const q of data.indices as Array<{ label: string; price: number | null; change_pct: number | null; currency: string; status: string }>) {
+          map[q.label] = { price: q.price, change_pct: q.change_pct, currency: q.currency, status: q.status };
+        }
+        setIndexQuotes(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const notes = researchNotes ?? [];
 
@@ -243,8 +258,8 @@ export default function DashboardCockpitClient({
                 Index tabs (fallback mode)
               </span>
             </div>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {(["S&P 500", "NASDAQ", "STI", "FTSE"] as const).map((tab) => {
+            <div className="mb-4 flex flex-wrap gap-1.5">
+              {ALL_TABS.map((tab) => {
                 const active = tab === marketTab;
                 return (
                   <button
@@ -252,32 +267,52 @@ export default function DashboardCockpitClient({
                     type="button"
                     onClick={() => setMarketTab(tab)}
                     className={[
-                      "rounded px-2 py-1 font-mono text-sm",
+                      "rounded px-2 py-1 font-mono text-xs",
                       active
-                        ? "bg-primary/15 text-primary"
+                        ? "bg-primary/15 text-primary font-semibold"
                         : "text-muted-foreground hover:text-foreground",
                     ].join(" ")}
-                    title="Index endpoint unavailable, showing regime-confidence fallback"
                   >
                     {tab}
                   </button>
                 );
               })}
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground">
-                  {regimeLabel}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {marketTab} data endpoint unavailable — showing live regime
-                  confidence fallback
-                </p>
-              </div>
-              <p className="shrink-0 font-mono text-sm tabular-nums text-foreground">
-                {Math.round(confidence * 100)}%
-              </p>
-            </div>
+            {(() => {
+              const q = indexQuotes[marketTab];
+              if (q?.price != null) {
+                const up = (q.change_pct ?? 0) >= 0;
+                return (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{marketTab}</p>
+                      <p className="mt-0.5 font-mono text-xl font-bold tabular-nums text-foreground">
+                        {q.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">{q.currency}</span>
+                      </p>
+                    </div>
+                    {q.change_pct != null && (
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-sm font-semibold ${up ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                        {up ? "+" : ""}{q.change_pct.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{regimeLabel}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {marketTab} — live regime confidence ({Math.round(confidence * 100)}%)
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-mono text-sm tabular-nums text-foreground">
+                    {Math.round(confidence * 100)}%
+                  </p>
+                </div>
+              );
+            })()}
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2">
               <div
                 className={`h-full rounded-full ${

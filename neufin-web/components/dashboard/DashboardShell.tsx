@@ -9,8 +9,8 @@ import { CommandBar } from "@/components/CommandBar";
 import { CheckoutSessionSuccessFeedback } from "@/components/dashboard/CheckoutSessionSuccessFeedback";
 import { TrialStatusBanner } from "@/components/dashboard/TrialStatusBanner";
 import { MarketDeskRail } from "@/components/dashboard/MarketDeskRail";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const RAIL_STORAGE_KEY = "neufin:dashboard:marketdesk-open";
 
@@ -82,21 +82,8 @@ export function DashboardShell({
           />
           <aside className="relative z-10 flex h-full w-72 max-w-[min(18rem,88vw)] flex-col bg-white shadow-2xl">
             <div className="flex h-16 flex-shrink-0 items-center justify-between border-b border-[#E2E8F0] px-5">
-              <div className="flex items-center gap-2">
-                <Image
-                  src="/logo-icon.png"
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-sm"
-                />
-                <Image
-                  src="/logo.png"
-                  alt="NeuFin"
-                  width={120}
-                  height={32}
-                  className="h-8 w-auto"
-                />
+              <div className="flex items-center">
+                <BrandLogo variant="sidebar" href="/dashboard" />
               </div>
               <button
                 type="button"
@@ -124,21 +111,8 @@ export function DashboardShell({
           >
             <Menu className="h-5 w-5" strokeWidth={1.5} />
           </button>
-          <div className="flex items-center gap-2">
-            <Image
-              src="/logo-icon.png"
-              alt=""
-              width={32}
-              height={32}
-              className="h-8 w-8 rounded-sm"
-            />
-            <Image
-              src="/logo.png"
-              alt="NeuFin"
-              width={120}
-              height={32}
-              className="h-8 w-auto"
-            />
+          <div className="flex items-center">
+            <BrandLogo variant="sidebar" href="/dashboard" />
           </div>
         </header>
         <CommandBar

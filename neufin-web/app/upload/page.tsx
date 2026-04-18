@@ -172,11 +172,24 @@ export default function UploadPage() {
       <main className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-xl">
           <h1 className="text-3xl font-bold mb-2">Upload your portfolio</h1>
-          <p className="text-shell-muted mb-8">
+          <p className="text-shell-muted mb-4">
             CSV with columns: <code className="text-primary">symbol</code>,{" "}
             <code className="text-primary">shares</code>, and optional{" "}
             <code className="text-primary">cost_basis</code>
           </p>
+          <div className="mb-6 rounded-lg border border-shell-border/60 bg-shell-raised/30 px-4 py-3 text-xs text-shell-muted">
+            <p className="font-semibold text-shell-fg mb-1">SEA &amp; international markets supported</p>
+            <p>Use exchange suffixes for non-US tickers — the system auto-detects currency from your symbols:</p>
+            <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-primary">
+              <li>.SI → SGD (Singapore)</li>
+              <li>.VN → VND (Vietnam)</li>
+              <li>.KL → MYR (Malaysia)</li>
+              <li>.BK → THB (Thailand)</li>
+              <li>.HK → HKD (Hong Kong)</li>
+              <li>.L → GBP (London)</li>
+            </ul>
+            <p className="mt-1.5">Example: <span className="text-primary font-mono">VCB.VN</span>, <span className="text-primary font-mono">D05.SI</span>, <span className="text-primary font-mono">1155.KL</span></p>
+          </div>
 
           {/* Drop zone */}
           <div

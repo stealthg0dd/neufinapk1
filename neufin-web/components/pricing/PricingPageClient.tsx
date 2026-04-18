@@ -110,8 +110,8 @@ export default function PricingPageClient() {
     <div className="flex min-h-screen flex-col bg-[var(--bg-app)]">
       <nav className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/95 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-sans text-xl text-primary">
-            NeuFin
+          <Link href="/" className="shrink-0">
+            <Image src="/logo.png" alt="NeuFin" width={140} height={36} className="h-9 w-auto" />
           </Link>
           <div className="flex gap-2">
             <Link href="/upload" className="btn-secondary px-3 py-2 text-sm">
@@ -193,8 +193,8 @@ export default function PricingPageClient() {
           </GlassCard>
 
           {/* Advisor */}
-          <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-white p-7 shadow-[var(--shadow-sm)]">
-            <span className="absolute -top-3 right-4 rounded-full bg-primary px-2 py-1 text-xs font-bold uppercase tracking-wide text-white">
+          <GlassCard className="relative flex flex-col rounded-xl border-2 border-primary bg-white p-7 pt-9 shadow-[var(--shadow-sm)]">
+            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-xs font-bold uppercase tracking-wide text-white shadow-md">
               Most Popular
             </span>
             <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">
@@ -292,9 +292,9 @@ export default function PricingPageClient() {
           <Image
             src="/logo.png"
             alt="NeuFin"
-            width={90}
-            height={26}
-            className="mb-3 h-6 w-auto opacity-80"
+            width={140}
+            height={36}
+            className="mb-3 h-9 w-auto"
           />
           <span>NeuFin © {new Date().getFullYear()}</span>
         </div>

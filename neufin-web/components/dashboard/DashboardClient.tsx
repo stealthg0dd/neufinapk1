@@ -59,6 +59,7 @@ type MetricPosition = {
 
 type PortfolioMetrics = {
   total_value: number;
+  base_currency?: string;
   dna_score: number;
   weighted_beta: number;
   annualized_volatility?: number;
@@ -94,11 +95,14 @@ function maxDrawdownPct(points: { value: number }[]): number | null {
   return maxDD * 100;
 }
 
-const fmtMoney = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+function makeFmtMoney(currency = "USD") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  });
+}
+const fmtMoneyUSD = makeFmtMoney("USD");
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -121,6 +125,9 @@ export default function DashboardClient() {
   const [portfolios, setPortfolios] = useState<PortfolioRow[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<PortfolioMetrics | null>(null);
+  const fmtMoney = metrics?.base_currency
+    ? makeFmtMoney(metrics.base_currency)
+    : fmtMoneyUSD;
   const [history, setHistory] = useState<{ time: string; value: number }[]>([]);
   const [notes, setNotes] = useState<ResearchNote[]>([]);
   const [loadMain, setLoadMain] = useState(true);
