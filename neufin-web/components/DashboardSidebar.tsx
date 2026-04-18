@@ -235,13 +235,14 @@ export default function DashboardSidebar({
       aria-label={embedded ? undefined : "Main navigation"}
     >
       {!embedded && (
-        <div className="flex h-16 shrink-0 items-center justify-center border-b border-[#F1F5F9] bg-gradient-to-r from-white to-[#F8FAFC] px-5">
+        <div className="flex h-[72px] shrink-0 items-center border-b border-[#F1F5F9] bg-gradient-to-r from-white to-[#F8FAFC] px-5">
           <Image
             src="/logo.png"
             alt="NeuFin"
-            width={140}
-            height={36}
-            className="h-9 w-auto shrink-0 object-contain object-left"
+            width={160}
+            height={40}
+            className="h-11 w-auto shrink-0 object-contain object-left"
+            priority
           />
         </div>
       )}

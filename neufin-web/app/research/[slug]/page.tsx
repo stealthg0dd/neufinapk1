@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import { ShareResearchUrlButton } from "@/components/research/ShareResearchUrlButton";
+import { normalizeResearchContent } from "@/lib/research-normalizer";
 
 function regimeBadge(regime: string | null | undefined) {
   if (!regime) return "Neutral";
@@ -120,11 +121,17 @@ export default async function ResearchArticlePage({
     );
   }
 
-  const keyInsights = note.executive_summary
-    .split(".")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 3);
+  const report = normalizeResearchContent(note.content, note.executive_summary);
+  const s = report.structured;
+
+  const keyInsights =
+    s?.key_findings && s.key_findings.length > 0
+      ? s.key_findings.slice(0, 3).map((f) => f.finding)
+      : note.executive_summary
+          .split(".")
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .slice(0, 3);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -172,14 +179,153 @@ export default async function ResearchArticlePage({
             </div>
           </header>
 
-          <div className="prose prose-slate max-w-none prose-p:text-gray-700 prose-headings:text-gray-900 prose-a:text-primary prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100 prose-pre:bg-gray-900 prose-pre:text-gray-100">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw, rehypeSanitize]}
-            >
-              {note.content || note.executive_summary}
-            </ReactMarkdown>
-          </div>
+          {/* Structured sections (when content was a JSON dict) */}
+          {s && (
+            <div className="mb-8 space-y-6">
+              {s.key_findings && s.key_findings.length > 0 && (
+                <section className="rounded-xl border border-border bg-surface p-5">
+                  <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                    Key Findings
+                  </h2>
+                  <ul className="space-y-3">
+                    {s.key_findings.map((f, i) => (
+                      <li key={i} className="flex gap-3">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mono text-xs font-semibold text-primary">
+                          {i + 1}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {f.finding}
+                          </p>
+                          {f.data_support && (
+                            <p className="mt-0.5 text-sm text-muted-foreground">
+                              {f.data_support}
+                            </p>
+                          )}
+                          {f.implication && (
+                            <p className="mt-0.5 text-sm text-primary/80">
+                              → {f.implication}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {s.sector_impacts && s.sector_impacts.length > 0 && (
+                <section className="rounded-xl border border-border bg-surface p-5">
+                  <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                    Sector Impacts
+                  </h2>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {s.sector_impacts.map((si, i) => {
+                      const dir = (si.direction ?? "").toLowerCase();
+                      const isPositive = dir.includes("positiv") || dir.includes("up") || dir === "bullish";
+                      const isNegative = dir.includes("negativ") || dir.includes("down") || dir === "bearish";
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-start gap-2 rounded-lg border border-border/60 bg-surface-2 p-3"
+                        >
+                          <span
+                            className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
+                              isPositive
+                                ? "bg-emerald-500"
+                                : isNegative
+                                  ? "bg-red-500"
+                                  : "bg-amber-400"
+                            }`}
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              {si.sector}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {si.impact}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {s.portfolio_implications && s.portfolio_implications.length > 0 && (
+                <section className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+                  <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-primary/70">
+                    Portfolio Implications
+                  </h2>
+                  <ul className="space-y-1.5">
+                    {s.portfolio_implications.map((imp, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-foreground">
+                        <span className="shrink-0 text-primary">→</span>
+                        {imp}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {s.risks && s.risks.length > 0 && (
+                <section className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+                  <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-amber-700">
+                    Risk Factors
+                  </h2>
+                  <ul className="space-y-1.5">
+                    {s.risks.map((r, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-amber-900">
+                        <span className="shrink-0">⚠</span>
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {(s.conclusion || s.recommended_action) && (
+                <section className="rounded-xl border border-border bg-surface p-5">
+                  <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                    Conclusion
+                  </h2>
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {s.conclusion ?? s.recommended_action}
+                  </p>
+                </section>
+              )}
+            </div>
+          )}
+
+          {/* Full markdown content (prose path) */}
+          {!s && (
+            <div className="prose prose-slate max-w-none prose-p:text-gray-700 prose-headings:text-gray-900 prose-a:text-primary prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100 prose-pre:bg-gray-900 prose-pre:text-gray-100">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              >
+                {report.markdown || note.executive_summary}
+              </ReactMarkdown>
+            </div>
+          )}
+
+          {/* Also render the markdown version below structured sections for full context */}
+          {s && report.markdown && (
+            <details className="mt-4">
+              <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+                Full analysis
+              </summary>
+              <div className="prose prose-slate mt-4 max-w-none prose-p:text-gray-700 prose-headings:text-gray-900 prose-a:text-primary prose-strong:text-gray-900 prose-code:text-gray-800 prose-code:bg-gray-100">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
+                >
+                  {report.markdown}
+                </ReactMarkdown>
+              </div>
+            </details>
+          )}
 
           <p className="mt-8 text-sm text-muted-foreground">
             Generated by NeuFin Synthesis Agent at{" "}
@@ -232,8 +378,8 @@ export default async function ResearchArticlePage({
               Key Insights
             </h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              {keyInsights.map((k) => (
-                <li key={k}>• {k}</li>
+              {keyInsights.map((k, i) => (
+                <li key={i}>• {k}</li>
               ))}
             </ul>
           </div>

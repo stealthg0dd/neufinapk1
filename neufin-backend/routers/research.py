@@ -36,6 +36,76 @@ logger = structlog.get_logger("neufin.research")
 router = APIRouter(prefix="/api/research", tags=["research"])
 
 
+def _dict_to_markdown(data: dict) -> str:
+    """Convert a structured research note dict to clean markdown prose.
+
+    Handles the common LLM-output schema:
+      thesis / executive_summary, key_findings, sector_impacts,
+      portfolio_implications, risks, conclusion, recommended_action.
+    Falls back to JSON pretty-print only as a last resort.
+    """
+    lines: list[str] = []
+
+    def _add_section(heading: str, value: object) -> None:
+        if not value:
+            return
+        lines.append(f"## {heading}\n")
+        if isinstance(value, str):
+            lines.append(value.strip())
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    # Flatten common dict shapes
+                    parts = []
+                    for k in (
+                        "finding",
+                        "implication",
+                        "sector",
+                        "impact",
+                        "text",
+                        "description",
+                    ):
+                        if item.get(k):
+                            parts.append(str(item[k]).strip())
+                    support = item.get("data_support") or item.get("evidence") or ""
+                    bullet = " — ".join(parts) if parts else str(item)
+                    lines.append(f"- {bullet}")
+                    if support:
+                        lines.append(f"  *{support}*")
+                else:
+                    lines.append(f"- {item}")
+        else:
+            lines.append(str(value))
+        lines.append("")
+
+    known_keys_handled = set()
+
+    # Ordered presentation
+    for field, label in (
+        ("thesis", "Thesis"),
+        ("executive_summary", "Executive Summary"),
+        ("key_findings", "Key Findings"),
+        ("sector_impacts", "Sector Impacts"),
+        ("portfolio_implications", "Portfolio Implications"),
+        ("risks", "Risks"),
+        ("conclusion", "Conclusion"),
+        ("recommended_action", "Recommended Action"),
+    ):
+        val = data.get(field)
+        if val:
+            _add_section(label, val)
+            known_keys_handled.add(field)
+
+    # Catch-all for any remaining string/list fields not yet handled
+    for k, v in data.items():
+        if k in known_keys_handled or k in ("title", "id", "slug", "generated_at"):
+            continue
+        if isinstance(v, str | list) and v:
+            _add_section(k.replace("_", " ").title(), v)
+
+    return "\n".join(lines).strip() if lines else json.dumps(data, indent=2)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -762,8 +832,18 @@ async def get_blog_note(slug: str):
     note_slug = str(note.get("slug") or "").strip() or slugify(title)
     content = note.get("content") or note.get("body") or note.get("full_content") or ""
     if isinstance(content, dict):
-        content = json.dumps(content, indent=2)
-    elif not isinstance(content, str):
+        content = _dict_to_markdown(content)
+    elif isinstance(content, str):
+        # Content might be a JSON-encoded dict stored as a string
+        stripped = content.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, dict):
+                    content = _dict_to_markdown(parsed)
+            except (json.JSONDecodeError, ValueError):
+                pass
+    else:
         content = str(content)
     tickers = note.get("asset_tickers") or note.get("affected_tickers") or []
     if not isinstance(tickers, list):

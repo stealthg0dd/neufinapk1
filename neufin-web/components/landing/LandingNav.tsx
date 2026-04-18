@@ -20,7 +20,7 @@ export default function LandingNav() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="flex h-14 items-center justify-between gap-3">
+        <div className="flex h-16 items-center justify-between gap-3">
           <Link
             href="/"
             className="flex min-w-0 flex-none items-center gap-3"
@@ -31,7 +31,8 @@ export default function LandingNav() {
               alt="NeuFin"
               width={160}
               height={40}
-              className="h-10 w-auto"
+              className="h-12 w-auto"
+              priority
             />
           </Link>
 

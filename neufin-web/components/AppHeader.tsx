@@ -98,14 +98,15 @@ export default function AppHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-screen-xl items-center justify-between gap-4 px-4">
-        <Link href="/dashboard" className="shrink-0">
+      <div className="mx-auto flex h-16 max-w-screen-xl items-center justify-between gap-4 px-4">
+        <Link href="/dashboard" className="shrink-0 flex-none">
           <Image
             src="/logo.png"
             alt="NeuFin"
-            width={140}
-            height={36}
-            className="h-9 w-auto"
+            width={160}
+            height={40}
+            className="h-12 w-auto"
+            priority
           />
         </Link>
 
