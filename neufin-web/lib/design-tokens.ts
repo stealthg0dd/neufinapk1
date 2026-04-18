@@ -13,6 +13,8 @@ export const designTokens = {
   textSecondary: "#64748B",
   /** Strong body copy on light surfaces (legacy “slate”) */
   textBody: "#334155",
+  /** Small/meta copy on white — meets stricter readable “muted” */
+  readableMuted: "#52607A",
   primary: "#1EB8CC",
   primaryDark: "#158A99",
   primaryLight: "#E0F7FA",

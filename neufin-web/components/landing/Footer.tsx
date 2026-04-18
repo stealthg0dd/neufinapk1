@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import NeuFinLogo from "@/components/landing/NeuFinLogo";
 
 const FOOTER_LINKS = {
   Product: [
@@ -28,16 +28,10 @@ const FOOTER_LINKS = {
 export default function Footer() {
   return (
     <footer className="border-t border-border/60 bg-surface py-section">
-      <div className="mx-auto max-w-7xl px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <Image
-              src="/logo.png"
-              alt="NeuFin"
-              width={160}
-              height={40}
-              className="h-10 w-auto"
-            />
+            <NeuFinLogo variant="footer-on-light" />
             <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">
               IC-grade portfolio intelligence in about a minute. Built for
               advisors, wealth platforms, and teams who need committee-ready
@@ -46,13 +40,13 @@ export default function Footer() {
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/upload"
-                className="inline-flex justify-center rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex justify-center rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 Analyze a portfolio
               </Link>
               <Link
                 href="/contact-sales"
-                className="inline-flex justify-center rounded-lg border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+                className="inline-flex justify-center rounded-lg border border-border bg-white px-6 py-3 text-sm font-semibold text-slate2 transition-colors hover:border-primary hover:bg-surface-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2"
               >
                 Book a demo
               </Link>
