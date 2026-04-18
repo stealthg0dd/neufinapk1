@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function BlogLayout({
   children,
@@ -11,9 +11,7 @@ export default function BlogLayout({
       {/* Nav */}
       <nav className="border-b border-shell-border/60 sticky top-0 z-10 bg-shell-deep/90 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="text-lg font-bold text-gradient">
-            NeuFin
-          </Link>
+          <BrandLogo variant="marketing-footer-dark" href="/" />
           <div className="flex items-center gap-4 text-sm">
             <Link
               href="/blog"
@@ -41,13 +39,9 @@ export default function BlogLayout({
       <footer className="border-t border-shell-border mt-16">
         <div className="max-w-3xl mx-auto px-6 py-section flex flex-wrap items-center justify-between gap-4">
           <div>
-            <Image
-              src="/logo.png"
-              alt="NeuFin"
-              width={90}
-              height={26}
-              className="h-6 w-auto mb-3 opacity-80"
-            />
+            <div className="mb-3">
+              <BrandLogo variant="research-footer" href="/" />
+            </div>
             <p className="text-xs text-shell-subtle mt-1">
               Behavioral finance intelligence for SEA SMEs · Founded 2025 ·
               Singapore

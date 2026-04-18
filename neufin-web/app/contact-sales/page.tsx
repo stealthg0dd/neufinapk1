@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
@@ -65,9 +65,7 @@ export default function ContactSalesPage() {
     <div className="min-h-screen bg-shell-deep flex flex-col">
       <nav className="border-b border-shell-border/60 backdrop-blur-sm sticky top-0 z-10 bg-shell-deep/80">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gradient">
-            Neufin
-          </Link>
+          <BrandLogo variant="marketing-footer-dark" href="/" />
           <Link
             href="/pricing"
             className="text-shell-muted hover:text-white text-sm transition-colors"
@@ -81,7 +79,7 @@ export default function ContactSalesPage() {
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <span className="badge bg-purple-500/10 text-purple-400 border border-purple-500/20 mb-4 inline-block">
+            <span className="badge border border-purple-400/35 bg-purple-500/15 text-purple-200 mb-4 inline-block">
               Enterprise Sales
             </span>
             <h1 className="text-3xl md:text-4xl font-extrabold mb-4">
@@ -239,7 +237,7 @@ export default function ContactSalesPage() {
                 )}
               </button>
 
-              <p className="text-center text-xs text-slate-500">
+              <p className="text-center text-xs text-shell-muted">
                 We&apos;ll contact you within 24 hours · No spam, ever
               </p>
             </form>
@@ -247,15 +245,11 @@ export default function ContactSalesPage() {
         </div>
       </main>
 
-      <footer className="border-t border-shell-border/60 py-6 text-center text-sm text-shell-subtle">
+      <footer className="border-t border-shell-border/60 py-6 text-center text-sm text-shell-muted">
         <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={90}
-            height={26}
-            className="mb-3 h-6 w-auto opacity-80"
-          />
+          <div className="mb-3 flex justify-center">
+            <BrandLogo variant="marketing-footer-dark" href="/" />
+          </div>
           <span>
             NeuFin © {new Date().getFullYear()} · Singapore · MAS-compliant
           </span>

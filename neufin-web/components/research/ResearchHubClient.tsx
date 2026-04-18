@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 import { motion } from "framer-motion";
 import { Lock, Search } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -117,9 +117,7 @@ export default function ResearchHubClient({
     <div className="min-h-screen bg-app text-navy">
       <nav className="sticky top-0 z-10 border-b border-border bg-white/90 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-sans text-lg text-primary">
-            NeuFin
-          </Link>
+          <BrandLogo variant="marketing-nav" href="/" />
           <div className="flex gap-3 text-sm">
             <Link href="/blog" className="text-slate2 hover:text-navy">
               Blog
@@ -133,7 +131,7 @@ export default function ResearchHubClient({
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-section space-y-12">
         <header className="space-y-4">
-          <p className="text-sm font-medium uppercase tracking-wide text-muted2">
+          <p className="text-sm font-medium uppercase tracking-wide text-readable">
             Live intelligence
           </p>
           <h1 className="font-sans text-4xl md:text-5xl leading-tight">
@@ -168,12 +166,12 @@ export default function ResearchHubClient({
 
         <form onSubmit={runSearch} className="space-y-4">
           <GlassCard className="flex items-center gap-2 border-primary/25 p-2">
-            <Search className="ml-3 h-5 w-5 shrink-0 text-muted2" />
+            <Search className="ml-3 h-5 w-5 shrink-0 text-readable" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search intelligence…"
-              className="flex-1 border-0 bg-transparent py-3 pr-3 text-sm text-navy placeholder:text-muted2 focus:outline-none focus:ring-0"
+              className="flex-1 border-0 bg-transparent py-3 pr-3 text-sm text-navy placeholder:text-readable focus:outline-none focus:ring-0"
             />
             <button
               type="submit"
@@ -190,7 +188,7 @@ export default function ResearchHubClient({
           )}
           {searchHits.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm text-muted2">Results</p>
+              <p className="text-sm font-medium text-readable">Results</p>
               {searchHits.map((h) => (
                 <GlassCard key={h.id || h.title} className="p-4">
                   {h.title && (
@@ -204,7 +202,7 @@ export default function ResearchHubClient({
                     </p>
                   )}
                   {h.similarity != null && (
-                    <p className="mt-2 font-mono text-sm text-muted2">
+                    <p className="mt-2 font-mono text-sm text-readable">
                       Match {(h.similarity * 100).toFixed(0)}%
                     </p>
                   )}
@@ -289,19 +287,13 @@ export default function ResearchHubClient({
       </div>
 
       <footer className="mt-12 border-t border-border px-4 py-6">
-        <div className="mx-auto flex max-w-5xl flex-wrap justify-between gap-4 text-sm text-muted2">
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={90}
-            height={26}
-            className="h-6 w-auto opacity-80"
-          />
+        <div className="mx-auto flex max-w-5xl flex-wrap justify-between gap-4 text-sm text-readable">
+          <BrandLogo variant="research-footer" href="/" />
           <div className="flex gap-4">
-            <Link href="/pricing" className="hover:text-navy">
+            <Link href="/pricing" className="font-medium text-slate2 hover:text-foreground">
               Pricing
             </Link>
-            <Link href="/privacy" className="hover:text-navy">
+            <Link href="/privacy" className="font-medium text-slate2 hover:text-foreground">
               Privacy
             </Link>
           </div>

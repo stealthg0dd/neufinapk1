@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getSubscriptionStatus } from "@/lib/api";
@@ -36,7 +36,7 @@ function TrialBadge({
     );
   }
   return (
-    <span className="rounded border border-border bg-surface-2 px-2 py-0.5 text-sm font-semibold text-muted2">
+    <span className="rounded border border-border bg-surface-2 px-2 py-0.5 text-sm font-semibold text-slate2">
       Trial
     </span>
   );
@@ -99,16 +99,7 @@ export default function AppHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-screen-xl items-center justify-between gap-4 px-4">
-        <Link href="/dashboard" className="shrink-0 flex-none">
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={160}
-            height={40}
-            className="h-12 w-auto"
-            priority
-          />
-        </Link>
+        <BrandLogo variant="app-header" href="/dashboard" />
 
         <nav className="hidden items-center gap-1 md:flex">
           {NAV_ITEMS.map(({ label, href }) => {

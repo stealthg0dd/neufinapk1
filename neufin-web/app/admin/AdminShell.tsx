@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -39,7 +40,7 @@ function AdminNavLinks({
               "rounded-lg px-3 py-2 text-sm transition-colors",
               active
                 ? "bg-zinc-800 text-white"
-                : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200",
+                : "text-zinc-300 hover:bg-zinc-900 hover:text-white",
             )}
           >
             {label}
@@ -78,13 +79,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
             height={32}
             className="h-8 w-8 rounded-sm"
           />
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={120}
-            height={32}
-            className="h-8 w-auto"
-          />
+          <BrandLogo variant="admin-wordmark" href="/admin" />
           <span className="sr-only">NeuFin Admin</span>
         </div>
         <button
@@ -130,13 +125,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
                   height={32}
                   className="h-8 w-8 rounded-sm"
                 />
-                <Image
-                  src="/logo.png"
-                  alt="NeuFin"
-                  width={120}
-                  height={32}
-                  className="h-8 w-auto"
-                />
+                <BrandLogo variant="admin-wordmark" href="/admin" />
               </div>
               <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
                 Admin
@@ -160,13 +149,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
               height={32}
               className="h-8 w-8 rounded-sm"
             />
-            <Image
-              src="/logo.png"
-              alt="NeuFin"
-              width={120}
-              height={32}
-              className="h-8 w-auto"
-            />
+            <BrandLogo variant="admin-wordmark" href="/admin" />
           </div>
           <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
             Admin

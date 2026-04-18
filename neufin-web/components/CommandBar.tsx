@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export type RegimeVariant = "risk-on" | "risk-off" | "neutral";
 
@@ -116,13 +116,7 @@ export function CommandBar({
     <>
       <header className="grid h-11 w-full shrink-0 grid-cols-1 items-center gap-2 border-b border-border bg-white px-4 sm:grid-cols-[1fr_minmax(0,28rem)_1fr] sm:gap-0">
         <div className="flex min-w-0 items-center gap-3">
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={140}
-            height={40}
-            className="hidden h-9 w-auto sm:block"
-          />
+          <BrandLogo variant="app-command" href="/dashboard" />
           <span
             className="hidden h-4 w-px shrink-0 bg-border sm:block"
             aria-hidden

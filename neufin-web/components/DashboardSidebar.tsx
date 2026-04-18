@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLogo } from "@/components/BrandLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -68,8 +68,8 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
       className={[
         "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ease-out",
         active
-          ? "bg-[#E0F7FA] font-semibold text-primary"
-          : "text-[#334155] hover:bg-[#F8FAFC] hover:text-[#0F172A] active:scale-[0.99]",
+          ? "bg-primary-light font-semibold text-primary"
+          : "text-slate2 hover:bg-surface-2 hover:text-foreground active:scale-[0.99]",
       ].join(" ")}
     >
       <Icon
@@ -227,7 +227,7 @@ export default function DashboardSidebar({
 
   const rootClass = embedded
     ? "flex h-full min-h-0 w-full flex-col bg-white"
-    : "flex h-full w-[220px] shrink-0 flex-col border-r border-[#E5E7EB] bg-white";
+    : "flex h-full w-[220px] shrink-0 flex-col border-r border-border bg-white";
 
   return (
     <aside
@@ -235,32 +235,25 @@ export default function DashboardSidebar({
       aria-label={embedded ? undefined : "Main navigation"}
     >
       {!embedded && (
-        <div className="flex h-[72px] shrink-0 items-center border-b border-[#F1F5F9] bg-gradient-to-r from-white to-[#F8FAFC] px-5">
-          <Image
-            src="/logo.png"
-            alt="NeuFin"
-            width={160}
-            height={40}
-            className="h-11 w-auto shrink-0 object-contain object-left"
-            priority
-          />
+        <div className="flex h-[72px] shrink-0 items-center border-b border-border bg-gradient-to-r from-white to-surface-2 px-5">
+          <BrandLogo variant="app-sidebar" href="/dashboard" />
         </div>
       )}
 
       {sidebarDnaScore != null && (
-        <div className="mx-3 mb-2 mt-4 rounded-xl border border-[#1EB8CC]/20 bg-gradient-to-br from-[#E0F7FA] to-[#F0FDF4] p-3">
-          <p className="mb-1 text-xs font-bold uppercase tracking-widest text-[#1EB8CC]">
+        <div className="mx-3 mb-2 mt-4 rounded-xl border border-primary/25 bg-gradient-to-br from-primary-light to-emerald-50/90 p-3">
+          <p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary">
             Portfolio Health
           </p>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[22px] font-bold tabular-nums tracking-tight text-[#0F172A]">
+            <span className="text-[22px] font-bold tabular-nums tracking-tight text-foreground">
               {sidebarDnaScore}
             </span>
             <span className="badge badge-success shrink-0 text-xs">Active</span>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E2E8F0]">
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
             <div
-              className="h-1.5 min-w-[4px] rounded-full bg-[#1EB8CC] transition-all duration-500"
+              className="h-1.5 min-w-[4px] rounded-full bg-primary transition-all duration-500"
               style={{
                 width: `${Math.min(100, Math.max(0, Number(sidebarDnaScore)))}%`,
               }}
@@ -292,7 +285,7 @@ export default function DashboardSidebar({
 
         {isActivePaid && (
           <>
-            <div className="mx-4 my-4 border-t border-[#F1F5F9]" />
+            <div className="mx-4 my-4 border-t border-border" />
             <div className="mt-0">
               <p className="text-label px-3 pb-1.5 pt-2">Developer</p>
               <div className="flex flex-col gap-0.5 px-2">
@@ -301,8 +294,8 @@ export default function DashboardSidebar({
                   className={[
                     "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActivePath(pathname, "/developer")
-                      ? "bg-[#E0F7FA] font-semibold text-primary"
-                      : "text-[#334155] hover:bg-[#F8FAFC] hover:text-[#0F172A]",
+                      ? "bg-primary-light font-semibold text-primary"
+                      : "text-slate2 hover:bg-surface-2 hover:text-foreground",
                   ].join(" ")}
                 >
                   <Code2
@@ -323,7 +316,7 @@ export default function DashboardSidebar({
         )}
       </nav>
 
-      <div className="border-t border-[#F1F5F9] px-4 py-3">
+      <div className="border-t border-border px-4 py-3">
         <div
           className={`mb-3 rounded-md px-2.5 py-1.5 text-sm font-medium ${planBadgeClass}`}
         >
@@ -334,14 +327,14 @@ export default function DashboardSidebar({
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm leading-snug text-[#64748B]">
+            <p className="truncate text-sm leading-snug text-readable">
               {user?.email ?? "—"}
             </p>
           </div>
           <button
             type="button"
             onClick={onSignOut}
-            className="shrink-0 rounded-md p-1.5 text-[#6B7280] hover:bg-slate-100 hover:text-slate-900"
+            className="shrink-0 rounded-md p-1.5 text-readable hover:bg-surface-2 hover:text-foreground"
             aria-label="Sign out"
           >
             <LogOut className="h-[14px] w-[14px]" strokeWidth={1.5} />

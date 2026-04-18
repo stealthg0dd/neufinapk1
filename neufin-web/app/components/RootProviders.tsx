@@ -47,15 +47,41 @@ export default function RootProviders({
           position="bottom-right"
           toastOptions={{
             duration: 4000,
+            className: "",
             style: {
               background: "var(--glass-bg)",
               color: "var(--text-primary)",
               border: "1px solid var(--glass-border)",
               borderRadius: "12px",
               fontSize: "14px",
+              fontWeight: 500,
               backdropFilter: "blur(12px)",
+              boxShadow: "var(--shadow-md)",
             },
-            error: { duration: 6000 },
+            success: {
+              duration: 3500,
+              style: {
+                background: "var(--success-bg)",
+                color: "var(--text-primary)",
+                border: "1px solid rgba(34, 197, 94, 0.35)",
+              },
+              iconTheme: {
+                primary: "var(--success)",
+                secondary: "var(--surface)",
+              },
+            },
+            error: {
+              duration: 6000,
+              style: {
+                background: "var(--danger-bg)",
+                color: "var(--text-primary)",
+                border: "1px solid rgba(239, 68, 68, 0.35)",
+              },
+              iconTheme: {
+                primary: "var(--danger)",
+                secondary: "var(--surface)",
+              },
+            },
           }}
         />
       </AuthProvider>
