@@ -16,6 +16,7 @@ import { formatRegimeLabel, regimePillClass } from "@/lib/regime-display";
 // SEA-NATIVE-CURRENCY-FIX: SEA market pulse widget
 import { SEAMarketPulse } from "@/components/sea";
 import { BenchmarkChart } from "@/components/benchmarking";
+import { SwarmBrainPanel } from "@/components/swarm";
 
 export const dynamic = "force-dynamic";
 
@@ -418,6 +419,31 @@ export default function DashboardPage() {
           </Link>
         </section>
       )}
+
+      {/* Swarm Brain — 7-agent collaboration visualization */}
+      <SwarmBrainPanel
+        isRunning={false}
+        agentStates={
+          swarmReport
+            ? {
+                market_regime: "complete",
+                strategist: "complete",
+                quant: "complete",
+                tax_architect: "complete",
+                risk_sentinel: "complete",
+                alpha_scout: "complete",
+                synthesizer: "complete",
+              }
+            : undefined
+        }
+        agentOutputs={
+          swarmReport
+            ? {
+                synthesizer: swarmReport.headline ?? swarmReport.recommendation_summary ?? undefined,
+              }
+            : undefined
+        }
+      />
 
       {/* SEA-NATIVE-CURRENCY-FIX: Regional market pulse — always visible for context */}
       <SEAMarketPulse />

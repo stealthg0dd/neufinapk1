@@ -333,17 +333,42 @@ async def track_event(body: TrackRequest):
 # five core SEA indices.  Falls back gracefully when yfinance is unavailable.
 
 _SEA_INDICES = {
-    "^VNINDEX": {"label": "VN-Index",             "region": "Vietnam",   "currency": "VND", "flag": "🇻🇳"},
-    "^JKSE":    {"label": "IDX Composite",        "region": "Indonesia", "currency": "IDR", "flag": "🇮🇩"},
-    "^SET.BK":  {"label": "SET Index",            "region": "Thailand",  "currency": "THB", "flag": "🇹🇭"},
-    "^KLSE":    {"label": "FBM KLCI",             "region": "Malaysia",  "currency": "MYR", "flag": "🇲🇾"},
-    "^STI":     {"label": "Straits Times Index",  "region": "Singapore", "currency": "SGD", "flag": "🇸🇬"},
+    "^VNINDEX": {
+        "label": "VN-Index",
+        "region": "Vietnam",
+        "currency": "VND",
+        "flag": "🇻🇳",
+    },
+    "^JKSE": {
+        "label": "IDX Composite",
+        "region": "Indonesia",
+        "currency": "IDR",
+        "flag": "🇮🇩",
+    },
+    "^SET.BK": {
+        "label": "SET Index",
+        "region": "Thailand",
+        "currency": "THB",
+        "flag": "🇹🇭",
+    },
+    "^KLSE": {
+        "label": "FBM KLCI",
+        "region": "Malaysia",
+        "currency": "MYR",
+        "flag": "🇲🇾",
+    },
+    "^STI": {
+        "label": "Straits Times Index",
+        "region": "Singapore",
+        "currency": "SGD",
+        "flag": "🇸🇬",
+    },
 }
 
 _REGIME_THRESHOLDS = [
-    (5, "Strong Rally",   "bullish"),
-    (2, "Mild Uptrend",   "bullish"),
-    (-2, "Sideways",      "neutral"),
+    (5, "Strong Rally", "bullish"),
+    (2, "Mild Uptrend", "bullish"),
+    (-2, "Sideways", "neutral"),
     (-5, "Mild Pullback", "bearish"),
 ]
 
@@ -391,9 +416,15 @@ def _fetch_sea_pulse() -> list[dict]:
             price_1w = closes[-6] if len(closes) >= 6 else closes[0]
             price_1m = closes[0]
 
-            chg_1d = round((price_now - price_1d) / price_1d * 100, 2) if price_1d else None
-            chg_1w = round((price_now - price_1w) / price_1w * 100, 2) if price_1w else None
-            chg_1m = round((price_now - price_1m) / price_1m * 100, 2) if price_1m else None
+            chg_1d = (
+                round((price_now - price_1d) / price_1d * 100, 2) if price_1d else None
+            )
+            chg_1w = (
+                round((price_now - price_1w) / price_1w * 100, 2) if price_1w else None
+            )
+            chg_1m = (
+                round((price_now - price_1m) / price_1m * 100, 2) if price_1m else None
+            )
 
             # 5-day daily pct std as volatility proxy
             if len(closes) >= 5:
@@ -408,38 +439,42 @@ def _fetch_sea_pulse() -> list[dict]:
 
             regime_label, regime_class = _classify_regime(chg_1m)
 
-            results.append({
-                "symbol": sym,
-                "label": meta["label"],
-                "region": meta["region"],
-                "currency": meta["currency"],
-                "flag": meta["flag"],
-                "price": round(price_now, 2),
-                "change_1d": chg_1d,
-                "change_1w": chg_1w,
-                "change_1m": chg_1m,
-                "regime": regime_label,
-                "regime_class": regime_class,
-                "volatility": _volatility_label(std_5d),
-                "status": "live",
-            })
+            results.append(
+                {
+                    "symbol": sym,
+                    "label": meta["label"],
+                    "region": meta["region"],
+                    "currency": meta["currency"],
+                    "flag": meta["flag"],
+                    "price": round(price_now, 2),
+                    "change_1d": chg_1d,
+                    "change_1w": chg_1w,
+                    "change_1m": chg_1m,
+                    "regime": regime_label,
+                    "regime_class": regime_class,
+                    "volatility": _volatility_label(std_5d),
+                    "status": "live",
+                }
+            )
         except Exception as exc:
             logger.warning("market.sea_pulse_failed", symbol=sym, error=str(exc))
-            results.append({
-                "symbol": sym,
-                "label": meta["label"],
-                "region": meta["region"],
-                "currency": meta["currency"],
-                "flag": meta["flag"],
-                "price": None,
-                "change_1d": None,
-                "change_1w": None,
-                "change_1m": None,
-                "regime": "Unavailable",
-                "regime_class": "neutral",
-                "volatility": "Unknown",
-                "status": "unavailable",
-            })
+            results.append(
+                {
+                    "symbol": sym,
+                    "label": meta["label"],
+                    "region": meta["region"],
+                    "currency": meta["currency"],
+                    "flag": meta["flag"],
+                    "price": None,
+                    "change_1d": None,
+                    "change_1w": None,
+                    "change_1m": None,
+                    "regime": "Unavailable",
+                    "regime_class": "neutral",
+                    "volatility": "Unknown",
+                    "status": "unavailable",
+                }
+            )
 
     return results
 
@@ -455,6 +490,7 @@ async def sea_market_pulse():
         return cached
 
     import asyncio
+
     data = await asyncio.to_thread(_fetch_sea_pulse)
     payload = {"indices": data, "count": len(data)}
     _store("sea_pulse", payload)

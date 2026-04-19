@@ -1394,8 +1394,17 @@ async def synthesizer_node(state: SwarmState) -> dict:
     # ── IC Briefing user turn ──────────────────────────────────────────────────
     # SEA-NATIVE-TICKER-FIX: native currency label for AUM; benchmark instead of implicit SPY
     _ccy_pfx = {
-        "USD": "$", "GBP": "£", "VND": "₫", "IDR": "Rp", "THB": "฿",
-        "MYR": "RM", "SGD": "S$", "HKD": "HK$", "JPY": "¥", "AUD": "A$", "INR": "₹",
+        "USD": "$",
+        "GBP": "£",
+        "VND": "₫",
+        "IDR": "Rp",
+        "THB": "฿",
+        "MYR": "RM",
+        "SGD": "S$",
+        "HKD": "HK$",
+        "JPY": "¥",
+        "AUD": "A$",
+        "INR": "₹",
     }.get(_port_native_ccy, f"{_port_native_ccy} ")
     _sea_note = (
         f" This is a {_port_market_ctx} portfolio — use {_port_benchmark_label} "

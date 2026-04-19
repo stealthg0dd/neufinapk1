@@ -1267,19 +1267,36 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     # SEA-NATIVE-CURRENCY-FIX: country/region exposure breakdown (% of portfolio value)
     _MARKET_COUNTRY: dict[str, str] = {
-        "VN": "Vietnam", "LSE": "United Kingdom", "US": "United States",
-        "JK": "Indonesia", "BK": "Thailand", "KL": "Malaysia",
-        "SG": "Singapore", "AX": "Australia", "TSE": "Japan",
-        "HKEX": "Hong Kong", "NSE": "India", "BSE": "India",
-        "SSE": "China", "SZSE": "China",
+        "VN": "Vietnam",
+        "LSE": "United Kingdom",
+        "US": "United States",
+        "JK": "Indonesia",
+        "BK": "Thailand",
+        "KL": "Malaysia",
+        "SG": "Singapore",
+        "AX": "Australia",
+        "TSE": "Japan",
+        "HKEX": "Hong Kong",
+        "NSE": "India",
+        "BSE": "India",
+        "SSE": "China",
+        "SZSE": "China",
     }
     _MARKET_REGION: dict[str, str] = {
-        "VN": "Southeast Asia", "JK": "Southeast Asia", "BK": "Southeast Asia",
-        "KL": "Southeast Asia", "SG": "Southeast Asia",
-        "LSE": "Europe", "US": "Americas", "AX": "Asia Pacific",
-        "TSE": "Asia Pacific", "HKEX": "Asia Pacific",
-        "NSE": "Asia Pacific", "BSE": "Asia Pacific",
-        "SSE": "Asia Pacific", "SZSE": "Asia Pacific",
+        "VN": "Southeast Asia",
+        "JK": "Southeast Asia",
+        "BK": "Southeast Asia",
+        "KL": "Southeast Asia",
+        "SG": "Southeast Asia",
+        "LSE": "Europe",
+        "US": "Americas",
+        "AX": "Asia Pacific",
+        "TSE": "Asia Pacific",
+        "HKEX": "Asia Pacific",
+        "NSE": "Asia Pacific",
+        "BSE": "Asia Pacific",
+        "SSE": "Asia Pacific",
+        "SZSE": "Asia Pacific",
     }
     _SEA_MARKETS = {"VN", "JK", "BK", "KL", "SG"}
 
@@ -1298,12 +1315,20 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     _tv = float(total_value) if total_value else 1.0
     country_exposure = sorted(
-        [{"country": c, "value": v, "pct": round(v / _tv * 100, 1)} for c, v in country_buckets.items()],
-        key=lambda x: x["pct"], reverse=True,
+        [
+            {"country": c, "value": v, "pct": round(v / _tv * 100, 1)}
+            for c, v in country_buckets.items()
+        ],
+        key=lambda x: x["pct"],
+        reverse=True,
     )
     region_exposure = sorted(
-        [{"region": r, "value": v, "pct": round(v / _tv * 100, 1)} for r, v in region_buckets.items()],
-        key=lambda x: x["pct"], reverse=True,
+        [
+            {"region": r, "value": v, "pct": round(v / _tv * 100, 1)}
+            for r, v in region_buckets.items()
+        ],
+        key=lambda x: x["pct"],
+        reverse=True,
     )
     sea_pct = round(sea_value / _tv * 100, 1) if _tv > 0 else 0.0
 

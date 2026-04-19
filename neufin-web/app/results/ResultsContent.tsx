@@ -29,6 +29,7 @@ import {
 // SEA-NATIVE-CURRENCY-FIX: market-aware display components
 import { MarketBadge, QuoteUnavailableBadge, BenchmarkLabel, RegionalContext, CountryExposure } from "@/components/sea";
 import { BenchmarkChart } from "@/components/benchmarking";
+import { SwarmBrainPanel } from "@/components/swarm";
 
 const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
   ssr: false,
@@ -829,6 +830,19 @@ export default function ResultsContent() {
                 </div>
               </motion.div>
             )}
+
+            {/* Swarm Brain — 7-agent visualization (all complete after analysis) */}
+            <SwarmBrainPanel
+              agentStates={{
+                market_regime: "complete",
+                strategist: "complete",
+                quant: "complete",
+                tax_architect: "complete",
+                risk_sentinel: "complete",
+                alpha_scout: "complete",
+                synthesizer: "complete",
+              }}
+            />
 
             {/* Competitor benchmarking — NeuFin vs Market */}
             <BenchmarkChart />

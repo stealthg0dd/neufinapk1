@@ -9,6 +9,7 @@ from services.market_resolver import (
 
 # ── Vietnam equities ───────────────────────────────────────────────────────────
 
+
 def test_hpg_vn_vnd_hose_bucket():
     m = resolve_security("HPG.VN")
     assert m.native_currency == "VND"
@@ -49,6 +50,7 @@ def test_lcg_vn():
 
 # ── VN indices ─────────────────────────────────────────────────────────────────
 
+
 def test_vnindex_alias_to_caret():
     m = resolve_security("VNINDEX")
     assert m.normalized_symbol == "^VNINDEX"
@@ -78,6 +80,7 @@ def test_vn30_alias():
 
 # ── UK / FTSE ──────────────────────────────────────────────────────────────────
 
+
 def test_vod_l_gbp():
     m = resolve_security("VOD.L")
     assert m.native_currency == "GBP"
@@ -106,6 +109,7 @@ def test_caret_ftse_direct():
 
 # ── US equities (must remain unchanged) ───────────────────────────────────────
 
+
 def test_us_unchanged():
     m = resolve_security("AAPL")
     assert m.native_currency == "USD"
@@ -127,6 +131,7 @@ def test_sp500_index():
 
 
 # ── Indonesia (.JK) ────────────────────────────────────────────────────────────
+
 
 def test_bbca_jk_idr():
     m = resolve_security("BBCA.JK")
@@ -151,6 +156,7 @@ def test_jci_alias():
 
 # ── Thailand (.BK) ─────────────────────────────────────────────────────────────
 
+
 def test_ptt_bk_thb():
     m = resolve_security("PTT.BK")
     assert m.native_currency == "THB"
@@ -167,6 +173,7 @@ def test_set_index_alias():
 
 # ── Malaysia (.KL) ─────────────────────────────────────────────────────────────
 
+
 def test_maybank_kl_myr():
     m = resolve_security("1155.KL")
     assert m.native_currency == "MYR"
@@ -181,6 +188,7 @@ def test_klci_alias():
 
 
 # ── Singapore (.SI) ────────────────────────────────────────────────────────────
+
 
 def test_dbs_si_sgd():
     m = resolve_security("D05.SI")
@@ -197,6 +205,7 @@ def test_sti_alias():
 
 
 # ── portfolio_dominant_benchmark() ─────────────────────────────────────────────
+
 
 def test_all_vn_benchmark():
     syms = ["HPG.VN", "MBB.VN", "SSI.VN", "VCI.VN", "VPB.VN"]
@@ -242,6 +251,7 @@ def test_empty_symbols_returns_gspc():
 
 # ── portfolio_market_framing() ─────────────────────────────────────────────────
 
+
 def test_framing_vn_portfolio():
     framing = portfolio_market_framing(["HPG.VN", "MBB.VN", "SSI.VN"])
     assert framing["benchmark"] == "^VNINDEX"
@@ -273,6 +283,7 @@ def test_framing_singapore_portfolio():
 
 # ── BENCHMARK_LABELS coverage ──────────────────────────────────────────────────
 
+
 def test_benchmark_labels_vn():
     assert BENCHMARK_LABELS["^VNINDEX"] == "VN-Index"
 
@@ -299,6 +310,7 @@ def test_benchmark_labels_sti():
 
 # ── Unresolved / unknown symbols don't crash ──────────────────────────────────
 
+
 def test_unknown_symbol_defaults_us():
     m = resolve_security("XYZUNK")
     assert m.market == "US"
@@ -313,6 +325,7 @@ def test_portfolio_benchmark_survives_bad_symbols():
 
 
 # ── Case insensitivity ─────────────────────────────────────────────────────────
+
 
 def test_lowercase_vn_ticker():
     m = resolve_security("hpg.vn")

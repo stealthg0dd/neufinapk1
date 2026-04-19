@@ -260,8 +260,10 @@ def _quality_check(ctx: dict) -> list[str]:
         str(p.get("symbol", "?"))
         for p in positions
         if (p.get("price_status") or "").lower() == "unresolvable"
-        or (float(p.get("current_price") or p.get("native_price") or 0) <= 0
-            and not p.get("price_status", "live").startswith("live"))
+        or (
+            float(p.get("current_price") or p.get("native_price") or 0) <= 0
+            and not p.get("price_status", "live").startswith("live")
+        )
     ]
     if unresolved:
         warnings.append(
@@ -807,19 +809,16 @@ def _build_report_context(
 
     # # SEA-NATIVE-TICKER-FIX: portfolio-aware benchmark + currency from metrics
     _benchmark_sym = (
-        m.get("portfolio_benchmark")
-        or p.get("portfolio_benchmark")
-        or "^GSPC"
+        m.get("portfolio_benchmark") or p.get("portfolio_benchmark") or "^GSPC"
     )
     _benchmark_label = (
-        m.get("portfolio_benchmark_label")
-        or p.get("portfolio_benchmark_label")
-        or ""
+        m.get("portfolio_benchmark_label") or p.get("portfolio_benchmark_label") or ""
     )
     if not _benchmark_label:
         # Lazy import to avoid circular; BENCHMARK_LABELS is a pure dict
         try:
             from services.market_resolver import BENCHMARK_LABELS
+
             _benchmark_label = BENCHMARK_LABELS.get(_benchmark_sym, _benchmark_sym)
         except Exception:
             _benchmark_label = _benchmark_sym
@@ -1022,9 +1021,17 @@ def _build_report_context(
         )
         # SEA-NATIVE-TICKER-FIX: use native currency prefix in fallback thesis text
         _ccy_pfx = {
-            "USD": "$", "GBP": "£", "VND": "₫", "IDR": "Rp",
-            "THB": "฿", "MYR": "RM", "SGD": "S$", "HKD": "HK$",
-            "JPY": "¥", "AUD": "A$", "INR": "₹",
+            "USD": "$",
+            "GBP": "£",
+            "VND": "₫",
+            "IDR": "Rp",
+            "THB": "฿",
+            "MYR": "RM",
+            "SGD": "S$",
+            "HKD": "HK$",
+            "JPY": "¥",
+            "AUD": "A$",
+            "INR": "₹",
         }.get(_base_currency, f"{_base_currency} ")
         thesis = (
             f"This {_ccy_pfx}{total_value:,.0f} portfolio is structured as a {investor_type} "
