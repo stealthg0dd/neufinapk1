@@ -588,7 +588,7 @@ export default function PartnersPage() {
             lineHeight: 1.7,
           }}
         >
-          NeuFin's 7-agent swarm delivers Investment Committee-grade analysis
+          NeuFin&apos;s 7-agent swarm delivers Investment Committee-grade analysis
           for every client portfolio. Fully white-labeled. Embeds in 12 lines of
           code.
         </p>
@@ -703,7 +703,7 @@ export default function PartnersPage() {
                 margin: "0 auto",
               }}
             >
-              Enter any US stock tickers below. We'll run a real behavioral DNA
+              Enter any US stock tickers below. We&apos;ll run a real behavioral DNA
               analysis against live market data — same engine used in
               production.
             </p>

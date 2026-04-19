@@ -2,9 +2,12 @@
 
 from services.market_resolver import (
     BENCHMARK_LABELS,
+    fetch_twelve_data,
     portfolio_dominant_benchmark,
     portfolio_market_framing,
     resolve_security,
+    should_use_twelve_data_first,
+    twelve_data_symbol,
 )
 
 # ── Vietnam equities ───────────────────────────────────────────────────────────
@@ -337,3 +340,51 @@ def test_mixed_case_index():
     m = resolve_security("vnindex")
     assert m.normalized_symbol == "^VNINDEX"
     assert m.native_currency == "VND"
+
+
+def test_twelve_data_symbol_mapping_for_vni():
+    assert should_use_twelve_data_first("VNI") is True
+    assert should_use_twelve_data_first("^VNINDEX") is True
+    assert should_use_twelve_data_first("HPG.VN") is True
+    assert twelve_data_symbol("VNI") == "VNI:INDEX"
+    assert twelve_data_symbol("^VNINDEX") == "VNI:INDEX"
+    assert twelve_data_symbol("HPG.VN") == "HPG:HOSE"
+
+
+def test_fetch_twelve_data_vni_quote(monkeypatch):
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "symbol": "VNI:INDEX",
+                "close": "1288.50",
+                "previous_close": "1275.75",
+                "change": "12.75",
+                "percent_change": "1.00",
+                "volume": "987654321",
+            }
+
+    captured = {}
+
+    def fake_get(url, params, timeout):
+        captured["url"] = url
+        captured["params"] = params
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        "services.market_resolver.settings.TWELVEDATA_API_KEY", "td-test"
+    )
+    monkeypatch.setattr("services.market_resolver.requests.get", fake_get)
+
+    quote = fetch_twelve_data("VNI")
+
+    assert captured["params"]["symbol"] == "VNI:INDEX"
+    assert captured["params"]["apikey"] == "td-test"
+    assert quote is not None
+    assert quote.price == 1288.50
+    assert quote.close == 1288.50
+    assert quote.previous_close == 1275.75
+    assert quote.percent_change_1d == 1.0
+    assert quote.change_1d == 12.75

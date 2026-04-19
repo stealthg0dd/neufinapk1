@@ -21,9 +21,12 @@ from services.market_cache import (
 )
 from services.market_currency import SUFFIX_CURRENCY as _SUFFIX_CURRENCY
 from services.market_resolver import (
+    fetch_twelve_data,
     persist_resolution_best_effort,
     portfolio_market_framing,
     resolve_security,
+    should_use_twelve_data_first,
+    twelve_data_symbol,
 )
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
@@ -164,6 +167,8 @@ def _polygon_sym(sym: str) -> str:
 
 def _td_sym(sym: str) -> str:
     """TwelveData: BRK-B → BRK/B."""
+    if should_use_twelve_data_first(sym):
+        return twelve_data_symbol(sym)
     return sym.replace("-", "/").upper()
 
 
@@ -306,6 +311,17 @@ def _twelvedata_batch(symbols: list[str]) -> dict[str, float]:
     except Exception as e:
         logger.warning("price.twelvedata_batch_failed", error=str(e))
         return {}
+
+
+def _twelvedata_quote_batch(symbols: list[str]) -> dict[str, float]:
+    """Twelve Data quote helper for SEA markets; returns live/close prices."""
+    results: dict[str, float] = {}
+    for sym in symbols:
+        quote = fetch_twelve_data(sym)
+        price = quote.price if quote else None
+        if price and price > 0:
+            results[sym] = price
+    return results
 
 
 def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
@@ -471,6 +487,12 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                 logger.debug("price.resolved", symbol=sym, price=price)
         # Only remove from remaining if we actually got a price > 0
         remaining = [s for s in remaining if s not in results]
+
+    # SEA indices and Vietnamese equities are materially better covered by
+    # Twelve Data than the US-first providers, so route them there first.
+    sea_first = [s for s in remaining if should_use_twelve_data_first(s)]
+    if sea_first:
+        _merge(_twelvedata_quote_batch(sea_first))
 
     # 1. Polygon batch
     if remaining:
