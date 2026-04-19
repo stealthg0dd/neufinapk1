@@ -132,6 +132,13 @@ from services.risk_engine import (  # noqa: E402
     format_clusters_for_ai,
 )
 
+def _zip_equal_lengths(left: list, right: list) -> list[tuple]:
+    """Pair two lists; raises if lengths differ (no zip B905 / Py3.9 strict issues)."""
+    if len(left) != len(right):
+        raise ValueError("paired iteration length mismatch")
+    return [(left[i], right[i]) for i in range(len(left))]
+
+
 # ── Startup time (for uptime_seconds in /health) ──────────────────────────────
 _startup_time: float = time.monotonic()
 
@@ -1010,7 +1017,7 @@ async def analyze_dna(
     price_warnings: list[str] = []
     status_by_sym: dict[str, str] = {}
     price_map: dict[str, float | None] = {}
-    for sym, result in zip(symbols, price_results):
+    for sym, result in _zip_equal_lengths(symbols, price_results):
         if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
             failed_tickers.append(sym)
             price_map[sym] = None
@@ -1028,7 +1035,7 @@ async def analyze_dna(
             if st == "unresolvable" or getattr(result, "price", None) is None:
                 failed_tickers.append(sym)
                 price_map[sym] = None
-            elif isinstance(result.price, (int, float)) and float(result.price) <= 0:
+            elif isinstance(result.price, (int, float)) and float(result.price) <= 0:  # noqa: UP038
                 failed_tickers.append(sym)
                 price_map[sym] = None
             else:
@@ -1086,7 +1093,7 @@ async def analyze_dna(
         else df["symbol"].tolist()[:5]
     )
     weights_dict = dict(
-        zip(df["symbol"].tolist(), df["weight"].tolist())
+        _zip_equal_lengths(df["symbol"].tolist(), df["weight"].tolist())
     )
     corr_matrix = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
     clusters = find_correlation_clusters(corr_matrix, weights_dict)

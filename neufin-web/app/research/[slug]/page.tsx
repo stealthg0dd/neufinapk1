@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
+import { ResearchMarkdown } from "@/components/content/ResearchMarkdown";
 import { ShareResearchUrlButton } from "@/components/research/ShareResearchUrlButton";
 import { normalizeResearchContent } from "@/lib/research-normalizer";
 
@@ -185,6 +182,19 @@ export default async function ResearchArticlePage({
           {/* Structured sections (when content was a JSON dict) */}
           {s && (
             <div className="mb-8 space-y-6">
+              {s.thesis &&
+                s.thesis.trim() &&
+                s.thesis.trim() !== (note.executive_summary ?? "").trim() && (
+                  <section className="rounded-xl border border-border/80 bg-surface p-5">
+                    <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                      Thesis
+                    </h2>
+                    <p className="text-base leading-relaxed text-foreground">
+                      {s.thesis}
+                    </p>
+                  </section>
+                )}
+
               {s.key_findings && s.key_findings.length > 0 && (
                 <section className="rounded-xl border border-border bg-surface p-5">
                   <h2 className="mb-3 text-xs font-mono uppercase tracking-widest text-muted-foreground">
@@ -303,14 +313,9 @@ export default async function ResearchArticlePage({
 
           {/* Full markdown content (prose path) */}
           {!s && (
-            <div className="prose prose-neutral dark:prose-invert max-w-none prose-p:text-muted-foreground prose-headings:text-foreground prose-li:text-muted-foreground prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-code:bg-surface-2 prose-pre:bg-surface-2 prose-pre:text-foreground">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, rehypeSanitize]}
-              >
-                {report.markdown || note.executive_summary}
-              </ReactMarkdown>
-            </div>
+            <ResearchMarkdown
+              markdown={report.markdown || note.executive_summary || ""}
+            />
           )}
 
           {/* Also render the markdown version below structured sections for full context */}
@@ -319,13 +324,8 @@ export default async function ResearchArticlePage({
               <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
                 Full analysis
               </summary>
-              <div className="prose prose-neutral dark:prose-invert mt-4 max-w-none prose-p:text-muted-foreground prose-headings:text-foreground prose-li:text-muted-foreground prose-a:text-primary prose-strong:text-foreground prose-code:text-foreground prose-code:bg-surface-2">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                >
-                  {report.markdown}
-                </ReactMarkdown>
+              <div className="mt-4">
+                <ResearchMarkdown markdown={report.markdown} />
               </div>
             </details>
           )}
