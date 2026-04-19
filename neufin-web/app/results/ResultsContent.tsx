@@ -23,7 +23,11 @@ import {
   formatPortfolioTotalLine,
   formatPositionValuePrimary,
   shouldShowFxHint,
+  isUnresolved,
+  BENCHMARK_LABELS,
 } from "@/lib/finance-content";
+// SEA-NATIVE-CURRENCY-FIX: market-aware display components
+import { MarketBadge, QuoteUnavailableBadge, BenchmarkLabel } from "@/components/sea";
 
 const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
   ssr: false,
@@ -550,9 +554,18 @@ export default function ResultsContent() {
             {/* ── Holdings table ─────────────────────────────────────────── */}
             {result.positions?.length > 0 && (
               <motion.div variants={fadeUp} className="card">
-                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted2">
-                  Holdings
-                </h3>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted2">
+                    Holdings
+                  </h3>
+                  {/* SEA-NATIVE-CURRENCY-FIX: show benchmark context when non-US */}
+                  {result.portfolio_benchmark && result.portfolio_benchmark !== "^GSPC" && (
+                    <span className="text-xs text-muted-foreground">
+                      Benchmark:{" "}
+                      <BenchmarkLabel benchmark={result.portfolio_benchmark} showTicker />
+                    </span>
+                  )}
+                </div>
 
                 {/* Desktop table */}
                 <div className="hidden sm:block overflow-x-auto">
@@ -573,28 +586,36 @@ export default function ResultsContent() {
                           className="transition-colors hover:bg-surface-2"
                         >
                           <td className="py-2.5 pr-4 font-mono font-bold text-navy">
-                            <span>{p.symbol}</span>
-                            {p.price == null ? (
-                              <span className="ml-1.5 text-[10px] font-sans font-normal uppercase tracking-wide text-amber-600">
-                                No quote
-                              </span>
-                            ) : null}
+                            <div className="flex flex-col gap-0.5">
+                              <span>{p.symbol}</span>
+                              {p.market_code && (
+                                <MarketBadge marketCode={p.market_code} />
+                              )}
+                            </div>
                           </td>
                           <td className="py-2.5 px-4 text-right text-slate2">
                             {new Intl.NumberFormat("en-US").format(p.shares)}
                           </td>
                           <td className="py-2.5 px-4 text-right text-slate2">
-                            {formatNativePrice(p.price, p.native_currency)}
+                            {isUnresolved(p) ? (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            ) : (
+                              formatNativePrice(p.price, p.native_currency)
+                            )}
                           </td>
                           <td className="py-2.5 px-4 text-right font-medium text-navy">
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span>{formatPositionValuePrimary(p)}</span>
-                              {shouldShowFxHint(p) ? (
-                                <span className="text-xs font-normal text-muted2">
-                                  {p.fx_indicative_sgd}
-                                </span>
-                              ) : null}
-                            </div>
+                            {isUnresolved(p) ? (
+                              <QuoteUnavailableBadge symbol={p.symbol} />
+                            ) : (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span>{formatPositionValuePrimary(p)}</span>
+                                {shouldShowFxHint(p) ? (
+                                  <span className="text-xs font-normal text-muted2">
+                                    {p.fx_indicative_sgd}
+                                  </span>
+                                ) : null}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 pl-4">
                             <div className="flex items-center gap-2">
@@ -625,29 +646,30 @@ export default function ResultsContent() {
                       className="flex items-center justify-between border-b border-border py-2 last:border-0"
                     >
                       <div>
-                        <p className="font-mono font-bold text-navy">
-                          {p.symbol}
-                          {p.price == null ? (
-                            <span className="ml-1.5 text-[10px] font-sans font-normal uppercase tracking-wide text-amber-600">
-                              {" "}
-                              No quote
-                            </span>
-                          ) : null}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-mono font-bold text-navy">{p.symbol}</p>
+                          {p.market_code && <MarketBadge marketCode={p.market_code} />}
+                        </div>
                         <p className="mt-0.5 text-xs text-muted2">
                           {new Intl.NumberFormat("en-US").format(p.shares)}{" "}
-                          shares · {formatNativePrice(p.price, p.native_currency)}
+                          shares · {isUnresolved(p) ? "—" : formatNativePrice(p.price, p.native_currency)}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-navy">
-                          {formatPositionValuePrimary(p)}
-                        </p>
-                        {shouldShowFxHint(p) ? (
-                          <p className="text-xs text-muted2 mt-0.5">
-                            {p.fx_indicative_sgd}
-                          </p>
-                        ) : null}
+                        {isUnresolved(p) ? (
+                          <QuoteUnavailableBadge symbol={p.symbol} />
+                        ) : (
+                          <>
+                            <p className="font-medium text-navy">
+                              {formatPositionValuePrimary(p)}
+                            </p>
+                            {shouldShowFxHint(p) ? (
+                              <p className="text-xs text-muted2 mt-0.5">
+                                {p.fx_indicative_sgd}
+                              </p>
+                            ) : null}
+                          </>
+                        )}
                         <div className="mt-1 flex items-center justify-end gap-1.5">
                           <div className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-3">
                             <div
@@ -844,7 +866,7 @@ export default function ResultsContent() {
                       {
                         icon: "📉",
                         label: "Annualized Volatility & Risk Metrics",
-                        sub: "Sharpe ratio, max drawdown, beta vs S&P 500",
+                        sub: `Sharpe ratio, max drawdown, beta vs ${BENCHMARK_LABELS[result.portfolio_benchmark ?? "^GSPC"] ?? "S&P 500"}`,
                       },
                       {
                         icon: "🎯",

@@ -235,6 +235,11 @@ export interface DNAAnalysisResponse {
   warnings?: string[];
   /** Tickers that could not be priced and were excluded from analysis */
   failed_tickers?: string[];
+  // SEA-NATIVE-CURRENCY-FIX: market framing fields from portfolio_market_framing()
+  portfolio_benchmark?: string;
+  portfolio_benchmark_label?: string;
+  portfolio_native_currency?: string;
+  portfolio_market_context?: string;
 }
 
 // Alias kept for backward compatibility with other pages
