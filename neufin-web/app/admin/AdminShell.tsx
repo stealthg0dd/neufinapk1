@@ -11,6 +11,7 @@ import { Menu, X } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Overview" },
+  { href: "/admin/ops", label: "Control tower" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/partners", label: "Partners" },
   { href: "/admin/api-keys", label: "API Keys" },

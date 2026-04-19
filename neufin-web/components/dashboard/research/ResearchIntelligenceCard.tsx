@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Bookmark,
   FilePlus,
+  ListOrdered,
   Share2,
   Sparkles,
   Waypoints,
@@ -174,6 +175,13 @@ export function ResearchIntelligenceCard({
         >
           <Sparkles className="h-3.5 w-3.5" aria-hidden />
           Advisor memo
+        </Link>
+        <Link
+          href={`/dashboard/actions?from=research&ref=${encodeURIComponent(display.id)}`}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-navy transition-colors hover:border-primary/40 hover:bg-primary-light/40"
+        >
+          <ListOrdered className="h-3.5 w-3.5" aria-hidden />
+          Recommended actions
         </Link>
         <button
           type="button"

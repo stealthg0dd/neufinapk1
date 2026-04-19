@@ -36,6 +36,7 @@ import {
   formatNativeValue,
   formatPortfolioTotalLine,
 } from "@/lib/finance-content";
+import { PageJourneyHint } from "@/components/dashboard/PageJourneyHint";
 
 const STAGES = [
   {
@@ -562,6 +563,10 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-5">
+      <PageJourneyHint>
+        Ground every score in your file — DNA feeds Swarm IC, Research context, and
+        Reports.
+      </PageJourneyHint>
       {/* 3-step analysis progress indicator — always visible */}
       <StepIndicator step={step} />
 

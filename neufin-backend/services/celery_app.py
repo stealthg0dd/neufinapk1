@@ -61,3 +61,6 @@ celery_app.conf.update(
 
 # Alias so `celery -A services.celery_app` resolves the app instance correctly.
 app = celery_app
+
+# Register optional background tasks (import side effect: @celery_app.task).
+import services.control_tower.sync_task  # noqa: E402, F401

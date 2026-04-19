@@ -255,6 +255,20 @@ def _quality_check(ctx: dict) -> list[str]:
                 "Position weights appear unnormalized; AUM reconciled from marks."
             )
 
+    # SEA-NATIVE-TICKER-FIX: surface unresolved tickers explicitly — never show $0.00 silently
+    unresolved = [
+        str(p.get("symbol", "?"))
+        for p in positions
+        if (p.get("price_status") or "").lower() == "unresolvable"
+        or (float(p.get("current_price") or p.get("native_price") or 0) <= 0
+            and not p.get("price_status", "live").startswith("live"))
+    ]
+    if unresolved:
+        warnings.append(
+            f"UNRESOLVED PRICES — {', '.join(unresolved[:8])}. "
+            "Portfolio totals exclude these positions. Verify symbols and retry."
+        )
+
     if not ctx.get("swarm_available"):
         warnings.append(
             "Swarm IC analysis not run; regime and alpha sections use portfolio estimates."
@@ -791,6 +805,31 @@ def _build_report_context(
     sharpe_ratio = _canon.get("sharpe_ratio")
     report_metrics_note = str(_canon.get("sources_note") or "")
 
+    # # SEA-NATIVE-TICKER-FIX: portfolio-aware benchmark + currency from metrics
+    _benchmark_sym = (
+        m.get("portfolio_benchmark")
+        or p.get("portfolio_benchmark")
+        or "^GSPC"
+    )
+    _benchmark_label = (
+        m.get("portfolio_benchmark_label")
+        or p.get("portfolio_benchmark_label")
+        or ""
+    )
+    if not _benchmark_label:
+        # Lazy import to avoid circular; BENCHMARK_LABELS is a pure dict
+        try:
+            from services.market_resolver import BENCHMARK_LABELS
+            _benchmark_label = BENCHMARK_LABELS.get(_benchmark_sym, _benchmark_sym)
+        except Exception:
+            _benchmark_label = _benchmark_sym
+    _portfolio_market_context = (
+        m.get("portfolio_market_context")
+        or p.get("portfolio_market_context")
+        or "Global equity market"
+    )
+    _base_currency = m.get("base_currency") or m.get("portfolio_base_currency") or "USD"
+
     # ── DNA ────────────────────────────────────────────────────────────────────
     dna_score = int(d.get("dna_score") or 0)
     investor_type = str(d.get("investor_type") or "Balanced Growth Investor")
@@ -981,10 +1020,16 @@ def _build_report_context(
             if total_tax_liability > 0
             else ""
         )
+        # SEA-NATIVE-TICKER-FIX: use native currency prefix in fallback thesis text
+        _ccy_pfx = {
+            "USD": "$", "GBP": "£", "VND": "₫", "IDR": "Rp",
+            "THB": "฿", "MYR": "RM", "SGD": "S$", "HKD": "HK$",
+            "JPY": "¥", "AUD": "A$", "INR": "₹",
+        }.get(_base_currency, f"{_base_currency} ")
         thesis = (
-            f"This ${total_value:,.0f} portfolio is structured as a {investor_type} "
+            f"This {_ccy_pfx}{total_value:,.0f} portfolio is structured as a {investor_type} "
             f"with {len(positions)} holdings. Core positions ({top_names or 'diversified holdings'}) "
-            f"drive a market beta of {weighted_beta:.2f}. "
+            f"drive a market beta of {weighted_beta:.2f} (vs {_benchmark_label}). "
             f"{tax_note}"
             f"Portfolio construction is {'sound' if dna_score >= 70 else 'under review'} "
             f"at a DNA score of {dna_score}/100."
@@ -1251,6 +1296,11 @@ def _build_report_context(
         "advisor_email": advisor_config.get("advisor_email") or "info@neufin.ai",
         "white_label": bool(advisor_config.get("white_label")),
         "report_run_id": advisor_config.get("report_run_id") or "—",
+        # SEA-NATIVE-TICKER-FIX: portfolio-aware benchmark + currency (never silently USD/SPY)
+        "benchmark_symbol": _benchmark_sym,
+        "benchmark_label": _benchmark_label,
+        "portfolio_market_context": _portfolio_market_context,
+        "base_currency": _base_currency,
     }
 
 
@@ -2494,8 +2544,10 @@ def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -
         0,
     )
 
+    # SEA-NATIVE-TICKER-FIX: show benchmark-aware beta label (not always SPY)
+    _bench_lbl = ctx.get("benchmark_label") or ctx.get("benchmark_symbol") or "^GSPC"
     signals = [
-        ("Portfolio Beta", f"{beta:.2f}", "vs SPY 1.00"),
+        ("Portfolio Beta", f"{beta:.2f}", f"vs {_bench_lbl} 1.00"),
         ("Defensive Weight", f"{def_w:.1f}%", "GLD/TLT/XLP/XLU"),
         ("Tech Concentration", f"{tech_w:.1f}%", "Large-cap tech"),
         ("Gold Hedge", f"{gld_w:.1f}%", "Inflation buffer"),

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { getTabByPath } from "@/lib/dashboard-ia";
+import { getJourneyHintForPath, getTabByPath } from "@/lib/dashboard-ia";
 
 export function DashboardBreadcrumb() {
   const pathname = usePathname() ?? "/dashboard";
   const tab = getTabByPath(pathname);
+  const hint = getJourneyHintForPath(pathname);
 
   if (!tab || tab.path === "/dashboard") {
     return (
@@ -15,6 +16,11 @@ export function DashboardBreadcrumb() {
         <ol className="flex flex-wrap items-center gap-1">
           <li className="font-medium text-navy">Command center</li>
         </ol>
+        {hint && (
+          <p className="mt-1 max-w-xl text-[11px] leading-snug text-readable/90">
+            {hint}
+          </p>
+        )}
       </nav>
     );
   }
@@ -35,6 +41,11 @@ export function DashboardBreadcrumb() {
           <span className="font-semibold text-navy">{tab.label}</span>
         </li>
       </ol>
+      {hint && (
+        <p className="mt-1 max-w-xl text-[11px] leading-snug text-readable/90">
+          {hint}
+        </p>
+      )}
     </nav>
   );
 }

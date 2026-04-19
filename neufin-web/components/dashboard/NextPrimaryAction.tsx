@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
 import { usePortfolioIntelligence } from "@/components/dashboard/PortfolioIntelligenceContext";
+import { computeNextPrimaryAction } from "@/lib/next-primary-action-engine";
+import { JOURNEY_EVENTS } from "@/lib/journey-analytics";
+import type { JourneySurface } from "@/lib/journey-analytics";
+import { useNeufinAnalytics } from "@/lib/analytics";
 
 type SubStatus = {
   plan?: string;
@@ -14,23 +18,15 @@ type SubStatus = {
   days_remaining?: number;
 };
 
-function planLabel(s: SubStatus): {
-  isPaid: boolean;
-  trialDays: number | null;
-  isExpired: boolean;
-} {
-  const plan = (s.plan ?? s.subscription_tier ?? "free").toString().toLowerCase();
-  const isPaid = plan === "advisor" || plan === "enterprise";
-  const trialDays =
-    s.trial_days_remaining ?? s.days_remaining ?? null;
-  const isExpired =
-    !isPaid && trialDays !== null && trialDays <= 0;
-  return { isPaid, trialDays, isExpired };
-}
-
-export function NextPrimaryAction() {
+export function NextPrimaryAction({
+  surface = "dashboard",
+}: {
+  /** Where this card is mounted — used for analytics only */
+  surface?: JourneySurface;
+}) {
   const { hasPortfolio, swarmReport } = usePortfolioIntelligence();
   const [sub, setSub] = useState<SubStatus | null>(null);
+  const { capture } = useNeufinAnalytics();
 
   useEffect(() => {
     let cancelled = false;
@@ -47,49 +43,27 @@ export function NextPrimaryAction() {
     };
   }, []);
 
-  const { isPaid, trialDays, isExpired } = planLabel(sub ?? {});
+  const payload = useMemo(
+    () =>
+      computeNextPrimaryAction({
+        hasPortfolio,
+        swarmReport,
+        subscription: sub,
+      }),
+    [hasPortfolio, swarmReport, sub],
+  );
 
-  let title: string;
-  let body: string;
-  let href: string;
-  let cta: string;
-  let variant: "primary" | "neutral" = "primary";
-
-  if (!hasPortfolio) {
-    title = "Upload a portfolio to unlock your DNA score";
-    body =
-      "We’ll map holdings to regime context, behavioral DNA, and IC-ready outputs — starting with a CSV.";
-    href = "/dashboard/portfolio";
-    cta = "Go to Portfolio upload";
-  } else if (isExpired) {
-    title = "Your trial has ended — keep your intelligence layer";
-    body =
-      "Upgrade to Advisor to continue Swarm IC, reports, and research workflows without interruption.";
-    href = "/dashboard/billing";
-    cta = "View billing & upgrade";
-    variant = "neutral";
-  } else if (!isPaid && trialDays !== null && trialDays <= 7) {
-    title = `Trial: ${trialDays} day${trialDays === 1 ? "" : "s"} left`;
-    body =
-      "Make the most of NeuFin: run Swarm IC, export reports, and align your book to the current regime.";
-    href = "/pricing";
-    cta = "Compare plans";
-  } else if (!swarmReport) {
-    title = "Next: run Swarm IC on your portfolio";
-    body =
-      "Seven agents produce a regime-aware Investment Committee briefing — the bridge from DNA to decisions.";
-    href = "/dashboard/swarm";
-    cta = "Open Swarm IC";
-  } else {
-    title = "Next: export or share your latest intelligence";
-    body =
-      "Vault holds PDFs and advisor-ready exports. Share with clients or your team from Reports.";
-    href = "/dashboard/reports";
-    cta = "Open Reports";
-  }
+  useEffect(() => {
+    capture(JOURNEY_EVENTS.stepViewed, {
+      surface,
+      step: payload.key,
+      path:
+        typeof window !== "undefined" ? window.location.pathname : undefined,
+    });
+  }, [capture, surface, payload.key]);
 
   const btnClass =
-    variant === "primary"
+    payload.variant === "primary"
       ? "inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark"
       : "inline-flex items-center gap-2 rounded-lg border border-border bg-surface-2 px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:border-primary/40 hover:bg-primary-light/30";
 
@@ -105,15 +79,44 @@ export function NextPrimaryAction() {
         id="next-primary-action-title"
         className="text-sm font-bold text-navy md:text-base"
       >
-        {title}
+        {payload.title}
       </p>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-readable">
-        {body}
+        {payload.body}
       </p>
-      <div className="mt-4">
-        <Link href={href} className={btnClass}>
-          {cta}
+      {payload.relatedInsight && (
+        <p className="mt-3 border-l-2 border-primary/30 pl-3 text-xs leading-relaxed text-readable">
+          <span className="font-semibold text-navy">Next best action context: </span>
+          {payload.relatedInsight}
+        </p>
+      )}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <Link
+          href={payload.href}
+          className={btnClass}
+          onClick={() =>
+            capture(JOURNEY_EVENTS.nextActionClicked, {
+              surface,
+              action_key: payload.key,
+              destination: payload.href,
+            })
+          }
+        >
+          {payload.cta}
           <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+        <Link
+          href="/dashboard/actions"
+          className="text-sm font-semibold text-primary hover:underline"
+          onClick={() =>
+            capture(JOURNEY_EVENTS.nextActionClicked, {
+              surface,
+              action_key: "see_all_recommendations",
+              destination: "/dashboard/actions",
+            })
+          }
+        >
+          All recommendations →
         </Link>
       </div>
     </aside>

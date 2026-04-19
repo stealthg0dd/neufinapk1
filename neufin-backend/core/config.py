@@ -335,6 +335,70 @@ class Settings(BaseSettings):
         description="Git commit SHA injected at build time via Railway environment variable.",
     )
 
+    # ── Admin control tower (optional — no secrets in client) ─────────────────
+    OPS_GITHUB_TOKEN: str | None = Field(
+        default=None,
+        description="GitHub PAT for repo intelligence (repo read scope).",
+    )
+    OPS_GITHUB_REPO: str = Field(
+        default="stealthg0dd/neufin",
+        description="owner/repo for GitHub REST stats.",
+    )
+    OPS_VERCEL_TOKEN: str | None = Field(
+        default=None,
+        description="Vercel API token for deployment list (optional).",
+    )
+    OPS_VERCEL_TEAM_ID: str | None = Field(
+        default=None,
+        description="Vercel team ID when project is under a team.",
+    )
+    OPS_VERCEL_PROJECT_ID: str | None = Field(
+        default=None,
+        description="Vercel project ID for /v6/deployments queries.",
+    )
+    OPS_RAILWAY_TOKEN: str | None = Field(
+        default=None,
+        description="Railway API token — reserved for future deploy/health adapters.",
+    )
+    OPS_CONTROL_TOWER_MANUAL_JSON: str | None = Field(
+        default=None,
+        description=(
+            "Optional JSON merged into GET /api/admin/control-tower (ai_accounts, github overrides, etc.)."
+        ),
+    )
+    OPS_ANTHROPIC_ADMIN_API_KEY: str | None = Field(
+        default=None,
+        description="Anthropic Admin API key (sk-ant-admin…) for Usage/Cost API.",
+    )
+    OPS_GITHUB_COPILOT_ORG: str | None = Field(
+        default=None,
+        description="GitHub org slug for GET /orgs/{org}/copilot/metrics.",
+    )
+    OPS_RAILWAY_PROJECT_ID: str | None = Field(
+        default=None,
+        description="Railway project UUID for GraphQL deployment queries.",
+    )
+    OPS_CONTROL_TOWER_DATA_DIR: str | None = Field(
+        default=None,
+        description="Directory for persisted control tower JSON snapshots (default: neufin-backend/.cache/control_tower).",
+    )
+    OPS_REPO_INTEL_ROOT: str | None = Field(
+        default=None,
+        description="Monorepo root for LOC scan; if unset, inferred locally when neufin-web + neufin-backend exist.",
+    )
+    OPS_SENTRY_AUTH_TOKEN: str | None = Field(
+        default=None,
+        description="Optional Sentry auth token for unresolved issues in admin observability summary.",
+    )
+    OPS_SENTRY_ORG: str | None = Field(
+        default=None,
+        description="Sentry organization slug (API).",
+    )
+    OPS_SENTRY_PROJECT: str | None = Field(
+        default=None,
+        description="Sentry project slug (API).",
+    )
+
     # ── Derived helpers ───────────────────────────────────────────────────────
     @property
     def allowed_origins_list(self) -> list[str]:
