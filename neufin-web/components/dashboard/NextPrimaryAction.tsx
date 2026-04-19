@@ -90,7 +90,7 @@ export function NextPrimaryAction({
           {payload.relatedInsight}
         </p>
       )}
-      <div className="mt-4">
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
         <Link
           href={payload.href}
           className={btnClass}
@@ -104,6 +104,19 @@ export function NextPrimaryAction({
         >
           {payload.cta}
           <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+        <Link
+          href="/dashboard/actions"
+          className="text-sm font-semibold text-primary hover:underline"
+          onClick={() =>
+            capture(JOURNEY_EVENTS.nextActionClicked, {
+              surface,
+              action_key: "see_all_recommendations",
+              destination: "/dashboard/actions",
+            })
+          }
+        >
+          All recommendations →
         </Link>
       </div>
     </aside>

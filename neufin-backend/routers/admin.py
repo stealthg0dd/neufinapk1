@@ -20,6 +20,7 @@ Admin only (is_admin):
   GET  /api/admin/system
   GET  /api/admin/partners/{partner_id}/usage
   GET  /api/admin/control-tower
+  POST /api/admin/control-tower/refresh
 """
 
 from __future__ import annotations
@@ -44,7 +45,10 @@ from services.auth_dependency import (
     invalidate_subscription_cache,
 )
 from services.jwt_auth import JWTUser
-from services.ops_control_tower import get_control_tower_snapshot_cached
+from services.ops_control_tower import (
+    get_control_tower_snapshot_cached,
+    refresh_control_tower_snapshot,
+)
 from services.request_metrics import http_stats_last_hours
 
 logger = structlog.get_logger(__name__)
@@ -164,9 +168,18 @@ async def admin_access(_user: JWTUser = Depends(get_admin_user)):
 
 
 @router.get("/api/admin/control-tower")
-async def admin_control_tower(_user: JWTUser = Depends(get_admin_user)):
+async def admin_control_tower(
+    refresh: bool = Query(False),
+    _user: JWTUser = Depends(get_admin_user),
+):
     """Aggregated ops snapshot: AI usage, GitHub, deploys, errors (admin JWT)."""
-    return await get_control_tower_snapshot_cached()
+    return await get_control_tower_snapshot_cached(force_refresh=refresh)
+
+
+@router.post("/api/admin/control-tower/refresh")
+async def admin_control_tower_refresh(_user: JWTUser = Depends(get_admin_user)):
+    """Rebuild snapshot, persist to OPS_CONTROL_TOWER_DATA_DIR, bypass TTL cache."""
+    return await refresh_control_tower_snapshot()
 
 
 @router.get("/api/admin/dashboard")
