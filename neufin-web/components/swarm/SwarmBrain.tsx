@@ -405,7 +405,7 @@ function AgentTooltip({
       <p className="text-[10px] text-muted-foreground leading-snug">{agent.role}</p>
       {agent.output && (
         <p className="mt-1 text-[10px] text-slate-600 italic leading-snug line-clamp-2">
-          "{agent.output}"
+          &quot;{agent.output}&quot;
         </p>
       )}
     </motion.div>

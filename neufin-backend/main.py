@@ -92,6 +92,7 @@ from routers import (  # noqa: E402
     admin as admin_router,
     advisor as advisor_router,
     advisors,
+    agent_studio,
     alerts,
     developer as developer_router,
     dna,
@@ -775,6 +776,7 @@ app.include_router(market.router)
 app.include_router(vault.router)
 app.include_router(vault.plans_router)
 app.include_router(swarm.router)
+app.include_router(agent_studio.router)
 app.include_router(alerts.router)
 app.include_router(admin_router.router)
 app.include_router(revenue_router.router)

@@ -128,9 +128,9 @@ export default function FeedbackFormClient() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#0B0F14] px-6 py-section text-foreground">
-        <div className="mx-auto max-w-xl rounded-2xl border border-border bg-surface p-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-primary/30 bg-primary/20 font-mono text-2xl font-bold text-primary">
+      <div className="min-h-screen bg-app-bg px-6 py-section text-navy">
+        <div className="mx-auto max-w-xl rounded-lg border border-border bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-lg border border-primary/30 bg-primary/20 font-mono text-2xl font-bold text-primary-dark">
             N
           </div>
           <CheckCircle2 className="mx-auto mb-3 h-7 w-7 text-positive" />
@@ -149,21 +149,21 @@ export default function FeedbackFormClient() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F14] text-foreground">
+    <div className="min-h-screen bg-app-bg text-navy">
       <div className="mx-auto max-w-4xl px-6 py-section">
         <h1 className="text-3xl font-semibold">NeuFin Beta Feedback</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-readable">
           Takes 5 minutes. Read by the founding team.
         </p>
         <div className="mt-4">
-          <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+          <div className="mb-2 flex items-center justify-between text-xs text-readable">
             <span>
               {requiredAnswered} of {REQUIRED_KEYS.length} required fields
               answered
             </span>
             <span>{progress}%</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+          <div className="h-2 overflow-hidden rounded-full bg-surface-3">
             <div
               className="h-full bg-primary transition-all"
               style={{ width: `${progress}%` }}
@@ -347,7 +347,7 @@ export default function FeedbackFormClient() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+            className="w-full rounded-lg bg-primary-dark px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary disabled:opacity-60"
           >
             {submitting ? "Submitting..." : "Submit feedback"}
           </button>
@@ -380,7 +380,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border/60 bg-surface/40 p-5">
+    <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
       <h2 className="mb-4 font-mono text-sm uppercase tracking-widest text-primary">
         {title}
       </h2>
@@ -399,14 +399,14 @@ function Input({
   onChange: (v: string) => void;
 }) {
   return (
-    <label className="block text-sm text-foreground">
-      <span className="mb-1.5 block text-xs text-muted-foreground">
+    <label className="block text-sm text-navy">
+      <span className="mb-1.5 block text-xs font-medium text-readable">
         {label}
       </span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
+        className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-navy outline-none transition-colors placeholder:text-muted2 focus:border-primary/60 focus:ring-2 focus:ring-primary/15"
       />
     </label>
   );
@@ -422,15 +422,15 @@ function Textarea({
   onChange: (v: string) => void;
 }) {
   return (
-    <label className="block text-sm text-foreground">
-      <span className="mb-1.5 block text-xs text-muted-foreground">
+    <label className="block text-sm text-navy">
+      <span className="mb-1.5 block text-xs font-medium text-readable">
         {label}
       </span>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={4}
-        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/60"
+        className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-navy outline-none transition-colors placeholder:text-muted2 focus:border-primary/60 focus:ring-2 focus:ring-primary/15"
       />
     </label>
   );
@@ -447,14 +447,14 @@ function Star({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-readable">{label}</p>
       <div className="flex gap-2">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onChange(n)}
-            className={`rounded px-2 py-1 text-lg ${value >= n ? "text-warning" : "text-muted-foreground"}`}
+            className={`rounded px-2 py-1 text-lg transition-colors ${value >= n ? "text-[#B45309]" : "text-[#64748B] hover:text-[#334155]"}`}
           >
             ★
           </button>
@@ -475,14 +475,14 @@ function Scale({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-readable">{label}</p>
       <div className="flex flex-wrap gap-2">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onChange(n)}
-            className={`rounded-md border px-3 py-1 text-xs ${value === n ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+            className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors ${value === n ? "border-primary/40 bg-primary-light/70 text-primary-dark" : "border-border bg-white text-readable hover:border-primary/30 hover:text-navy"}`}
           >
             {n}
           </button>
@@ -503,14 +503,14 @@ function Scale10({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-readable">{label}</p>
       <div className="grid grid-cols-6 gap-2 md:grid-cols-11">
         {Array.from({ length: 11 }).map((_, n) => (
           <button
             key={n}
             type="button"
             onClick={() => onChange(n)}
-            className={`rounded-md border px-2 py-1 text-xs ${value === n ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+            className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${value === n ? "border-primary/40 bg-primary-light/70 text-primary-dark" : "border-border bg-white text-readable hover:border-primary/30 hover:text-navy"}`}
           >
             {n}
           </button>
@@ -533,14 +533,14 @@ function Pills({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-readable">{label}</p>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <button
             key={o}
             type="button"
             onClick={() => onToggle(o)}
-            className={`rounded-full border px-3 py-1 text-xs ${values.includes(o) ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+            className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors ${values.includes(o) ? "border-primary/40 bg-primary-light/70 text-primary-dark" : "border-border bg-white text-readable hover:border-primary/30 hover:text-navy"}`}
           >
             {o}
           </button>
@@ -563,14 +563,14 @@ function PillsSingle({
 }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs text-muted-foreground">{label}</p>
+      <p className="mb-1.5 text-xs font-medium text-readable">{label}</p>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
           <button
             key={o}
             type="button"
             onClick={() => onChange(o)}
-            className={`rounded-full border px-3 py-1 text-xs ${value === o ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground"}`}
+            className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors ${value === o ? "border-primary/40 bg-primary-light/70 text-primary-dark" : "border-border bg-white text-readable hover:border-primary/30 hover:text-navy"}`}
           >
             {o}
           </button>

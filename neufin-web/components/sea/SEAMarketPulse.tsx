@@ -137,7 +137,7 @@ export function SEAMarketPulse({ className = "" }: SEAMarketPulseProps) {
       )}
 
       <p className="mt-3 text-[10px] text-muted-foreground">
-        Prices via Yahoo Finance · refreshed every 5 min
+        Prices via Twelve Data / Yahoo Finance · refreshed every 5 min
       </p>
     </div>
   );

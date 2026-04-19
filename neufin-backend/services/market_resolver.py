@@ -7,10 +7,13 @@ and metadata. Falls back to suffix-based logic from market_currency for unknowns
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
+import requests
 import structlog
 
+from core.config import settings
 from services.market_currency import (
     finnhub_symbol,
     infer_native_currency,
@@ -31,6 +34,21 @@ class SecurityMetadata:
     provider_finnhub: str  # Finnhub /quote & /stock/candle symbol
     benchmark: str
     is_index: bool
+
+
+@dataclass(frozen=True)
+class TwelveDataQuote:
+    """Normalized Twelve Data quote payload used by SEA market services."""
+
+    requested_symbol: str
+    provider_symbol: str
+    price: float | None
+    close: float | None
+    previous_close: float | None
+    change_1d: float | None
+    percent_change_1d: float | None
+    volume: float | None
+    source: str = "twelvedata"
 
 
 # # SEA-NATIVE-TICKER-FIX: User-typed index aliases → Yahoo-style symbols
@@ -135,6 +153,142 @@ BENCHMARK_LABELS: dict[str, str] = {
     "^BSESN": "Sensex",
     "^AXJO": "ASX 200",
 }
+
+_TWELVEDATA_INDEX_SYMBOLS: dict[str, str] = {
+    "^VNINDEX": "VNI:INDEX",
+    "VNINDEX": "VNI:INDEX",
+    "VNI": "VNI:INDEX",
+    "^VN30": "VN30:INDEX",
+    "VN30": "VN30:INDEX",
+    "^STI": "STI:INDEX",
+    "STI": "STI:INDEX",
+    "^JKSE": "JKSE:INDEX",
+    "JKSE": "JKSE:INDEX",
+    "JCI": "JKSE:INDEX",
+    "^SET.BK": "SET:INDEX",
+    "SET": "SET:INDEX",
+    "^KLSE": "KLCI:INDEX",
+    "KLCI": "KLCI:INDEX",
+    "FBMKLCI": "KLCI:INDEX",
+}
+
+_TWELVEDATA_FIRST_ALIASES = {
+    "VNINDEX",
+    "VNI",
+    "STI",
+    "JKSE",
+    "SET",
+}
+
+_TWELVEDATA_CACHE: dict[str, tuple[TwelveDataQuote, float]] = {}
+_TWELVEDATA_TTL_SECONDS = 300
+
+
+def twelve_data_symbol(symbol: str) -> str:
+    """Return the Twelve Data symbol format for SEA indices/equities."""
+    raw = (symbol or "").strip().upper()
+    canonical = _INDEX_CANON.get(raw, raw)
+    if canonical in _TWELVEDATA_INDEX_SYMBOLS:
+        return _TWELVEDATA_INDEX_SYMBOLS[canonical]
+    if raw in _TWELVEDATA_INDEX_SYMBOLS:
+        return _TWELVEDATA_INDEX_SYMBOLS[raw]
+    if raw.endswith(".VN"):
+        return f"{raw.removesuffix('.VN')}:HOSE"
+    return raw.replace("-", "/")
+
+
+def should_use_twelve_data_first(symbol: str) -> bool:
+    """SEA routing rule: prefer Twelve Data for VN tickers and core SEA indices."""
+    raw = (symbol or "").strip().upper()
+    if raw.endswith(".VN"):
+        return True
+    canonical = _INDEX_CANON.get(raw, raw)
+    if raw in _TWELVEDATA_FIRST_ALIASES:
+        return True
+    return canonical in {
+        "^VNINDEX",
+        "^STI",
+        "^JKSE",
+        "^SET.BK",
+    }
+
+
+def _float_or_none(value: object, *, positive_only: bool = True) -> float | None:
+    try:
+        num = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if positive_only and num <= 0:
+        return None
+    return num
+
+
+def fetch_twelve_data(symbol: str) -> TwelveDataQuote | None:
+    """
+    Fetch a normalized quote from Twelve Data using ``TWELVEDATA_API_KEY``.
+
+    SEA indices are mapped to Twelve Data's ``*:INDEX`` format and Vietnamese
+    equities use the HOSE venue format, e.g. ``HPG.VN`` -> ``HPG:HOSE``.
+    """
+    api_key = settings.TWELVEDATA_API_KEY
+    if not api_key:
+        return None
+
+    provider_symbol = twelve_data_symbol(symbol)
+    cached = _TWELVEDATA_CACHE.get(provider_symbol)
+    if cached and (time.time() - cached[1]) < _TWELVEDATA_TTL_SECONDS:
+        return cached[0]
+
+    try:
+        response = requests.get(
+            "https://api.twelvedata.com/quote",
+            params={"symbol": provider_symbol, "apikey": api_key},
+            timeout=8.0,
+        )
+        if response.status_code == 429:
+            logger.warning("twelvedata.rate_limited", symbol=provider_symbol)
+            return None
+        data = response.json()
+        if not isinstance(data, dict) or data.get("status") == "error":
+            logger.warning(
+                "twelvedata.quote_error",
+                symbol=provider_symbol,
+                message=data.get("message") if isinstance(data, dict) else None,
+            )
+            return None
+
+        close = _float_or_none(data.get("close"))
+        previous_close = _float_or_none(data.get("previous_close"))
+        live_price = _float_or_none(data.get("price"))
+        price = live_price or close
+        change = _float_or_none(data.get("change"), positive_only=False)
+        pct_change = _float_or_none(data.get("percent_change"), positive_only=False)
+        volume = _float_or_none(data.get("volume"))
+
+        if price is None:
+            return None
+        if pct_change is None and previous_close and previous_close > 0:
+            pct_change = round((price - previous_close) / previous_close * 100, 4)
+        if change is None and previous_close:
+            change = round(price - previous_close, 4)
+
+        quote = TwelveDataQuote(
+            requested_symbol=symbol,
+            provider_symbol=provider_symbol,
+            price=price,
+            close=close,
+            previous_close=previous_close,
+            change_1d=change,
+            percent_change_1d=pct_change,
+            volume=volume,
+        )
+        _TWELVEDATA_CACHE[provider_symbol] = (quote, time.time())
+        return quote
+    except Exception as exc:
+        logger.warning(
+            "twelvedata.quote_failed", symbol=provider_symbol, error=str(exc)
+        )
+        return None
 
 
 def _vn_market_from_symbol(sym: str) -> str:

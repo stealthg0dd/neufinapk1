@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from database import supabase
+from services.market_resolver import fetch_twelve_data
 
 logger = structlog.get_logger(__name__)
 
@@ -405,6 +406,34 @@ def _fetch_sea_pulse() -> list[dict]:
     for sym in symbols:
         meta = _SEA_INDICES[sym]
         try:
+            td_quote = fetch_twelve_data(sym)
+            if td_quote and td_quote.price:
+                chg_1d = (
+                    round(td_quote.percent_change_1d, 2)
+                    if td_quote.percent_change_1d is not None
+                    else None
+                )
+                regime_label, regime_class = _classify_regime(chg_1d)
+                results.append(
+                    {
+                        "symbol": sym,
+                        "label": meta["label"],
+                        "region": meta["region"],
+                        "currency": meta["currency"],
+                        "flag": meta["flag"],
+                        "price": round(td_quote.price, 2),
+                        "change_1d": chg_1d,
+                        "change_1w": None,
+                        "change_1m": None,
+                        "regime": regime_label,
+                        "regime_class": regime_class,
+                        "volatility": "Live",
+                        "status": "live",
+                        "source": "twelvedata",
+                    }
+                )
+                continue
+
             ticker = yf.Ticker(sym)
             hist = ticker.history(period="1mo", interval="1d", auto_adjust=True)
             if hist.empty or len(hist) < 2:
@@ -454,6 +483,7 @@ def _fetch_sea_pulse() -> list[dict]:
                     "regime_class": regime_class,
                     "volatility": _volatility_label(std_5d),
                     "status": "live",
+                    "source": "yahoo",
                 }
             )
         except Exception as exc:

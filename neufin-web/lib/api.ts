@@ -297,6 +297,7 @@ export interface SEAIndexPulse {
   regime_class: "bullish" | "bearish" | "neutral";
   volatility: string;
   status: "live" | "unavailable";
+  source?: "twelvedata" | "yahoo";
 }
 
 export interface SEAPulseResponse {
