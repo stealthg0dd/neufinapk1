@@ -41,6 +41,7 @@ import { TickerNumber } from "@/components/ui/TickerNumber";
 import {
   FINANCIAL_EM_DASH,
   formatNativePrice,
+  formatNativeValue,
 } from "@/lib/finance-content";
 import clsx from "clsx";
 
@@ -59,6 +60,7 @@ type MetricPosition = {
   current_price: number | null;
   current_value: number | null;
   weight: number;
+  native_currency?: string | null;
 };
 
 type PortfolioMetrics = {
@@ -690,14 +692,13 @@ export default function DashboardClient() {
                           <ArrowUpDown className="w-3 h-3 opacity-60" />
                         </button>
                       </th>
-                      <th className="p-3 font-medium">Day Δ</th>
                       <th className="p-3 font-medium">
                         <button
                           type="button"
                           onClick={() => toggleSort("value")}
                           className="inline-flex items-center gap-1 hover:text-primary transition-colors"
                         >
-                          Total Return
+                          Position value
                           <ArrowUpDown className="w-3 h-3 opacity-60" />
                         </button>
                       </th>
@@ -725,21 +726,13 @@ export default function DashboardClient() {
                           <td className="p-3 font-mono text-[var(--text-primary)]">
                             {formatNativePrice(
                               p.current_price,
-                              metrics?.base_currency ?? "USD",
+                              p.native_currency ?? metrics?.base_currency ?? "USD",
                             )}
                           </td>
-                          <td className="p-3 font-mono text-ui-muted">
-                            {FINANCIAL_EM_DASH}
-                          </td>
-                          <td className="p-3 font-mono">
-                            {metrics?.pnl_pct != null ? (
-                              <TickerNumber
-                                value={metrics.pnl_pct}
-                                format="percent"
-                                highlightSign
-                              />
-                            ) : (
-                              FINANCIAL_EM_DASH
+                          <td className="p-3 font-mono text-[var(--text-primary)]">
+                            {formatNativeValue(
+                              p.current_value,
+                              p.native_currency ?? metrics?.base_currency ?? "USD",
                             )}
                           </td>
                         </motion.tr>

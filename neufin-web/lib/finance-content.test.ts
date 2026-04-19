@@ -4,6 +4,7 @@ import {
   FINANCIAL_QUOTE_UNAVAILABLE,
   formatNativePrice,
   formatNativeValue,
+  formatPortfolioTotalLine,
 } from "./finance-content";
 
 describe("finance-content", () => {
@@ -26,5 +27,26 @@ describe("finance-content", () => {
 
   it("formats VND with grouping", () => {
     expect(formatNativeValue(1_500_000, "VND")).toMatch(/1[\s,]?500[\s,]?000/);
+  });
+});
+
+describe("formatPortfolioTotalLine", () => {
+  it("uses USD when single-currency", () => {
+    expect(
+      formatPortfolioTotalLine({
+        totalValue: 12_345.67,
+        multiCurrency: false,
+      }),
+    ).toMatch(/\$12,346/);
+  });
+
+  it("shows mixed-currency raw sum when flagged", () => {
+    const s = formatPortfolioTotalLine({
+      totalValue: 99_000_000,
+      multiCurrency: true,
+      portfolioCurrencies: ["USD", "VND"],
+    });
+    expect(s).toContain("Mixed CCY (USD, VND)");
+    expect(s).toContain("99,000,000");
   });
 });

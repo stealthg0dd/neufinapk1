@@ -31,7 +31,11 @@ import {
   getStoredReportTheme,
   type ReportTheme,
 } from "@/components/dashboard/ReportThemeModal";
-import { formatNativePrice, formatNativeValue } from "@/lib/finance-content";
+import {
+  formatNativePrice,
+  formatNativeValue,
+  formatPortfolioTotalLine,
+} from "@/lib/finance-content";
 
 const STAGES = [
   {
@@ -508,9 +512,11 @@ export default function PortfolioPage() {
     const rows: { label: string; value: string }[] = [
       {
         label: "Total Value",
-        value: multi
-          ? `Mixed CCY (${(result.portfolio_currencies || []).join(", ")}) · raw sum ${Math.round(result.total_value).toLocaleString()}`
-          : `$${Math.round(result.total_value).toLocaleString()}`,
+        value: formatPortfolioTotalLine({
+          totalValue: result.total_value,
+          multiCurrency: multi,
+          portfolioCurrencies: result.portfolio_currencies,
+        }),
       },
       { label: "Positions", value: String(result.num_positions) },
       {

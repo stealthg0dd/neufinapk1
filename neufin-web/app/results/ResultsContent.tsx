@@ -18,6 +18,7 @@ import type { DNAAnalysisResponse } from "@/lib/api";
 import PaywallOverlay from "@/components/PaywallOverlay";
 import {
   formatNativePrice,
+  formatPortfolioTotalLine,
   formatPositionValuePrimary,
   shouldShowFxHint,
 } from "@/lib/finance-content";
@@ -36,24 +37,12 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-const usd = (n: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
-
 const pct = (n: number) =>
   new Intl.NumberFormat("en-US", {
     style: "percent",
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(n / 100);
-
-const usdFull = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-    n,
-  );
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const fadeUp = {
@@ -447,7 +436,11 @@ export default function ResultsContent() {
               <p className="mt-3 text-sm text-slate2">
                 Portfolio value:&nbsp;
                 <span className="font-semibold text-navy">
-                  {usd(result.total_value)}
+                  {formatPortfolioTotalLine({
+                    totalValue: result.total_value,
+                    multiCurrency: Boolean(result.multi_currency_portfolio),
+                    portfolioCurrencies: result.portfolio_currencies,
+                  })}
                 </span>
                 {result.multi_currency_portfolio ? (
                   <span className="block mt-1 text-xs text-amber-400/90">
@@ -471,7 +464,11 @@ export default function ResultsContent() {
                   Total Value
                 </p>
                 <p className="text-2xl font-bold text-navy">
-                  {usd(result.total_value)}
+                  {formatPortfolioTotalLine({
+                    totalValue: result.total_value,
+                    multiCurrency: Boolean(result.multi_currency_portfolio),
+                    portfolioCurrencies: result.portfolio_currencies,
+                  })}
                 </p>
               </div>
               <div className="card text-center">

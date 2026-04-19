@@ -96,3 +96,25 @@ export function shouldShowFxHint(p: Position): boolean {
   const c = (p.native_currency || "USD").toUpperCase();
   return !["USD", "SGD"].includes(c);
 }
+
+/** Headline portfolio total — matches dashboard DNA metrics copy for single- vs multi-currency. */
+export function formatPortfolioTotalLine(args: {
+  totalValue: number;
+  multiCurrency: boolean;
+  portfolioCurrencies?: string[] | null;
+}): string {
+  const { totalValue, multiCurrency, portfolioCurrencies } = args;
+  if (Number.isNaN(totalValue)) {
+    return FINANCIAL_QUOTE_UNAVAILABLE;
+  }
+  if (multiCurrency) {
+    const cur = (portfolioCurrencies ?? []).filter(Boolean);
+    const codes = cur.length ? cur.join(", ") : "…";
+    return `Mixed CCY (${codes}) · raw sum ${Math.round(totalValue).toLocaleString("en-US")}`;
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(totalValue);
+}
