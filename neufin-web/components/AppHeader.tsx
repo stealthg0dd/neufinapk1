@@ -7,6 +7,10 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getSubscriptionStatus } from "@/lib/api";
+import {
+  APP_HEADER_PRIMARY_NAV,
+  isNavActive,
+} from "@/lib/product-navigation";
 
 function TrialBadge({
   status,
@@ -42,14 +46,6 @@ function TrialBadge({
     </span>
   );
 }
-
-const NAV_ITEMS = [
-  { label: "Portfolio", href: "/dashboard" },
-  { label: "Swarm", href: "/swarm" },
-  { label: "Vault", href: "/vault" },
-  { label: "Reports", href: "/reports/success" },
-  { label: "Partners", href: "/partners" },
-] as const;
 
 export default function AppHeader() {
   const { user, token, signOut } = useAuth();
@@ -102,11 +98,12 @@ export default function AppHeader() {
       <div className="mx-auto flex h-16 max-w-screen-xl items-center justify-between gap-4 px-4">
         <BrandLogo variant="app-header" href="/dashboard" />
 
-        <nav className="hidden items-center gap-1 md:flex">
-          {NAV_ITEMS.map(({ label, href }) => {
-            const active =
-              pathname === href ||
-              (href !== "/dashboard" && pathname.startsWith(href));
+        <nav
+          className="hidden items-center gap-1 md:flex"
+          aria-label="Product areas"
+        >
+          {APP_HEADER_PRIMARY_NAV.map(({ label, href }) => {
+            const active = isNavActive(pathname, href);
             return (
               <Link
                 key={href}

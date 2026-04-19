@@ -4,45 +4,19 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import {
-  LayoutDashboard,
-  PieChart,
-  BookOpen,
-  FileText,
-  CreditCard,
-  Bot,
-  LogOut,
-  Code2,
-  Shield,
-} from "lucide-react";
+import { LogOut, Code2, Shield } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiGet } from "@/lib/api-client";
 import type { User } from "@supabase/supabase-js";
 import { useUser } from "@/lib/store";
-
-type NavItem = { href: string; label: string; icon: LucideIcon };
-
-const NAV_OVERVIEW: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/portfolio", label: "Portfolio", icon: PieChart },
-  { href: "/dashboard/swarm", label: "Swarm IC", icon: Bot },
-];
-
-const NAV_INSIGHTS: NavItem[] = [
-  { href: "/dashboard/research", label: "Research", icon: BookOpen },
-  { href: "/dashboard/quant", label: "Quant", icon: Code2 },
-  { href: "/dashboard/reports", label: "Reports", icon: FileText },
-];
-
-const NAV_ACCOUNT: NavItem[] = [
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
-];
+import {
+  SIDEBAR_NAV,
+  isNavActive,
+  type ProductNavItem,
+} from "@/lib/product-navigation";
 
 function isActivePath(pathname: string, href: string): boolean {
-  if (href === "/dashboard") return pathname === "/dashboard";
-  if (pathname === href) return true;
-  return pathname.startsWith(`${href}/`);
+  return isNavActive(pathname, href);
 }
 
 type PortfolioListRow = { dna_score?: number | null };
@@ -59,7 +33,7 @@ type SubscriptionStatus = {
   role?: string;
 };
 
-function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavLink({ item, pathname }: { item: ProductNavItem; pathname: string }) {
   const active = isActivePath(pathname, item.href);
   const Icon = item.icon;
   return (
@@ -88,7 +62,7 @@ function NavSection({
   pathname,
 }: {
   label: string;
-  items: NavItem[];
+  items: ProductNavItem[];
   pathname: string;
 }) {
   return (
@@ -263,9 +237,9 @@ export default function DashboardSidebar({
       )}
 
       <nav className="flex flex-1 flex-col overflow-y-auto pb-3 pt-1">
-        <NavSection label="Overview" items={NAV_OVERVIEW} pathname={pathname} />
-        <NavSection label="Insights" items={NAV_INSIGHTS} pathname={pathname} />
-        <NavSection label="Account" items={NAV_ACCOUNT} pathname={pathname} />
+        <NavSection label="Overview" items={[...SIDEBAR_NAV.overview]} pathname={pathname} />
+        <NavSection label="Insights" items={[...SIDEBAR_NAV.insights]} pathname={pathname} />
+        <NavSection label="Account" items={[...SIDEBAR_NAV.account]} pathname={pathname} />
 
         {isAdminNav && (
           <div className="mt-2">

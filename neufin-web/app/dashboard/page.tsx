@@ -3,54 +3,18 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { usePortfolioData } from "@/hooks/usePortfolioData";
+import { usePortfolioIntelligence } from "@/components/dashboard/PortfolioIntelligenceContext";
 import { useDashboardPowerMode } from "@/hooks/useDashboardPowerMode";
 import { GraphicPlaceholder } from "@/components/GraphicPlaceholder";
-import type { RegimeData } from "@/hooks/usePortfolioData";
 import { SwarmBriefingPreview } from "@/components/dashboard/SwarmBriefingPreview";
 import DashboardModeControls from "@/components/dashboard/DashboardModeControls";
 import ResearchFeedClient from "@/components/dashboard/ResearchFeedClient";
+import { NextPrimaryAction } from "@/components/dashboard/NextPrimaryAction";
+import { UpgradeValuePanel } from "@/components/dashboard/UpgradeValuePanel";
 import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
+import { formatRegimeLabel, regimePillClass } from "@/lib/regime-display";
 
 export const dynamic = "force-dynamic";
-
-function formatRegimeLabel(regime: RegimeData | null): string {
-  const raw = regime?.regime ?? regime?.label;
-  if (!raw || raw === "unknown") return "Macro regime pending";
-  return String(raw)
-    .replace(/_/g, " ")
-    .replace(/-/g, "-")
-    .split(" ")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
-}
-
-function regimePillClass(regime: RegimeData | null): string {
-  const u = (regime?.regime ?? regime?.label ?? "").toLowerCase();
-  if (u.includes("inflation")) {
-    return "inline-block rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold text-red-800";
-  }
-  if (u.includes("stagflation")) {
-    return "inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900";
-  }
-  if (
-    u.includes("risk_off") ||
-    u.includes("risk-off") ||
-    u.includes("recession") ||
-    u.includes("crisis")
-  ) {
-    return "inline-block rounded-md border border-primary/25 bg-primary-light px-2 py-0.5 text-sm font-semibold text-primary-dark";
-  }
-  if (
-    u.includes("risk_on") ||
-    u.includes("risk-on") ||
-    u.includes("recovery") ||
-    u.includes("growth")
-  ) {
-    return "inline-block rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-sm font-semibold text-emerald-900";
-  }
-  return "inline-block rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-sm font-semibold text-amber-900";
-}
 
 function fmtMetric(v: number | null | undefined, digits = 2): string {
   if (v == null || Number.isNaN(v)) return FINANCIAL_EM_DASH;
@@ -72,7 +36,7 @@ export default function DashboardPage() {
     swarmReport,
     regime,
     loading,
-  } = usePortfolioData();
+  } = usePortfolioIntelligence();
 
   if (loading) {
     return (
@@ -197,6 +161,9 @@ export default function DashboardPage() {
           <p>Portfolio intelligence, DNA score, and research in one place.</p>
         </div>
       </div>
+
+      <NextPrimaryAction />
+      <UpgradeValuePanel />
 
       <DashboardModeControls
         advancedQuantMode={advancedQuantMode}
@@ -340,7 +307,7 @@ export default function DashboardPage() {
           </div>
           <div>
             <Link
-              href={hasPortfolio ? "/swarm" : "/dashboard/portfolio"}
+              href={hasPortfolio ? "/dashboard/swarm" : "/dashboard/portfolio"}
               className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
             >
               Generate IC report
