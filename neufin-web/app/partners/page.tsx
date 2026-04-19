@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
+import { PopularPlanBadge } from "@/components/ui/PopularPlanBadge";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 type DemoStatus = "idle" | "analyzing" | "done" | "error";
@@ -1277,23 +1278,7 @@ export default function PartnersPage() {
               }}
             >
               {tier.badge && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: -12,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: tier.color,
-                    color: "#fff",
-                    borderRadius: 20,
-                    padding: "3px 14px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {tier.badge}
-                </div>
+                <PopularPlanBadge variant="pill">{tier.badge}</PopularPlanBadge>
               )}
               <div
                 style={{

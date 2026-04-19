@@ -5,12 +5,18 @@
 
 import type { Position } from "@/lib/api";
 
+/** Missing numeric price (per-share line) — use instead of ad-hoc dashes. */
+export const FINANCIAL_EM_DASH = "—";
+
+/** Missing or non-quotable position value — explicit, not a silent zero. */
+export const FINANCIAL_QUOTE_UNAVAILABLE = "Quote unavailable";
+
 export function formatNativePrice(
   amount: number | null | undefined,
   currency: string | undefined | null,
 ): string {
   if (amount == null || Number.isNaN(amount)) {
-    return "—";
+    return FINANCIAL_EM_DASH;
   }
   const c = (currency || "USD").toUpperCase();
   if (c === "VND") {
@@ -49,7 +55,7 @@ export function formatNativeValue(
   currency: string | undefined | null,
 ): string {
   if (amount == null || Number.isNaN(amount)) {
-    return "Quote unavailable";
+    return FINANCIAL_QUOTE_UNAVAILABLE;
   }
   const c = (currency || "USD").toUpperCase();
   if (c === "VND") {
