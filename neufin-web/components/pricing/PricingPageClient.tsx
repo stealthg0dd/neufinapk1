@@ -8,6 +8,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api-client";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { PopularPlanBadge } from "@/components/ui/PopularPlanBadge";
 import toast from "react-hot-toast";
 import { stripeSuccessUrlDashboard } from "@/lib/stripe-checkout-urls";
 
@@ -41,7 +42,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
       >
         {q}
         <motion.span animate={{ rotate: open ? 180 : 0 }}>
-          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-readable" />
         </motion.span>
       </button>
       <motion.div
@@ -50,7 +51,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
         className="overflow-hidden"
       >
-        <p className="px-4 pb-4 text-sm leading-relaxed text-[var(--slate)]">
+        <p className="px-4 pb-4 text-sm leading-relaxed text-readable">
           {a}
         </p>
       </motion.div>
@@ -194,11 +195,7 @@ export default function PricingPageClient() {
 
           {/* Advisor */}
           <GlassCard className="flex flex-col overflow-hidden rounded-xl border-2 border-primary bg-white p-0 shadow-[var(--shadow-sm)]">
-            <div className="shrink-0 bg-gradient-to-r from-primary to-primary-dark px-3 py-2 text-center sm:py-2.5">
-              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white">
-                Most popular
-              </span>
-            </div>
+            <PopularPlanBadge variant="strip" />
             <div className="flex flex-1 flex-col p-7">
               <p className="mb-2 text-base font-bold uppercase tracking-wide text-navy">
                 Advisor
@@ -279,7 +276,7 @@ export default function PricingPageClient() {
 
       <section className="border-t border-[var(--border)] py-section px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <p className="text-sm leading-relaxed text-[var(--muted)]">
+          <p className="text-sm leading-relaxed text-readable">
             <strong className="text-[var(--slate)]">
               Regulatory Disclaimer:
             </strong>{" "}
@@ -291,7 +288,7 @@ export default function PricingPageClient() {
         </div>
       </section>
 
-      <footer className="border-t border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">
+      <footer className="border-t border-[var(--border)] py-6 text-center text-sm text-readable">
         <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
           <NeuFinLogo variant="compact" className="mb-3" />
           <span>NeuFin © {new Date().getFullYear()}</span>

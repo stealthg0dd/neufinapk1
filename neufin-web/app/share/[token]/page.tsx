@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 import ShareCard from "./ShareCard";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -78,13 +79,11 @@ export default async function SharePage({
     return (
       <div className="min-h-screen flex flex-col bg-shell-deep">
         <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-            <Link href="/" className="text-xl font-bold text-gradient">
-              Neufin
-            </Link>
+          <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-between px-4 sm:px-6">
+            <BrandLogo variant="shell-inverted" href="/" priority />
           </div>
         </nav>
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-10 text-center sm:px-6">
           <p className="text-5xl">🔍</p>
           <h1 className="text-2xl font-bold text-white">Result Not Found</h1>
           <p className="text-shell-muted text-sm max-w-xs">
@@ -103,17 +102,15 @@ export default async function SharePage({
     <div className="min-h-screen flex flex-col bg-shell-deep">
       {/* Nav */}
       <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-gradient">
-            Neufin
-          </Link>
-          <Link href="/upload" className="btn-primary py-2 text-sm">
+        <div className="mx-auto flex h-16 w-full max-w-2xl items-center justify-between gap-3 px-4 sm:px-6">
+          <BrandLogo variant="shell-inverted" href="/" priority />
+          <Link href="/upload" className="btn-primary shrink-0 py-2 text-sm">
             Get My Score →
           </Link>
         </div>
       </nav>
 
-      <main className="flex-1 flex flex-col items-center px-6 py-section max-w-3xl mx-auto w-full">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center px-4 py-8 sm:px-6 sm:py-10">
         <ShareCard data={data} />
       </main>
     </div>

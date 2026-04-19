@@ -9,6 +9,7 @@ import { GraphicPlaceholder } from "@/components/GraphicPlaceholder";
 import SwarmHeroTerminal from "@/components/landing/SwarmHeroTerminal";
 import LandingSwarmChatDock from "@/components/landing/LandingSwarmChatDock";
 import NeuFinLogo from "@/components/landing/NeuFinLogo";
+import { PopularPlanBadge } from "@/components/ui/PopularPlanBadge";
 
 const SWARM_AGENTS = [
   {
@@ -797,11 +798,10 @@ export default function HomeLandingPage({
               </div>
 
               <div className="flex flex-col overflow-hidden rounded-2xl bg-shell shadow-[0_20px_60px_rgba(15,23,42,0.28)] ring-2 ring-primary/80">
-                <div className="shrink-0 bg-gradient-to-r from-primary to-primary-dark px-4 py-2.5 text-center sm:py-3">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-white">
-                    Most popular
-                  </span>
-                </div>
+                <PopularPlanBadge
+                  variant="strip"
+                  className="px-4 py-2.5 sm:py-3"
+                />
                 <div className="flex flex-1 flex-col px-7 pb-7 pt-6 sm:px-8 sm:pb-8 sm:pt-7">
                   <p className="mb-4 text-xs font-bold uppercase tracking-widest text-primary">
                     Advisor

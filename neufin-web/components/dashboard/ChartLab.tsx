@@ -1,5 +1,7 @@
 "use client";
 
+import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import CandlestickChart, {
   type ChartMarker,
@@ -262,20 +264,26 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
       <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
         <Metric
           title="Current Price"
-          value={currentStats ? `$${currentStats.current.toFixed(2)}` : "—"}
+          value={
+            currentStats
+              ? `$${currentStats.current.toFixed(2)}`
+              : FINANCIAL_EM_DASH
+          }
         />
         <Metric
           title="Day Change %"
           value={
             currentStats
               ? `${currentStats.dayChangePct >= 0 ? "+" : ""}${currentStats.dayChangePct.toFixed(2)}%`
-              : "—"
+              : FINANCIAL_EM_DASH
           }
         />
         <Metric
           title="Beta vs Market"
           value={
-            currentStats?.beta != null ? currentStats.beta.toFixed(2) : "—"
+            currentStats?.beta != null
+              ? currentStats.beta.toFixed(2)
+              : FINANCIAL_EM_DASH
           }
         />
         <Metric
@@ -283,7 +291,7 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
           value={
             currentStats?.weight != null
               ? `${currentStats.weight.toFixed(1)}%`
-              : "—"
+              : FINANCIAL_EM_DASH
           }
         />
       </div>

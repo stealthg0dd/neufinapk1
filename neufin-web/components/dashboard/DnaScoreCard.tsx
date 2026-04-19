@@ -1,5 +1,7 @@
 "use client";
 
+import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
+
 interface Props {
   score: number | null;
   investorType: string | null;
@@ -14,7 +16,7 @@ function scoreColor(s: number | null) {
 }
 
 function scoreLabel(s: number | null) {
-  if (s == null) return "—";
+  if (s == null) return FINANCIAL_EM_DASH;
   if (s >= 71) return "Healthy";
   if (s >= 41) return "At Risk";
   return "Critical";
@@ -47,7 +49,9 @@ export function DnaScoreCard({ score, investorType, hasPortfolio }: Props) {
         </>
       ) : (
         <>
-          <div className="mt-2 text-[32px] font-semibold text-slate-300">—</div>
+          <div className="mt-2 text-[32px] font-semibold text-slate-300">
+            {FINANCIAL_EM_DASH}
+          </div>
           <p className="mt-1 text-body-sm text-slate-600">
             {hasPortfolio
               ? "Analysis pending"

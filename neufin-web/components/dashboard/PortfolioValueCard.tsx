@@ -1,5 +1,7 @@
 "use client";
 
+import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
+
 interface Props {
   totalValue: number | null | undefined;
   numPositions?: number;
@@ -7,7 +9,7 @@ interface Props {
 }
 
 function formatValue(v: number | null | undefined) {
-  if (v == null || v === 0) return null;
+  if (v == null || Number.isNaN(v)) return null;
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
   if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`;
   return `$${v.toFixed(0)}`;
@@ -35,7 +37,9 @@ export function PortfolioValueCard({
         </>
       ) : (
         <>
-          <div className="mt-2 text-[32px] font-semibold text-slate-300">—</div>
+          <div className="mt-2 text-[32px] font-semibold text-slate-300">
+            {FINANCIAL_EM_DASH}
+          </div>
           <p className="mt-1 text-body-sm text-slate-600">
             {hasPortfolio ? "Value loading" : "No portfolio yet"}
           </p>

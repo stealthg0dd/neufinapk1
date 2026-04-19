@@ -10,6 +10,7 @@ import type { RegimeData } from "@/hooks/usePortfolioData";
 import { SwarmBriefingPreview } from "@/components/dashboard/SwarmBriefingPreview";
 import DashboardModeControls from "@/components/dashboard/DashboardModeControls";
 import ResearchFeedClient from "@/components/dashboard/ResearchFeedClient";
+import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ function regimePillClass(regime: RegimeData | null): string {
 }
 
 function fmtMetric(v: number | null | undefined, digits = 2): string {
-  if (v == null || Number.isNaN(v)) return "—";
+  if (v == null || Number.isNaN(v)) return FINANCIAL_EM_DASH;
   return Number(v).toFixed(digits);
 }
 
@@ -123,7 +124,10 @@ export default function DashboardPage() {
           },
           {
             label: "Capital at Review",
-            value: positionsCount != null ? `${positionsCount} positions` : "—",
+            value:
+              positionsCount != null
+                ? `${positionsCount} positions`
+                : FINANCIAL_EM_DASH,
             tone: "text-[#0F172A]",
             sub:
               latestPortfolio?.total_value != null
@@ -285,7 +289,9 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                <div className="text-metric text-slate-300">—</div>
+                <div className="text-metric text-slate-300">
+                  {FINANCIAL_EM_DASH}
+                </div>
                 <div className="text-muted-marketing mt-1">
                   Portfolio health score
                 </div>
@@ -322,13 +328,13 @@ export default function DashboardPage() {
             <div>
               <p className="text-label">Sharpe</p>
               <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">
-                —
+                {FINANCIAL_EM_DASH}
               </p>
             </div>
             <div>
               <p className="text-label">Positions</p>
               <p className="mt-1 text-sm font-semibold text-[#0F172A] tabular-nums">
-                {positionsCount != null ? positionsCount : "—"}
+                {positionsCount != null ? positionsCount : FINANCIAL_EM_DASH}
               </p>
             </div>
           </div>
