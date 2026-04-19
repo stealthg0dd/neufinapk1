@@ -53,6 +53,16 @@ export default function DashboardActionsPage() {
     return buildJourneyRecommendations(next);
   }, [hasPortfolio, swarmReport, sub]);
 
+  useEffect(() => {
+    if (loading || recs.length === 0) return;
+    capture(JOURNEY_EVENTS.recommendationViewed, {
+      surface: "actions_feed",
+      phase: "batch",
+      count: recs.length,
+      recommendation_ids: recs.map((r) => r.id),
+    });
+  }, [capture, loading, recs]);
+
   if (loading) {
     return (
       <div className="py-12 text-center text-sm text-readable">
@@ -66,11 +76,11 @@ export default function DashboardActionsPage() {
       <header className="section-header">
         <div>
           <p className="text-label text-primary">Journey</p>
-          <h1>Recommended actions</h1>
+          <h1>Recommendations &amp; actions</h1>
           <p className="mt-1 max-w-2xl text-sm text-readable">
-            Ranked next steps from your subscription state, portfolio, Swarm IC,
-            and the standard NeuFin workflow — same logic as the command center
-            card, expanded for planning.
+            Now / Soon / Watch — ranked by impact, confidence, and urgency. Same
+            engine as the command center card, expanded so you can plan the full
+            loop (Portfolio → Swarm → Reports → Research).
           </p>
         </div>
       </header>

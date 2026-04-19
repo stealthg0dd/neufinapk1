@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import AppHeader from "@/components/AppHeader";
 import SwarmTerminal from "@/components/SwarmTerminal";
+import { SwarmBrain } from "@/components/swarm";
 import type { AgentTraceItem } from "@/components/SwarmTerminal";
 import CommandPalette from "@/components/CommandPalette";
 import RiskMatrix from "@/components/RiskMatrix";
@@ -1665,6 +1666,24 @@ export default function SwarmPage() {
 
         {/* Right sidebar */}
         <div className="space-y-3 xl:col-span-2">
+          {/* Swarm Brain — live 7-agent visualization */}
+          <div className="overflow-hidden rounded-lg border border-border bg-white p-3 shadow-sm flex flex-col items-center gap-2">
+            <p className="w-full text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Agent Network
+            </p>
+            <SwarmBrain
+              compact
+              agentStates={Object.fromEntries(
+                agentTrace.map((t) => [t.agent, t.status as "running" | "complete" | "failed"])
+              )}
+              agentOutputs={Object.fromEntries(
+                agentTrace
+                  .filter((t) => t.summary)
+                  .map((t) => [t.agent, t.summary])
+              )}
+            />
+          </div>
+
           <div className="overflow-hidden rounded-lg border border-border bg-white shadow-sm">
             <div className="border-b border-border-light bg-surface-2 px-3 py-1.5">
               <span className="text-xs font-bold uppercase tracking-wide text-primary-dark">

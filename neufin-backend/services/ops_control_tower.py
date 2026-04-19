@@ -1,11 +1,7 @@
 """
 NeuFin Admin Control Tower — aggregated observability for ops (admin JWT only).
 
-Design:
-- Normalized Pydantic-friendly dicts for AI usage accounts, GitHub, deploys, errors.
-- Adapters are explicit about sync method; nothing is fake-automated.
-- Optional external calls: GitHub REST, OpenAI billing (best-effort), Vercel, Railway.
-- Manual / import overrides via OPS_CONTROL_TOWER_MANUAL_JSON (JSON object).
+Uses modular connectors (services.control_tower) + optional repo intelligence.
 """
 
 from __future__ import annotations
@@ -16,25 +12,30 @@ import os
 import time
 from typing import Any
 
-import httpx
 import structlog
-from pydantic import BaseModel, Field
 
 from core.config import settings
+from services.control_tower import store as ct_store
+from services.control_tower.accounts import AIUsageAccount, SyncSourceType
+from services.control_tower.orchestrator import run_connector_pipeline
+from services.ops_unified_summary import build_unified_observability_async
+from services.repo_intel.orchestrator import build_repo_intelligence_snapshot
 from services.request_metrics import http_stats_last_hours
+
+# Re-export for callers that imported from here
+__all__ = [
+    "AIUsageAccount",
+    "SyncSourceType",
+    "build_control_tower_snapshot",
+    "get_control_tower_snapshot_cached",
+    "refresh_control_tower_snapshot",
+]
 
 logger = structlog.get_logger(__name__)
 
 _CACHE: dict[str, Any] | None = None
 _CACHE_AT: float = 0.0
 _CACHE_TTL = 60.0
-
-
-class SyncSourceType:
-    DIRECT_API = "direct_api"
-    EXPORT_IMPORT = "export_import"
-    MANUAL_OVERRIDE = "manual_override"
-    DASHBOARD_PLACEHOLDER = "dashboard_placeholder"
 
 
 def _utcnow_iso() -> str:
@@ -51,34 +52,7 @@ def _safe_json_loads(raw: str | None) -> dict[str, Any] | None:
         return None
 
 
-# ── AI usage account (normalized) ─────────────────────────────────────────────
-
-
-class AIUsageAccount(BaseModel):
-    provider_name: str
-    account_name: str
-    workspace_or_org: str | None = None
-    model_name: str | None = None
-    billing_cycle_start: str | None = None
-    billing_cycle_end: str | None = None
-    quota_type: str = "unknown"
-    quota_limit: float | None = None
-    quota_used: float | None = None
-    quota_remaining: float | None = None
-    cost_to_date_usd: float | None = None
-    estimated_runway_days: float | None = None
-    refresh_source: str
-    last_synced_at: str | None = None
-    sync_confidence: float = Field(
-        ge=0.0,
-        le=1.0,
-        description="1.0 = verified API read; 0 = manual stub",
-    )
-    notes: str | None = None
-
-
 def _manual_accounts_from_env() -> list[AIUsageAccount]:
-    """Optional OPS_CONTROL_TOWER_MANUAL_JSON key `ai_accounts` list."""
     raw = (
         settings.OPS_CONTROL_TOWER_MANUAL_JSON
         or os.getenv("OPS_CONTROL_TOWER_MANUAL_JSON")
@@ -101,104 +75,42 @@ def _manual_accounts_from_env() -> list[AIUsageAccount]:
     return out
 
 
-async def _openai_billing_probe(api_key: str) -> list[AIUsageAccount] | None:
-    """
-    Best-effort: OpenAI billing subscription endpoint (may 403 on restricted keys).
-    Returns None if not usable — callers should not treat as failure.
-    """
-    url = "https://api.openai.com/v1/dashboard/billing/subscription"
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.get(
-                url,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-            )
-    except Exception as exc:
-        logger.debug("ops_control_tower.openai_billing_net", error=str(exc))
-        return None
-    if r.status_code != 200:
-        logger.debug(
-            "ops_control_tower.openai_billing_status",
-            status=r.status_code,
-        )
-        return None
-    try:
-        body = r.json()
-    except Exception:
-        return None
-    hard_limit = body.get("hard_limit_usd")
-    plan = body.get("plan") or {}
-    title = str(plan.get("title") or "openai_org")
-    return [
-        AIUsageAccount(
-            provider_name="openai",
-            account_name=title,
-            workspace_or_org=str(body.get("id") or "primary"),
-            model_name=None,
-            billing_cycle_start=None,
-            billing_cycle_end=None,
-            quota_type="billing_account",
-            quota_limit=float(hard_limit) if hard_limit is not None else None,
-            quota_used=None,
-            quota_remaining=None,
-            cost_to_date_usd=None,
-            estimated_runway_days=None,
-            refresh_source=SyncSourceType.DIRECT_API,
-            last_synced_at=_utcnow_iso(),
-            sync_confidence=0.85,
-            notes="Subscription object from OpenAI billing API (limits; not per-model spend).",
-        )
-    ]
-
-
 def _anthropic_placeholder() -> AIUsageAccount:
     return AIUsageAccount(
         provider_name="anthropic",
         account_name="primary",
-        workspace_or_org=None,
-        model_name=None,
-        billing_cycle_start=None,
-        billing_cycle_end=None,
         quota_type="usage_api_not_wired",
-        quota_limit=None,
-        quota_used=None,
-        quota_remaining=None,
-        cost_to_date_usd=None,
-        estimated_runway_days=None,
         refresh_source=SyncSourceType.DASHBOARD_PLACEHOLDER,
         last_synced_at=_utcnow_iso(),
         sync_confidence=0.0,
         notes=(
-            "Anthropic usage is not pulled automatically in this build. "
-            "Export from console.anthropic.com or add OPS_CONTROL_TOWER_MANUAL_JSON."
+            "No Anthropic Admin API key — set OPS_ANTHROPIC_ADMIN_API_KEY or manual JSON."
         ),
     )
 
 
-def _cursor_copilot_placeholders() -> list[AIUsageAccount]:
-    return [
-        AIUsageAccount(
-            provider_name="cursor",
-            account_name="team_pool",
-            quota_type="manual_or_import",
-            refresh_source=SyncSourceType.MANUAL_OVERRIDE,
-            last_synced_at=_utcnow_iso(),
-            sync_confidence=0.0,
-            notes="Cursor billing has no public usage API here — paste usage into manual JSON.",
-        ),
-        AIUsageAccount(
-            provider_name="github_copilot",
-            account_name="org_seat",
-            quota_type="aggregated",
-            refresh_source=SyncSourceType.DASHBOARD_PLACEHOLDER,
-            last_synced_at=_utcnow_iso(),
-            sync_confidence=0.0,
-            notes="Copilot: use GitHub billing export or manual JSON until an API is configured.",
-        ),
-    ]
+def _cursor_placeholder() -> AIUsageAccount:
+    return AIUsageAccount(
+        provider_name="cursor",
+        account_name="team_pool",
+        quota_type="manual_or_import",
+        refresh_source=SyncSourceType.MANUAL_OVERRIDE,
+        last_synced_at=_utcnow_iso(),
+        sync_confidence=0.0,
+        notes="Cursor: add cursor_accounts to OPS_CONTROL_TOWER_MANUAL_JSON for spend rows.",
+    )
+
+
+def _copilot_placeholder() -> AIUsageAccount:
+    return AIUsageAccount(
+        provider_name="github_copilot",
+        account_name="org_seat",
+        quota_type="aggregated",
+        refresh_source=SyncSourceType.DASHBOARD_PLACEHOLDER,
+        last_synced_at=_utcnow_iso(),
+        sync_confidence=0.0,
+        notes="Copilot: set OPS_GITHUB_COPILOT_ORG + token with Copilot metrics access.",
+    )
 
 
 def _aggregate_ai_metrics(accounts: list[AIUsageAccount]) -> dict[str, Any]:
@@ -238,171 +150,7 @@ def _build_alerts(accounts: list[AIUsageAccount]) -> list[dict[str, Any]]:
     return alerts
 
 
-# ── GitHub ────────────────────────────────────────────────────────────────────
-
-
-async def _github_repo_intel(token: str, repo: str) -> dict[str, Any] | None:
-    owner, _, name = repo.partition("/")
-    if not name:
-        return None
-    base = "https://api.github.com"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=25.0) as client:
-            r = await client.get(f"{base}/repos/{owner}/{name}", headers=headers)
-            if r.status_code != 200:
-                return {
-                    "ok": False,
-                    "status": r.status_code,
-                    "source_type": SyncSourceType.DIRECT_API,
-                    "sync_confidence": 0.0,
-                    "error": r.text[:200],
-                }
-            repo_json = r.json()
-            lang_r = await client.get(
-                f"{base}/repos/{owner}/{name}/languages", headers=headers
-            )
-            langs: dict[str, int] = {}
-            if lang_r.status_code == 200:
-                langs = {str(k): int(v) for k, v in (lang_r.json() or {}).items()}
-            part_r = await client.get(
-                f"{base}/repos/{owner}/{name}/stats/participation", headers=headers
-            )
-            weeks: list[int] = []
-            if part_r.status_code == 200:
-                pj = part_r.json() or {}
-                weeks = list(pj.get("all") or [])[-12:]
-            open_prs = None
-            pr_r = await client.get(
-                f"{base}/repos/{owner}/{name}/pulls?state=open&per_page=1",
-                headers=headers,
-            )
-            if pr_r.status_code == 200:
-                link = pr_r.headers.get("link") or ""
-                if 'rel="last"' in link:
-                    import re
-
-                    m = re.search(r"page=(\d+)>; rel=\"last\"", link)
-                    if m:
-                        open_prs = int(m.group(1))
-                elif isinstance(pr_r.json(), list):
-                    open_prs = len(pr_r.json())
-            total_bytes = sum(langs.values()) if langs else None
-            return {
-                "ok": True,
-                "source_type": SyncSourceType.DIRECT_API,
-                "sync_confidence": 0.9,
-                "last_synced_at": _utcnow_iso(),
-                "repository": repo,
-                "description": repo_json.get("description"),
-                "default_branch": repo_json.get("default_branch"),
-                "stars": repo_json.get("stargazers_count"),
-                "forks": repo_json.get("forks_count"),
-                "open_issues": repo_json.get("open_issues_count"),
-                "open_pull_requests_hint": open_prs,
-                "size_kb": repo_json.get("size"),
-                "pushed_at": repo_json.get("pushed_at"),
-                "languages_bytes": langs,
-                "languages_total_bytes": total_bytes,
-                "commit_activity_last_12_weeks": weeks,
-                "notes": (
-                    "LOC by language from /languages (bytes, not lines). "
-                    "Open PR count from Link header when paginated; may be null."
-                ),
-            }
-    except Exception as exc:
-        logger.warning("ops_control_tower.github_error", error=str(exc))
-        return {
-            "ok": False,
-            "source_type": SyncSourceType.DIRECT_API,
-            "sync_confidence": 0.0,
-            "error": str(exc),
-        }
-
-
-# ── Deployments (best-effort) ─────────────────────────────────────────────────
-
-
-async def _vercel_deployments_hint() -> dict[str, Any]:
-    tok = settings.OPS_VERCEL_TOKEN
-    pid = settings.OPS_VERCEL_PROJECT_ID
-    team = settings.OPS_VERCEL_TEAM_ID
-    if not tok or not pid:
-        return {
-            "configured": False,
-            "source_type": SyncSourceType.MANUAL_OVERRIDE,
-            "notes": "Set OPS_VERCEL_TOKEN and OPS_VERCEL_PROJECT_ID (and OPS_VERCEL_TEAM_ID if on team scope).",
-        }
-    q = f"projectId={pid}&limit=5"
-    if team:
-        q += f"&teamId={team}"
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            r = await client.get(
-                f"https://api.vercel.com/v6/deployments?{q}",
-                headers={"Authorization": f"Bearer {tok}"},
-            )
-        if r.status_code != 200:
-            return {
-                "configured": True,
-                "ok": False,
-                "status": r.status_code,
-                "source_type": SyncSourceType.DIRECT_API,
-                "body": r.text[:300],
-            }
-        data = r.json()
-        dep = data.get("deployments") or []
-        items = []
-        for d in dep[:8]:
-            items.append(
-                {
-                    "id": d.get("uid"),
-                    "url": d.get("url"),
-                    "state": d.get("state"),
-                    "created": d.get("createdAt"),
-                    "target": d.get("target"),
-                }
-            )
-        return {
-            "configured": True,
-            "ok": True,
-            "source_type": SyncSourceType.DIRECT_API,
-            "sync_confidence": 0.8,
-            "last_synced_at": _utcnow_iso(),
-            "deployments": items,
-        }
-    except Exception as exc:
-        return {
-            "configured": True,
-            "ok": False,
-            "error": str(exc),
-            "source_type": SyncSourceType.DIRECT_API,
-        }
-
-
-def _railway_placeholder() -> dict[str, Any]:
-    if not settings.OPS_RAILWAY_TOKEN:
-        return {
-            "configured": False,
-            "source_type": SyncSourceType.MANUAL_OVERRIDE,
-            "notes": "Railway GraphQL not wired. Set OPS_RAILWAY_TOKEN for future automation.",
-        }
-    return {
-        "configured": True,
-        "source_type": SyncSourceType.DASHBOARD_PLACEHOLDER,
-        "sync_confidence": 0.0,
-        "notes": "Token present; per-service deploy feed not implemented in this slice — use Railway UI or extend adapter.",
-    }
-
-
-# ── Errors / system (reuse in-process metrics) ────────────────────────────────
-
-
-def _error_unified_panel() -> dict[str, Any]:
+def _error_unified_panel(connector_errors: list[dict[str, Any]]) -> dict[str, Any]:
     http_stats = http_stats_last_hours(24.0)
     return {
         "api_process_24h": {
@@ -412,24 +160,18 @@ def _error_unified_panel() -> dict[str, Any]:
             "p95_ms": http_stats.get("p95_ms"),
             "source": "in_process_ring_buffer",
         },
+        "connector_errors": connector_errors,
         "external_connectors": [
             {
                 "name": "sentry",
                 "status": "not_queried",
                 "source_type": SyncSourceType.MANUAL_OVERRIDE,
-                "notes": "Wire Sentry API or embed issue counts in OPS_CONTROL_TOWER_MANUAL_JSON.",
+                "notes": "Wire Sentry API or embed in OPS_CONTROL_TOWER_MANUAL_JSON.",
             },
             {
                 "name": "posthog",
                 "status": "not_queried",
                 "source_type": SyncSourceType.MANUAL_OVERRIDE,
-                "notes": "Use PostHog project API for error trends.",
-            },
-            {
-                "name": "stripe_webhooks",
-                "status": "not_queried",
-                "source_type": SyncSourceType.MANUAL_OVERRIDE,
-                "notes": "Surface Stripe Dashboard webhook delivery failures.",
             },
         ],
         "top_recurring_messages": [],
@@ -441,64 +183,131 @@ def _integrations_matrix() -> list[dict[str, Any]]:
         {
             "id": "openai",
             "automation": "partial" if settings.OPENAI_KEY else "none",
-            "detail": "Billing subscription probe when OPENAI_KEY is set.",
+            "detail": "OpenAIConnector: billing usage + org completions when permitted.",
         },
         {
             "id": "anthropic",
-            "automation": "none",
-            "detail": "No usage pull in this build.",
+            "automation": (
+                "full"
+                if getattr(settings, "OPS_ANTHROPIC_ADMIN_API_KEY", None)
+                else "none"
+            ),
+            "detail": "Admin Usage/Cost API when OPS_ANTHROPIC_ADMIN_API_KEY set.",
         },
         {
             "id": "github",
             "automation": "full" if settings.OPS_GITHUB_TOKEN else "none",
-            "detail": "REST repo + languages + participation when token set.",
+            "detail": "Extended REST + repo intelligence.",
+        },
+        {
+            "id": "github_copilot",
+            "automation": (
+                "partial"
+                if settings.OPS_GITHUB_TOKEN
+                and getattr(settings, "OPS_GITHUB_COPILOT_ORG", None)
+                else "none"
+            ),
+            "detail": "GET /orgs/{org}/copilot/metrics",
+        },
+        {
+            "id": "cursor",
+            "automation": "partial",
+            "detail": "Manual JSON cursor_accounts — no public API.",
         },
         {
             "id": "vercel",
-            "automation": "partial" if settings.OPS_VERCEL_TOKEN else "none",
+            "automation": (
+                "partial"
+                if settings.OPS_VERCEL_TOKEN and settings.OPS_VERCEL_PROJECT_ID
+                else "none"
+            ),
         },
         {
             "id": "railway",
-            "automation": "none",
+            "automation": (
+                "partial"
+                if settings.OPS_RAILWAY_TOKEN
+                and getattr(settings, "OPS_RAILWAY_PROJECT_ID", None)
+                else "none"
+            ),
+            "detail": "GraphQL project deployments.",
         },
     ]
 
 
-def _audit_stub() -> list[dict[str, Any]]:
+def _audit_entries(persisted: bool) -> list[dict[str, Any]]:
     return [
         {
             "at": _utcnow_iso(),
             "event": "control_tower_snapshot",
-            "message": "In-memory TTL cache; no persistent audit log yet.",
+            "message": (
+                "Snapshot persisted to OPS_CONTROL_TOWER_DATA_DIR"
+                if persisted
+                else "In-memory TTL cache; use POST refresh to persist."
+            ),
         }
     ]
 
 
-async def build_control_tower_snapshot() -> dict[str, Any]:
+def _merge_deployments(pipe: dict[str, Any]) -> dict[str, Any]:
+    cp = pipe["connector_payloads"]
+    vercel_ex = (cp.get("vercel") or {}).get("extra") or {}
+    railway_ex = (cp.get("railway") or {}).get("extra") or {}
+    return {
+        "vercel": {
+            "configured": bool(
+                settings.OPS_VERCEL_TOKEN and settings.OPS_VERCEL_PROJECT_ID
+            ),
+            "ok": bool(pipe["vercel_deployments_flat"]),
+            "source_type": SyncSourceType.DIRECT_API,
+            "sync_confidence": 0.82 if pipe["vercel_deployments_flat"] else 0.0,
+            "last_synced_at": _utcnow_iso(),
+            "deployments": pipe["vercel_deployments_flat"],
+            "project_meta": vercel_ex.get("project"),
+            **{k: v for k, v in vercel_ex.items() if k != "project"},
+        },
+        "railway": {
+            "configured": bool(
+                settings.OPS_RAILWAY_TOKEN
+                and getattr(settings, "OPS_RAILWAY_PROJECT_ID", None)
+            ),
+            "ok": bool(pipe["railway_deployments_flat"]),
+            "source_type": SyncSourceType.DIRECT_API,
+            "sync_confidence": 0.8 if pipe["railway_deployments_flat"] else 0.0,
+            "last_synced_at": _utcnow_iso(),
+            "deployments": pipe["railway_deployments_flat"],
+            "graphql_meta": railway_ex,
+        },
+    }
+
+
+def _ensure_provider_stubs(accounts: list[AIUsageAccount]) -> None:
+    prov = {a.provider_name for a in accounts}
+    if "anthropic" not in prov:
+        accounts.append(_anthropic_placeholder())
+    if "cursor" not in prov:
+        accounts.append(_cursor_placeholder())
+    if "github_copilot" not in prov:
+        accounts.append(_copilot_placeholder())
+
+
+async def build_control_tower_snapshot(*, persist: bool = False) -> dict[str, Any]:
+    ga = _utcnow_iso()
     accounts: list[AIUsageAccount] = []
     accounts.extend(_manual_accounts_from_env())
 
-    okey = settings.OPENAI_KEY
-    if okey:
-        oa = await _openai_billing_probe(okey)
-        if oa:
-            accounts.extend(oa)
-    if not any(a.provider_name == "anthropic" for a in accounts):
-        accounts.append(_anthropic_placeholder())
-    accounts.extend(_cursor_copilot_placeholders())
+    pipe = await run_connector_pipeline()
+    accounts.extend(pipe["ai_accounts_from_connectors"])
+    _ensure_provider_stubs(accounts)
 
     ai_metrics = _aggregate_ai_metrics(accounts)
     alerts = _build_alerts(accounts)
 
-    gh: dict[str, Any] | None = None
-    if settings.OPS_GITHUB_TOKEN and settings.OPS_GITHUB_REPO:
-        gh = await _github_repo_intel(
-            settings.OPS_GITHUB_TOKEN, settings.OPS_GITHUB_REPO.strip()
-        )
+    repo_intel = await build_repo_intelligence_snapshot()
+    gh = repo_intel.get("github_extended")
 
-    vercel = await _vercel_deployments_hint()
-    railway = _railway_placeholder()
-    errors = _error_unified_panel()
+    deployments = _merge_deployments(pipe)
+    errors = _error_unified_panel(pipe["connector_errors"])
 
     manual_merge = _safe_json_loads(
         (
@@ -507,19 +316,35 @@ async def build_control_tower_snapshot() -> dict[str, Any]:
             or ""
         ).strip()
     )
+
+    unified_obs = await build_unified_observability_async(
+        connector_payloads=pipe["connector_payloads"],
+        connector_errors_flat=pipe["connector_errors"],
+        vercel_deployments=pipe["vercel_deployments_flat"],
+        railway_deployments=pipe["railway_deployments_flat"],
+        generated_at=ga,
+        manual=manual_merge,
+    )
+
     snapshot: dict[str, Any] = {
-        "generated_at": _utcnow_iso(),
+        "generated_at": ga,
+        "control_tower_version": 2,
         "cache_ttl_seconds": int(_CACHE_TTL),
         "ai_usage": {
             "accounts": [a.model_dump() for a in accounts],
             **ai_metrics,
         },
+        "connectors": pipe["connector_payloads"],
         "github": gh,
-        "deployments": {"vercel": vercel, "railway": railway},
+        "repo_intelligence": repo_intel,
+        "deployments": deployments,
         "errors": errors,
+        "unified_observability": unified_obs,
         "integrations": _integrations_matrix(),
         "alerts": alerts,
-        "audit_sync_logs": _audit_stub(),
+        "audit_sync_logs": _audit_entries(persist),
+        "last_persisted_snapshot": ct_store.load_last_snapshot(),
+        "connector_sync_state": ct_store.load_sync_state(),
         "automation_summary": {
             "fully_automated": [
                 x["id"] for x in _integrations_matrix() if x.get("automation") == "full"
@@ -536,10 +361,13 @@ async def build_control_tower_snapshot() -> dict[str, Any]:
             ],
         },
         "limitations": (
-            "Per-model spend and multi-account Claude/Cursor/Copilot require manual JSON or future billing APIs. "
-            "Vercel/Railway surfaces are feature-flagged via env. Error panel uses in-process HTTP stats only unless extended."
+            "OpenAI billing dashboards may 403 on restricted keys. Anthropic requires Admin API keys. "
+            "Copilot metrics need org policy. Cursor has no public usage API. "
+            "LOC scan runs only when OPS_REPO_INTEL_ROOT or monorepo root is available. "
+            "Railway GraphQL requires project id + token with access."
         ),
     }
+
     if manual_merge:
         snapshot["manual_overrides_merged"] = True
         for k, v in manual_merge.items():
@@ -547,15 +375,38 @@ async def build_control_tower_snapshot() -> dict[str, Any]:
                 snapshot[k] = {**snapshot[k], **v}
             else:
                 snapshot[k] = v
+
+    if persist:
+        try:
+            ct_store.persist_snapshot(snapshot)
+            ct_store.persist_sync_state(
+                {k: v.get("sync_status") for k, v in pipe["connector_payloads"].items()}
+            )
+        except Exception as exc:
+            logger.warning("ops_control_tower.persist_failed", error=str(exc))
+
     return snapshot
 
 
-async def get_control_tower_snapshot_cached() -> dict[str, Any]:
+async def refresh_control_tower_snapshot() -> dict[str, Any]:
+    """Bypass TTL, rebuild, persist connector state + snapshot."""
     global _CACHE, _CACHE_AT
+    snap = await build_control_tower_snapshot(persist=True)
+    _CACHE = {k: v for k, v in snap.items() if k not in ("cache_hit",)}
+    _CACHE_AT = time.monotonic()
+    return {**snap, "cache_hit": False, "refreshed": True}
+
+
+async def get_control_tower_snapshot_cached(
+    *, force_refresh: bool = False
+) -> dict[str, Any]:
+    global _CACHE, _CACHE_AT
+    if force_refresh:
+        return await refresh_control_tower_snapshot()
     now = time.monotonic()
     if _CACHE is not None and (now - _CACHE_AT) < _CACHE_TTL:
         return {**_CACHE, "cache_hit": True}
-    snap = await build_control_tower_snapshot()
+    snap = await build_control_tower_snapshot(persist=False)
     _CACHE = snap
     _CACHE_AT = now
     return {**snap, "cache_hit": False}

@@ -10,7 +10,7 @@ export interface AgentTraceItem {
   ts: string;
 }
 
-type JobStatus = "idle" | "queued" | "running" | "complete" | "failed";
+type JobStatus = "idle" | "queued" | "running" | "complete" | "failed" | "result_unavailable";
 
 const AGENT_CONFIG: Record<
   string,

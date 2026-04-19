@@ -60,7 +60,10 @@ from services.calculator import (  # noqa: E402
 )
 from services.fx_format import format_swarm_fx_note  # noqa: E402
 from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
-from services.market_resolver import resolve_security  # noqa: E402
+from services.market_resolver import (  # noqa: E402
+    portfolio_market_framing,
+    resolve_security,
+)
 from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,
     build_correlation_matrix_from_series,
@@ -1304,6 +1307,15 @@ async def synthesizer_node(state: SwarmState) -> dict:
         "correlation": corr_pts,
     }
 
+    # # SEA-NATIVE-TICKER-FIX: derive portfolio-level benchmark and market framing
+    _all_syms = [t["symbol"] for t in state["ticker_data"]]
+    _mf = portfolio_market_framing(_all_syms)
+    _port_benchmark = _mf["benchmark"]
+    _port_benchmark_label = _mf["benchmark_label"]
+    _port_market_ctx = _mf["market_context"]
+    _port_native_ccy = _mf["native_currency"]
+    _is_sea = _mf["is_sea"]
+
     # ── Build structured input payload for the MD (all 7 agents) ──────────────
     portfolio_positions = []
     for t in state["ticker_data"]:
@@ -1315,7 +1327,7 @@ async def synthesizer_node(state: SwarmState) -> dict:
             {
                 "symbol": sym,
                 "weight_pct": round(t.get("weight", 0) * 100, 1),
-                "value_usd": round(val, 2),
+                "native_value": round(val, 2),
                 "native_currency": meta.native_currency,
                 "fx_indicative_sgd": fx_note,
                 "beta": round(risk.get("beta_map", {}).get(sym, 1.0), 2),
@@ -1330,7 +1342,12 @@ async def synthesizer_node(state: SwarmState) -> dict:
 
     swarm_state_payload = {
         "portfolio": {
-            "total_value_usd": round(state["total_value"], 2),
+            # SEA-NATIVE-TICKER-FIX: native value + explicit currency (not always USD)
+            "total_value": round(state["total_value"], 2),
+            "total_value_native_currency": _port_native_ccy,
+            "benchmark": _port_benchmark,
+            "benchmark_label": _port_benchmark_label,
+            "market_context": _port_market_ctx,
             "positions": portfolio_positions,
             "dna_score": dna_score,
             "score_breakdown": score_breakdown,
@@ -1375,9 +1392,30 @@ async def synthesizer_node(state: SwarmState) -> dict:
     )
 
     # ── IC Briefing user turn ──────────────────────────────────────────────────
+    # SEA-NATIVE-TICKER-FIX: native currency label for AUM; benchmark instead of implicit SPY
+    _ccy_pfx = {
+        "USD": "$",
+        "GBP": "£",
+        "VND": "₫",
+        "IDR": "Rp",
+        "THB": "฿",
+        "MYR": "RM",
+        "SGD": "S$",
+        "HKD": "HK$",
+        "JPY": "¥",
+        "AUD": "A$",
+        "INR": "₹",
+    }.get(_port_native_ccy, f"{_port_native_ccy} ")
+    _sea_note = (
+        f" This is a {_port_market_ctx} portfolio — use {_port_benchmark_label} "
+        f"({_port_benchmark}) as the reference index, NOT SPY/S&P 500."
+        if _is_sea or _port_benchmark != "^GSPC"
+        else ""
+    )
     user_content = (
         f"Generate the full Investment Committee Briefing for this portfolio. "
-        f"Total AUM: ${state['total_value']:,.0f}. DNA Score: {dna_score}/100. "
+        f"Total AUM: {_ccy_pfx}{state['total_value']:,.0f} {_port_native_ccy}. "
+        f"DNA Score: {dna_score}/100. Benchmark: {_port_benchmark_label} ({_port_benchmark}).{_sea_note} "
         "Use the exact 5-section markdown structure specified in your instructions. "
         "Incorporate Risk Sentinel findings in section 2 and Alpha Scout opportunities in section 5. "
         "Every claim must cite a number from the input data."
@@ -1465,6 +1503,11 @@ Return ONLY valid JSON matching this exact schema:
         "regime": regime_label,
         "stress_results": risk.get("stress_results", []),
         "risk_factors": risk.get("risk_factors", []),
+        # SEA-NATIVE-TICKER-FIX: expose benchmark so PDF + frontend can render correctly
+        "portfolio_benchmark": _port_benchmark,
+        "portfolio_benchmark_label": _port_benchmark_label,
+        "portfolio_market_context": _port_market_ctx,
+        "portfolio_native_currency": _port_native_ccy,
         # ── New structured Investment Thesis fields ───────────────────────────
         "headline": struct_result.get(
             "headline",

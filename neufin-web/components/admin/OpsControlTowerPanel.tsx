@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import clsx from "clsx";
+import {
+  ObservabilitySummary,
+  type UnifiedObservabilityPayload,
+} from "@/components/admin/ObservabilitySummary";
 
 type AIAccount = {
   provider_name: string;
@@ -26,9 +30,15 @@ type AIAccount = {
 type ControlTower = {
   generated_at?: string;
   cache_hit?: boolean;
+  refreshed?: boolean;
   cache_ttl_seconds?: number;
   limitations?: string;
   manual_overrides_merged?: boolean;
+  connectors?: Record<string, unknown>;
+  repo_intelligence?: {
+    loc_analytics?: Record<string, unknown>;
+    engineering_health?: Record<string, unknown>;
+  };
   ai_usage?: {
     accounts: AIAccount[];
     total_cost_usd_by_provider?: Record<string, number>;
@@ -36,6 +46,7 @@ type ControlTower = {
     top_models_by_spend?: { model: string; cost_usd: number }[];
   };
   github?: Record<string, unknown> | null;
+  unified_observability?: UnifiedObservabilityPayload;
   deployments?: {
     vercel?: Record<string, unknown>;
     railway?: Record<string, unknown>;
@@ -60,8 +71,8 @@ const SECTIONS = [
   { id: "overview", label: "Overview" },
   { id: "ai-usage", label: "AI usage" },
   { id: "repo", label: "Repo" },
-  { id: "deployments", label: "Deployments" },
-  { id: "errors", label: "Errors" },
+  { id: "connectors", label: "Connectors" },
+  { id: "operations", label: "Deployments & incidents" },
   { id: "integrations", label: "Integrations" },
   { id: "audit", label: "Audit / sync" },
 ] as const;
@@ -149,6 +160,24 @@ export default function OpsControlTowerPanel() {
     }
   }, []);
 
+  const syncPersist = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const res = await apiFetch("/api/admin/control-tower/refresh", {
+        method: "POST",
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const j = (await res.json()) as ControlTower;
+      setData(j);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to sync");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -200,6 +229,14 @@ export default function OpsControlTowerPanel() {
             className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-600 hover:bg-zinc-800 disabled:opacity-50"
           >
             Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => void syncPersist()}
+            disabled={loading}
+            className="rounded-lg border border-cyan-900/60 bg-cyan-950/40 px-3 py-1.5 text-sm text-cyan-100 hover:bg-cyan-950/60 disabled:opacity-50"
+          >
+            Sync &amp; persist
           </button>
         </div>
       </div>
@@ -521,11 +558,41 @@ export default function OpsControlTowerPanel() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-zinc-500">Open PRs (hint)</p>
+                      <p className="text-xs text-zinc-500">Open PRs</p>
                       <p className="text-zinc-300">
                         {String(
-                          (data.github as { open_pull_requests_hint?: number })
-                            .open_pull_requests_hint ?? "—",
+                          (data.github as { open_pull_requests?: number })
+                            .open_pull_requests ??
+                            (data.github as { open_pull_requests_hint?: number })
+                              .open_pull_requests_hint ??
+                            "—",
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Merged PRs (30d)</p>
+                      <p className="text-zinc-300">
+                        {String(
+                          (data.github as { merged_pull_requests_30d?: number })
+                            .merged_pull_requests_30d ?? "—",
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Contributors</p>
+                      <p className="text-zinc-300">
+                        {String(
+                          (data.github as { contributors_count?: number })
+                            .contributors_count ?? "—",
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500">Open issues</p>
+                      <p className="text-zinc-300">
+                        {String(
+                          (data.github as { open_issues_count?: number })
+                            .open_issues_count ?? "—",
                         )}
                       </p>
                     </div>
@@ -543,6 +610,22 @@ export default function OpsControlTowerPanel() {
                         {String((data.github as { size_kb?: number }).size_kb ?? "—")}
                       </p>
                     </div>
+                  </div>
+                  <div className="space-y-1 text-xs text-zinc-500">
+                    <p className="font-semibold uppercase text-zinc-600">Recent commits</p>
+                    <ul className="space-y-1 font-mono text-[11px] text-zinc-400">
+                      {(
+                        (data.github as { recent_commits?: { sha?: string; message?: string }[] })
+                          .recent_commits ?? []
+                      )
+                        .slice(0, 6)
+                        .map((c, i) => (
+                          <li key={i}>
+                            <span className="text-cyan-700/90">{c.sha}</span>{" "}
+                            {c.message}
+                          </li>
+                        ))}
+                    </ul>
                   </div>
                   <p className="text-xs text-zinc-600">
                     {(data.github as { notes?: string }).notes}
@@ -583,39 +666,94 @@ export default function OpsControlTowerPanel() {
                 </div>
               </div>
             )}
-          </section>
-
-          <section id="deployments" className="scroll-mt-24 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-              Deployments
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-                <p className="text-xs font-semibold uppercase text-cyan-600/90">
-                  Vercel
+            {data.repo_intelligence?.loc_analytics &&
+              !(data.repo_intelligence.loc_analytics as { skipped?: boolean }).skipped && (
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4">
+                  <p className="text-xs font-semibold uppercase text-zinc-500">
+                    LOC scan (excludes node_modules, build dirs, lockfiles)
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tabular-nums text-white">
+                    {Number(
+                      (data.repo_intelligence.loc_analytics as { total_loc?: number })
+                        .total_loc ?? 0,
+                    ).toLocaleString()}{" "}
+                    <span className="text-sm font-normal text-zinc-500">lines</span>
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {Object.entries(
+                      ((data.repo_intelligence.loc_analytics as { loc_by_language?: Record<string, number> })
+                        .loc_by_language ?? {}) as Record<string, number>,
+                    )
+                      .slice(0, 12)
+                      .map(([lang, n]) => (
+                        <div
+                          key={lang}
+                          className="flex justify-between gap-2 rounded border border-zinc-800/80 bg-black/20 px-2 py-1 text-xs"
+                        >
+                          <span className="text-zinc-400">{lang}</span>
+                          <span className="font-mono tabular-nums text-zinc-300">
+                            {n.toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            {data.repo_intelligence?.engineering_health && (
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-4 text-sm text-zinc-400">
+                <p className="text-xs font-semibold uppercase text-zinc-500">
+                  Engineering health (heuristics)
                 </p>
-                <pre className="mt-2 max-h-64 overflow-auto text-xs text-zinc-400">
-                  {JSON.stringify(data.deployments?.vercel ?? {}, null, 2)}
+                <pre className="mt-2 max-h-40 overflow-auto text-xs">
+                  {JSON.stringify(data.repo_intelligence.engineering_health, null, 2)}
                 </pre>
               </div>
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-                <p className="text-xs font-semibold uppercase text-zinc-500">
-                  Railway
-                </p>
-                <pre className="mt-2 max-h-64 overflow-auto text-xs text-zinc-400">
+            )}
+          </section>
+
+          <section id="connectors" className="scroll-mt-24 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+              Connector payloads
+            </h2>
+            <p className="text-sm text-zinc-500">
+              Raw normalized output per provider (usage, deployments, sync status).
+            </p>
+            <pre className="max-h-[28rem] overflow-auto rounded-xl border border-zinc-800 bg-black/30 p-4 text-xs text-zinc-400">
+              {JSON.stringify(data.connectors ?? {}, null, 2)}
+            </pre>
+          </section>
+
+          <section id="operations" className="scroll-mt-24 space-y-4">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
+              Unified deployments &amp; incidents
+            </h2>
+            <p className="max-w-3xl text-sm text-zinc-500">
+              One operational slice across Vercel, Railway, API process metrics, and
+              optional Sentry — not a SIEM. Expand a row for fingerprint / remediation.
+              Raw connector payloads remain under Connectors if you need full JSON.
+            </p>
+            <ObservabilitySummary data={data.unified_observability} />
+            <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-zinc-400">
+                Raw errors payload (legacy API health block)
+              </summary>
+              <pre className="mt-3 max-h-64 overflow-auto text-xs text-zinc-500">
+                {JSON.stringify(data.errors ?? {}, null, 2)}
+              </pre>
+            </details>
+            <details className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+              <summary className="cursor-pointer text-sm font-medium text-zinc-400">
+                Raw deployment blobs (per platform)
+              </summary>
+              <div className="mt-3 grid gap-4 md:grid-cols-2">
+                <pre className="max-h-64 overflow-auto text-xs text-zinc-500">
+                  {JSON.stringify(data.deployments?.vercel ?? {}, null, 2)}
+                </pre>
+                <pre className="max-h-64 overflow-auto text-xs text-zinc-500">
                   {JSON.stringify(data.deployments?.railway ?? {}, null, 2)}
                 </pre>
               </div>
-            </div>
-          </section>
-
-          <section id="errors" className="scroll-mt-24 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">
-              Errors & API health
-            </h2>
-            <pre className="max-h-96 overflow-auto rounded-xl border border-zinc-800 bg-black/30 p-4 text-xs text-zinc-400">
-              {JSON.stringify(data.errors ?? {}, null, 2)}
-            </pre>
+            </details>
           </section>
 
           <section id="integrations" className="scroll-mt-24 space-y-4">

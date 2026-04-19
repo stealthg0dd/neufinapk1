@@ -20,7 +20,11 @@ from services.market_cache import (
     upsert_ticker_price_cache,
 )
 from services.market_currency import SUFFIX_CURRENCY as _SUFFIX_CURRENCY
-from services.market_resolver import persist_resolution_best_effort, resolve_security
+from services.market_resolver import (
+    persist_resolution_best_effort,
+    portfolio_market_framing,
+    resolve_security,
+)
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
@@ -1255,10 +1259,87 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     positions_out["display_currency"] = positions_out["native_currency"]
     positions_out["fx_rate_used"] = None
 
+    # # SEA-NATIVE-TICKER-FIX: derive canonical benchmark from resolved symbols
+    _mf = portfolio_market_framing(resolved)
+    portfolio_benchmark = _mf["benchmark"]
+    portfolio_benchmark_label = _mf["benchmark_label"]
+    portfolio_market_context = _mf["market_context"]
+
+    # SEA-NATIVE-CURRENCY-FIX: country/region exposure breakdown (% of portfolio value)
+    _MARKET_COUNTRY: dict[str, str] = {
+        "VN": "Vietnam",
+        "LSE": "United Kingdom",
+        "US": "United States",
+        "JK": "Indonesia",
+        "BK": "Thailand",
+        "KL": "Malaysia",
+        "SG": "Singapore",
+        "AX": "Australia",
+        "TSE": "Japan",
+        "HKEX": "Hong Kong",
+        "NSE": "India",
+        "BSE": "India",
+        "SSE": "China",
+        "SZSE": "China",
+    }
+    _MARKET_REGION: dict[str, str] = {
+        "VN": "Southeast Asia",
+        "JK": "Southeast Asia",
+        "BK": "Southeast Asia",
+        "KL": "Southeast Asia",
+        "SG": "Southeast Asia",
+        "LSE": "Europe",
+        "US": "Americas",
+        "AX": "Asia Pacific",
+        "TSE": "Asia Pacific",
+        "HKEX": "Asia Pacific",
+        "NSE": "Asia Pacific",
+        "BSE": "Asia Pacific",
+        "SSE": "Asia Pacific",
+        "SZSE": "Asia Pacific",
+    }
+    _SEA_MARKETS = {"VN", "JK", "BK", "KL", "SG"}
+
+    country_buckets: dict[str, float] = {}
+    region_buckets: dict[str, float] = {}
+    sea_value = 0.0
+    for _pos in _records_nan_to_none(positions_out.to_dict("records")):
+        _mc = str(_pos.get("market_code") or "US")
+        _val = float(_pos.get("current_value") or 0)
+        _country = _MARKET_COUNTRY.get(_mc, "Other")
+        _region = _MARKET_REGION.get(_mc, "Other")
+        country_buckets[_country] = country_buckets.get(_country, 0) + _val
+        region_buckets[_region] = region_buckets.get(_region, 0) + _val
+        if _mc in _SEA_MARKETS:
+            sea_value += _val
+
+    _tv = float(total_value) if total_value else 1.0
+    country_exposure = sorted(
+        [
+            {"country": c, "value": v, "pct": round(v / _tv * 100, 1)}
+            for c, v in country_buckets.items()
+        ],
+        key=lambda x: x["pct"],
+        reverse=True,
+    )
+    region_exposure = sorted(
+        [
+            {"region": r, "value": v, "pct": round(v / _tv * 100, 1)}
+            for r, v in region_buckets.items()
+        ],
+        key=lambda x: x["pct"],
+        reverse=True,
+    )
+    sea_pct = round(sea_value / _tv * 100, 1) if _tv > 0 else 0.0
+
     result = {
         "total_value": float(total_value),
         "base_currency": base_currency,
         "portfolio_base_currency": base_currency,
+        # SEA-NATIVE-TICKER-FIX: canonical benchmark for PDF/swarm (never silently ^GSPC for VN)
+        "portfolio_benchmark": portfolio_benchmark,
+        "portfolio_benchmark_label": portfolio_benchmark_label,
+        "portfolio_market_context": portfolio_market_context,
         "hhi": round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
         "num_positions": len(df),
         "num_priced": len(resolved),
@@ -1277,6 +1358,10 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "positions": _enrich_positions_fx_hint(
             _records_nan_to_none(positions_out.to_dict("records"))
         ),
+        # SEA-NATIVE-CURRENCY-FIX: geographic exposure
+        "country_exposure": country_exposure,
+        "region_exposure": region_exposure,
+        "sea_pct": sea_pct,
     }
     if price_warnings:
         result["warnings"] = price_warnings

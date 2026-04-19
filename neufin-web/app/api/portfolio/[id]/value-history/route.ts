@@ -2,11 +2,8 @@ import { NextRequest } from "next/server";
 import { proxyToRailway } from "@/lib/proxy";
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  return proxyToRailway(
-    req,
-    `/api/portfolio/${params.id}/value-history`,
-    "GET",
-  );
+  const { id } = await params;
+  return proxyToRailway(req, `/api/portfolio/${id}/value-history`, "GET");
 }

@@ -235,6 +235,15 @@ export interface DNAAnalysisResponse {
   warnings?: string[];
   /** Tickers that could not be priced and were excluded from analysis */
   failed_tickers?: string[];
+  // SEA-NATIVE-CURRENCY-FIX: market framing fields from portfolio_market_framing()
+  portfolio_benchmark?: string;
+  portfolio_benchmark_label?: string;
+  portfolio_native_currency?: string;
+  portfolio_market_context?: string;
+  // Geographic exposure breakdown
+  country_exposure?: Array<{ country: string; value: number; pct: number }>;
+  region_exposure?: Array<{ region: string; value: number; pct: number }>;
+  sea_pct?: number;
 }
 
 // Alias kept for backward compatibility with other pages
@@ -270,6 +279,35 @@ export interface CandleData {
 export interface LinePoint {
   time: string;
   value: number;
+}
+
+// ── SEA Market Pulse ─────────────────────────────────────────────────────────
+
+export interface SEAIndexPulse {
+  symbol: string;
+  label: string;
+  region: string;
+  currency: string;
+  flag: string;
+  price: number | null;
+  change_1d: number | null;
+  change_1w: number | null;
+  change_1m: number | null;
+  regime: string;
+  regime_class: "bullish" | "bearish" | "neutral";
+  volatility: string;
+  status: "live" | "unavailable";
+}
+
+export interface SEAPulseResponse {
+  indices: SEAIndexPulse[];
+  count: number;
+}
+
+export async function getSEAPulse(): Promise<SEAPulseResponse> {
+  const res = await fetch(`${API}/api/market/sea-pulse`, { next: { revalidate: 300 } });
+  if (!res.ok) throw new Error("Could not fetch SEA pulse");
+  return res.json();
 }
 
 // ── DNA ───────────────────────────────────────────────────────────────────────

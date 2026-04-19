@@ -4,5 +4,8 @@ import { proxyBackendJson } from "@/lib/admin-backend-proxy";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  return proxyBackendJson(req, "/api/admin/control-tower", { method: "GET" });
+  const q = req.nextUrl.search;
+  return proxyBackendJson(req, `/api/admin/control-tower${q}`, {
+    method: "GET",
+  });
 }
