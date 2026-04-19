@@ -522,13 +522,13 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                         if sym in remaining:
                             remaining.remove(sym)
                 except Exception as e:
-                    logger.warning(
-                        "price.av_future_error", symbol=sym, error=str(e)
-                    )
+                    logger.warning("price.av_future_error", symbol=sym, error=str(e))
 
     # 8. iTick — optional .VN / .L fallback (# SEA-TICKER-FIX, env-gated)
     if remaining and settings.ENABLE_ITICK_VN_FALLBACK and settings.ITICK_API_KEY:
-        _merge(_itick_batch([s for s in remaining if s.upper().endswith((".VN", ".L"))]))
+        _merge(
+            _itick_batch([s for s in remaining if s.upper().endswith((".VN", ".L"))])
+        )
 
     if remaining:
         logger.warning(
@@ -1197,9 +1197,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     # Recalculate weights based only on resolved tickers
     resolved_mask = df["symbol"].isin(resolved) & df["current_price"].notna()
-    total_value = float(
-        np.nansum(df.loc[resolved_mask, "current_value"].astype(float))
-    )
+    total_value = float(np.nansum(df.loc[resolved_mask, "current_value"].astype(float)))
     df["weight"] = 0.0
     if total_value > 0:
         df.loc[resolved_mask, "weight"] = (

@@ -27,7 +27,12 @@ def test_unresolvable_position_does_not_inflate_aum_via_zero_price():
 
 def test_native_price_used_when_present():
     positions = [
-        {"symbol": "HPG.VN", "shares": 10, "native_price": 25.5, "native_currency": "VND"}
+        {
+            "symbol": "HPG.VN",
+            "shares": 10,
+            "native_price": 25.5,
+            "native_currency": "VND",
+        }
     ]
     out = canonical_portfolio_headlines({}, {}, {}, positions)
     assert out["total_value"] == pytest.approx(255.0)

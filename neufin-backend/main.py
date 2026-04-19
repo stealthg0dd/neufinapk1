@@ -132,6 +132,7 @@ from services.risk_engine import (  # noqa: E402
     format_clusters_for_ai,
 )
 
+
 def _zip_equal_lengths(left: list, right: list) -> list[tuple]:
     """Pair two lists; raises if lengths differ (no zip B905 / Py3.9 strict issues)."""
     if len(left) != len(right):
@@ -1035,7 +1036,9 @@ async def analyze_dna(
             if st == "unresolvable" or getattr(result, "price", None) is None:
                 failed_tickers.append(sym)
                 price_map[sym] = None
-            elif isinstance(result.price, (int, float)) and float(result.price) <= 0:  # noqa: UP038
+            elif (
+                isinstance(result.price, (int, float)) and float(result.price) <= 0
+            ):  # noqa: UP038
                 failed_tickers.append(sym)
                 price_map[sym] = None
             else:
@@ -1051,9 +1054,10 @@ async def analyze_dna(
     df["current_price"] = df["symbol"].map(_px_for)
     df["value"] = (df["shares"] * df["current_price"]).round(2)
     total_value = float(df["value"].sum())
-    if total_value <= 0 or not (
-        (df["current_price"].notna()) & (df["shares"] > 0)
-    ).any():
+    if (
+        total_value <= 0
+        or not ((df["current_price"].notna()) & (df["shares"] > 0)).any()
+    ):
         raise HTTPException(
             status_code=422,
             detail=(
@@ -1175,7 +1179,9 @@ Return ONLY valid JSON:
 
     # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = []
-    for _, row in df[["symbol", "shares", "current_price", "value", "weight"]].iterrows():
+    for _, row in df[
+        ["symbol", "shares", "current_price", "value", "weight"]
+    ].iterrows():
         weight = round(float(row["weight"]) * 100, 2) if total_value > 0 else 0.0
         # # SEA-TICKER-FIX: align DNA response with MarketResolver metadata
         _m = resolve_security(str(row["symbol"]))
