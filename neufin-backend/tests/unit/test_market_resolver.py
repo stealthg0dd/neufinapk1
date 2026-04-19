@@ -1,14 +1,11 @@
 """# SEA-NATIVE-TICKER-FIX: MarketResolver unit tests — VN, UK, SEA, mixed, unresolved."""
 
-import pytest
-
 from services.market_resolver import (
     BENCHMARK_LABELS,
     portfolio_dominant_benchmark,
     portfolio_market_framing,
     resolve_security,
 )
-
 
 # ── Vietnam equities ───────────────────────────────────────────────────────────
 

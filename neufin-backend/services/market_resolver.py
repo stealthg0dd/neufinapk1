@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import structlog
 
 from services.market_currency import (
-    SUFFIX_CURRENCY,
     finnhub_symbol,
     infer_native_currency,
 )

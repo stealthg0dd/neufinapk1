@@ -325,3 +325,137 @@ async def track_event(body: TrackRequest):
             "Failed to track analytics event", exc_info=True
         )  # fire-and-forget
     return {"ok": True}
+
+
+# ── SEA Market Pulse ──────────────────────────────────────────────────────────
+# GET /api/market/sea-pulse
+# Returns 1D/1W/1M performance, regime classification, and volatility for the
+# five core SEA indices.  Falls back gracefully when yfinance is unavailable.
+
+_SEA_INDICES = {
+    "^VNINDEX": {"label": "VN-Index",             "region": "Vietnam",   "currency": "VND", "flag": "🇻🇳"},
+    "^JKSE":    {"label": "IDX Composite",        "region": "Indonesia", "currency": "IDR", "flag": "🇮🇩"},
+    "^SET.BK":  {"label": "SET Index",            "region": "Thailand",  "currency": "THB", "flag": "🇹🇭"},
+    "^KLSE":    {"label": "FBM KLCI",             "region": "Malaysia",  "currency": "MYR", "flag": "🇲🇾"},
+    "^STI":     {"label": "Straits Times Index",  "region": "Singapore", "currency": "SGD", "flag": "🇸🇬"},
+}
+
+_REGIME_THRESHOLDS = [
+    (5, "Strong Rally",   "bullish"),
+    (2, "Mild Uptrend",   "bullish"),
+    (-2, "Sideways",      "neutral"),
+    (-5, "Mild Pullback", "bearish"),
+]
+
+
+def _classify_regime(change_pct_1m: float | None) -> tuple[str, str]:
+    """Returns (regime_label, regime_class) from 1-month return."""
+    if change_pct_1m is None:
+        return "Unavailable", "neutral"
+    for threshold, label, cls in _REGIME_THRESHOLDS:
+        if change_pct_1m >= threshold:
+            return label, cls
+    return "Correction", "bearish"
+
+
+def _volatility_label(std_5d: float | None) -> str:
+    if std_5d is None:
+        return "Unknown"
+    if std_5d < 0.5:
+        return "Low"
+    if std_5d < 1.2:
+        return "Moderate"
+    return "High"
+
+
+def _fetch_sea_pulse() -> list[dict]:
+    try:
+        import yfinance as yf
+    except ImportError:
+        return []
+
+    symbols = list(_SEA_INDICES.keys())
+    results = []
+
+    for sym in symbols:
+        meta = _SEA_INDICES[sym]
+        try:
+            ticker = yf.Ticker(sym)
+            hist = ticker.history(period="1mo", interval="1d", auto_adjust=True)
+            if hist.empty or len(hist) < 2:
+                raise ValueError("insufficient history")
+
+            closes = hist["Close"].dropna().tolist()
+            price_now = closes[-1]
+            price_1d = closes[-2] if len(closes) >= 2 else None
+            price_1w = closes[-6] if len(closes) >= 6 else closes[0]
+            price_1m = closes[0]
+
+            chg_1d = round((price_now - price_1d) / price_1d * 100, 2) if price_1d else None
+            chg_1w = round((price_now - price_1w) / price_1w * 100, 2) if price_1w else None
+            chg_1m = round((price_now - price_1m) / price_1m * 100, 2) if price_1m else None
+
+            # 5-day daily pct std as volatility proxy
+            if len(closes) >= 5:
+                recent = closes[-5:]
+                pct_changes = [
+                    abs((recent[i] - recent[i - 1]) / recent[i - 1] * 100)
+                    for i in range(1, len(recent))
+                ]
+                std_5d = sum(pct_changes) / len(pct_changes) if pct_changes else None
+            else:
+                std_5d = None
+
+            regime_label, regime_class = _classify_regime(chg_1m)
+
+            results.append({
+                "symbol": sym,
+                "label": meta["label"],
+                "region": meta["region"],
+                "currency": meta["currency"],
+                "flag": meta["flag"],
+                "price": round(price_now, 2),
+                "change_1d": chg_1d,
+                "change_1w": chg_1w,
+                "change_1m": chg_1m,
+                "regime": regime_label,
+                "regime_class": regime_class,
+                "volatility": _volatility_label(std_5d),
+                "status": "live",
+            })
+        except Exception as exc:
+            logger.warning("market.sea_pulse_failed", symbol=sym, error=str(exc))
+            results.append({
+                "symbol": sym,
+                "label": meta["label"],
+                "region": meta["region"],
+                "currency": meta["currency"],
+                "flag": meta["flag"],
+                "price": None,
+                "change_1d": None,
+                "change_1w": None,
+                "change_1m": None,
+                "regime": "Unavailable",
+                "regime_class": "neutral",
+                "volatility": "Unknown",
+                "status": "unavailable",
+            })
+
+    return results
+
+
+@router.get("/api/market/sea-pulse")
+async def sea_market_pulse():
+    """
+    1D / 1W / 1M performance + regime + volatility for the five SEA indices.
+    Cached for 5 minutes.
+    """
+    hit, cached = _cached("sea_pulse", ttl=_INDEX_CACHE_TTL)
+    if hit:
+        return cached
+
+    import asyncio
+    data = await asyncio.to_thread(_fetch_sea_pulse)
+    payload = {"indices": data, "count": len(data)}
+    _store("sea_pulse", payload)
+    return payload

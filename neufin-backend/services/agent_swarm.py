@@ -61,10 +61,8 @@ from services.calculator import (  # noqa: E402
 from services.fx_format import format_swarm_fx_note  # noqa: E402
 from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
 from services.market_resolver import (  # noqa: E402
-    resolve_security,
-    portfolio_dominant_benchmark,
     portfolio_market_framing,
-    BENCHMARK_LABELS,
+    resolve_security,
 )
 from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,

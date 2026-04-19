@@ -27,7 +27,7 @@ import {
   BENCHMARK_LABELS,
 } from "@/lib/finance-content";
 // SEA-NATIVE-CURRENCY-FIX: market-aware display components
-import { MarketBadge, QuoteUnavailableBadge, BenchmarkLabel } from "@/components/sea";
+import { MarketBadge, QuoteUnavailableBadge, BenchmarkLabel, RegionalContext, CountryExposure } from "@/components/sea";
 
 const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
   ssr: false,
@@ -550,6 +550,14 @@ export default function ResultsContent() {
                 {result.recommendation}
               </p>
             </motion.div>
+
+            {/* SEA-NATIVE-CURRENCY-FIX: Regional context card (shown when SEA exposure > 10%) */}
+            <RegionalContext result={result} />
+
+            {/* SEA-NATIVE-CURRENCY-FIX: Country / region exposure breakdown */}
+            {(result.country_exposure?.length ?? 0) > 1 && (
+              <CountryExposure result={result} />
+            )}
 
             {/* ── Holdings table ─────────────────────────────────────────── */}
             {result.positions?.length > 0 && (
