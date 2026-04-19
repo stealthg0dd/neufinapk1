@@ -16,6 +16,8 @@ import { useAnalytics } from "@/lib/posthog";
 import { useNeufinAnalytics } from "@/lib/analytics";
 import type { DNAAnalysisResponse } from "@/lib/api";
 import PaywallOverlay from "@/components/PaywallOverlay";
+import { PortfolioIntelligenceProvider } from "@/components/dashboard/PortfolioIntelligenceContext";
+import { NextPrimaryAction } from "@/components/dashboard/NextPrimaryAction";
 import {
   formatNativePrice,
   formatPortfolioTotalLine,
@@ -314,6 +316,15 @@ export default function ResultsContent() {
   return (
     <>
       <SocialProof />
+      {user && (
+        <div className="border-b border-border bg-white">
+          <div className="page-container max-w-4xl py-4">
+            <PortfolioIntelligenceProvider>
+              <NextPrimaryAction surface="results" />
+            </PortfolioIntelligenceProvider>
+          </div>
+        </div>
+      )}
       <div className="flex min-h-screen flex-col bg-app text-navy">
         {/* Ticker warning banner — non-blocking, shown above results */}
         {(priceWarnings.length > 0 || failedTickers.length > 0) && (

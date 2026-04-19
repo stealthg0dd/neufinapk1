@@ -5,6 +5,7 @@
 
 export type DashboardTabId =
   | "overview"
+  | "actions"
   | "portfolio"
   | "swarm"
   | "research"
@@ -38,9 +39,10 @@ export type DashboardTabDefinition = {
   nextInJourney: { tabId: DashboardTabId; reason: string };
 };
 
-/** Ordered decision workflow: overview → depth → outputs → monetization */
+/** Ordered decision workflow: orient → recommendations → depth → outputs → monetization */
 export const DASHBOARD_WORKFLOW_ORDER: DashboardTabId[] = [
   "overview",
+  "actions",
   "portfolio",
   "swarm",
   "research",
@@ -67,8 +69,23 @@ export const DASHBOARD_TABS: Record<DashboardTabId, DashboardTabDefinition> = {
     ],
     primaryCta: "Upload portfolio OR deep-link to Portfolio / Swarm / Reports",
     nextInJourney: {
+      tabId: "actions",
+      reason: "See ranked recommendations for the next best moves.",
+    },
+  },
+  actions: {
+    id: "actions",
+    path: "/dashboard/actions",
+    label: "Actions",
+    section: "overview",
+    jobToBeDone:
+      "Ranked next steps across portfolio, IC, research, and reports — one place to decide what to do.",
+    entryStates: ["empty_no_portfolio", "ready", "trial", "paid"],
+    keyDataObjects: ["subscription status", "swarm state", "DNA", "regime"],
+    primaryCta: "Jump to the highest-impact destination",
+    nextInJourney: {
       tabId: "portfolio",
-      reason: "Ground scores in holdings and refresh DNA.",
+      reason: "Execute on holdings and DNA when recommendations point there.",
     },
   },
   portfolio: {
@@ -189,4 +206,10 @@ export function getTabByPath(pathname: string): DashboardTabDefinition | null {
     return DASHBOARD_TABS.overview;
   }
   return null;
+}
+
+/** Human-readable journey line for breadcrumbs (not raw route segments). */
+export function getJourneyHintForPath(pathname: string): string | null {
+  const tab = getTabByPath(pathname);
+  return tab?.jobToBeDone ?? null;
 }

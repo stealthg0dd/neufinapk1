@@ -16,7 +16,8 @@ describe("dashboard-ia", () => {
   });
 
   it("has consistent workflow coverage", () => {
-    expect(DASHBOARD_TABS.overview.nextInJourney.tabId).toBe("portfolio");
+    expect(DASHBOARD_TABS.overview.nextInJourney.tabId).toBe("actions");
+    expect(getTabByPath("/dashboard/actions")?.id).toBe("actions");
     expect(DASHBOARD_TABS.reports.nextInJourney.tabId).toBe("billing");
   });
 });
