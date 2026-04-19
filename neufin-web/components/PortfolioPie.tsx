@@ -40,10 +40,12 @@ const pct = (n: number) =>
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as Position & { color: string };
+  const v =
+    typeof d.value === "number" && !Number.isNaN(d.value) ? d.value : 0;
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-md">
       <p className="font-mono font-semibold text-foreground">{d.symbol}</p>
-      <p className="mt-0.5 text-muted-foreground">{usd(d.value)}</p>
+      <p className="mt-0.5 text-muted-foreground">{usd(v)}</p>
       <p className="mt-0.5 text-sm text-muted-foreground">
         {pct(d.weight)} of portfolio
       </p>
@@ -53,6 +55,12 @@ function CustomTooltip({ active, payload }: any) {
 
 export default function PortfolioPie({ positions }: Props) {
   const data = positions
+    .filter(
+      (p): p is Position & { value: number } =>
+        typeof p.value === "number" &&
+        !Number.isNaN(p.value) &&
+        p.value > 0,
+    )
     .slice()
     .sort((a, b) => b.value - a.value)
     .map((p, i) => ({ ...p, color: SLICE_COLORS[i % SLICE_COLORS.length] }));

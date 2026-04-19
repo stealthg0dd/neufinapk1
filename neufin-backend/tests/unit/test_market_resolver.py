@@ -31,3 +31,16 @@ def test_us_unchanged():
     assert m.native_currency == "USD"
     assert m.market == "US"
     assert m.provider_ticker == "AAPL"
+
+
+def test_ftse_index_gbp():
+    m = resolve_security("FTSE100")
+    assert m.normalized_symbol == "^FTSE"
+    assert m.native_currency == "GBP"
+    assert m.benchmark == "^FTSE"
+
+
+def test_caret_vn30_vnd():
+    m = resolve_security("^VN30")
+    assert m.native_currency == "VND"
+    assert m.is_index

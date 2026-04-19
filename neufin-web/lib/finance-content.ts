@@ -6,9 +6,12 @@
 import type { Position } from "@/lib/api";
 
 export function formatNativePrice(
-  amount: number,
+  amount: number | null | undefined,
   currency: string | undefined | null,
 ): string {
+  if (amount == null || Number.isNaN(amount)) {
+    return "—";
+  }
   const c = (currency || "USD").toUpperCase();
   if (c === "VND") {
     return new Intl.NumberFormat("en-VN").format(Math.round(amount));
@@ -42,9 +45,12 @@ export function formatNativePrice(
 }
 
 export function formatNativeValue(
-  amount: number,
+  amount: number | null | undefined,
   currency: string | undefined | null,
 ): string {
+  if (amount == null || Number.isNaN(amount)) {
+    return "Quote unavailable";
+  }
   const c = (currency || "USD").toUpperCase();
   if (c === "VND") {
     return `${new Intl.NumberFormat("en-VN").format(Math.round(amount))} VND`;

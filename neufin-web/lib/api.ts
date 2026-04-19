@@ -244,8 +244,8 @@ export interface Position {
   symbol: string;
   shares: number;
   /** Last price in the instrument's listing / native currency when known */
-  price: number;
-  value: number;
+  price: number | null;
+  value: number | null;
   weight: number;
   native_currency?: string;
   /** Indicative SGD line from API when FX display is enabled, e.g. "(≈ S$1,234.56)" */
@@ -254,6 +254,8 @@ export interface Position {
   market_code?: string;
   provider_ticker?: string;
   benchmark?: string;
+  /** live | stale | alias | unresolvable | error — from DNA API when present */
+  price_status?: string;
 }
 
 export interface CandleData {

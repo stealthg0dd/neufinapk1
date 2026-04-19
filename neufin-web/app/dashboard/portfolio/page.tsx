@@ -58,7 +58,13 @@ const STAGES = [
 /** Circumference for r=58 (140×140 SVG, stroke 12) */
 const RING_C = 2 * Math.PI * 58;
 
-function formatListedMoney(amount: number, currencyCode?: string | null): string {
+function formatListedMoney(
+  amount: number | null | undefined,
+  currencyCode?: string | null,
+): string {
+  if (amount == null || Number.isNaN(amount)) {
+    return "—";
+  }
   const c = (currencyCode || "USD").toUpperCase();
   if (c === "USD") return `$${amount.toFixed(2)}`;
   if (c === "GBP") return `£${amount.toFixed(2)}`;
@@ -888,10 +894,7 @@ export default function PortfolioPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {formatListedMoney(
-                          Math.round(p.value),
-                          p.native_currency,
-                        )}
+                        {formatListedMoney(p.value, p.native_currency)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         {(p.weight * 100).toFixed(1)}%

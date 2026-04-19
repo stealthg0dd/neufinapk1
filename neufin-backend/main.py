@@ -120,7 +120,10 @@ from services.calculator import (  # noqa: E402
     get_tax_impact_analysis,
 )
 from services.fx_format import indicative_sgd_suffix  # noqa: E402
-from services.market_resolver import resolve_security  # noqa: E402
+from services.market_resolver import (  # noqa: E402
+    persist_resolution_best_effort,
+    resolve_security,
+)
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,
@@ -996,43 +999,68 @@ async def analyze_dna(
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
     symbols = df["symbol"].str.upper().unique().tolist()
 
-    # ── 5. Price fetching — treat unresolvable / zero quote as failure, not $0 ───
+    # ── 5. Price fetching — partial success like calculate_portfolio_metrics ───
+    # # SEA-TICKER-FIX: never write $0 for missing quotes; exclude unpriced rows
+    # from totals; return failed_tickers + warnings instead of failing the upload.
     price_results = await asyncio.gather(
         *[asyncio.to_thread(get_price_with_fallback, sym) for sym in symbols],
         return_exceptions=True,
     )
     failed_tickers: list[str] = []
-    price_map: dict[str, float] = {}
-    for sym, result in zip(symbols, price_results, strict=True):
+    price_warnings: list[str] = []
+    status_by_sym: dict[str, str] = {}
+    price_map: dict[str, float | None] = {}
+    for sym, result in zip(symbols, price_results):
         if isinstance(result, ValueError) and "DATA_INTEGRITY_ERROR" in str(result):
             failed_tickers.append(sym)
+            price_map[sym] = None
+            status_by_sym[sym] = "error"
         elif isinstance(result, Exception):
             logger.warning("analyze_dna.price_error", symbol=sym, error=str(result))
             failed_tickers.append(sym)
-        elif getattr(result, "status", None) == "unresolvable" or (
-            getattr(result, "price", None) is None
-            or (isinstance(result.price, int | float) and float(result.price) <= 0)
-        ):
-            failed_tickers.append(sym)
+            price_map[sym] = None
+            status_by_sym[sym] = "error"
         else:
-            price_map[sym] = float(result.price)  # type: ignore[union-attr]
+            st = getattr(result, "status", "") or ""
+            status_by_sym[sym] = st
+            if getattr(result, "warning", ""):
+                price_warnings.append(str(result.warning))
+            if st == "unresolvable" or getattr(result, "price", None) is None:
+                failed_tickers.append(sym)
+                price_map[sym] = None
+            elif isinstance(result.price, (int, float)) and float(result.price) <= 0:
+                failed_tickers.append(sym)
+                price_map[sym] = None
+            else:
+                price_map[sym] = float(result.price)  # type: ignore[union-attr]
+                persist_resolution_best_effort(resolve_security(sym))
 
-    if failed_tickers:
+    df["symbol"] = df["symbol"].str.upper()
+
+    def _px_for(sym: str) -> float:
+        v = price_map.get(sym)
+        return float(v) if v is not None else float("nan")
+
+    df["current_price"] = df["symbol"].map(_px_for)
+    df["value"] = (df["shares"] * df["current_price"]).round(2)
+    total_value = float(df["value"].sum())
+    if total_value <= 0 or not (
+        (df["current_price"].notna()) & (df["shares"] > 0)
+    ).any():
         raise HTTPException(
             status_code=422,
             detail=(
-                f"DATA_INTEGRITY_ERROR: Could not verify price for "
-                f"{', '.join(failed_tickers)}. "
-                "Please check these ticker symbols and try again."
+                "No tickers could be priced. Check symbols/markets and try again. "
+                f"Unpriced: {', '.join(failed_tickers) if failed_tickers else 'all'}"
             ),
         )
 
     prices_available = bool(price_map)
-    df["symbol"] = df["symbol"].str.upper()
-    df["current_price"] = df["symbol"].map(price_map).fillna(0.0)
-    df["value"] = (df["shares"] * df["current_price"]).round(2)
-    total_value = float(df["value"].sum())
-    df["weight"] = df["value"] / total_value if total_value > 0 else 0.0
+    if total_value > 0:
+        df["weight"] = df["value"].fillna(0.0) / total_value
+    else:
+        df["weight"] = 0.0
+    df.loc[df["current_price"].isna(), "weight"] = 0.0
     max_pos = float(df["weight"].max() * 100) if total_value > 0 else 0.0
 
     # ── 6. Scoring — 4-component model ────────────────────────────────────────
@@ -1053,12 +1081,12 @@ async def analyze_dna(
 
     # Correlation factor (30 pts) — top-5 holdings via Alpha Vantage TIME_SERIES_DAILY
     top5_symbols = (
-        df.nlargest(5, "weight")["symbol"].tolist()
+        df.loc[df["weight"] > 0].nlargest(5, "weight")["symbol"].tolist()
         if total_value > 0
         else df["symbol"].tolist()[:5]
     )
     weights_dict = dict(
-        zip(df["symbol"].tolist(), df["weight"].tolist(), strict=True)
+        zip(df["symbol"].tolist(), df["weight"].tolist())
     )
     corr_matrix = await asyncio.to_thread(build_correlation_matrix, top5_symbols)
     clusters = find_correlation_clusters(corr_matrix, weights_dict)
@@ -1082,6 +1110,11 @@ async def analyze_dna(
                 "\nNote: Holdings use multiple listing currencies "
                 f"({', '.join(sorted(ccy_set))}); totals are not FX-converted to a single currency.\n"
             )
+        if failed_tickers:
+            price_note += (
+                f"\nNote: No live quote for: {', '.join(sorted(set(failed_tickers)))}. "
+                "Those lines are excluded from totals; do not treat them as zero-value by choice.\n"
+            )
     else:
         price_note = "\nNote: Live market prices are currently unavailable. Analyze based on share quantities and symbol weights only; do not reference dollar values.\n"
 
@@ -1089,8 +1122,25 @@ async def analyze_dna(
     tax_narrative = tax_analysis.get("narrative", "")
     cluster_narrative = format_clusters_for_ai(clusters)
 
+    _prompt_positions = df.assign(
+        native_currency=df["symbol"].map(lambda s: resolve_security(s).native_currency)
+    )
+    _prompt_records = []
+    for _, prow in _prompt_positions.iterrows():
+        cpp = prow["current_price"]
+        vvv = prow["value"]
+        _prompt_records.append(
+            {
+                "symbol": prow["symbol"],
+                "shares": float(prow["shares"]),
+                "native_currency": prow["native_currency"],
+                "current_price": None if pd.isna(cpp) else float(cpp),
+                "value": None if pd.isna(vvv) else float(vvv),
+            }
+        )
+
     prompt = f"""You are a behavioral finance expert.{price_note}
-Portfolio: {df.assign(native_currency=df["symbol"].map(lambda s: resolve_security(s).native_currency))[["symbol", "shares", "native_currency", "current_price", "value"]].to_dict(orient="records")}
+Portfolio: {_prompt_records}
 Total value (mixed-currency sum, not FX-adjusted): {total_value:,.2f}
 Max position: {max_pos:.1f}%
 Weighted beta: {weighted_beta:.2f}
@@ -1118,28 +1168,28 @@ Return ONLY valid JSON:
 
     # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = []
-    for _, row in df[["symbol", "shares", "current_price", "value"]].iterrows():
-        weight = (
-            round(float(row["value"]) / total_value * 100, 2)
-            if total_value > 0
-            else 0.0
-        )
+    for _, row in df[["symbol", "shares", "current_price", "value", "weight"]].iterrows():
+        weight = round(float(row["weight"]) * 100, 2) if total_value > 0 else 0.0
         # # SEA-TICKER-FIX: align DNA response with MarketResolver metadata
         _m = resolve_security(str(row["symbol"]))
+        cp = row["current_price"]
+        vv = row["value"]
         pos = {
             "symbol": row["symbol"],
-            "shares": row["shares"],
+            "shares": float(row["shares"]),
             "native_currency": _m.native_currency,
             "market_code": _m.market,
             "provider_ticker": _m.provider_ticker,
             "benchmark": _m.benchmark,
-            "price": row["current_price"],
-            "value": row["value"],
+            "price": None if pd.isna(cp) else float(cp),
+            "value": None if pd.isna(vv) else float(vv),
             "weight": weight,
+            "price_status": status_by_sym.get(str(row["symbol"]).upper(), "live"),
         }
-        fx_hint = indicative_sgd_suffix(float(row["value"]), _m.native_currency)
-        if fx_hint:
-            pos["fx_indicative_sgd"] = fx_hint
+        if not pd.isna(vv):
+            fx_hint = indicative_sgd_suffix(float(vv), _m.native_currency)
+            if fx_hint:
+                pos["fx_indicative_sgd"] = fx_hint
         positions_out.append(pos)
 
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
@@ -1279,7 +1329,8 @@ Return ONLY valid JSON:
         portfolio_id=portfolio_id,
         investor_type=analysis.get("investor_type"),
     )
-    return {
+    num_priced = len([s for s in symbols if s not in set(failed_tickers)])
+    out: dict = {
         **analysis,
         "dna_score": dna_score,
         "score_breakdown": score_breakdown,
@@ -1287,6 +1338,7 @@ Return ONLY valid JSON:
         "multi_currency_portfolio": multi_ccy,
         "portfolio_currencies": sorted(ccy_set),
         "num_positions": len(df),
+        "num_priced": num_priced,
         "max_position_pct": round(max_pos, 2),
         "weighted_beta": round(weighted_beta, 3),
         "avg_correlation": round(avg_corr, 3),
@@ -1299,6 +1351,11 @@ Return ONLY valid JSON:
         "portfolio_id": portfolio_id,
         "market_context": _market_context,
     }
+    if failed_tickers:
+        out["failed_tickers"] = sorted(set(failed_tickers))
+    if price_warnings:
+        out["warnings"] = price_warnings
+    return out
 
 
 # ── System endpoints ───────────────────────────────────────────────────────────

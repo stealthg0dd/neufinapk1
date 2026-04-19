@@ -565,7 +565,12 @@ export default function ResultsContent() {
                           className="transition-colors hover:bg-surface-2"
                         >
                           <td className="py-2.5 pr-4 font-mono font-bold text-navy">
-                            {p.symbol}
+                            <span>{p.symbol}</span>
+                            {p.price == null ? (
+                              <span className="ml-1.5 text-[10px] font-sans font-normal uppercase tracking-wide text-amber-600">
+                                No quote
+                              </span>
+                            ) : null}
                           </td>
                           <td className="py-2.5 px-4 text-right text-slate2">
                             {new Intl.NumberFormat("en-US").format(p.shares)}
@@ -614,6 +619,12 @@ export default function ResultsContent() {
                       <div>
                         <p className="font-mono font-bold text-navy">
                           {p.symbol}
+                          {p.price == null ? (
+                            <span className="ml-1.5 text-[10px] font-sans font-normal uppercase tracking-wide text-amber-600">
+                              {" "}
+                              No quote
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-muted2">
                           {new Intl.NumberFormat("en-US").format(p.shares)}{" "}
