@@ -28,7 +28,7 @@ const TAB_ICONS: Record<DashboardTabId, LucideIcon> = {
 };
 
 export type ProductNavItem = {
-  tabId: DashboardTabId;
+  tabId?: DashboardTabId;
   href: string;
   label: string;
   icon: LucideIcon;

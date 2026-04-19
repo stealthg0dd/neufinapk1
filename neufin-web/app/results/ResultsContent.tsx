@@ -28,6 +28,7 @@ import {
 } from "@/lib/finance-content";
 // SEA-NATIVE-CURRENCY-FIX: market-aware display components
 import { MarketBadge, QuoteUnavailableBadge, BenchmarkLabel, RegionalContext, CountryExposure } from "@/components/sea";
+import { BenchmarkChart } from "@/components/benchmarking";
 
 const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
   ssr: false,
@@ -828,6 +829,9 @@ export default function ResultsContent() {
                 </div>
               </motion.div>
             )}
+
+            {/* Competitor benchmarking — NeuFin vs Market */}
+            <BenchmarkChart />
 
             {/* ── Unlock report ───────────────────────────────────────────── */}
             <motion.div variants={fadeUp} id="unlock-report">

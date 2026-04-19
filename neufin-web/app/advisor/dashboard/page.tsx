@@ -88,22 +88,19 @@ export default function AdvisorDashboardPage() {
     setGenerating(portfolioId);
     setGenError(null);
     try {
-      const result = await generateWhiteLabelReport(
-        {
-          portfolio_id: portfolioId,
-          advisor_id: user.id,
-          advisor_name: profile.advisor_name,
-          logo_base64: profile.logo_base64,
-          color_scheme: profile.white_label
-            ? {
-                primary: profile.brand_color,
-                secondary: "#8B5CF6",
-                accent: "#F97316",
-              }
-            : null,
-        },
-        token,
-      );
+      const result = await generateWhiteLabelReport({
+        portfolio_id: portfolioId,
+        advisor_id: user.id,
+        advisor_name: profile.advisor_name,
+        logo_base64: profile.logo_base64,
+        color_scheme: profile.white_label
+          ? {
+              primary: profile.brand_color,
+              secondary: "#8B5CF6",
+              accent: "#F97316",
+            }
+          : null,
+      });
       if (result.pdf_url) {
         setReports((prev) =>
           prev.map((r) =>

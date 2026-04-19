@@ -15,6 +15,7 @@ import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
 import { formatRegimeLabel, regimePillClass } from "@/lib/regime-display";
 // SEA-NATIVE-CURRENCY-FIX: SEA market pulse widget
 import { SEAMarketPulse } from "@/components/sea";
+import { BenchmarkChart } from "@/components/benchmarking";
 
 export const dynamic = "force-dynamic";
 
@@ -424,6 +425,9 @@ export default function DashboardPage() {
       <section className="min-w-0">
         <ResearchFeedClient limit={5} />
       </section>
+
+      {/* Competitor benchmarking widget — anonymized industry comparison */}
+      <BenchmarkChart />
 
       <section className="flex flex-col flex-wrap justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
         <div>
