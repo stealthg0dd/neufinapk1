@@ -1037,8 +1037,9 @@ async def analyze_dna(
                 failed_tickers.append(sym)
                 price_map[sym] = None
             elif (
-                isinstance(result.price, (int, float)) and float(result.price) <= 0
-            ):  # noqa: UP038
+                isinstance(result.price, (int, float))  # noqa: UP038
+                and float(result.price) <= 0
+            ):
                 failed_tickers.append(sym)
                 price_map[sym] = None
             else:
