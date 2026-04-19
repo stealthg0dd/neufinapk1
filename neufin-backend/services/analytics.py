@@ -12,6 +12,8 @@ Funnel stages tracked:
   referral_used       → checkout with a valid ref_token
 """
 
+from __future__ import annotations
+
 import structlog
 
 from database import supabase

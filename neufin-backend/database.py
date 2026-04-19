@@ -1,3 +1,9 @@
+import datetime
+
+# Py3.9 — datetime.UTC was added in 3.11
+if not hasattr(datetime, "UTC"):
+    datetime.UTC = datetime.timezone.utc  # type: ignore[attr-defined, assignment]  # noqa: UP017
+
 import structlog
 
 from core.config import settings

@@ -6,6 +6,8 @@ All endpoints require advisor role.
 GET /api/revenue/stats → aggregated revenue, subscriber, and funnel stats
 """
 
+from __future__ import annotations
+
 import asyncio
 import calendar
 import datetime

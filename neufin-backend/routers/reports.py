@@ -11,6 +11,8 @@
 # CREATE INDEX IF NOT EXISTS idx_analytics_events_user ON analytics_events(user_id);
 # CREATE INDEX IF NOT EXISTS idx_analytics_events_name ON analytics_events(event_name);
 
+from __future__ import annotations
+
 import base64
 import datetime
 import json

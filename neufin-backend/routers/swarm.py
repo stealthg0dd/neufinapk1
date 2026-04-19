@@ -7,6 +7,8 @@ POST /api/swarm/chat      Bloomberg-style agentic chat with MD context
 Both endpoints are public (added to PUBLIC_PREFIXES in main.py).
 """
 
+from __future__ import annotations
+
 import json
 import re
 import uuid

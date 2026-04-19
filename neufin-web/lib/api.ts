@@ -227,6 +227,10 @@ export interface DNAAnalysisResponse {
   share_url: string;
   record_id: string | null;
   portfolio_id: string | null;
+  /** True when listing currencies differ across holdings (total is not a single CCY FX total). */
+  multi_currency_portfolio?: boolean;
+  /** ISO 4217 codes present in the upload. */
+  portfolio_currencies?: string[];
   /** Non-blocking warnings: stale prices, alias resolutions, excluded tickers */
   warnings?: string[];
   /** Tickers that could not be priced and were excluded from analysis */
@@ -239,9 +243,19 @@ export type DNAResult = DNAAnalysisResponse;
 export interface Position {
   symbol: string;
   shares: number;
-  price: number;
-  value: number;
+  /** Last price in the instrument's listing / native currency when known */
+  price: number | null;
+  value: number | null;
   weight: number;
+  native_currency?: string;
+  /** Indicative SGD line from API when FX display is enabled, e.g. "(≈ S$1,234.56)" */
+  fx_indicative_sgd?: string;
+  /** SEA-TICKER-FIX: resolver metadata when present */
+  market_code?: string;
+  provider_ticker?: string;
+  benchmark?: string;
+  /** live | stale | alias | unresolvable | error — from DNA API when present */
+  price_status?: string;
 }
 
 export interface CandleData {
@@ -418,6 +432,8 @@ export async function createCheckoutSession(
         price: p.price,
         value: p.value,
         weight: p.weight,
+        native_currency: p.native_currency,
+        fx_indicative_sgd: p.fx_indicative_sgd,
       }))
     : undefined;
   // Prefer the stored portfolio_id (correct portfolios table UUID) over

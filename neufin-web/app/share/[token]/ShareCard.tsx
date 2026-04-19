@@ -4,6 +4,10 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import CopyButton from "./CopyButton";
 import AdvisorCTA from "@/components/AdvisorCTA";
+import {
+  parseStringListField,
+  unwrapAccidentalJsonObjectString,
+} from "@/lib/display-text";
 
 interface DNAShare {
   id: string;
@@ -73,7 +77,22 @@ function ScoreArc({ score }: { score: number }) {
   );
 }
 
+function normalizeBulletLines(lines: string[]): string[] {
+  return lines.flatMap((line) => {
+    const t = (line ?? "").trim();
+    if (!t) return [];
+    if (t.startsWith("[")) return parseStringListField(t);
+    return [unwrapAccidentalJsonObjectString(t)];
+  });
+}
+
 export default function ShareCard({ data }: { data: DNAShare }) {
+  const strengths = normalizeBulletLines(data.strengths ?? []);
+  const weaknesses = normalizeBulletLines(data.weaknesses ?? []);
+  const recommendation = unwrapAccidentalJsonObjectString(
+    data.recommendation ?? "",
+  );
+
   const cfg = TYPE_CONFIG[data.investor_type] ?? {
     emoji: "🧬",
     color: "#3b82f6",
@@ -151,7 +170,7 @@ export default function ShareCard({ data }: { data: DNAShare }) {
               💪 Strengths
             </h3>
             <ul className="space-y-2">
-              {data.strengths.map((s, i) => (
+              {strengths.map((s, i) => (
                 <li key={i} className="flex gap-2 text-sm text-shell-fg/90">
                   <span className="text-green-500 shrink-0 mt-0.5">✓</span>
                   {s}
@@ -164,7 +183,7 @@ export default function ShareCard({ data }: { data: DNAShare }) {
               ⚠️ Watch out
             </h3>
             <ul className="space-y-2">
-              {data.weaknesses.map((w, i) => (
+              {weaknesses.map((w, i) => (
                 <li key={i} className="flex gap-2 text-sm text-shell-fg/90">
                   <span className="text-amber-500 shrink-0 mt-0.5">!</span>
                   {w}
@@ -189,7 +208,7 @@ export default function ShareCard({ data }: { data: DNAShare }) {
             🎯 AI Recommendation
           </p>
           <p className="text-sm text-shell-fg/90 leading-relaxed">
-            {data.recommendation}
+            {recommendation || "—"}
           </p>
         </div>
 

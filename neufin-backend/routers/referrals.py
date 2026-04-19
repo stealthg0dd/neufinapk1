@@ -8,6 +8,8 @@ POST /api/emails/subscribe                → subscribe to weekly digest
 GET  /api/emails/weekly-digest            → data payload for cron email job
 """
 
+from __future__ import annotations
+
 import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel

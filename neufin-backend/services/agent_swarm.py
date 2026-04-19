@@ -58,7 +58,9 @@ from services.calculator import (  # noqa: E402
     get_tax_impact_analysis,
     get_tax_neutral_pairs,
 )
+from services.fx_format import format_swarm_fx_note  # noqa: E402
 from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
+from services.market_resolver import resolve_security  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,
     build_correlation_matrix_from_series,
@@ -1303,15 +1305,22 @@ async def synthesizer_node(state: SwarmState) -> dict:
     }
 
     # ── Build structured input payload for the MD (all 7 agents) ──────────────
-    portfolio_positions = [
-        {
-            "symbol": t["symbol"],
-            "weight_pct": round(t.get("weight", 0) * 100, 1),
-            "value_usd": round(t.get("value", 0), 2),
-            "beta": round(risk.get("beta_map", {}).get(t["symbol"], 1.0), 2),
-        }
-        for t in state["ticker_data"]
-    ]
+    portfolio_positions = []
+    for t in state["ticker_data"]:
+        sym = t["symbol"]
+        meta = resolve_security(str(sym))
+        val = float(t.get("value", 0))
+        fx_note = format_swarm_fx_note(meta.native_currency, val)
+        portfolio_positions.append(
+            {
+                "symbol": sym,
+                "weight_pct": round(t.get("weight", 0) * 100, 1),
+                "value_usd": round(val, 2),
+                "native_currency": meta.native_currency,
+                "fx_indicative_sgd": fx_note,
+                "beta": round(risk.get("beta_map", {}).get(sym, 1.0), 2),
+            }
+        )
 
     strategist_parsed = (
         json.loads(macro)

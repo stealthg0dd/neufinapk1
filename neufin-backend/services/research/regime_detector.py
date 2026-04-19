@@ -20,13 +20,15 @@ Schedule: every 6 hours via APScheduler.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 
 from database import supabase
 from services.ai_router import get_ai_analysis
 from services.research.slug_utils import slugify
+
+UTC = timezone.utc  # noqa: UP017  # Py3.9 compat (datetime.UTC is 3.11+)
 
 logger = structlog.get_logger("neufin.regime_detector")
 

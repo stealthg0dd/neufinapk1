@@ -9,6 +9,8 @@ GET /api/market/indices          → live global index quotes (SEA + US, 5-min c
 POST /api/analytics/track        → client-side funnel event ingestion
 """
 
+from __future__ import annotations
+
 import time
 
 import structlog

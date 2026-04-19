@@ -314,8 +314,9 @@ async def list_users(
     Paginated user list for admin + advisor ops consoles.
     """
     try:
+        # display_name omitted — not present on all prod DBs (use advisor_name).
         query = supabase.table("user_profiles").select(
-            "id, email, advisor_name, display_name, firm_name, subscription_status, "
+            "id, email, advisor_name, firm_name, subscription_status, "
             "subscription_tier, trial_started_at, created_at, last_sign_in_at, role"
         )
         if plan and plan != "all":
@@ -338,7 +339,6 @@ async def list_users(
             for p in profiles
             if q in (p.get("email") or "").lower()
             or q in (p.get("advisor_name") or "").lower()
-            or q in (p.get("display_name") or "").lower()
             or q in (p.get("firm_name") or "").lower()
         ]
         profiles = profiles[offset : offset + limit]
@@ -385,10 +385,7 @@ async def list_users(
             {
                 "id": tid,
                 "email": p.get("email") or "",
-                "name": p.get("advisor_name")
-                or p.get("display_name")
-                or p.get("email")
-                or "",
+                "name": p.get("advisor_name") or p.get("email") or "",
                 "firm_name": p.get("firm_name"),
                 "plan": p.get("subscription_tier") or "—",
                 "status": p.get("subscription_status"),
@@ -419,7 +416,7 @@ async def get_user_detail(
         r = (
             supabase.table("user_profiles")
             .select(
-                "id, email, advisor_name, display_name, firm_name, subscription_status, "
+                "id, email, advisor_name, firm_name, subscription_status, "
                 "subscription_tier, trial_started_at, created_at, last_sign_in_at, role"
             )
             .eq("id", user_id)
@@ -462,7 +459,7 @@ async def get_user_detail(
     return {
         "id": p["id"],
         "email": p.get("email") or "",
-        "name": p.get("advisor_name") or p.get("display_name") or "",
+        "name": p.get("advisor_name") or "",
         "firm_name": p.get("firm_name"),
         "subscription_status": p.get("subscription_status"),
         "subscription_tier": p.get("subscription_tier"),

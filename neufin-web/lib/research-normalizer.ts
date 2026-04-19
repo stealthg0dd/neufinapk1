@@ -27,6 +27,7 @@ export type NormalizedReport = {
   markdown: string;
   /** Structured sections — only present when the payload was a JSON dict */
   structured?: {
+    /** Executive thesis / summary when parsed from JSON */
     thesis?: string;
     key_findings?: KeyFinding[];
     sector_impacts?: SectorImpact[];
@@ -40,19 +41,48 @@ export type NormalizedReport = {
 function safeParseJson(raw: string): Record<string, unknown> | null {
   const trimmed = raw.trim();
   // Remove common LLM artifacts: leading/trailing fences, parentheses
-  const cleaned = trimmed
+  let cleaned = trimmed
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .replace(/^\(\s*/, "")
     .replace(/\s*\)$/, "");
 
+  // Unwrap `"{"thesis":...}"` style double-encoding from some APIs
+  try {
+    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+      const once = JSON.parse(cleaned);
+      if (typeof once === "string") cleaned = once.trim();
+    }
+  } catch {
+    /* keep cleaned */
+  }
+
   if (!cleaned.startsWith("{")) return null;
   try {
     const parsed = JSON.parse(cleaned);
+    // Double-encoded JSON string from some providers
+    if (typeof parsed === "string") {
+      return safeParseJson(parsed);
+    }
     return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null;
   } catch {
+    // Near-JSON: trim trailing prose after the closing `}` (LLM chatter)
+    const end = cleaned.lastIndexOf("}");
+    if (end > 1) {
+      try {
+        const parsed = JSON.parse(cleaned.slice(0, end + 1));
+        if (typeof parsed === "string") {
+          return safeParseJson(parsed);
+        }
+        return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      } catch {
+        return null;
+      }
+    }
     return null;
   }
 }
@@ -90,19 +120,20 @@ function toKeyFindings(val: unknown): KeyFinding[] {
 
 function toSectorImpacts(val: unknown): SectorImpact[] {
   if (!Array.isArray(val)) return [];
-  return val
-    .map((item) => {
-      if (typeof item === "object" && item !== null) {
-        const o = item as Record<string, unknown>;
-        return {
-          sector: String(o.sector ?? o.name ?? ""),
-          impact: String(o.impact ?? o.description ?? ""),
-          direction: o.direction ? String(o.direction) : undefined,
-        };
-      }
-      return null;
-    })
-    .filter((s): s is SectorImpact => s !== null && s.sector.length > 0);
+  const out: SectorImpact[] = [];
+  for (const item of val) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    const sector = String(o.sector ?? o.name ?? "").trim();
+    if (!sector) continue;
+    const impact = String(o.impact ?? o.description ?? "").trim();
+    const row: SectorImpact = { sector, impact };
+    if (o.direction != null && String(o.direction).trim()) {
+      row.direction = String(o.direction).trim();
+    }
+    out.push(row);
+  }
+  return out;
 }
 
 function structuredToMarkdown(data: Record<string, unknown>): string {
@@ -190,7 +221,11 @@ export function normalizeResearchContent(
         ? String(parsed.recommended_action)
         : undefined,
     };
-    const markdown = structuredToMarkdown(parsed) || executiveSummary || "";
+    const markdown =
+      structuredToMarkdown(parsed) ||
+      (structured.thesis ? String(structured.thesis) : "") ||
+      executiveSummary ||
+      "";
     return { markdown, structured };
   }
 

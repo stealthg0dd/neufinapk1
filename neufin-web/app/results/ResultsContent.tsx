@@ -16,6 +16,11 @@ import { useAnalytics } from "@/lib/posthog";
 import { useNeufinAnalytics } from "@/lib/analytics";
 import type { DNAAnalysisResponse } from "@/lib/api";
 import PaywallOverlay from "@/components/PaywallOverlay";
+import {
+  formatNativePrice,
+  formatPositionValuePrimary,
+  shouldShowFxHint,
+} from "@/lib/finance-content";
 
 const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
   ssr: false,
@@ -444,6 +449,12 @@ export default function ResultsContent() {
                 <span className="font-semibold text-navy">
                   {usd(result.total_value)}
                 </span>
+                {result.multi_currency_portfolio ? (
+                  <span className="block mt-1 text-xs text-amber-400/90">
+                    Mixed listing currencies — total is a sum of native amounts, not
+                    FX-unified.
+                  </span>
+                ) : null}
                 &nbsp;·&nbsp;
                 {result.num_positions} positions &nbsp;·&nbsp; Max
                 position:&nbsp;
@@ -554,16 +565,28 @@ export default function ResultsContent() {
                           className="transition-colors hover:bg-surface-2"
                         >
                           <td className="py-2.5 pr-4 font-mono font-bold text-navy">
-                            {p.symbol}
+                            <span>{p.symbol}</span>
+                            {p.price == null ? (
+                              <span className="ml-1.5 text-[10px] font-sans font-normal uppercase tracking-wide text-amber-600">
+                                No quote
+                              </span>
+                            ) : null}
                           </td>
                           <td className="py-2.5 px-4 text-right text-slate2">
                             {new Intl.NumberFormat("en-US").format(p.shares)}
                           </td>
                           <td className="py-2.5 px-4 text-right text-slate2">
-                            {usdFull(p.price)}
+                            {formatNativePrice(p.price, p.native_currency)}
                           </td>
                           <td className="py-2.5 px-4 text-right font-medium text-navy">
-                            {usd(p.value)}
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span>{formatPositionValuePrimary(p)}</span>
+                              {shouldShowFxHint(p) ? (
+                                <span className="text-xs font-normal text-muted2">
+                                  {p.fx_indicative_sgd}
+                                </span>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="py-2.5 pl-4">
                             <div className="flex items-center gap-2">
@@ -596,14 +619,27 @@ export default function ResultsContent() {
                       <div>
                         <p className="font-mono font-bold text-navy">
                           {p.symbol}
+                          {p.price == null ? (
+                            <span className="ml-1.5 text-[10px] font-sans font-normal uppercase tracking-wide text-amber-600">
+                              {" "}
+                              No quote
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-muted2">
                           {new Intl.NumberFormat("en-US").format(p.shares)}{" "}
-                          shares · {usdFull(p.price)}
+                          shares · {formatNativePrice(p.price, p.native_currency)}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-navy">{usd(p.value)}</p>
+                        <p className="font-medium text-navy">
+                          {formatPositionValuePrimary(p)}
+                        </p>
+                        {shouldShowFxHint(p) ? (
+                          <p className="text-xs text-muted2 mt-0.5">
+                            {p.fx_indicative_sgd}
+                          </p>
+                        ) : null}
                         <div className="mt-1 flex items-center justify-end gap-1.5">
                           <div className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-3">
                             <div

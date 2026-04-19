@@ -21,6 +21,8 @@ Endpoints:
   DELETE /api/developer/keys/{key_id}   → revoke a key
 """
 
+from __future__ import annotations
+
 import datetime
 import hashlib
 import secrets

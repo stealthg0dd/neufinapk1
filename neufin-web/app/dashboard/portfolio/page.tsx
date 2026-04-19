@@ -58,6 +58,30 @@ const STAGES = [
 /** Circumference for r=58 (140×140 SVG, stroke 12) */
 const RING_C = 2 * Math.PI * 58;
 
+function formatListedMoney(
+  amount: number | null | undefined,
+  currencyCode?: string | null,
+): string {
+  if (amount == null || Number.isNaN(amount)) {
+    return "—";
+  }
+  const c = (currencyCode || "USD").toUpperCase();
+  if (c === "USD") return `$${amount.toFixed(2)}`;
+  if (c === "GBP") return `£${amount.toFixed(2)}`;
+  if (c === "EUR") return `€${amount.toFixed(2)}`;
+  if (c === "VND")
+    return `${Math.round(amount).toLocaleString("en-US")} ₫`;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: c,
+      maximumFractionDigits: 4,
+    }).format(amount);
+  } catch {
+    return `${amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${c}`;
+  }
+}
+
 // ── 3-step analysis state machine ────────────────────────────────────────────
 type AnalysisStep = "idle" | "dna_complete" | "swarm_complete" | "report_ready";
 
@@ -503,10 +527,13 @@ export default function PortfolioPage() {
 
   const metricEntries = useMemo(() => {
     if (!result) return [];
+    const multi = Boolean(result.multi_currency_portfolio);
     const rows: { label: string; value: string }[] = [
       {
         label: "Total Value",
-        value: `$${Math.round(result.total_value).toLocaleString()}`,
+        value: multi
+          ? `Mixed CCY (${(result.portfolio_currencies || []).join(", ")}) · raw sum ${Math.round(result.total_value).toLocaleString()}`
+          : `$${Math.round(result.total_value).toLocaleString()}`,
       },
       { label: "Positions", value: String(result.num_positions) },
       {
@@ -861,10 +888,13 @@ export default function PortfolioPage() {
                         {p.shares.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        ${p.price.toFixed(2)}
+                        {formatListedMoney(
+                          p.price,
+                          p.native_currency,
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        ${Math.round(p.value).toLocaleString()}
+                        {formatListedMoney(p.value, p.native_currency)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         {(p.weight * 100).toFixed(1)}%

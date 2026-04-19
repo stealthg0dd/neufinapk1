@@ -17,7 +17,7 @@ import json
 import math
 import random
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -30,6 +30,8 @@ from services.jwt_auth import JWTUser
 from services.quant_model_engine import analyze_financial_modes
 from services.research.regime_detector import get_current_regime_summary
 from services.research.slug_utils import estimate_read_time_minutes, slugify
+
+UTC = timezone.utc  # noqa: UP017  # Py3.9 compat (datetime.UTC is 3.11+)
 
 logger = structlog.get_logger("neufin.research")
 

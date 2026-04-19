@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 import datetime
 import io
@@ -18,6 +20,7 @@ from services.calculator import (
     verify_price_integrity,
 )
 from services.jwt_auth import JWTUser
+from services.market_resolver import resolve_security
 from services.risk_engine import build_risk_report
 
 logger = structlog.get_logger(__name__)
@@ -67,10 +70,12 @@ def _candle(symbol: str, period_days: int) -> dict | None:
     # ── 1. Finnhub ─────────────────────────────────────────────────────────────
     if FINNHUB_API_KEY:
         try:
+            # # SEA-TICKER-FIX: Finnhub symbol normalization (VN / UK / indices)
+            fh_sym = resolve_security(symbol).provider_finnhub
             r = requests.get(
                 "https://finnhub.io/api/v1/stock/candle",
                 params={
-                    "symbol": symbol,
+                    "symbol": fh_sym,
                     "resolution": "D",
                     "from": unix_from,
                     "to": unix_to,
@@ -257,21 +262,37 @@ async def create_portfolio(body: PortfolioCreate):
 
     # Insert positions
     for pos in metrics["positions"]:
+        base_row = {
+            "portfolio_id": portfolio_id,
+            "symbol": pos["symbol"],
+            "shares": pos["shares"],
+            "cost_basis": (
+                encrypt_value(pos["cost_basis"])
+                if pos.get("cost_basis") is not None
+                else None
+            ),
+        }
+        # # SEA-TICKER-FIX: optional metadata columns when migration applied
+        if pos.get("native_currency"):
+            base_row["native_currency"] = pos["native_currency"]
+        if pos.get("market_code"):
+            base_row["market_code"] = pos["market_code"]
+        if pos.get("provider_ticker"):
+            base_row["provider_ticker"] = pos["provider_ticker"]
         try:
-            supabase.table("portfolio_positions").insert(
-                {
-                    "portfolio_id": portfolio_id,
-                    "symbol": pos["symbol"],
-                    "shares": pos["shares"],
-                    "cost_basis": (
-                        encrypt_value(pos["cost_basis"])
-                        if pos.get("cost_basis") is not None
-                        else None
-                    ),
-                }
-            ).execute()
+            supabase.table("portfolio_positions").insert(base_row).execute()
         except Exception:
-            logger.warning("Position insert failed", exc_info=True)
+            try:
+                supabase.table("portfolio_positions").insert(
+                    {
+                        "portfolio_id": portfolio_id,
+                        "symbol": pos["symbol"],
+                        "shares": pos["shares"],
+                        "cost_basis": base_row.get("cost_basis"),
+                    }
+                ).execute()
+            except Exception:
+                logger.warning("Position insert failed", exc_info=True)
 
     return {"portfolio_id": portfolio_id, "metrics": metrics}
 

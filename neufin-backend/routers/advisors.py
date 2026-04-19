@@ -6,6 +6,8 @@ GET  /api/advisors/{advisor_id}            → public profile by user UUID
 PUT  /api/advisors/me                      → upsert own profile (requires Bearer token)
 """
 
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 

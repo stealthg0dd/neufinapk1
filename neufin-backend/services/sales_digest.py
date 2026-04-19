@@ -10,12 +10,14 @@ Can also be triggered on-demand for testing.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 
 from database import supabase
 from services.slack import notify_ctech
+
+UTC = timezone.utc  # noqa: UP017  # Py3.9 compat (datetime.UTC is 3.11+)
 
 logger = structlog.get_logger("neufin.sales_digest")
 

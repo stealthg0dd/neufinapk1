@@ -3,6 +3,8 @@ AI Fallback Chain (March 14, 2026 Stable):
 Claude Sonnet 4.6 → OpenAI GPT-4o → Gemini 3.1 Pro (→ 1.5 Flash) → Groq Llama 3.3 70B
 """
 
+from __future__ import annotations
+
 import json
 import re
 import time

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import datetime
+import math
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -9,16 +12,51 @@ import structlog
 from dotenv import load_dotenv
 
 from core.config import settings
+from services.fx_format import indicative_sgd_suffix
 from services.market_cache import (
     TICKER_ALIASES,
     PriceResult,
     get_ticker_price_cache,
     upsert_ticker_price_cache,
 )
+from services.market_currency import SUFFIX_CURRENCY as _SUFFIX_CURRENCY
+from services.market_resolver import persist_resolution_best_effort, resolve_security
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
 logger = structlog.get_logger("neufin.calculator")
+
+
+def _enrich_positions_fx_hint(records: list[dict]) -> list[dict]:
+    """Optional indicative SGD line per position (display-only; gated by settings)."""
+    out: list[dict] = []
+    for r in records:
+        row = dict(r)
+        try:
+            val = float(row.get("current_value") or 0)
+        except (TypeError, ValueError):
+            val = 0.0
+        ccy = str(row.get("native_currency") or "USD")
+        hint = indicative_sgd_suffix(val, ccy)
+        if hint:
+            row["fx_indicative_sgd"] = hint
+        out.append(row)
+    return out
+
+
+def _records_nan_to_none(rows: list[dict]) -> list[dict]:
+    """JSON-safe position rows: float NaN → None (not a misleading null price)."""
+    out: list[dict] = []
+    for r in rows:
+        row = {}
+        for k, v in r.items():
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                row[k] = None
+            else:
+                row[k] = v
+        out.append(row)
+    return out
+
 
 POLYGON_API_KEY = settings.POLYGON_API_KEY
 FINNHUB_API_KEY = settings.FINNHUB_API_KEY
@@ -110,8 +148,9 @@ def _is_rate_limit(response_json: dict) -> bool:
 
 # ── Ticker normalisation ───────────────────────────────────────────────────────
 def _fh_ticker(sym: str) -> str:
-    """Finnhub: BRK.B → BRK-B."""
-    return sym.replace(".", "-").upper()
+    """Finnhub-compatible symbol (regional suffixes keep dots)."""
+    # # SEA-TICKER-FIX: index aliases + regional metadata applied before Finnhub.
+    return resolve_security(sym).provider_finnhub
 
 
 def _polygon_sym(sym: str) -> str:
@@ -298,6 +337,45 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
         return {}
 
 
+def _yfinance_batch(symbols: list[str]) -> dict[str, float]:
+    """
+    Yahoo Finance last close — reliable for international suffixes (.VN, .L), UK,
+    and indices (^VNINDEX, ^FTSE). Polygon US snapshot does not cover these.
+    """
+    if not symbols:
+        return {}
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning("price.yfinance_unavailable")
+        return {}
+
+    results: dict[str, float] = {}
+
+    def _one(sym: str) -> tuple[str, float | None]:
+        try:
+            # # SEA-TICKER-FIX: Yahoo symbol may differ after index alias normalization.
+            ysym = resolve_security(sym).provider_ticker
+            t = yf.Ticker(ysym)
+            hist = t.history(period="5d", auto_adjust=True)
+            if hist is not None and not hist.empty and "Close" in hist.columns:
+                px = float(hist["Close"].iloc[-1])
+                if px > 0:
+                    return sym, px
+        except Exception as e:
+            logger.debug("price.yfinance_one_failed", symbol=sym, error=str(e))
+        return sym, None
+
+    with ThreadPoolExecutor(max_workers=min(8, len(symbols))) as ex:
+        futs = {ex.submit(_one, s): s for s in symbols}
+        for fut in as_completed(futs, timeout=45.0):
+            sym, px = fut.result()
+            if px and px > 0:
+                results[sym] = px
+                logger.debug("price.yfinance_resolved", symbol=sym, price=px)
+    return results
+
+
 def _av_single(sym: str) -> float | None:
     """Alpha Vantage GLOBAL_QUOTE fallback for one symbol. Returns None when unavailable."""
     if not ALPHA_VANTAGE_API_KEY or not _available("alphavantage"):
@@ -324,15 +402,55 @@ def _av_single(sym: str) -> float | None:
         return None
 
 
+def _itick_single(sym: str) -> float | None:
+    """iTick quote for .VN / .L when env-gated; returns None on failure."""
+    if not settings.ENABLE_ITICK_VN_FALLBACK or not settings.ITICK_API_KEY:
+        return None
+    u = sym.upper()
+    if not (u.endswith(".VN") or u.endswith(".L")):
+        return None
+    try:
+        r = requests.get(
+            "https://api.itick.org/v1/quote",
+            params={"code": sym},
+            headers={"Authorization": f"Bearer {settings.ITICK_API_KEY}"},
+            timeout=6.0,
+        )
+        if r.status_code != 200:
+            return None
+        body = r.json()
+        p = body.get("data") if isinstance(body.get("data"), dict) else body
+        if not isinstance(p, dict):
+            return None
+        raw = p.get("price") or p.get("last") or p.get("close") or 0
+        try:
+            price = float(raw)
+        except (TypeError, ValueError):
+            return None
+        return price if price > 0 else None
+    except Exception as e:
+        logger.debug("price.itick_failed", symbol=sym, error=str(e))
+        return None
+
+
+def _itick_batch(symbols: list[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for sym in symbols:
+        px = _itick_single(sym)
+        if px and px > 0:
+            out[sym] = px
+    return out
+
+
 # ── Batch spot-price fetcher (public) ─────────────────────────────────────────
 def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
     """
     Fetch spot prices for a list of symbols using a tiered provider chain
     with circuit breakers.
 
-    Chain: Polygon (batch) → FMP (batch) → TwelveData (batch) →
-           Marketstack (batch) → Finnhub (parallel, ThreadPoolExecutor) →
-           Alpha Vantage (parallel, ThreadPoolExecutor).
+    Chain: Polygon (batch) → Yahoo Finance (international + indices) → FMP →
+           TwelveData → Marketstack → Finnhub (parallel) →
+           Alpha Vantage (parallel).
 
     Returns {sym: price} for every symbol that could be resolved.
     Symbols that could not be resolved are omitted (caller decides how to handle).
@@ -354,19 +472,23 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
     if remaining:
         _merge(_polygon_batch(remaining))
 
-    # 2. FMP batch
+    # 2. Yahoo Finance — fills gaps for .VN, .L, ^index, etc.
+    if remaining:
+        _merge(_yfinance_batch(remaining))
+
+    # 3. FMP batch
     if remaining:
         _merge(_fmp_batch(remaining))
 
-    # 3. TwelveData batch
+    # 4. TwelveData batch
     if remaining:
         _merge(_twelvedata_batch(remaining))
 
-    # 4. Marketstack batch
+    # 5. Marketstack batch
     if remaining:
         _merge(_marketstack_batch(remaining))
 
-    # 5. Finnhub — parallel across all remaining symbols
+    # 6. Finnhub — parallel across all remaining symbols
     if remaining and _available("finnhub"):
         syms_to_try = list(remaining)
         with ThreadPoolExecutor(max_workers=min(8, len(syms_to_try))) as ex:
@@ -385,7 +507,7 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                         "price.finnhub_future_error", symbol=sym, error=str(e)
                     )
 
-    # 6. Alpha Vantage — parallel, last resort
+    # 7. Alpha Vantage — parallel, last resort
     if remaining and _available("alphavantage"):
         syms_to_try = list(remaining)
         with ThreadPoolExecutor(max_workers=min(4, len(syms_to_try))) as ex:
@@ -402,12 +524,18 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
                 except Exception as e:
                     logger.warning("price.av_future_error", symbol=sym, error=str(e))
 
+    # 8. iTick — optional .VN / .L fallback (# SEA-TICKER-FIX, env-gated)
+    if remaining and settings.ENABLE_ITICK_VN_FALLBACK and settings.ITICK_API_KEY:
+        _merge(
+            _itick_batch([s for s in remaining if s.upper().endswith((".VN", ".L"))])
+        )
+
     if remaining:
         logger.warning(
             "price.resolution_failure",
             symbols=remaining,
             resolved=list(results.keys()),
-            providers_tried="polygon,fmp,twelvedata,marketstack,finnhub,alphavantage",
+            providers_tried="polygon,yfinance,fmp,twelvedata,marketstack,finnhub,alphavantage,itick",
         )
         results["__failed__"] = [*remaining]  # type: ignore[assignment]
 
@@ -434,7 +562,7 @@ def fetch_spot_price(sym: str) -> float:
     return result.price if result.price is not None else 0.0
 
 
-def get_price_with_fallback(sym: str) -> "PriceResult":
+def get_price_with_fallback(sym: str) -> PriceResult:
     """
     Full price resolution waterfall returning a PriceResult — never raises.
 
@@ -560,7 +688,11 @@ def verify_price_integrity(positions: list) -> list[dict]:
 
     # Compute weights using cached prices (best-effort)
     spot = fetch_spot_prices_batch(df["symbol"].tolist())
-    df["current_price"] = df["symbol"].map(spot).fillna(0.0)
+    spot.pop("__failed__", None)
+    df["current_price"] = df["symbol"].map(spot)
+    df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce").fillna(
+        0.0
+    )
     df["current_value"] = df["shares"] * df["current_price"]
     total = float(df["current_value"].sum())
     if total <= 0:
@@ -657,7 +789,7 @@ def fetch_beta(sym: str) -> float:
 
 
 # ── Scoring components ─────────────────────────────────────────────────────────
-def _hhi_score(weights: "pd.Series") -> float:
+def _hhi_score(weights: pd.Series) -> float:
     """
     HHI-based concentration score (0-25 pts).
     Lower HHI (more diversified) → higher score.
@@ -696,7 +828,7 @@ def _beta_score(weighted_beta: float) -> float:
     return round(score, 2)
 
 
-def _tax_alpha_score(df: "pd.DataFrame") -> float:
+def _tax_alpha_score(df: pd.DataFrame) -> float:
     """
     Tax alpha component (0-20 pts).
 
@@ -710,8 +842,12 @@ def _tax_alpha_score(df: "pd.DataFrame") -> float:
 
     df = df.copy()
     df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce").fillna(0)
-    df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce").fillna(0)
+    df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce")
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
+    priced = df["current_price"].notna() & (df["current_price"] > 0)
+    if not priced.any():
+        return 10.0
+    df = df.loc[priced]
 
     total_value = float((df["shares"] * df["current_price"]).sum())
     if total_value <= 0:
@@ -731,7 +867,7 @@ def _tax_alpha_score(df: "pd.DataFrame") -> float:
 
 
 # ── Tax impact analysis ────────────────────────────────────────────────────────
-def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
+def get_tax_impact_analysis(df: pd.DataFrame) -> dict:
     """
     Per-position tax liability and harvest-credit analysis at 20% LT CGT rate.
 
@@ -750,7 +886,7 @@ def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
 
     df = df.copy()
     df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce").fillna(0)
-    df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce").fillna(0)
+    df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce")
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
 
     positions = []
@@ -758,7 +894,19 @@ def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
     total_harvest_opp = 0.0
 
     for _, row in df.iterrows():
-        gain = (row["current_price"] - row["cost_basis"]) * row["shares"]
+        px = row["current_price"]
+        if pd.isna(px) or float(px) <= 0:
+            positions.append(
+                {
+                    "symbol": row["symbol"],
+                    "unrealised_gain": None,
+                    "tax_liability": 0.0,
+                    "harvest_credit": 0.0,
+                    "note": "price_unavailable",
+                }
+            )
+            continue
+        gain = (float(px) - row["cost_basis"]) * row["shares"]
         if gain > 0:
             tax_liability = round(gain * CGT_RATE, 2)
             harvest_credit = 0.0
@@ -793,7 +941,7 @@ def get_tax_impact_analysis(df: "pd.DataFrame") -> dict:
 
 
 # ── Tax-neutral pair matchmaking ───────────────────────────────────────────────
-def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
+def get_tax_neutral_pairs(df: pd.DataFrame) -> list[dict]:
     """
     For the top-2 gainer positions, find the exact loser shares to sell to
     achieve a $0 net tax outcome.
@@ -897,7 +1045,7 @@ def get_tax_neutral_pairs(df: "pd.DataFrame") -> list[dict]:
 
 
 # ── History helpers (used by portfolio metrics) ────────────────────────────────
-def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> "pd.Series | None":
+def _fetch_symbol_history(sym: str, unix_from: int, unix_to: int) -> pd.Series | None:
     """Fetch daily close prices for one symbol. Returns None on failure."""
     if FINNHUB_API_KEY:
         try:
@@ -970,25 +1118,6 @@ def _fetch_prices(symbols: list[str], period: str) -> pd.DataFrame:
 
 
 # ── Portfolio metrics (used by routers/portfolio.py) ──────────────────────────
-# ── Currency detection ────────────────────────────────────────────────────────
-# Maps ticker exchange suffix → ISO 4217 currency code.
-_SUFFIX_CURRENCY: dict[str, str] = {
-    ".SI": "SGD",  # Singapore Exchange
-    ".VN": "VND",  # Vietnam HoSE / HNX
-    ".KL": "MYR",  # Bursa Malaysia
-    ".BK": "THB",  # Thailand SET
-    ".HK": "HKD",  # Hong Kong Stock Exchange
-    ".L": "GBP",  # London Stock Exchange
-    ".AX": "AUD",  # ASX Australia
-    ".T": "JPY",  # Tokyo Stock Exchange
-    ".SS": "CNY",  # Shanghai Stock Exchange
-    ".SZ": "CNY",  # Shenzhen Stock Exchange
-    ".NS": "INR",  # NSE India
-    ".BO": "INR",  # BSE India
-    ".JK": "IDR",  # Indonesia IDX
-}
-
-
 def detect_portfolio_currency(symbols: list[str]) -> str:
     """
     Infer the dominant currency from ticker exchange suffixes.
@@ -1016,6 +1145,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
     df["symbol"] = df["symbol"].str.upper()
     symbols = df["symbol"].tolist()
+    # # SEA-TICKER-FIX: One resolver pass per row (cached in local dict)
+    _meta_by = {s: resolve_security(s) for s in symbols}
 
     # Resolve prices using the full waterfall (live → alias → stale → unresolvable)
     price_results: dict[str, PriceResult] = {
@@ -1040,19 +1171,33 @@ def calculate_portfolio_metrics(positions: list) -> dict:
             price_warnings.append(r.warning)
 
     spot_prices = {
-        sym: r.price for sym, r in price_results.items() if r.price is not None
+        sym: float(r.price)
+        for sym, r in price_results.items()
+        if r.price is not None and float(r.price) > 0
     }
     price_status = {sym: r.status for sym, r in price_results.items()}
 
-    df["current_price"] = df["symbol"].map(spot_prices).fillna(0.0)
+    df["native_currency"] = df["symbol"].map(lambda s: _meta_by[s].native_currency)
+    df["market_code"] = df["symbol"].map(lambda s: _meta_by[s].market)
+    df["provider_ticker"] = df["symbol"].map(lambda s: _meta_by[s].provider_ticker)
+
+    for sym in resolved:
+        persist_resolution_best_effort(_meta_by[sym])
+    df["current_price"] = df["symbol"].map(spot_prices)
+    df["native_price"] = df["current_price"]
 
     # Historical prices for volatility (only resolved tickers)
     returns = _fetch_historical_returns(resolved, "1mo")
-    df["current_value"] = df["shares"] * df["current_price"]
+    priced = df["symbol"].isin(resolved) & df["current_price"].notna()
+    df["current_value"] = np.where(
+        priced,
+        df["shares"] * df["current_price"],
+        np.nan,
+    )
 
     # Recalculate weights based only on resolved tickers
-    resolved_mask = df["symbol"].isin(resolved)
-    total_value = float(df.loc[resolved_mask, "current_value"].sum())
+    resolved_mask = df["symbol"].isin(resolved) & df["current_price"].notna()
+    total_value = float(np.nansum(df.loc[resolved_mask, "current_value"].astype(float)))
     df["weight"] = 0.0
     if total_value > 0:
         df.loc[resolved_mask, "weight"] = (
@@ -1090,17 +1235,30 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         )
 
     positions_out = df[
-        ["symbol", "shares", "current_price", "current_value", "weight"]
+        [
+            "symbol",
+            "shares",
+            "native_currency",
+            "market_code",
+            "provider_ticker",
+            "native_price",
+            "current_price",
+            "current_value",
+            "weight",
+        ]
     ].copy()
     positions_out["price_status"] = (
         positions_out["symbol"].map(price_status).fillna("live")
     )
-
     base_currency = detect_portfolio_currency(symbols)
+    positions_out["portfolio_base_currency"] = base_currency
+    positions_out["display_currency"] = positions_out["native_currency"]
+    positions_out["fx_rate_used"] = None
 
     result = {
         "total_value": float(total_value),
         "base_currency": base_currency,
+        "portfolio_base_currency": base_currency,
         "hhi": round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
         "num_positions": len(df),
         "num_priced": len(resolved),
@@ -1116,7 +1274,9 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
-        "positions": positions_out.to_dict("records"),
+        "positions": _enrich_positions_fx_hint(
+            _records_nan_to_none(positions_out.to_dict("records"))
+        ),
     }
     if price_warnings:
         result["warnings"] = price_warnings
