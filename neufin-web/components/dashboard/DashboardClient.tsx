@@ -38,6 +38,10 @@ import {
 } from "@/lib/api";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { TickerNumber } from "@/components/ui/TickerNumber";
+import {
+  FINANCIAL_EM_DASH,
+  formatNativePrice,
+} from "@/lib/finance-content";
 import clsx from "clsx";
 
 type PortfolioRow = {
@@ -52,8 +56,8 @@ type PortfolioRow = {
 type MetricPosition = {
   symbol: string;
   shares: number;
-  current_price: number;
-  current_value: number;
+  current_price: number | null;
+  current_value: number | null;
   weight: number;
 };
 
@@ -256,11 +260,11 @@ export default function DashboardClient() {
         vx = x.weight;
         vy = y.weight;
       } else if (sortKey === "price") {
-        vx = x.current_price;
-        vy = y.current_price;
+        vx = x.current_price ?? 0;
+        vy = y.current_price ?? 0;
       } else {
-        vx = x.current_value;
-        vy = y.current_value;
+        vx = x.current_value ?? 0;
+        vy = y.current_value ?? 0;
       }
       return mul * (vx - vy);
     });
@@ -372,7 +376,7 @@ export default function DashboardClient() {
               {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-[var(--text-muted)] truncate">
+              <p className="text-xs text-ui-muted truncate">
                 {user?.email}
               </p>
               <span className="text-sm uppercase tracking-wider text-[var(--text-secondary)]">
@@ -389,7 +393,7 @@ export default function DashboardClient() {
           <button
             type="button"
             onClick={() => signOut()}
-            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            className="text-xs text-ui-muted hover:text-[var(--text-secondary)]"
           >
             Sign out
           </button>
@@ -428,7 +432,7 @@ export default function DashboardClient() {
                 </span>{" "}
                 — no credit card required.
               </p>
-              <p className="text-sm text-[var(--text-muted)] mb-8">
+              <p className="text-sm text-ui-muted mb-8">
                 Upload a portfolio CSV to generate your Investor DNA Score and
                 unlock AI swarm analysis.
               </p>
@@ -485,7 +489,7 @@ export default function DashboardClient() {
           <>
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
-                <label className="text-xs text-[var(--text-muted)] block mb-1">
+                <label className="text-xs text-ui-muted block mb-1">
                   Portfolio
                 </label>
                 <div className="relative inline-block">
@@ -500,15 +504,15 @@ export default function DashboardClient() {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+                  <ChevronDown className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 text-ui-muted pointer-events-none" />
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-[var(--text-muted)] mb-1">
+                <p className="text-xs text-ui-muted mb-1">
                   Total value
                 </p>
                 <p className="font-mono text-3xl md:text-[40px] leading-none text-[var(--text-primary)] tabular-nums">
-                  {metrics ? fmtMoney.format(metrics.total_value) : "—"}
+                  {metrics ? fmtMoney.format(metrics.total_value) : FINANCIAL_EM_DASH}
                 </p>
                 <div className="mt-2 flex items-center justify-end gap-2 text-sm font-mono flex-wrap">
                   {dayChangePct != null ? (
@@ -518,14 +522,14 @@ export default function DashboardClient() {
                         format="percent"
                         showArrow
                       />
-                      <span className="text-[var(--text-muted)] text-xs">
+                      <span className="text-ui-muted text-xs">
                         30d Δ
                       </span>
                     </>
                   ) : (
-                    <span className="text-[var(--text-muted)]">—</span>
+                    <span className="text-ui-muted">{FINANCIAL_EM_DASH}</span>
                   )}
-                  <span className="text-[var(--text-muted)] text-xs">
+                  <span className="text-ui-muted text-xs">
                     As of{" "}
                     {new Date().toLocaleTimeString("en-SG", {
                       hour: "2-digit",
@@ -538,15 +542,25 @@ export default function DashboardClient() {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {[
-                { label: "DNA Score", v: metrics?.dna_score ?? "—" },
+                {
+                  label: "DNA Score",
+                  v: metrics?.dna_score ?? FINANCIAL_EM_DASH,
+                },
                 {
                   label: "Sharpe (est.)",
-                  v: sharpe != null ? sharpe.toFixed(2) : "—",
+                  v:
+                    sharpe != null ? sharpe.toFixed(2) : FINANCIAL_EM_DASH,
                 },
-                { label: "Portfolio Beta", v: metrics?.weighted_beta ?? "—" },
+                {
+                  label: "Portfolio Beta",
+                  v: metrics?.weighted_beta ?? FINANCIAL_EM_DASH,
+                },
                 {
                   label: "Max Drawdown",
-                  v: maxDd != null ? `${maxDd.toFixed(1)}%` : "—",
+                  v:
+                    maxDd != null
+                      ? `${maxDd.toFixed(1)}%`
+                      : FINANCIAL_EM_DASH,
                 },
               ].map((k) => (
                 <div
@@ -568,7 +582,7 @@ export default function DashboardClient() {
               {loadChart ? (
                 <div className="h-64 shimmer rounded-xl" />
               ) : history.length === 0 ? (
-                <p className="text-sm text-[var(--text-muted)] py-section text-center">
+                <p className="text-sm text-readable py-section text-center">
                   No history for this range.
                 </p>
               ) : (
@@ -642,7 +656,7 @@ export default function DashboardClient() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--text-muted)]">
+                    <tr className="border-b border-[var(--border)] text-left text-xs text-readable">
                       <th className="p-3 font-medium">
                         <button
                           type="button"
@@ -709,10 +723,13 @@ export default function DashboardClient() {
                             {(p.weight * 100).toFixed(1)}%
                           </td>
                           <td className="p-3 font-mono text-[var(--text-primary)]">
-                            {fmtMoney.format(p.current_price)}
+                            {formatNativePrice(
+                              p.current_price,
+                              metrics?.base_currency ?? "USD",
+                            )}
                           </td>
-                          <td className="p-3 font-mono text-[var(--text-muted)]">
-                            —
+                          <td className="p-3 font-mono text-ui-muted">
+                            {FINANCIAL_EM_DASH}
                           </td>
                           <td className="p-3 font-mono">
                             {metrics?.pnl_pct != null ? (
@@ -722,7 +739,7 @@ export default function DashboardClient() {
                                 highlightSign
                               />
                             ) : (
-                              "—"
+                              FINANCIAL_EM_DASH
                             )}
                           </td>
                         </motion.tr>
@@ -763,7 +780,7 @@ export default function DashboardClient() {
                   <p className="text-xs text-[var(--text-secondary)] line-clamp-2 mt-1">
                     {n.executive_summary}
                   </p>
-                  <p className="text-sm font-mono text-[var(--text-muted)] mt-2">
+                  <p className="text-sm font-mono text-ui-muted mt-2">
                     {new Date(n.generated_at).toLocaleString("en-SG", {
                       dateStyle: "short",
                       timeStyle: "short",
@@ -773,7 +790,7 @@ export default function DashboardClient() {
               ))}
         </div>
         {!notes.length && !loadNotes && (
-          <p className="text-xs text-[var(--text-muted)] mb-4">
+          <p className="text-xs text-ui-muted mb-4">
             No research notes yet.
           </p>
         )}
@@ -783,7 +800,7 @@ export default function DashboardClient() {
             onChange={(e) => setAiQ(e.target.value)}
             placeholder="Ask AI about this portfolio…"
             rows={3}
-            className="w-full rounded-xl bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2 text-xs font-sans text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-amber resize-none"
+            className="w-full rounded-xl bg-[var(--surface-2)] border border-[var(--glass-border)] px-3 py-2 text-xs font-sans text-[var(--text-primary)] placeholder:text-ui-muted focus-amber resize-none"
           />
           <button
             type="button"

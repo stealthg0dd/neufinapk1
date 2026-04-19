@@ -31,6 +31,7 @@ import {
   getStoredReportTheme,
   type ReportTheme,
 } from "@/components/dashboard/ReportThemeModal";
+import { formatNativePrice, formatNativeValue } from "@/lib/finance-content";
 
 const STAGES = [
   {
@@ -57,30 +58,6 @@ const STAGES = [
 
 /** Circumference for r=58 (140×140 SVG, stroke 12) */
 const RING_C = 2 * Math.PI * 58;
-
-function formatListedMoney(
-  amount: number | null | undefined,
-  currencyCode?: string | null,
-): string {
-  if (amount == null || Number.isNaN(amount)) {
-    return "—";
-  }
-  const c = (currencyCode || "USD").toUpperCase();
-  if (c === "USD") return `$${amount.toFixed(2)}`;
-  if (c === "GBP") return `£${amount.toFixed(2)}`;
-  if (c === "EUR") return `€${amount.toFixed(2)}`;
-  if (c === "VND")
-    return `${Math.round(amount).toLocaleString("en-US")} ₫`;
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: c,
-      maximumFractionDigits: 4,
-    }).format(amount);
-  } catch {
-    return `${amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${c}`;
-  }
-}
 
 // ── 3-step analysis state machine ────────────────────────────────────────────
 type AnalysisStep = "idle" | "dna_complete" | "swarm_complete" | "report_ready";
@@ -888,13 +865,10 @@ export default function PortfolioPage() {
                         {p.shares.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {formatListedMoney(
-                          p.price,
-                          p.native_currency,
-                        )}
+                        {formatNativePrice(p.price, p.native_currency)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {formatListedMoney(p.value, p.native_currency)}
+                        {formatNativeValue(p.value, p.native_currency)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         {(p.weight * 100).toFixed(1)}%

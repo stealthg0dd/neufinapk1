@@ -33,7 +33,7 @@ export default function TrialBanner({
     return (
       <div className="flex max-h-10 min-h-10 w-full items-center justify-center border-b border-primary/25 bg-[#E0F7FA] px-4 text-sm text-[#0F172A]">
         <span className="font-medium">Trial active</span>
-        <span className="mx-1 text-[var(--muted)]">—</span>
+        <span className="mx-1 text-readable">—</span>
         <span>
           {daysRemaining} day{daysRemaining === 1 ? "" : "s"} remaining ·{" "}
         </span>

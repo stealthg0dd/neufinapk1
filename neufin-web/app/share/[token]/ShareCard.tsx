@@ -8,6 +8,7 @@ import {
   parseStringListField,
   unwrapAccidentalJsonObjectString,
 } from "@/lib/display-text";
+import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
 
 interface DNAShare {
   id: string;
@@ -208,7 +209,7 @@ export default function ShareCard({ data }: { data: DNAShare }) {
             🎯 AI Recommendation
           </p>
           <p className="text-sm text-shell-fg/90 leading-relaxed">
-            {recommendation || "—"}
+            {recommendation || FINANCIAL_EM_DASH}
           </p>
         </div>
 

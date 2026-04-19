@@ -276,7 +276,7 @@ export default function PricingPageClient() {
 
       <section className="border-t border-[var(--border)] py-section px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <p className="text-sm leading-relaxed text-[var(--muted)]">
+          <p className="text-sm leading-relaxed text-readable">
             <strong className="text-[var(--slate)]">
               Regulatory Disclaimer:
             </strong>{" "}
@@ -288,7 +288,7 @@ export default function PricingPageClient() {
         </div>
       </section>
 
-      <footer className="border-t border-[var(--border)] py-6 text-center text-sm text-[var(--muted)]">
+      <footer className="border-t border-[var(--border)] py-6 text-center text-sm text-readable">
         <div className="mx-auto flex max-w-3xl flex-col items-center justify-center">
           <NeuFinLogo variant="compact" className="mb-3" />
           <span>NeuFin © {new Date().getFullYear()}</span>

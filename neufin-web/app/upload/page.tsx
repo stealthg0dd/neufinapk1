@@ -100,12 +100,12 @@ export default function UploadPage() {
     return (
       <div className="min-h-screen flex flex-col bg-shell text-shell-fg">
         <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
+          <div className="mx-auto flex h-16 w-full max-w-2xl items-center gap-4 px-4 sm:px-6">
             <BrandLogo variant="shell-inverted" href={null} priority />
           </div>
         </nav>
-        <main className="flex-1 flex items-center justify-center p-6">
-          <div className="w-full max-w-xl space-y-5">
+        <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
+          <div className="w-full max-w-2xl space-y-5">
             {/* Status header */}
             <div className="text-center space-y-2 mb-8">
               <div className="inline-flex items-center gap-2 text-primary text-sm font-medium">
@@ -159,10 +159,10 @@ export default function UploadPage() {
         <RefCapture />
       </Suspense>
       <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center gap-4">
+        <div className="mx-auto flex h-16 w-full max-w-2xl items-center gap-4 px-4 sm:px-6">
           <Link
             href="/"
-            className="text-shell-muted hover:text-white transition-colors text-sm"
+            className="text-sm text-shell-muted transition-colors hover:text-white"
           >
             ← Back
           </Link>
@@ -170,8 +170,8 @@ export default function UploadPage() {
         </div>
       </nav>
 
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-xl">
+      <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
+        <div className="w-full max-w-2xl">
           <h1 className="text-3xl font-bold mb-2 text-shell-fg">Upload your portfolio</h1>
           <p className="text-shell-muted mb-4">
             CSV with columns: <code className="text-primary">symbol</code>,{" "}
