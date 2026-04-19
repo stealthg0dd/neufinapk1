@@ -1,15 +1,36 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check } from "lucide-react";
 import type { MarketRegime, ResearchNote } from "@/lib/api";
 import { GraphicPlaceholder } from "@/components/GraphicPlaceholder";
-import SwarmHeroTerminal from "@/components/landing/SwarmHeroTerminal";
-import LandingSwarmChatDock from "@/components/landing/LandingSwarmChatDock";
 import NeuFinLogo from "@/components/landing/NeuFinLogo";
 import { PopularPlanBadge } from "@/components/ui/PopularPlanBadge";
+import { DemoEntryLinks } from "@/components/onboarding/DemoEntryLinks";
+import { HeroTrustStrip } from "@/components/landing/HeroTrustStrip";
+import { ConversionHierarchyBar } from "@/components/landing/ConversionHierarchyBar";
+import { SampleOutputsGallery } from "@/components/landing/SampleOutputsGallery";
+import { ObjectionsFAQ } from "@/components/landing/ObjectionsFAQ";
+
+const SwarmHeroTerminal = dynamic(
+  () => import("@/components/landing/SwarmHeroTerminal"),
+  {
+    loading: () => (
+      <div
+        className="h-[min(420px,52vh)] w-full max-w-lg animate-pulse rounded-2xl bg-slate-100"
+        aria-hidden
+      />
+    ),
+  },
+);
+
+const LandingSwarmChatDock = dynamic(
+  () => import("@/components/landing/LandingSwarmChatDock"),
+  { ssr: false, loading: () => null },
+);
 
 const SWARM_AGENTS = [
   {
@@ -308,6 +329,8 @@ export default function HomeLandingPage({
                   white-labeled IC memo.
                 </motion.p>
 
+                <HeroTrustStrip />
+
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -335,6 +358,8 @@ export default function HomeLandingPage({
                     Watch 60-second demo
                   </Link>
                 </motion.div>
+
+                <ConversionHierarchyBar />
 
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -467,6 +492,8 @@ export default function HomeLandingPage({
           </div>
         </section>
 
+        <SampleOutputsGallery />
+
         {/* Seven agents */}
         <section className="relative bg-white py-24 md:py-28" id="demo">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -524,6 +551,8 @@ export default function HomeLandingPage({
                 portfolio.
               </motion.p>
             </div>
+
+            <DemoEntryLinks />
 
             <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {SWARM_AGENTS.slice(0, 4).map((a, i) => (
@@ -741,6 +770,8 @@ export default function HomeLandingPage({
             </div>
           </div>
         </section>
+
+        <ObjectionsFAQ />
 
         {/* Pricing — data and hrefs preserved */}
         <section className="bg-white py-24 md:py-28" id="pricing">
@@ -1034,6 +1065,9 @@ export default function HomeLandingPage({
                     { l: "Partners", href: "/partners" },
                     { l: "Research", href: "/research" },
                     { l: "API Docs", href: "/developer" },
+                    { l: "Samples", href: "/#samples" },
+                    { l: "FAQ", href: "/#faq" },
+                    { l: "Help & tutorials", href: "/help/tutorials" },
                   ],
                 },
                 {

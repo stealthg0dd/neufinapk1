@@ -11,6 +11,8 @@ import { TrialStatusBanner } from "@/components/dashboard/TrialStatusBanner";
 import { MarketDeskRail } from "@/components/dashboard/MarketDeskRail";
 import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/BrandLogo";
+import { PortfolioIntelligenceProvider } from "@/components/dashboard/PortfolioIntelligenceContext";
+import { DashboardWorkspaceChrome } from "@/components/dashboard/DashboardWorkspaceChrome";
 
 const RAIL_STORAGE_KEY = "neufin:dashboard:marketdesk-open";
 
@@ -122,11 +124,14 @@ export function DashboardShell({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <main className="flex-1 overflow-y-auto bg-app py-4 md:py-6">
             <div className="page-container">
-              <Suspense fallback={null}>
-                <CheckoutSessionSuccessFeedback />
-              </Suspense>
-              <TrialStatusBanner />
-              {children}
+              <PortfolioIntelligenceProvider>
+                <DashboardWorkspaceChrome />
+                <Suspense fallback={null}>
+                  <CheckoutSessionSuccessFeedback />
+                </Suspense>
+                <TrialStatusBanner />
+                {children}
+              </PortfolioIntelligenceProvider>
             </div>
           </main>
         </div>
