@@ -20,7 +20,12 @@ from services.market_cache import (
     upsert_ticker_price_cache,
 )
 from services.market_currency import SUFFIX_CURRENCY as _SUFFIX_CURRENCY
-from services.market_resolver import persist_resolution_best_effort, resolve_security
+from services.market_resolver import (
+    persist_resolution_best_effort,
+    portfolio_dominant_benchmark,
+    portfolio_market_framing,
+    resolve_security,
+)
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
@@ -1255,10 +1260,20 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     positions_out["display_currency"] = positions_out["native_currency"]
     positions_out["fx_rate_used"] = None
 
+    # # SEA-NATIVE-TICKER-FIX: derive canonical benchmark from resolved symbols
+    _mf = portfolio_market_framing(resolved)
+    portfolio_benchmark = _mf["benchmark"]
+    portfolio_benchmark_label = _mf["benchmark_label"]
+    portfolio_market_context = _mf["market_context"]
+
     result = {
         "total_value": float(total_value),
         "base_currency": base_currency,
         "portfolio_base_currency": base_currency,
+        # SEA-NATIVE-TICKER-FIX: canonical benchmark for PDF/swarm (never silently ^GSPC for VN)
+        "portfolio_benchmark": portfolio_benchmark,
+        "portfolio_benchmark_label": portfolio_benchmark_label,
+        "portfolio_market_context": portfolio_market_context,
         "hhi": round(float((df["weight"] ** 2).sum()), 4) if total_value > 0 else 0.0,
         "num_positions": len(df),
         "num_priced": len(resolved),
