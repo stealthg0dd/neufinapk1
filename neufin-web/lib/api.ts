@@ -835,11 +835,20 @@ export interface ResearchNote {
     implication: string;
   }>;
   affected_sectors?: string[];
+  /** Optional: ISO country codes or names from synthesis */
+  countries_affected?: string[];
   regime?: string;
   time_horizon?: string;
   confidence_score?: number;
   generated_at: string;
   is_public: boolean;
+  /** When backend sends explicit read time */
+  read_time_minutes?: number;
+  /** Portfolio-aware fields (optional; synthesized or agent-provided) */
+  why_portfolio_matters?: string;
+  portfolio_implications?: string[];
+  suggested_next_action?: string;
+  benchmark_tags?: string[];
 }
 
 const RESEARCH_FETCH_MS = 3000;
