@@ -42,7 +42,7 @@ export const dynamic = "force-dynamic";
 function getStripe(): Stripe | null {
   const key = process.env.STRIPE_SECRET_KEY?.trim();
   if (!key) return null;
-  return new Stripe(key, { apiVersion: "2024-12-18.acacia" });
+  return new Stripe(key, { apiVersion: "2026-03-25.dahlia" });
 }
 
 function getSupabaseAdmin(): SupabaseClient | null {

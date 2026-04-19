@@ -273,7 +273,7 @@ export default function DeveloperDocsPage() {
               };
               if (Array.isArray(pollJson.agent_trace))
                 setAgentTrace(pollJson.agent_trace);
-              setResponse((prev) => ({
+              setResponse((prev: unknown) => ({
                 ...(prev as Record<string, unknown>),
                 latest_status: pollJson,
               }));

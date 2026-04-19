@@ -61,10 +61,8 @@ from services.calculator import (  # noqa: E402
 from services.fx_format import format_swarm_fx_note  # noqa: E402
 from services.market_cache import get_swarm_job, update_swarm_job  # noqa: E402
 from services.market_resolver import (  # noqa: E402
-    resolve_security,
-    portfolio_dominant_benchmark,
     portfolio_market_framing,
-    BENCHMARK_LABELS,
+    resolve_security,
 )
 from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,
@@ -1396,8 +1394,17 @@ async def synthesizer_node(state: SwarmState) -> dict:
     # ── IC Briefing user turn ──────────────────────────────────────────────────
     # SEA-NATIVE-TICKER-FIX: native currency label for AUM; benchmark instead of implicit SPY
     _ccy_pfx = {
-        "USD": "$", "GBP": "£", "VND": "₫", "IDR": "Rp", "THB": "฿",
-        "MYR": "RM", "SGD": "S$", "HKD": "HK$", "JPY": "¥", "AUD": "A$", "INR": "₹",
+        "USD": "$",
+        "GBP": "£",
+        "VND": "₫",
+        "IDR": "Rp",
+        "THB": "฿",
+        "MYR": "RM",
+        "SGD": "S$",
+        "HKD": "HK$",
+        "JPY": "¥",
+        "AUD": "A$",
+        "INR": "₹",
     }.get(_port_native_ccy, f"{_port_native_ccy} ")
     _sea_note = (
         f" This is a {_port_market_ctx} portfolio — use {_port_benchmark_label} "

@@ -13,6 +13,10 @@ import { NextPrimaryAction } from "@/components/dashboard/NextPrimaryAction";
 import { UpgradeValuePanel } from "@/components/dashboard/UpgradeValuePanel";
 import { FINANCIAL_EM_DASH } from "@/lib/finance-content";
 import { formatRegimeLabel, regimePillClass } from "@/lib/regime-display";
+// SEA-NATIVE-CURRENCY-FIX: SEA market pulse widget
+import { SEAMarketPulse } from "@/components/sea";
+import { BenchmarkChart } from "@/components/benchmarking";
+import { SwarmBrainPanel } from "@/components/swarm";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +76,7 @@ export default function DashboardPage() {
             label: "Strategic Risk Budget",
             value:
               latestDna?.weighted_beta != null
-                ? `${latestDna.weighted_beta.toFixed(2)} β vs SPY 1.00`
+                ? `${latestDna.weighted_beta.toFixed(2)} β vs ${(latestDna as { portfolio_benchmark_label?: string }).portfolio_benchmark_label ?? "S&P 500"} 1.00`
                 : "Awaiting beta",
             tone: "text-[#0F172A]",
             sub: "Weighted portfolio beta",
@@ -416,9 +420,40 @@ export default function DashboardPage() {
         </section>
       )}
 
+      {/* Swarm Brain — 7-agent collaboration visualization */}
+      <SwarmBrainPanel
+        isRunning={false}
+        agentStates={
+          swarmReport
+            ? {
+                market_regime: "complete",
+                strategist: "complete",
+                quant: "complete",
+                tax_architect: "complete",
+                risk_sentinel: "complete",
+                alpha_scout: "complete",
+                synthesizer: "complete",
+              }
+            : undefined
+        }
+        agentOutputs={
+          swarmReport
+            ? {
+                synthesizer: swarmReport.headline ?? swarmReport.recommendation_summary ?? undefined,
+              }
+            : undefined
+        }
+      />
+
+      {/* SEA-NATIVE-CURRENCY-FIX: Regional market pulse — always visible for context */}
+      <SEAMarketPulse />
+
       <section className="min-w-0">
         <ResearchFeedClient limit={5} />
       </section>
+
+      {/* Competitor benchmarking widget — anonymized industry comparison */}
+      <BenchmarkChart />
 
       <section className="flex flex-col flex-wrap justify-between gap-4 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center">
         <div>

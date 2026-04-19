@@ -52,7 +52,9 @@ class UnifiedDeploymentView(BaseModel):
     rollback_candidate: bool = False
     url: str | None = None
     service_name: str | None = None
-    logs_summary: str = "Logs not fetched in this summary — open provider UI for full logs."
+    logs_summary: str = (
+        "Logs not fetched in this summary — open provider UI for full logs."
+    )
     related_route: str | None = None
 
 
@@ -157,9 +159,11 @@ async def _sentry_issues() -> list[UnifiedIncident]:
                     count=int(row.get("count") or 1),
                     latest_message=row.get("culprit"),
                     status="open",
-                    remediation_link=f"https://sentry.io/issues/{row.get('id')}/"
-                    if row.get("id")
-                    else None,
+                    remediation_link=(
+                        f"https://sentry.io/issues/{row.get('id')}/"
+                        if row.get("id")
+                        else None
+                    ),
                 )
             )
         return out

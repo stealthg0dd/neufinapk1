@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { usePathname } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 
 // Only rendered in development — zero bundle cost in production.
 export function AuthDebugPanel() {
@@ -154,10 +155,10 @@ export function AuthDebugPanel() {
           <div className="pt-1 flex gap-2">
             <button
               onClick={() => {
-                const supabase = createClient();
+                const supabase = getSupabaseClient();
                 void supabase.auth
                   .getSession()
-                  .then(({ data: { session } }) => {
+                  .then(({ data: { session } }: { data: { session: Session | null } }) => {
                     const cookieMap = Object.fromEntries(
                       document.cookie.split(";").map((c) => {
                         const [k, ...v] = c.trim().split("=");
@@ -179,10 +180,10 @@ export function AuthDebugPanel() {
             <button
               onClick={() => {
                 // Force re-sync the cookie from Supabase session
-                const supabase = createClient();
+                const supabase = getSupabaseClient();
                 void supabase.auth
                   .getSession()
-                  .then(({ data: { session } }) => {
+                  .then(({ data: { session } }: { data: { session: Session | null } }) => {
                     if (session?.access_token) {
                       const maxAge = session.expires_in ?? 3600;
                       document.cookie = `neufin-auth=${session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`;

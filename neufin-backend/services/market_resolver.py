@@ -12,7 +12,6 @@ from dataclasses import dataclass
 import structlog
 
 from services.market_currency import (
-    SUFFIX_CURRENCY,
     finnhub_symbol,
     infer_native_currency,
 )
@@ -72,10 +71,10 @@ _INDEX_META: dict[str, tuple[str, str, str]] = {
     "^DJI": ("GLOBAL_INDEX", "USD", "^DJI"),
     "^IXIC": ("GLOBAL_INDEX", "USD", "^IXIC"),
     # SEA
-    "^JKSE": ("GLOBAL_INDEX", "IDR", "^JKSE"),    # Indonesia JKSE
+    "^JKSE": ("GLOBAL_INDEX", "IDR", "^JKSE"),  # Indonesia JKSE
     "^SET.BK": ("GLOBAL_INDEX", "THB", "^SET.BK"),  # Thailand SET
-    "^KLSE": ("GLOBAL_INDEX", "MYR", "^KLSE"),    # Malaysia KLCI
-    "^STI": ("GLOBAL_INDEX", "SGD", "^STI"),      # Singapore STI
+    "^KLSE": ("GLOBAL_INDEX", "MYR", "^KLSE"),  # Malaysia KLCI
+    "^STI": ("GLOBAL_INDEX", "SGD", "^STI"),  # Singapore STI
     # Others
     "^N225": ("GLOBAL_INDEX", "JPY", "^N225"),
     "^HSI": ("GLOBAL_INDEX", "HKD", "^HSI"),
@@ -88,17 +87,17 @@ _INDEX_META: dict[str, tuple[str, str, str]] = {
 _SUFFIX_BENCHMARK: dict[str, str] = {
     ".VN": "^VNINDEX",
     ".L": "^FTSE",
-    ".JK": "^JKSE",     # Indonesia (IDX)
-    ".BK": "^SET.BK",   # Thailand (SET)
-    ".KL": "^KLSE",     # Malaysia (Bursa)
-    ".SI": "^STI",      # Singapore (SGX)
-    ".AX": "^AXJO",     # Australia (ASX)
-    ".T": "^N225",      # Japan (TSE)
-    ".HK": "^HSI",      # Hong Kong
-    ".NS": "^NSEI",     # India (NSE)
-    ".BO": "^BSESN",    # India (BSE)
-    ".SS": "000001.SS", # China (Shanghai)
-    ".SZ": "399001.SZ", # China (Shenzhen)
+    ".JK": "^JKSE",  # Indonesia (IDX)
+    ".BK": "^SET.BK",  # Thailand (SET)
+    ".KL": "^KLSE",  # Malaysia (Bursa)
+    ".SI": "^STI",  # Singapore (SGX)
+    ".AX": "^AXJO",  # Australia (ASX)
+    ".T": "^N225",  # Japan (TSE)
+    ".HK": "^HSI",  # Hong Kong
+    ".NS": "^NSEI",  # India (NSE)
+    ".BO": "^BSESN",  # India (BSE)
+    ".SS": "000001.SS",  # China (Shanghai)
+    ".SZ": "399001.SZ",  # China (Shenzhen)
 }
 
 # # SEA-NATIVE-TICKER-FIX: Exchange suffix → canonical market code

@@ -1052,7 +1052,6 @@ export default function PartnersPage() {
             <div>
               <h3
                 style={{
-                  fontSize: 16,
                   fontWeight: 700,
                   marginBottom: 20,
                   color: "#64748B",
