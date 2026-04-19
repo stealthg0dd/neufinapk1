@@ -335,6 +335,38 @@ class Settings(BaseSettings):
         description="Git commit SHA injected at build time via Railway environment variable.",
     )
 
+    # ── Admin control tower (optional — no secrets in client) ─────────────────
+    OPS_GITHUB_TOKEN: str | None = Field(
+        default=None,
+        description="GitHub PAT for repo intelligence (repo read scope).",
+    )
+    OPS_GITHUB_REPO: str = Field(
+        default="stealthg0dd/neufin",
+        description="owner/repo for GitHub REST stats.",
+    )
+    OPS_VERCEL_TOKEN: str | None = Field(
+        default=None,
+        description="Vercel API token for deployment list (optional).",
+    )
+    OPS_VERCEL_TEAM_ID: str | None = Field(
+        default=None,
+        description="Vercel team ID when project is under a team.",
+    )
+    OPS_VERCEL_PROJECT_ID: str | None = Field(
+        default=None,
+        description="Vercel project ID for /v6/deployments queries.",
+    )
+    OPS_RAILWAY_TOKEN: str | None = Field(
+        default=None,
+        description="Railway API token — reserved for future deploy/health adapters.",
+    )
+    OPS_CONTROL_TOWER_MANUAL_JSON: str | None = Field(
+        default=None,
+        description=(
+            "Optional JSON merged into GET /api/admin/control-tower (ai_accounts, github overrides, etc.)."
+        ),
+    )
+
     # ── Derived helpers ───────────────────────────────────────────────────────
     @property
     def allowed_origins_list(self) -> list[str]:
