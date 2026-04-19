@@ -66,6 +66,11 @@ function MetricCard({
 }
 
 const QUICK_LINKS = [
+  {
+    href: "/admin/ops",
+    label: "Control tower",
+    hint: "AI usage, repo, deploys, errors",
+  },
   { href: "/admin/users", label: "Users", hint: "Subscriptions and access" },
   { href: "/admin/partners", label: "Partners", hint: "API customers and keys" },
   { href: "/admin/api-keys", label: "API Keys", hint: "Issue, revoke, rate limit" },
