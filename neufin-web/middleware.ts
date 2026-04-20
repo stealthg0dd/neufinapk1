@@ -48,6 +48,7 @@ const PUBLIC_PREFIXES = [
   "/signup",
   "/onboarding", // new-user onboarding flow (auth checked client-side)
   "/pricing",
+  "/partners",
   "/contact-sales",
   "/upload",
   "/results",
@@ -56,6 +57,7 @@ const PUBLIC_PREFIXES = [
   "/market",
   "/leaderboard",
   "/research",
+  "/sample",
   "/feedback",
   "/privacy",
   "/share",

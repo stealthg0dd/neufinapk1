@@ -125,6 +125,7 @@ from services.market_resolver import (  # noqa: E402
     persist_resolution_best_effort,
     resolve_security,
 )
+from services.portfolio_region import dna_archetype_overlay  # noqa: E402
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,
@@ -1179,6 +1180,10 @@ Return ONLY valid JSON:
         raise HTTPException(
             status_code=503, detail="AI analysis providers are unavailable."
         ) from e
+    analysis["investor_type"] = dna_archetype_overlay(
+        _prompt_records,
+        str(analysis.get("investor_type") or "Balanced Growth Investor"),
+    )
 
     # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = []

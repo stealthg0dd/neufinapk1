@@ -203,3 +203,77 @@ class TestCalculatePortfolioMetrics:
         result = calculate_portfolio_metrics(SAMPLE_POSITIONS_WITH_COST)
 
         assert "tax_alpha_score" in result
+
+    @patch("services.calculator.compute_market_value")
+    @patch("services.calculator._fetch_beta")
+    @patch("services.calculator._fetch_historical_returns")
+    @patch("services.calculator.get_price_with_fallback")
+    def test_vn_position_includes_usd_market_value(
+        self,
+        mock_price,
+        mock_hist,
+        mock_beta,
+        mock_market_value,
+    ):
+        from services.calculator import calculate_portfolio_metrics
+        from services.market_cache import PriceResult
+
+        mock_price.return_value = PriceResult(
+            symbol="HPG.VN", price=25000.0, status="live"
+        )
+        mock_hist.return_value = None
+        mock_beta.return_value = 1.0
+        mock_market_value.return_value = {
+            "ticker": "HPG.VN",
+            "price_local": 25000.0,
+            "fx_rate": 0.00004,
+            "price_usd": 1.0,
+            "market_value_usd": 100.0,
+            "source": "twelvedata",
+            "timestamp": "2026-04-21T00:00:00+00:00",
+        }
+
+        result = calculate_portfolio_metrics([{"symbol": "HPG.VN", "shares": 100}])
+
+        assert result["positions"][0]["market_value_usd"] == pytest.approx(100.0)
+        assert result["positions"][0]["data_unavailable"] is False
+        assert result["positions"][0]["price_unavailable_message"] is None
+
+    @patch("services.calculator.compute_market_value")
+    @patch("services.calculator._fetch_beta")
+    @patch("services.calculator._fetch_historical_returns")
+    @patch("services.calculator.get_price_with_fallback")
+    def test_all_vn_price_failures_return_degraded_metrics(
+        self,
+        mock_price,
+        mock_hist,
+        mock_beta,
+        mock_market_value,
+    ):
+        from data_providers.ticker_normalizer import DataUnavailableError
+        from services.calculator import calculate_portfolio_metrics
+        from services.market_cache import PriceResult
+
+        mock_price.return_value = PriceResult(
+            symbol="HPG.VN",
+            price=None,
+            status="unresolvable",
+            warning="HPG.VN could not be priced and was excluded from analysis.",
+        )
+        mock_hist.return_value = None
+        mock_beta.return_value = 1.0
+        mock_market_value.side_effect = DataUnavailableError(
+            "Price unavailable for HPG.VN"
+        )
+
+        result = calculate_portfolio_metrics([{"symbol": "HPG.VN", "shares": 100}])
+
+        position = result["positions"][0]
+        assert result["total_value"] == 0.0
+        assert result["failed_tickers"] == ["HPG.VN"]
+        assert position["market_value_usd"] is None
+        assert position["data_unavailable"] is True
+        assert (
+            position["price_unavailable_message"]
+            == "Price data unavailable for HPG.VN. Upload confirmed prices or retry."
+        )

@@ -60,6 +60,20 @@ type QuantDashboardResponse = {
     regime?: string | { label?: string; confidence?: number };
     recommendation_summary?: string;
     generated_at?: string;
+    region_context?: {
+      primary_market?: string;
+      benchmark_name?: string;
+      sea_specific_flags?: string[];
+    };
+    sea_alpha?: boolean;
+    alpha_framework?: string;
+    regime_alignment_score?: number;
+    vn_specific_alpha_signals?: Array<{
+      type?: string;
+      symbol?: string;
+      severity?: string;
+      message?: string;
+    }>;
   };
 };
 
@@ -249,6 +263,19 @@ export default function QuantDashboardPage() {
 
   const alphaFeed = data?.charts.alpha_feed ?? [];
   const network = data?.charts.correlation_network;
+  const seaAlpha = Boolean(data?.context?.sea_alpha);
+  const alphaFramework =
+    data?.context?.alpha_framework ||
+    (seaAlpha
+      ? data?.context?.region_context?.primary_market === "VN"
+        ? "VN30 sector rotation"
+        : "ASEAN factor tilt"
+      : "S&P sector rotation");
+  const regimeAlignmentScore = Math.max(
+    0,
+    Math.min(100, Number(data?.context?.regime_alignment_score ?? 0)),
+  );
+  const seaSignals = data?.context?.vn_specific_alpha_signals ?? [];
 
   return (
     <div className="space-y-5">
@@ -673,9 +700,21 @@ export default function QuantDashboardPage() {
           {tab === "Alpha" ? (
             <div className="rounded-xl border border-[#E2E8F0] bg-white p-5">
               <div className="mb-4 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#0F172A]">
-                  Alpha Opportunity Feed
-                </h3>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-[#0F172A]">
+                      Alpha Opportunity Feed
+                    </h3>
+                    {seaAlpha ? (
+                      <span className="rounded-md bg-[#E0F2FE] px-2 py-0.5 text-[11px] font-bold text-[#075985]">
+                        SEA Alpha
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-xs text-[#475569]">
+                    {alphaFramework}
+                  </p>
+                </div>
                 <Link
                   href="/dashboard/swarm"
                   className="text-xs text-[#0EA5E9] hover:underline"
@@ -683,6 +722,41 @@ export default function QuantDashboardPage() {
                   Run full swarm
                 </Link>
               </div>
+              {seaAlpha ? (
+                <div className="mb-4 rounded-lg border border-[#BAE6FD] bg-[#F0F9FF] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#075985]">
+                        Regime alignment score
+                      </p>
+                      <p className="mt-1 text-sm text-[#334155]">
+                        Factor tilts versus current SEA macro regime.
+                      </p>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums text-[#075985]">
+                      {regimeAlignmentScore}
+                    </p>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                    <div
+                      className="h-full rounded-full bg-[#0284C7]"
+                      style={{ width: `${regimeAlignmentScore}%` }}
+                    />
+                  </div>
+                  {seaSignals.length ? (
+                    <ul className="mt-3 space-y-1 text-xs leading-5 text-[#334155]">
+                      {seaSignals.slice(0, 3).map((signal, idx) => (
+                        <li key={`${signal.type ?? "signal"}-${idx}`}>
+                          <span className="font-semibold">
+                            {signal.symbol ? `${signal.symbol}: ` : ""}
+                          </span>
+                          {signal.message}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="space-y-3">
                 {alphaFeed.length ? (
                   alphaFeed.map((row, idx) => {

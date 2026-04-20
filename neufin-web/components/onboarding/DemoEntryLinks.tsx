@@ -41,7 +41,7 @@ export function DemoEntryLinks() {
     },
     {
       label: "See sample IC memo",
-      href: sampleIc ?? "/dashboard/reports",
+      href: sampleIc ?? "/sample/ic-memo",
       event: "sample_ic",
       external: Boolean(sampleIc),
     },

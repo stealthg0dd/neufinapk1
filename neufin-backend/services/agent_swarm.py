@@ -64,6 +64,12 @@ from services.market_resolver import (  # noqa: E402
     portfolio_market_framing,
     resolve_security,
 )
+from services.portfolio_region import (  # noqa: E402
+    detect_region,
+    humanize_sea_flag,
+    is_sea_region,
+    sea_macro_context,
+)
 from services.risk_engine import (  # noqa: E402
     _fetch_daily_closes_av,
     build_correlation_matrix_from_series,
@@ -116,6 +122,7 @@ class SwarmState(TypedDict):
     # ── Input (caller must provide) ────────────────────────────────────────────
     ticker_data: list[dict]  # [{symbol, shares, price, value, weight, cost_basis?}]
     total_value: float
+    region_context: dict
     external_quant_intelligence: dict
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
@@ -820,9 +827,14 @@ async def market_regime_node(state: SwarmState) -> dict:
     Runs BEFORE strategist so downstream agents can access the canonical regime label.
     """
     trace: list[str] = []
+    region_context = state.get("region_context") or {}
     trace.append(
         "[Market Regime] Fetching FRED CPI data for macro regime classification..."
     )
+    if region_context.get("primary_market") == "VN":
+        trace.append(
+            "[Market Regime] VN region context active: adding SBV policy rate, VND NEER, and HOSE liquidity placeholders alongside FRED."
+        )
 
     cpi_data = await asyncio.to_thread(_get_fred_cpi_analysis)
 
@@ -942,6 +954,9 @@ regime MUST be one of: growth, inflation, recession, stagflation, risk-off"""
     # Inject raw CPI scalars so the frontend can render sparklines / badges
     market_regime_out["cpi_yoy"] = yoy  # float | None
     market_regime_out["cpi_trend_3m"] = trend  # float | None
+    if region_context.get("primary_market") == "VN":
+        market_regime_out["sea_macro_context"] = sea_macro_context(region_context)
+        market_regime_out["region_context"] = region_context
 
     return {"market_regime": market_regime_out, "agent_trace": trace}
 
@@ -1070,6 +1085,112 @@ async def risk_sentinel_node(state: SwarmState) -> dict:
     return {"risk_sentinel_output": risk_sentinel_out, "agent_trace": trace}
 
 
+VN_BANK_AND_BROKER_TICKERS = {
+    "ACB.VN",
+    "BID.VN",
+    "CTG.VN",
+    "EIB.VN",
+    "HDB.VN",
+    "MBB.VN",
+    "MSB.VN",
+    "SHB.VN",
+    "SSB.VN",
+    "SSI.VN",
+    "STB.VN",
+    "TCB.VN",
+    "VCB.VN",
+    "VCI.VN",
+    "VIB.VN",
+    "VPB.VN",
+}
+
+
+def _sea_alpha_signals(
+    ticker_data: list[dict[str, Any]],
+    region_context: dict[str, Any],
+    regime: str,
+) -> list[dict[str, Any]]:
+    """Structured SEA alpha overlays for Alpha Scout and dashboard consumers."""
+    primary_market = str(region_context.get("primary_market") or "").upper()
+    if primary_market not in {
+        "VN",
+        "ASEAN",
+        "ASEAN_MULTI",
+        "SG",
+        "ID",
+        "TH",
+        "MY",
+        "PH",
+    }:
+        return []
+
+    signals: list[dict[str, Any]] = []
+    risk_off = str(regime or "").lower() in {"risk-off", "risk_off", "recession"}
+
+    for pos in ticker_data:
+        symbol = str(pos.get("symbol") or "").strip().upper()
+        if primary_market == "VN" and symbol in VN_BANK_AND_BROKER_TICKERS:
+            try:
+                weight_pct = float(pos.get("weight") or 0) * 100.0
+            except (TypeError, ValueError):
+                weight_pct = 0.0
+            severity = "high" if weight_pct >= 25 else "medium"
+            signals.append(
+                {
+                    "type": "foreign_ownership_limit_proximity",
+                    "symbol": symbol,
+                    "severity": severity,
+                    "message": (
+                        f"{symbol} is a VN financial-sector holding; monitor foreign "
+                        "ownership room and flag exact threshold once exchange-level "
+                        "FOL data is available."
+                    ),
+                }
+            )
+
+    signals.append(
+        {
+            "type": "dividend_yield_vs_vn30_average",
+            "severity": "medium",
+            "message": (
+                "Compare current portfolio dividend yield with VN30 average before "
+                "adding beta; live dividend feed is pending."
+            ),
+        }
+    )
+
+    for pos in ticker_data:
+        symbol = str(pos.get("symbol") or "").strip().upper()
+        try:
+            beta = float(pos.get("beta") or pos.get("portfolio_beta") or 0)
+        except (TypeError, ValueError):
+            beta = 0.0
+        if beta > 1.3 and (risk_off or primary_market == "VN"):
+            signals.append(
+                {
+                    "type": "vn_index_momentum_divergence",
+                    "symbol": symbol,
+                    "severity": "high" if risk_off else "medium",
+                    "message": (
+                        f"{symbol} beta {beta:.2f} is above 1.3; verify divergence "
+                        "against VN-Index momentum before increasing exposure."
+                    ),
+                }
+            )
+
+    signals.append(
+        {
+            "type": "smart_money_signal",
+            "severity": "low",
+            "message": (
+                "Data pending - recommend monitoring quarterly public disclosures "
+                "from major Vietnam funds for institutional flow confirmation."
+            ),
+        }
+    )
+    return signals[:8]
+
+
 async def alpha_scout_node(state: SwarmState) -> dict:
     """
     Alpha Scout Agent — AI-driven opportunity discovery outside the current portfolio.
@@ -1088,15 +1209,32 @@ async def alpha_scout_node(state: SwarmState) -> dict:
     market_regime = state.get("market_regime", {})
     macro_context = state.get("macro_context", "")
     risk_sentinel = state.get("risk_sentinel_output", {})
+    region_context = state.get("region_context") or {}
     ticker_data = state["ticker_data"]
 
     regime = market_regime.get("regime", "growth")
     risk_level = risk_sentinel.get("risk_level", "medium")
+    primary_market = str(region_context.get("primary_market") or "").upper()
+    sea_alpha = bool(is_sea_region(region_context)) or primary_market in {
+        "VN",
+        "ASEAN",
+        "ASEAN_MULTI",
+    }
+    sector_framework = (
+        "VN30/HOSE sector rotation"
+        if primary_market == "VN"
+        else "ASEAN factor tilt" if sea_alpha else "US sector rotation"
+    )
     existing_symbols = {t["symbol"] for t in ticker_data}
     exposure_summary = [
         {"symbol": t["symbol"], "weight_pct": round(t.get("weight", 0) * 100, 1)}
         for t in sorted(ticker_data, key=lambda x: x.get("weight", 0), reverse=True)[:5]
     ]
+    sea_signals = (
+        _sea_alpha_signals(ticker_data, region_context, regime) if sea_alpha else []
+    )
+    if sea_alpha:
+        trace.append(f"[Alpha Scout] SEA Alpha mode active: {sector_framework}.")
 
     macro_snippet = ""
     if macro_context and macro_context not in ("", "N/A"):
@@ -1108,13 +1246,26 @@ async def alpha_scout_node(state: SwarmState) -> dict:
         except Exception:
             macro_snippet = macro_context[:300]
 
+    if sea_alpha:
+        regional_rules = f"""
+SEA Alpha requirements:
+- Use {sector_framework}; do not default to generic S&P sector rotation.
+- For Vietnam, prioritize VN30/HOSE financials, real estate, materials, dividend quality, and liquidity risk.
+- Include VN-specific alpha signals when relevant: foreign ownership limit proximity, dividend yield versus VN30 average, VN-Index momentum divergence, and VN fund disclosure monitoring.
+- Smart-money data is optional. If unavailable, explicitly mark it as data pending and recommend monitoring VN fund disclosure filings.
+"""
+    else:
+        regional_rules = ""
+
     prompt = f"""You are a portfolio alpha-generation specialist identifying investment opportunities.
 
 Current macro regime: {regime}  |  Portfolio risk level: {risk_level}
+Regional alpha framework: {sector_framework}
 Portfolio top holdings (DO NOT recommend these): {json.dumps(exposure_summary)}
 All existing symbols (never include in output): {", ".join(sorted(existing_symbols))}
 Macro context: {macro_snippet or "N/A"}
 Risk sentinel mitigations: {risk_sentinel.get("mitigations", [])[:2]}
+{regional_rules}
 
 Identify exactly 3-5 specific investment opportunities that:
 1. Are NOT in the existing portfolio (check the exclusion list above)
@@ -1149,7 +1300,26 @@ confidence must be between 0.0 and 1.0. Return 3-5 opportunities."""
                 )
             except (TypeError, ValueError):
                 o["confidence"] = 0.65
-        alpha_out = {"opportunities": opps[:5]}
+        alpha_out = {
+            "opportunities": opps[:5],
+            "sector_rotation_framework": sector_framework,
+        }
+        if sea_alpha:
+            alpha_out.update(
+                {
+                    "sea_alpha": True,
+                    "region_context": region_context,
+                    "vn_specific_alpha_signals": sea_signals,
+                    "smart_money_signal": {
+                        "status": "data_pending",
+                        "message": (
+                            "VN institutional 13F-equivalent data pending — "
+                            "recommend monitoring quarterly public disclosures "
+                            "from major Vietnam funds."
+                        ),
+                    },
+                }
+            )
         trace.append(
             f"[Alpha Scout] {len(opps)} opportunity(ies) identified for {regime} regime:"
         )
@@ -1159,7 +1329,26 @@ confidence must be between 0.0 and 1.0. Return 3-5 opportunities."""
             conf = o.get("confidence", 0.0)
             trace.append(f"[Alpha Scout] ✦ {sym}: {why}... (conf={conf:.0%})")
     except Exception as e:
-        alpha_out = {"opportunities": []}
+        alpha_out = {
+            "opportunities": [],
+            "sector_rotation_framework": sector_framework,
+        }
+        if sea_alpha:
+            alpha_out.update(
+                {
+                    "sea_alpha": True,
+                    "region_context": region_context,
+                    "vn_specific_alpha_signals": sea_signals,
+                    "smart_money_signal": {
+                        "status": "data_pending",
+                        "message": (
+                            "VN institutional 13F-equivalent data pending — "
+                            "recommend monitoring quarterly public disclosures "
+                            "from major Vietnam funds."
+                        ),
+                    },
+                }
+            )
         trace.append(
             f"[Alpha Scout] AI opportunity scan failed ({e}) — no opportunities returned."
         )
@@ -1315,6 +1504,14 @@ async def synthesizer_node(state: SwarmState) -> dict:
     _port_market_ctx = _mf["market_context"]
     _port_native_ccy = _mf["native_currency"]
     _is_sea = _mf["is_sea"]
+    region_context = state.get("region_context") or detect_region(_all_syms)
+    if region_context.get("primary_market") != "US/EU generic":
+        _port_benchmark = region_context.get("benchmark_symbol") or _port_benchmark
+        _port_benchmark_label = (
+            region_context.get("benchmark_name") or _port_benchmark_label
+        )
+        _port_native_ccy = region_context.get("local_currency") or _port_native_ccy
+        _is_sea = True
 
     # ── Build structured input payload for the MD (all 7 agents) ──────────────
     portfolio_positions = []
@@ -1348,11 +1545,13 @@ async def synthesizer_node(state: SwarmState) -> dict:
             "benchmark": _port_benchmark,
             "benchmark_label": _port_benchmark_label,
             "market_context": _port_market_ctx,
+            "region_context": region_context,
             "positions": portfolio_positions,
             "dna_score": dna_score,
             "score_breakdown": score_breakdown,
         },
         "external_quant_intelligence": external_quant,
+        "region_context": region_context,
         "market_regime_agent": mkt_regime,
         "quant_agent": {
             "hhi_concentration_score": hhi_pts,
@@ -1412,6 +1611,11 @@ async def synthesizer_node(state: SwarmState) -> dict:
         if _is_sea or _port_benchmark != "^GSPC"
         else ""
     )
+    if region_context.get("primary_market") == "VN":
+        _sea_note += (
+            " Macro Intelligence must incorporate SBV policy rate, VND NEER, and "
+            "Ho Chi Minh Stock Exchange liquidity data alongside FRED signals."
+        )
     user_content = (
         f"Generate the full Investment Committee Briefing for this portfolio. "
         f"Total AUM: {_ccy_pfx}{state['total_value']:,.0f} {_port_native_ccy}. "
@@ -1441,6 +1645,7 @@ Input:
 - Tax Narrative: {tax_narrative or "N/A"}
 - Critic: {crit[:200] if crit else "No critical issues"}
 - Regime Drivers: {mkt_regime.get("drivers", [])}
+- Region Context: {region_context}
 
 Return ONLY valid JSON matching this exact schema:
 {{
@@ -1508,6 +1713,11 @@ Return ONLY valid JSON matching this exact schema:
         "portfolio_benchmark_label": _port_benchmark_label,
         "portfolio_market_context": _port_market_ctx,
         "portfolio_native_currency": _port_native_ccy,
+        "region_context": region_context,
+        "sea_risk_flags": [
+            humanize_sea_flag(flag)
+            for flag in region_context.get("sea_specific_flags", [])
+        ],
         # ── New structured Investment Thesis fields ───────────────────────────
         "headline": struct_result.get(
             "headline",
@@ -1750,6 +1960,7 @@ async def run_swarm(
     ticker_data: list[dict] | dict,
     total_value: float,
     job_id: str | None = None,
+    region_context: dict | None = None,
     external_quant_intelligence: dict | None = None,
 ) -> dict:
     """
@@ -1759,6 +1970,9 @@ async def run_swarm(
     """
     normalized_ticker_data = (
         list(ticker_data.values()) if isinstance(ticker_data, dict) else ticker_data
+    )
+    resolved_region_context = region_context or detect_region(
+        [str(t.get("symbol") or "") for t in normalized_ticker_data]
     )
 
     step_log: list[dict[str, Any]] = []
@@ -1813,6 +2027,7 @@ async def run_swarm(
     initial: dict = {
         "ticker_data": normalized_ticker_data,
         "total_value": total_value,
+        "region_context": resolved_region_context,
         "external_quant_intelligence": external_quant_intelligence or {},
         "macro_context": "",
         "market_regime": {},
