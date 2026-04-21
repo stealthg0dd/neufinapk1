@@ -22,7 +22,12 @@ const nextConfig = {
     ],
   },
 
+  // Explicit turbopack config — required in Next.js 16+ when a webpack config is also present.
+  // Turbopack handles OpenTelemetry's dynamic requires natively; no ignoreWarnings needed.
+  turbopack: {},
+
   // Sentry pulls @opentelemetry/instrumentation; webpack warns on dynamic requires (harmless).
+  // Only applies to webpack builds (not Turbopack).
   webpack: (config) => {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings || []),
