@@ -2,15 +2,6 @@
 
 const nextConfig = {
   reactStrictMode: true,
-  typescript: {
-    // Temporary shield: unblock production builds while we burn down type debt.
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    // Temporary shield: keep CI/CD shipping while lint issues are cleaned up.
-    ignoreDuringBuilds: true,
-  },
-
   // Required for the production Docker image (copies only what node server.js needs).
   // Has no effect on `next dev` — safe to leave on at all times.
   output: "standalone",
@@ -49,13 +40,14 @@ const nextConfig = {
   // is never proxied — `afterFiles`-style rewrites can run before some API matches and
   // break Stripe signature verification (wrong host + wrong STRIPE_WEBHOOK_SECRET).
   //
-  // Last-resort URL is production only for local builds without env; Vercel Preview and
-  // CI must set RAILWAY_API_URL or NEXT_PUBLIC_API_URL (see docs/deployments.md).
+  // RAILWAY_API_URL or NEXT_PUBLIC_API_URL must be set explicitly — no hardcoded fallback.
   async rewrites() {
     const railwayBase =
-      process.env.RAILWAY_API_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      "https://neufin101-production.up.railway.app";
+      process.env.RAILWAY_API_URL || process.env.NEXT_PUBLIC_API_URL || "";
+    if (!railwayBase) {
+      // No proxy target configured — all /api/* requests must be App Router handlers.
+      return { fallback: [] };
+    }
     return {
       fallback: [
         {
