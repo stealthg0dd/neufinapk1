@@ -4159,6 +4159,7 @@ def _build_pdf_sync(
     ctx["section_confidence"] = build_section_confidence(ctx)
 
     # VN-specific footer note (built once, reused per page in _make_hf_callback)
+    now = datetime.datetime.utcnow()
     if ctx.get("is_sea_region") and (ctx.get("region_profile") or {}).get(
         "primary_market", ""
     ).upper() == "VN":
