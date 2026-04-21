@@ -13,6 +13,7 @@ from config import APP_BASE_URL
 from database import supabase
 from services.ai_router import get_ai_analysis
 from services.calculator import calculate_portfolio_metrics
+from services.portfolio_region import dna_archetype_overlay
 from services.quant_model_engine import analyze_financial_modes
 
 logger = structlog.get_logger(__name__)
@@ -116,6 +117,10 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
 
     final_dna_score = round(max(0.0, min(100.0, base_dna_score + applied_modifier)))
     analysis["dna_score"] = final_dna_score
+    analysis["investor_type"] = dna_archetype_overlay(
+        metrics.get("positions") or positions,
+        str(analysis.get("investor_type") or "Balanced Growth Investor"),
+    )
 
     share_token = str(uuid.uuid4())[:8]
 

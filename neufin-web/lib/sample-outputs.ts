@@ -24,14 +24,14 @@ export function getSampleOutputGallery(): SampleOutputCard[] {
       kind: "ic_memo",
       title: "Sample IC memo",
       description: "Committee-style synthesis with regime, risks, and actions.",
-      href: sampleIc ?? "/dashboard/reports",
+      href: sampleIc ?? "/sample/ic-memo",
       external: Boolean(sampleIc),
     },
     {
       kind: "dna",
       title: "Sample DNA report",
       description: "Behavioral and structural diagnostics for the book.",
-      href: "/results",
+      href: "/sample/dna-report",
     },
     {
       kind: "advisor_pdf",

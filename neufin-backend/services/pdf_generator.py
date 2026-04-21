@@ -50,6 +50,12 @@ from reportlab.platypus import (
 
 from services.calculator import canonical_metrics_for_institutional_report
 from services.fx_format import format_pdf_market_value_cell
+from services.portfolio_region import (
+    detect_region,
+    dna_archetype_overlay,
+    humanize_sea_flag,
+    is_sea_region,
+)
 from services.report_state import (
     REPORT_DRAFT,
     REPORT_FINAL,
@@ -800,7 +806,23 @@ def _build_report_context(
         thesis_obj = {}
 
     # ── Portfolio basics (canonical AUM / beta / Sharpe — single source) ───────
-    positions: list[dict] = p.get("positions_with_basis") or m.get("positions") or []
+    raw_positions: list[dict] = p.get("positions_with_basis") or []
+    metric_positions: list[dict] = m.get("positions") or []
+    if raw_positions and metric_positions:
+        metric_by_symbol = {
+            str(pos.get("symbol") or "").strip().upper(): pos
+            for pos in metric_positions
+            if str(pos.get("symbol") or "").strip()
+        }
+        positions = []
+        for pos in raw_positions:
+            sym = str(pos.get("symbol") or "").strip().upper()
+            positions.append({**pos, **metric_by_symbol.get(sym, {})})
+    else:
+        positions = raw_positions or metric_positions
+    tickers = [str(pos.get("symbol") or "") for pos in positions]
+    region_profile = detect_region(tickers)
+    sea_region = is_sea_region(region_profile)
     _canon = canonical_metrics_for_institutional_report(p, d, thesis_obj, positions)
     total_value = float(_canon["total_value"])
     weighted_beta = float(_canon["weighted_beta"])
@@ -822,6 +844,9 @@ def _build_report_context(
             _benchmark_label = BENCHMARK_LABELS.get(_benchmark_sym, _benchmark_sym)
         except Exception:
             _benchmark_label = _benchmark_sym
+    if sea_region:
+        _benchmark_sym = region_profile["benchmark_symbol"]
+        _benchmark_label = region_profile["benchmark_name"]
     _portfolio_market_context = (
         m.get("portfolio_market_context")
         or p.get("portfolio_market_context")
@@ -829,9 +854,36 @@ def _build_report_context(
     )
     _base_currency = m.get("base_currency") or m.get("portfolio_base_currency") or "USD"
 
+    fx_values: list[float] = []
+    for pos in positions:
+        try:
+            fx_val = float(pos.get("fx_rate") or 0)
+        except (TypeError, ValueError):
+            fx_val = 0.0
+        if fx_val > 0:
+            fx_values.append(fx_val)
+    timestamps = [
+        str(pos.get("timestamp"))
+        for pos in positions
+        if str(pos.get("timestamp") or "").strip()
+    ]
+    region_data_sources = ""
+    if sea_region:
+        latest_date = sorted(timestamps)[-1][:10] if timestamps else "latest available"
+        fx_note = (
+            f"{region_profile['local_currency']}USD FX {fx_values[-1]:.8f}"
+            if fx_values and region_profile["local_currency"] != "MULTI"
+            else "FX translated per position where available"
+        )
+        region_data_sources = (
+            f"Data sources used: {region_profile['benchmark_name']} close date "
+            f"{latest_date}; {fx_note}."
+        )
+
     # ── DNA ────────────────────────────────────────────────────────────────────
     dna_score = int(d.get("dna_score") or 0)
     investor_type = str(d.get("investor_type") or "Balanced Growth Investor")
+    investor_type = dna_archetype_overlay(positions, investor_type)
     strengths: list[str] = list(d.get("strengths") or [])
     weaknesses: list[str] = list(d.get("weaknesses") or [])
     recommendation = str(d.get("recommendation") or "")
@@ -1308,6 +1360,13 @@ def _build_report_context(
         "benchmark_label": _benchmark_label,
         "portfolio_market_context": _portfolio_market_context,
         "base_currency": _base_currency,
+        "region_profile": region_profile,
+        "is_sea_region": sea_region,
+        "sea_risk_flags": [
+            humanize_sea_flag(flag)
+            for flag in region_profile.get("sea_specific_flags", [])
+        ],
+        "region_data_sources": region_data_sources,
     }
 
 
@@ -1810,6 +1869,8 @@ def _page_executive_memo(
         items.append(
             Paragraph(_xml(str(ctx["report_metrics_note"])), st["muted8"]),
         )
+    if ctx.get("region_data_sources"):
+        items.append(Paragraph(_xml(str(ctx["region_data_sources"])), st["muted8"]))
     items.append(Spacer(1, 8))
 
     # Quality warning banners
@@ -2120,6 +2181,15 @@ def _page_portfolio_snapshot(
         ["Sharpe ratio", f"{sharpe:.2f}" if sharpe is not None else "—"],
         ["YTD Return", _fpct(ytd) if ytd is not None else "—"],
     ]
+    if ctx.get("is_sea_region"):
+        region = ctx.get("region_profile") or {}
+        stats_data.insert(
+            2,
+            [
+                "Region",
+                f"{region.get('primary_market', 'SEA')} · {region.get('local_currency', 'MULTI')}",
+            ],
+        )
     right = Table(stats_data, colWidths=[140, 110], style=_tbl_std(pal))
 
     items.append(
@@ -2145,6 +2215,22 @@ def _page_portfolio_snapshot(
         )
 
     items.append(Spacer(1, 10))
+
+    if ctx.get("is_sea_region") and ctx.get("sea_risk_flags"):
+        items.append(Paragraph("SEA RISK FLAGS", st["h3"]))
+        flag_rows = [["Severity", "Flag"]]
+        for flag in ctx["sea_risk_flags"]:
+            severity = (
+                "HIGH"
+                if "ownership" in flag.lower() or "liquidity" in flag.lower()
+                else "MED"
+            )
+            flag_rows.append([severity, flag])
+        items.append(Table(flag_rows, colWidths=[70, cw - 70], style=_tbl_std(pal)))
+        if ctx.get("region_data_sources"):
+            items.append(Spacer(1, 4))
+            items.append(Paragraph(_xml(ctx["region_data_sources"]), st["muted8"]))
+        items.append(Spacer(1, 10))
 
     # Legend for the donut (if chart rendered)
     if labels_p:
@@ -3324,6 +3410,89 @@ def _page_alpha_opportunities(
     return items
 
 
+def _behavioral_alpha_summary(ctx: dict) -> list[dict[str, str]]:
+    positions = list(ctx.get("positions") or [])
+    hhi = float(ctx.get("hhi") or 0)
+    rows: list[dict[str, str]] = []
+
+    disposition_rows: list[str] = []
+    for pos in positions:
+        symbol = str(pos.get("symbol") or "").strip().upper()
+        if not symbol:
+            continue
+        try:
+            shares = float(pos.get("shares") or pos.get("quantity") or 0)
+            price = float(
+                pos.get("current_price")
+                or pos.get("price")
+                or pos.get("price_local")
+                or 0
+            )
+            basis = float(pos.get("cost_basis") or pos.get("avg_cost") or 0)
+            fx_rate = float(pos.get("fx_rate") or 1)
+        except (TypeError, ValueError):
+            continue
+        if shares <= 0 or price <= 0 or basis <= 0:
+            continue
+        pnl_usd = (price - basis) * shares * fx_rate
+        if abs(pnl_usd) >= 500:
+            bias = "loss anchoring" if pnl_usd < 0 else "premature profit-taking"
+            decay = abs(pnl_usd) * 0.01
+            disposition_rows.append(
+                f"{symbol}: {bias}; estimated monthly alpha decay USD {decay:,.0f}."
+            )
+    rows.append(
+        {
+            "signal": "Disposition effect",
+            "status": "Monitor" if disposition_rows else "Data pending",
+            "detail": (
+                " ".join(disposition_rows[:3])
+                if disposition_rows
+                else "Holding-period and cost-basis data required for position-level alpha decay."
+            ),
+        }
+    )
+
+    sector_totals: dict[str, float] = {}
+    total_value = 0.0
+    for pos in positions:
+        try:
+            value = float(
+                pos.get("market_value_usd")
+                or pos.get("value")
+                or pos.get("current_value")
+                or 0
+            )
+        except (TypeError, ValueError):
+            value = 0.0
+        if value <= 0:
+            continue
+        sector = str(pos.get("sector") or pos.get("industry") or "Unclassified")
+        sector_totals[sector] = sector_totals.get(sector, 0.0) + value
+        total_value += value
+    sector_bits = []
+    if total_value > 0:
+        sector_bits = [
+            f"{sector}: {(value / total_value) * 100:.0f}%"
+            for sector, value in sorted(
+                sector_totals.items(), key=lambda item: item[1], reverse=True
+            )[:4]
+        ]
+    rows.append(
+        {
+            "signal": "Concentration cascade",
+            "status": "Alert" if hhi > 0.4 else "Normal",
+            "detail": (
+                f"Smart concentration alert: HHI {hhi:.2f}. "
+                f"Sector breakdown: {', '.join(sector_bits) or 'unavailable'}."
+                if hhi > 0.4
+                else f"HHI {hhi:.2f}; no cascade alert triggered."
+            ),
+        }
+    )
+    return rows
+
+
 # ─── PAGE 8b — QUANT MODEL OUTPUTS (standalone) ─────────────────────────────
 
 
@@ -3822,6 +3991,26 @@ def _page_agent_attribution(
     items.append(Table(quant_rows, colWidths=[130, cw - 130], style=_tbl_std(pal)))
     items.append(Spacer(1, 10))
 
+    # Behavioral alpha appendix
+    items.append(Paragraph("BEHAVIORAL ALPHA SUMMARY", st["h3"]))
+    behavioral_rows = [["Signal", "Status", "Interpretation"]]
+    for row in _behavioral_alpha_summary(ctx):
+        behavioral_rows.append(
+            [
+                Paragraph(_xml(row["signal"]), st["body_sm"]),
+                Paragraph(_xml(row["status"]), st["body_sm"]),
+                Paragraph(_xml(row["detail"]), st["body_sm"]),
+            ]
+        )
+    items.append(
+        Table(
+            behavioral_rows,
+            colWidths=[120, 75, cw - 195],
+            style=_tbl_std(pal),
+        )
+    )
+    items.append(Spacer(1, 10))
+
     # Data sources
     items.append(Paragraph("DATA SOURCES & INFRASTRUCTURE", st["h3"]))
     sources = [
@@ -3832,6 +4021,17 @@ def _page_agent_attribution(
         ["AI Engine", "Anthropic Claude Sonnet", "IC synthesis & narrative"],
         ["DNA Engine", "NeuFin proprietary model", "Behavioral archetype scoring"],
     ]
+    if ctx.get("is_sea_region"):
+        region = ctx.get("region_profile") or {}
+        sources.insert(
+            2,
+            [
+                "SEA Market Data",
+                f"{region.get('benchmark_name', 'Local index')} / TwelveData / Yahoo Finance",
+                ctx.get("region_data_sources")
+                or "Local benchmark, FX, and listing data",
+            ],
+        )
     items.append(Table(sources, colWidths=[100, 180, 155], style=_tbl_std(pal)))
     items.append(Spacer(1, 8))
 
