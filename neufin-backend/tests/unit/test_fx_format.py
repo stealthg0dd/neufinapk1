@@ -58,3 +58,16 @@ def test_format_pdf_market_value_vn(monkeypatch: pytest.MonkeyPatch) -> None:
         {"symbol": "HPG.VN", "value": 1_000_000, "native_currency": "VND"}
     )
     assert "VND" in cell
+
+
+def test_format_pdf_market_value_vn_dual_currency() -> None:
+    cell = format_pdf_market_value_cell(
+        {
+            "symbol": "HPG.VN",
+            "current_value": 25_000_000_000,
+            "native_currency": "VND",
+            "market_value_usd": 1_000_000,
+        }
+    )
+
+    assert cell == "VND 25.000 B\nUSD 1.00M"

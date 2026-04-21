@@ -1219,7 +1219,7 @@ export default function PartnersPage() {
               name: "STARTER",
               price: "Free",
               period: "90 days",
-              color: "#64748B",
+              color: "#475569",
               highlight: false,
               features: [
                 "100 analyses per month",
@@ -1234,7 +1234,7 @@ export default function PartnersPage() {
               name: "GROWTH",
               price: "$499",
               period: "/month",
-              color: "#0EA5E9",
+              color: "#0369A1",
               highlight: true,
               badge: "Most Popular",
               features: [
@@ -1251,7 +1251,7 @@ export default function PartnersPage() {
               name: "INSTITUTIONAL",
               price: "$2,999",
               period: "/month",
-              color: "#8B5CF6",
+              color: "#5B21B6",
               highlight: false,
               features: [
                 "Everything in Growth",
@@ -1268,12 +1268,13 @@ export default function PartnersPage() {
             <div
               key={tier.name}
               style={{
-                background: tier.highlight ? "#0D1A2E" : "#0D1520",
-                border: `1px solid ${tier.highlight ? tier.color + "66" : "#E2E8F0"}`,
-                borderRadius: 16,
+                background: "#FFFFFF",
+                color: "#0F172A",
+                border: `1px solid ${tier.highlight ? "#0369A1" : "#CBD5E1"}`,
+                borderRadius: 8,
                 padding: "32px 28px",
                 position: "relative",
-                boxShadow: tier.highlight ? `0 0 40px ${tier.color}18` : "none",
+                boxShadow: tier.highlight ? "0 18px 44px rgba(3, 105, 161, 0.18)" : "none",
               }}
             >
               {tier.badge && (
@@ -1304,13 +1305,13 @@ export default function PartnersPage() {
                 >
                   {tier.price}
                 </span>
-                <span style={{ fontSize: 14, color: "#64748B" }}>
+                <span style={{ fontSize: 14, color: "#475569" }}>
                   {tier.period}
                 </span>
               </div>
               <div
                 style={{
-                  borderTop: "1px solid #E2E8F0",
+                  borderTop: "1px solid #CBD5E1",
                   margin: "20px 0 20px",
                 }}
               />
@@ -1329,7 +1330,7 @@ export default function PartnersPage() {
                     key={f}
                     style={{
                       fontSize: 14,
-                      color: "#64748B",
+                      color: "#334155",
                       display: "flex",
                       gap: 8,
                       alignItems: "flex-start",
@@ -1354,9 +1355,9 @@ export default function PartnersPage() {
                   fontWeight: 700,
                   fontSize: 14,
                   textDecoration: "none",
-                  background: tier.highlight ? tier.color : "transparent",
+                  background: tier.highlight ? "#0369A1" : "#FFFFFF",
                   color: tier.highlight ? "#fff" : tier.color,
-                  border: tier.highlight ? "none" : `1px solid ${tier.color}44`,
+                  border: tier.highlight ? "1px solid #0369A1" : `1px solid ${tier.color}`,
                 }}
               >
                 {tier.cta}
@@ -1470,7 +1471,7 @@ export default function PartnersPage() {
                     border: "none",
                     cursor: "pointer",
                     background: codeCopied ? "rgba(34,197,94,0.15)" : "#1E3A5F",
-                    color: codeCopied ? "#22C55E" : "#64748B",
+                    color: codeCopied ? "#22C55E" : "#CBD5E1",
                     fontSize: 11,
                     fontWeight: 600,
                     marginLeft: 8,

@@ -27,6 +27,7 @@ from pydantic import BaseModel
 from database import supabase
 from services.auth_dependency import get_current_user, get_subscribed_user
 from services.jwt_auth import JWTUser
+from services.portfolio_region import detect_region, is_sea_region
 from services.quant_model_engine import analyze_financial_modes
 from services.research.regime_detector import get_current_regime_summary
 from services.research.slug_utils import estimate_read_time_minutes, slugify
@@ -228,6 +229,42 @@ def _parse_alpha_opportunities(raw_alpha: Any) -> list[dict[str, Any]]:
         except Exception:
             return []
     return []
+
+
+def _parse_alpha_payload(raw_alpha: Any) -> dict[str, Any]:
+    if isinstance(raw_alpha, dict):
+        return raw_alpha
+    if isinstance(raw_alpha, str) and raw_alpha.strip().startswith("{"):
+        try:
+            payload = json.loads(raw_alpha)
+            return payload if isinstance(payload, dict) else {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _regime_alignment_score(
+    quant_result: dict[str, Any],
+    alpha_payload: dict[str, Any],
+    region_context: dict[str, Any],
+) -> int:
+    if not is_sea_region(region_context):
+        return 0
+    score = 62.0
+    signals = alpha_payload.get("vn_specific_alpha_signals") or []
+    if signals:
+        score += min(14.0, len(signals) * 3.0)
+    try:
+        alpha_score = float(quant_result.get("alpha_score") or 0)
+    except (TypeError, ValueError):
+        alpha_score = 0.0
+    if alpha_score >= 70:
+        score += 12
+    elif alpha_score >= 50:
+        score += 6
+    if region_context.get("primary_market") == "VN":
+        score += 6
+    return int(max(0, min(100, round(score))))
 
 
 def _factor_decomposition(quant_result: dict[str, Any]) -> list[dict[str, Any]]:
@@ -435,6 +472,7 @@ async def get_quant_dashboard(
     positions = _normalize_position_weights(list(pos_res.data or []))
     if not positions:
         raise HTTPException(status_code=404, detail="No portfolio positions found.")
+    region_context = detect_region([str(p.get("symbol") or "") for p in positions])
 
     quant_result = await analyze_financial_modes(
         portfolio["id"],
@@ -456,6 +494,7 @@ async def get_quant_dashboard(
     swarm_row = (latest_swarm.data or [None])[0] or {}
 
     raw_alpha = swarm_row.get("alpha_signal")
+    alpha_payload = _parse_alpha_payload(raw_alpha)
     alpha_opps = _parse_alpha_opportunities(raw_alpha)
     if not alpha_opps:
         alpha_opps = [
@@ -470,6 +509,12 @@ async def get_quant_dashboard(
     vol_proxy = float(risk_metrics.get("volatility_annualized_proxy") or 0.18)
     dd_proxy = float(risk_metrics.get("max_drawdown_proxy") or 0.14)
     alpha_score = float(quant_result.get("alpha_score") or 50.0)
+    sea_region = is_sea_region(region_context)
+    regime_alignment_score = _regime_alignment_score(
+        quant_result,
+        alpha_payload,
+        region_context,
+    )
 
     return {
         "portfolio": {
@@ -508,6 +553,19 @@ async def get_quant_dashboard(
             "regime": swarm_row.get("regime") or quant_result.get("regime_context", {}),
             "recommendation_summary": swarm_row.get("recommendation_summary") or "",
             "generated_at": datetime.now(UTC).isoformat(),
+            "region_context": region_context,
+            "sea_alpha": sea_region,
+            "alpha_framework": (
+                alpha_payload.get("sector_rotation_framework")
+                or (
+                    "VN30 sector rotation"
+                    if region_context.get("primary_market") == "VN"
+                    else "ASEAN factor tilt" if sea_region else "S&P sector rotation"
+                )
+            ),
+            "regime_alignment_score": regime_alignment_score,
+            "vn_specific_alpha_signals": alpha_payload.get("vn_specific_alpha_signals")
+            or [],
         },
     }
 

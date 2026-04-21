@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useRef, DragEvent, ChangeEvent } from "react";
+import { Suspense, useState, useEffect, useRef, DragEvent, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -31,6 +31,20 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isVnPortfolio, setIsVnPortfolio] = useState(false);
+
+  useEffect(() => {
+    if (!file) { setIsVnPortfolio(false); return; }
+    const isViLocale =
+      typeof navigator !== "undefined" && navigator.language.startsWith("vi");
+    if (isViLocale) { setIsVnPortfolio(true); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = (e.target?.result as string) ?? "";
+      setIsVnPortfolio(/\b[A-Z0-9]{1,10}\.VN\b/i.test(text));
+    };
+    reader.readAsText(file);
+  }, [file]);
 
   const handleDrop = (e: DragEvent) => {
     e.preventDefault();
@@ -248,6 +262,24 @@ export default function UploadPage() {
           {error && (
             <div className="mt-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-400 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* VN portfolio detection banner */}
+          {isVnPortfolio && (
+            <div className="mt-4 flex items-start gap-3 rounded-lg border border-[#0EA5E9]/40 bg-[#0EA5E9]/8 px-4 py-3 text-sm">
+              <span className="mt-0.5 shrink-0 text-[#38BDF8]">🇻🇳</span>
+              <div>
+                <p className="font-semibold text-[#38BDF8]">
+                  Detected Vietnamese portfolio
+                </p>
+                <p className="mt-0.5 text-shell-fg/80 leading-relaxed">
+                  We support HOSE/HNX tickers, VND→USD conversion, and VN-Index
+                  benchmarking. Add a{" "}
+                  <code className="text-primary font-mono">cost_basis_vnd</code>{" "}
+                  column for full Vietnam securities transfer tax analysis.
+                </p>
+              </div>
             </div>
           )}
 

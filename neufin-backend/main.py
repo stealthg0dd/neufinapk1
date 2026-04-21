@@ -125,6 +125,7 @@ from services.market_resolver import (  # noqa: E402
     persist_resolution_best_effort,
     resolve_security,
 )
+from services.portfolio_region import dna_archetype_overlay  # noqa: E402
 from services.jwt_auth import verify_jwt  # noqa: E402
 from services.risk_engine import (  # noqa: E402
     build_correlation_matrix,
@@ -467,12 +468,16 @@ PUBLIC_PREFIXES = [
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
+_is_production = settings.ENVIRONMENT.lower() == "production"
 app = FastAPI(
     title="Neufin API",
     description="AI Portfolio Intelligence Platform",
     version=settings.APP_VERSION,
     lifespan=lifespan,
     debug=settings.debug,
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None,
+    openapi_url=None if _is_production else "/openapi.json",
 )
 
 
@@ -730,6 +735,18 @@ async def auth_middleware(request: Request, call_next):
 
     if request.url.path in ("/health", "/api/admin/health"):
         return await call_next(request)
+
+    # Protect /metrics: require METRICS_TOKEN bearer, or deny in production
+    if request.url.path == "/metrics":
+        _metrics_token = os.getenv("METRICS_TOKEN", "")
+        _auth_hdr = request.headers.get("Authorization", "")
+        if _metrics_token:
+            if _auth_hdr != f"Bearer {_metrics_token}":
+                from starlette.responses import Response as _Resp
+                return _Resp(status_code=401, content="Unauthorized")
+        elif _is_production:
+            from starlette.responses import Response as _Resp
+            return _Resp(status_code=404, content="Not Found")
 
     # ── Soft JWT attachment ────────────────────────────────────────────────────
     auth_header = request.headers.get("Authorization", "")
@@ -1179,6 +1196,10 @@ Return ONLY valid JSON:
         raise HTTPException(
             status_code=503, detail="AI analysis providers are unavailable."
         ) from e
+    analysis["investor_type"] = dna_archetype_overlay(
+        _prompt_records,
+        str(analysis.get("investor_type") or "Balanced Growth Investor"),
+    )
 
     # ── 8. Format positions ────────────────────────────────────────────────────
     positions_out = []

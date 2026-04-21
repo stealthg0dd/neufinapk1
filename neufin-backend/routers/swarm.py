@@ -68,6 +68,7 @@ from services.market_cache import (  # noqa: E402
     update_swarm_job,
 )
 from services.pdf_generator import build_swarm_ic_export_pdf  # noqa: E402
+from services.portfolio_region import detect_region  # noqa: E402
 from services.quant_model_engine import run_models  # noqa: E402
 
 router = APIRouter(prefix="/api/swarm", tags=["swarm"])
@@ -369,6 +370,7 @@ async def _run_swarm_background(
 
         # Prepare ticker data exactly as before
         ticker_data = {p["symbol"]: p for p in positions}
+        region_context = detect_region([p.get("symbol", "") for p in positions])
         modes = _normalize_quant_modes(quant_modes)
         quant_result = {}
         if modes:
@@ -382,6 +384,7 @@ async def _run_swarm_background(
             ticker_data=ticker_data,
             total_value=total_value,
             job_id=job_id,
+            region_context=region_context,
             external_quant_intelligence=_build_swarm_quant_context(quant_result, modes),
         )
         if modes:
@@ -510,6 +513,7 @@ async def analyze_with_swarm_sync(
         require_active_subscription(user)
 
     ticker_data = [p.model_dump() for p in body.positions]
+    region_context = detect_region([p.get("symbol", "") for p in ticker_data])
     modes = _normalize_quant_modes(body.quant_modes)
     quant_result = {}
     if modes:
@@ -520,6 +524,7 @@ async def analyze_with_swarm_sync(
     result = await run_swarm(
         ticker_data=ticker_data,
         total_value=body.total_value,
+        region_context=region_context,
         external_quant_intelligence=_build_swarm_quant_context(quant_result, modes),
     )
     if modes:

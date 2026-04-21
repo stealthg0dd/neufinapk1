@@ -12,6 +12,12 @@ import structlog
 from dotenv import load_dotenv
 
 from core.config import settings
+from data_providers.ticker_normalizer import (
+    SEA_EXCHANGE_MAP,
+    DataUnavailableError,
+    compute_market_value,
+    normalize_sea_ticker,
+)
 from services.fx_format import indicative_sgd_suffix
 from services.market_cache import (
     TICKER_ALIASES,
@@ -21,7 +27,6 @@ from services.market_cache import (
 )
 from services.market_currency import SUFFIX_CURRENCY as _SUFFIX_CURRENCY
 from services.market_resolver import (
-    fetch_twelve_data,
     persist_resolution_best_effort,
     portfolio_market_framing,
     resolve_security,
@@ -168,8 +173,36 @@ def _polygon_sym(sym: str) -> str:
 def _td_sym(sym: str) -> str:
     """TwelveData: BRK-B → BRK/B."""
     if should_use_twelve_data_first(sym):
+        # SEA-VN-FIX before: SEA symbols were converted to provider-looking strings only.
+        # SEA-VN-FIX after: the request layer adds required exchange/country params.
         return twelve_data_symbol(sym)
     return sym.replace("-", "/").upper()
+
+
+def _is_sea_market_symbol(sym: str) -> bool:
+    """True for SEA stock suffixes and index aliases handled by the normalizer."""
+    upper = (sym or "").strip().upper()
+    normalized_symbol, _, _ = normalize_sea_ticker(
+        upper,
+        api_preference="twelvedata",
+        is_index=upper.startswith("^"),
+    )
+    return (
+        normalized_symbol != upper
+        or upper
+        in {
+            "VNINDEX",
+            "VNI",
+            "STI",
+            "JKSE",
+            "JCI",
+            "SET",
+            "KLSE",
+            "FBMKLCI",
+            "PSEI",
+        }
+        or any(upper.endswith(suffix) for suffix in SEA_EXCHANGE_MAP)
+    )
 
 
 def _av_ticker(sym: str) -> str:
@@ -315,12 +348,53 @@ def _twelvedata_batch(symbols: list[str]) -> dict[str, float]:
 
 def _twelvedata_quote_batch(symbols: list[str]) -> dict[str, float]:
     """Twelve Data quote helper for SEA markets; returns live/close prices."""
+    if not TWELVEDATA_API_KEY or not _available("twelvedata"):
+        return {}
+
     results: dict[str, float] = {}
     for sym in symbols:
-        quote = fetch_twelve_data(sym)
-        price = quote.price if quote else None
-        if price and price > 0:
-            results[sym] = price
+        upper = str(sym or "").strip().upper()
+        normalized_symbol, query_params, api_to_use = normalize_sea_ticker(
+            upper,
+            api_preference="twelvedata",
+            is_index=upper.startswith("^"),
+        )
+        if api_to_use != "twelvedata":
+            continue
+        try:
+            # SEA-VN-FIX before: fetch_twelve_data() sent only a symbol and TwelveData
+            # classified VN names as CCY/index. SEA-VN-FIX after: include explicit
+            # exchange=HOSE and country=Vietnam for .VN, country=Vietnam for ^VNINDEX.
+            response = requests.get(
+                "https://api.twelvedata.com/price",
+                params={**query_params, "apikey": TWELVEDATA_API_KEY},
+                timeout=8.0,
+            )
+            if response.status_code == 429:
+                _blacklist("twelvedata")
+                continue
+            data = response.json()
+            if isinstance(data, dict) and (
+                data.get("status") == "error" or _is_rate_limit(data)
+            ):
+                logger.warning(
+                    "price.twelvedata_sea_error",
+                    symbol=upper,
+                    normalized_symbol=normalized_symbol,
+                    query_params=query_params,
+                    message=data.get("message") or data.get("Information"),
+                )
+                continue
+            price = float(data.get("price") or 0) if isinstance(data, dict) else 0.0
+            if price > 0:
+                results[sym] = price
+        except Exception as e:
+            logger.warning(
+                "price.twelvedata_sea_failed",
+                symbol=upper,
+                normalized_symbol=normalized_symbol,
+                error=str(e),
+            )
     return results
 
 
@@ -475,6 +549,24 @@ def fetch_spot_prices_batch(symbols: list[str]) -> dict[str, float]:
     Returns {sym: price} for every symbol that could be resolved.
     Symbols that could not be resolved are omitted (caller decides how to handle).
     """
+    # SEA-VN-FIX before: some callers reached the provider waterfall with raw SEA
+    # tickers only. SEA-VN-FIX after: every ticker is normalized once up front so
+    # routing and logs carry the provider-specific symbol and params.
+    normalized_routes = {
+        s: normalize_sea_ticker(
+            str(s or "").strip().upper(),
+            api_preference="twelvedata",
+            is_index=str(s or "").strip().upper().startswith("^"),
+        )
+        for s in symbols
+    }
+    logger.debug(
+        "price.normalized_routes",
+        symbols=list(normalized_routes.keys()),
+        sea_symbols=[
+            s for s, route in normalized_routes.items() if route[0] != str(s).upper()
+        ],
+    )
     remaining = list(symbols)
     results: dict[str, float] = {}
 
@@ -598,6 +690,18 @@ def get_price_with_fallback(sym: str) -> PriceResult:
     Step 4: Return unresolvable — caller decides whether to exclude.
     """
     sym = sym.upper()
+    normalized_symbol, query_params, api_to_use = normalize_sea_ticker(
+        sym,
+        api_preference="twelvedata",
+        is_index=sym.startswith("^"),
+    )
+    logger.debug(
+        "price.normalized_symbol",
+        symbol=sym,
+        normalized_symbol=normalized_symbol,
+        api=api_to_use,
+        query_params=query_params,
+    )
 
     # In-process 1-hour cache hit
     cached = _PRICE_CACHE.get(sym)
@@ -1185,9 +1289,13 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     resolved = [sym for sym in symbols if sym not in unresolvable]
 
     if not resolved:
-        raise ValueError(
-            "No tickers could be priced. Check your symbols and try again. "
-            f"Unresolvable: {unresolvable}"
+        # SEA-VN-FIX before: an all-price-failure portfolio raised here and the
+        # report path died. SEA-VN-FIX after: keep non-price fields and mark
+        # each position explicitly unavailable.
+        logger.warning(
+            "price.all_positions_unavailable",
+            symbols=symbols,
+            unresolvable=unresolvable,
         )
 
     # Build warnings list for all non-live tickers
@@ -1280,6 +1388,87 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     positions_out["portfolio_base_currency"] = base_currency
     positions_out["display_currency"] = positions_out["native_currency"]
     positions_out["fx_rate_used"] = None
+
+    # SEA-VN-FIX before: VN rows only exposed current_value, which could become
+    # null/blank with no explicit reason. SEA-VN-FIX after: compute USD market
+    # value with local price + FX, or annotate an actionable data outage.
+    market_value_payload: dict[str, dict] = {}
+    shares_by_symbol = dict(zip(df["symbol"], df["shares"], strict=False))
+    for sym in symbols:
+        status = price_status.get(sym, "unresolvable")
+        if _is_sea_market_symbol(sym):
+            try:
+                market_value_payload[sym] = compute_market_value(
+                    sym,
+                    float(shares_by_symbol.get(sym) or 0),
+                )
+                market_value_payload[sym]["data_unavailable"] = False
+                market_value_payload[sym]["price_unavailable_message"] = None
+            except (DataUnavailableError, ValueError, TypeError) as exc:
+                logger.warning(
+                    "price.market_value_unavailable",
+                    symbol=sym,
+                    error=str(exc),
+                )
+                market_value_payload[sym] = {
+                    "ticker": sym,
+                    "price_local": None,
+                    "fx_rate": None,
+                    "price_usd": None,
+                    "market_value_usd": None,
+                    "source": "unavailable",
+                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                    "data_unavailable": True,
+                    "price_unavailable_message": (
+                        f"Price data unavailable for {sym}. Upload confirmed prices or retry."
+                    ),
+                }
+            continue
+
+        current_value = spot_prices.get(sym)
+        market_value_payload[sym] = {
+            "ticker": sym,
+            "price_local": spot_prices.get(sym),
+            "fx_rate": 1.0 if _meta_by[sym].native_currency == "USD" else None,
+            "price_usd": (
+                spot_prices.get(sym) if _meta_by[sym].native_currency == "USD" else None
+            ),
+            "market_value_usd": (
+                float(current_value) * float(shares_by_symbol.get(sym) or 0)
+                if current_value and _meta_by[sym].native_currency == "USD"
+                else None
+            ),
+            "source": status,
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+            "data_unavailable": status == "unresolvable",
+            "price_unavailable_message": (
+                f"Price data unavailable for {sym}. Upload confirmed prices or retry."
+                if status == "unresolvable"
+                else None
+            ),
+        }
+
+    positions_out["price_local"] = positions_out["symbol"].map(
+        lambda s: market_value_payload.get(s, {}).get("price_local")
+    )
+    positions_out["fx_rate"] = positions_out["symbol"].map(
+        lambda s: market_value_payload.get(s, {}).get("fx_rate")
+    )
+    positions_out["price_usd"] = positions_out["symbol"].map(
+        lambda s: market_value_payload.get(s, {}).get("price_usd")
+    )
+    positions_out["market_value_usd"] = positions_out["symbol"].map(
+        lambda s: market_value_payload.get(s, {}).get("market_value_usd")
+    )
+    positions_out["source"] = positions_out["symbol"].map(
+        lambda s: market_value_payload.get(s, {}).get("source")
+    )
+    positions_out["data_unavailable"] = positions_out["symbol"].map(
+        lambda s: bool(market_value_payload.get(s, {}).get("data_unavailable"))
+    )
+    positions_out["price_unavailable_message"] = positions_out["symbol"].map(
+        lambda s: market_value_payload.get(s, {}).get("price_unavailable_message")
+    )
 
     # # SEA-NATIVE-TICKER-FIX: derive canonical benchmark from resolved symbols
     _mf = portfolio_market_framing(resolved)

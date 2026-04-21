@@ -48,6 +48,7 @@ const PUBLIC_PREFIXES = [
   "/signup",
   "/onboarding", // new-user onboarding flow (auth checked client-side)
   "/pricing",
+  "/partners",
   "/contact-sales",
   "/upload",
   "/results",
@@ -56,6 +57,7 @@ const PUBLIC_PREFIXES = [
   "/market",
   "/leaderboard",
   "/research",
+  "/sample",
   "/feedback",
   "/privacy",
   "/share",
@@ -131,7 +133,7 @@ async function hasValidSupabaseSession(token: string): Promise<boolean> {
 }
 
 async function hasAdminRole(token: string): Promise<boolean> {
-  if (!BACKEND_API_URL) return true;
+  if (!BACKEND_API_URL) return false;
   try {
     const res = await fetch(
       `${BACKEND_API_URL.replace(/\/$/, "")}/api/admin/access`,
@@ -146,7 +148,7 @@ async function hasAdminRole(token: string): Promise<boolean> {
     return res.ok;
   } catch (error) {
     log("error", "middleware.admin_check_error", error);
-    return true;
+    return false;
   }
 }
 

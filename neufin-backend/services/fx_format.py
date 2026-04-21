@@ -79,14 +79,26 @@ def format_pdf_market_value_cell(pos: dict) -> str:
             p["native_currency"] = "USD"
     val = float(p.get("current_value") or p.get("value") or 0)
     ccy = (p.get("native_currency") or "USD").upper()
+    usd_val_raw = p.get("market_value_usd")
+    if usd_val_raw is None and p.get("fx_rate") and ccy != "USD":
+        try:
+            usd_val_raw = val * float(p.get("fx_rate") or 0)
+        except (TypeError, ValueError):
+            usd_val_raw = None
+    try:
+        usd_val = float(usd_val_raw) if usd_val_raw is not None else None
+    except (TypeError, ValueError):
+        usd_val = None
     if ccy == "USD":
         return f"${val:,.0f}"
     if ccy == "VND":
-        line1 = f"{val:,.0f} VND"
+        line1 = f"VND {val / 1_000_000_000:.3f} B"
     elif ccy == "GBP":
         line1 = f"£{val:,.0f}"
     else:
         line1 = f"{val:,.2f} {ccy}"
+    if usd_val is not None and usd_val > 0:
+        return line1 + f"\nUSD {usd_val / 1_000_000:.2f}M"
     suf = indicative_sgd_suffix(val, ccy)
     if suf:
         return line1 + "\n" + suf
