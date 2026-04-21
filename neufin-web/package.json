@@ -47,7 +47,7 @@
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "autoprefixer": "^10",
-    "eslint": "^10",
+    "eslint": "^9",
     "eslint-config-next": "^15.3.0",
     "eslint-plugin-security": "^3.0.0",
     "lighthouse": "^13.1.0",
