@@ -23,7 +23,7 @@
     "framer-motion": "^11.18.2",
     "lightweight-charts": "^4.2.0",
     "lucide-react": "^0.577.0",
-    "next": "^15.3.0",
+    "next": "^16.2.4",
     "pagedjs": "^0.4.3",
     "pino": "^9.0.0",
     "pino-pretty": "^11.0.0",
