@@ -1787,6 +1787,11 @@ def _make_hf_callback(ctx: dict, pal: dict, firm_name: str) -> Any:
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(pal["text_mut"])
         canvas.drawString(MARGIN, MARGIN - 4, disc[:200])
+        # VN-specific market context line above disclaimer
+        vn_note = ctx.get("vn_footer_note")
+        if vn_note:
+            canvas.setFont("Helvetica", 6)
+            canvas.drawString(MARGIN, MARGIN + 8, str(vn_note)[:220])
         canvas.restoreState()
 
     return callback
@@ -2952,6 +2957,37 @@ def _page_tax_optimization(
             "This identifies realizable losses that can offset capital gains."
         )
     items.append(Paragraph(_xml(harvest_text), st["body"]))
+
+    # ── Vietnam-specific tax notes (conditional on region) ────────────────────
+    is_vn_tax = (
+        ctx.get("is_sea_region")
+        and (ctx.get("region_profile") or {}).get("primary_market", "").upper() == "VN"
+    )
+    if is_vn_tax:
+        items.append(Spacer(1, 12))
+        items.append(Paragraph("VIETNAM SECURITIES TAX NOTES", st["h3"]))
+        vn_notes = [
+            "Securities transfer tax: 0.1% of sale value (per Circular 111/2013/TT-BTC), "
+            "applied on every sale regardless of gain or loss.",
+            "Personal income tax on dividends: 5% withholding at source for listed securities.",
+            "Foreign investor repatriation: governed by State Bank of Vietnam (SBV) regulations. "
+            "Consult your custodian for VND\u2192USD conversion limits and SWIFT transfer thresholds.",
+        ]
+        if tax_positions:
+            vn_notes.append(
+                f"Tax-loss harvest figures above are computed in VND first "
+                f"(base currency: {ctx.get('base_currency', 'VND')}), then converted to USD "
+                "at the current FX rate shown in the page footer."
+            )
+        for note in vn_notes:
+            items.append(
+                Paragraph(
+                    f'<font color="{_hex(ACCENT_AMBER)}">&#x2022;  </font>{_xml(note)}',
+                    st["body"],
+                )
+            )
+            items.append(Spacer(1, 4))
+
     return items
 
 
@@ -4035,6 +4071,20 @@ def _page_agent_attribution(
     items.append(Table(sources, colWidths=[100, 180, 155], style=_tbl_std(pal)))
     items.append(Spacer(1, 8))
 
+    # VN market context in methodology appendix
+    if ctx.get("is_sea_region") and (ctx.get("region_profile") or {}).get(
+        "primary_market", ""
+    ).upper() == "VN":
+        items.append(Paragraph("VIETNAM MARKET CONTEXT", st["h3"]))
+        vn_ctx_rows = [
+            ["Exchange hours", "HOSE 09:00\u201311:30 / 13:00\u201314:30 ICT (UTC+7). HNX closes 15:00."],
+            ["Daily price limits", "\u00b17% for most HOSE stocks; \u00b110% for newly listed; \u00b15% for UpCoM."],
+            ["Foreign ownership limits", "Sector-specific FOL: typically 49% for non-banking; lower for banking/insurance/defence."],
+            ["Currency & settlement", "VND (Vietnamese Dong). T+2 settlement on HOSE. FX rate per SBV reference or TwelveData."],
+        ]
+        items.append(Table(vn_ctx_rows, colWidths=[130, cw - 130], style=_tbl_std(pal)))
+        items.append(Spacer(1, 8))
+
     # Overall confidence
     conf_pct = 78 if swarm_available else 65
     now = datetime.datetime.now()
@@ -4107,6 +4157,25 @@ def _build_pdf_sync(
     ctx["swarm_available"] = swarm_data_present
     ctx["report_state"] = assess_report_state(ctx)
     ctx["section_confidence"] = build_section_confidence(ctx)
+
+    # VN-specific footer note (built once, reused per page in _make_hf_callback)
+    if ctx.get("is_sea_region") and (ctx.get("region_profile") or {}).get(
+        "primary_market", ""
+    ).upper() == "VN":
+        _vn_positions = ctx.get("positions") or []
+        _vn_fx_vals = [
+            float(p.get("fx_rate") or 0)
+            for p in _vn_positions
+            if float(p.get("fx_rate") or 0) > 0
+        ]
+        _vn_fx_str = f"VNDUSD {_vn_fx_vals[-1]:.6f}" if _vn_fx_vals else "VNDUSD: see position data"
+        ctx["vn_footer_note"] = (
+            f"Prices as of {now.strftime('%Y-%m-%d')} \u00b7 VN-Index benchmark"
+            f" \u00b7 {_vn_fx_str} \u00b7 Source: TwelveData / Yahoo Finance"
+        )
+    else:
+        ctx["vn_footer_note"] = None
+
     if ic_grade_only and ctx["report_state"] == REPORT_DRAFT:
         raise ValueError(
             "IC-grade PDF export requires complete portfolio data, DNA analysis, "
