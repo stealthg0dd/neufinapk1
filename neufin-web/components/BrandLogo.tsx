@@ -25,13 +25,13 @@ const VARIANTS: Record<
 > = {
   "marketing-header": {
     width: 160,
-    height: 44,
-    className: "h-[2.375rem] w-auto sm:h-11",
+    height: 40,
+    className: "h-10 w-auto",
   },
   "marketing-nav": {
     width: 160,
-    height: 44,
-    className: "h-[2.375rem] w-auto sm:h-11",
+    height: 40,
+    className: "h-10 w-auto",
   },
   "marketing-footer-dark": {
     width: 180,
@@ -40,8 +40,8 @@ const VARIANTS: Record<
   },
   "marketing-footer-light": {
     width: 180,
-    height: 50,
-    className: "h-[3.125rem] w-auto",
+    height: 45,
+    className: "h-[45px] w-auto",
   },
   "marketing-compact": {
     width: 176,

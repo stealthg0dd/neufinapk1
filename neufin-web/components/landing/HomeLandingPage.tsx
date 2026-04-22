@@ -287,7 +287,7 @@ export default function HomeLandingPage({
 
           <div className="relative z-10 mx-auto max-w-7xl px-6 py-24">
             <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2">
-              <div className="min-w-0 max-w-4xl">
+              <div className="min-w-0 max-w-3xl">
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -307,10 +307,9 @@ export default function HomeLandingPage({
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.1 }}
-                  className="font-bold leading-[1.08] tracking-[-0.04em] text-foreground"
-                  style={{ fontSize: "clamp(40px, 5.5vw, 68px)" }}
+                  className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-[1.1]"
                 >
-                  <span className="mb-3 block text-[13px] font-medium uppercase tracking-[0.15em] text-[#00D4FF]">
+                  <span className="text-xs font-semibold tracking-widest text-teal-400 uppercase mb-3 block">
                     The Behavioral Finance Intelligence Layer for Serious Wealth Professionals
                   </span>
                   7 AI agents.
@@ -334,7 +333,7 @@ export default function HomeLandingPage({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
-                  className="mb-10 max-w-xl text-[18px] leading-[1.75] text-slate2"
+                  className="text-base sm:text-lg text-gray-300 max-w-2xl leading-relaxed mt-4"
                 >
                   Upload your portfolio. Our 7-agent AI swarm delivers a
                   complete Investment Committee briefing — behavioral biases,
