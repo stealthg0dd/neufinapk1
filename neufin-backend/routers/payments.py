@@ -55,6 +55,7 @@ class CheckoutRequest(BaseModel):
     positions: list[dict] | None = None  # anonymous flow: pass positions directly
     portfolio_id: str | None = None  # authenticated flow: existing portfolio
     advisor_id: str = "anonymous"
+    supabase_user_id: str | None = None
     ref_token: str | None = None  # referral token → apply 20% coupon
     success_url: str = f"{APP_BASE_URL}/results?checkout_success=1"
     cancel_url: str = f"{APP_BASE_URL}/results"
@@ -373,6 +374,7 @@ async def create_checkout(
                 "portfolio_id": portfolio_id or "",
                 "report_id": report_id or "",
                 "advisor_id": effective_advisor_id,
+                "supabase_user_id": body.supabase_user_id or "",
                 "ref_token": body.ref_token or "",
             },
             "allow_promotion_codes": not bool(

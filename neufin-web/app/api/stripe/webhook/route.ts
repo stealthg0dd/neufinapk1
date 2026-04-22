@@ -52,6 +52,19 @@ function getSupabaseAdmin(): SupabaseClient | null {
   return createClient(url, key);
 }
 
+function getBackendBaseUrl(): string | null {
+  const raw =
+    process.env.RAILWAY_API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw.includes("://") ? raw : `https://${raw}`).origin;
+  } catch {
+    console.warn("[webhook] Invalid backend URL for cache invalidation:", raw);
+    return null;
+  }
+}
+
 /** Trim + strip accidental wrapping quotes from .env (breaks signing if left in). */
 function normalizeStripeWebhookSecret(
   raw: string | undefined,
@@ -209,6 +222,55 @@ async function reportStripeWebhookFailure(
   }
 }
 
+async function invalidateBackendSubscriptionCache(
+  userIds: string[],
+): Promise<void> {
+  const ids = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) return;
+
+  const backendBaseUrl = getBackendBaseUrl();
+  const internalKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!backendBaseUrl || !internalKey) {
+    console.warn(
+      "[webhook] Skipping subscription cache invalidation; backend URL or internal key missing",
+      {
+        hasBackendBaseUrl: Boolean(backendBaseUrl),
+        hasInternalKey: Boolean(internalKey),
+      },
+    );
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `${backendBaseUrl}/api/subscription/invalidate-cache`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-neufin-internal-key": internalKey,
+        },
+        body: JSON.stringify({ user_ids: ids }),
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+
+    if (!res.ok) {
+      const detail = await res.text();
+      console.warn("[webhook] Subscription cache invalidation failed", {
+        status: res.status,
+        detail,
+        user_ids: ids,
+      });
+    }
+  } catch (error) {
+    console.warn("[webhook] Subscription cache invalidation request failed", {
+      user_ids: ids,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function dispatchStripeWebhookEvent(
   supabase: SupabaseClient,
   event: Stripe.Event,
@@ -216,6 +278,7 @@ async function dispatchStripeWebhookEvent(
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
+      const supabaseUserId = session.metadata?.supabase_user_id || null;
       const email =
         session.customer_email || session.customer_details?.email || null;
       const customerId =
@@ -227,29 +290,31 @@ async function dispatchStripeWebhookEvent(
           ? session.subscription
           : session.subscription?.id;
 
-      if (!email) {
+      if (!supabaseUserId && !email) {
         await reportStripeWebhookFailure(
-          "checkout.session.completed_missing_email",
+          "checkout.session.completed_missing_user_match",
           {
             stripe_event_id: event.id,
             checkout_session_id: session.id,
             customer_id: customerId ?? null,
+            supabase_user_id: supabaseUserId,
           },
         );
         return;
       }
 
-      const { data: rows, error } = await supabase
-        .from("user_profiles")
-        .update({
-          subscription_tier: "advisor",
-          stripe_customer_id: customerId ?? null,
-          stripe_subscription_id: subscriptionId ?? null,
-          trial_started_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("email", email)
-        .select("id");
+      const updatedAt = new Date().toISOString();
+      const updateQuery = supabase.from("user_profiles").update({
+        subscription_status: "active",
+        subscription_tier: "advisor",
+        stripe_customer_id: customerId ?? null,
+        stripe_subscription_id: subscriptionId ?? null,
+        updated_at: updatedAt,
+      });
+      const matchedQuery = supabaseUserId
+        ? updateQuery.eq("id", supabaseUserId)
+        : updateQuery.eq("email", email!);
+      const { data: rows, error } = await matchedQuery.select("id");
 
       if (error) {
         await reportStripeWebhookFailure(
@@ -258,6 +323,7 @@ async function dispatchStripeWebhookEvent(
             stripe_event_id: event.id,
             checkout_session_id: session.id,
             customer_id: customerId ?? null,
+            supabase_user_id: supabaseUserId,
             email_domain: emailDomainOnly(email),
           },
           error,
@@ -266,12 +332,22 @@ async function dispatchStripeWebhookEvent(
       }
 
       if (!rows?.length) {
+        console.warn(
+          "[webhook] checkout.session.completed matched no user_profiles rows",
+          {
+            checkout_session_id: session.id,
+            customer_id: customerId ?? null,
+            supabase_user_id: supabaseUserId,
+            email_domain: emailDomainOnly(email),
+          },
+        );
         await reportStripeWebhookFailure(
           "checkout.session.completed_no_profile_row",
           {
             stripe_event_id: event.id,
             checkout_session_id: session.id,
             customer_id: customerId ?? null,
+            supabase_user_id: supabaseUserId,
             email_domain: emailDomainOnly(email),
             hint: "No user_profiles row matched this checkout email — paid user may need manual tier fix",
           },
@@ -285,6 +361,7 @@ async function dispatchStripeWebhookEvent(
       console.log(
         `[webhook] Upgraded to advisor: ${email_domain_only_log(email)}`,
       );
+      await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
 
@@ -339,6 +416,7 @@ async function dispatchStripeWebhookEvent(
       }
 
       console.log(`[webhook] Invoice paid for customer: ${customerId}`);
+      await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
 
@@ -393,6 +471,7 @@ async function dispatchStripeWebhookEvent(
       }
 
       console.log(`[webhook] Sub updated: ${customerId} → ${sub.status}`);
+      await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
 
@@ -448,6 +527,7 @@ async function dispatchStripeWebhookEvent(
       }
 
       console.log(`[webhook] Sub cancelled: ${customerId}`);
+      await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
 
@@ -456,7 +536,7 @@ async function dispatchStripeWebhookEvent(
   }
 }
 
-function email_domain_only_log(email: string): string {
+function email_domain_only_log(email: string | null | undefined): string {
   const d = emailDomainOnly(email);
   return d ? `*@${d}` : "(redacted)";
 }
