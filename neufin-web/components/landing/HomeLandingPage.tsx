@@ -307,15 +307,28 @@ export default function HomeLandingPage({
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.1 }}
-                  className="mb-6 font-bold leading-[1.08] tracking-[-0.04em] text-foreground"
+                  className="font-bold leading-[1.08] tracking-[-0.04em] text-foreground"
                   style={{ fontSize: "clamp(40px, 5.5vw, 68px)" }}
                 >
+                  <span className="mb-3 block text-[13px] font-medium uppercase tracking-[0.15em] text-[#00D4FF]">
+                    The Behavioral Finance Intelligence Layer for Serious Wealth Professionals
+                  </span>
                   7 AI agents.
                   <br />
                   One portfolio.
                   <br />
                   <span className="text-primary">60 seconds.</span>
                 </motion.h1>
+
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.16 }}
+                  className="mb-4 text-[clamp(16px,2vw,18px)] font-normal text-gray-400"
+                >
+                  IC-grade analysis. 47 behavioral biases. White-labeled output.
+                  MAS · MiFID II · GDPR aligned.
+                </motion.p>
 
                 <motion.p
                   initial={{ opacity: 0, y: 20 }}

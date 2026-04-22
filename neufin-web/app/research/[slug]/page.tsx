@@ -183,6 +183,8 @@ export default async function ResearchArticlePage({
         publishedAt={note.created_at}
         signals={signals}
         assetTickers={note.asset_tickers}
+        implicationItems={report.structured?.portfolio_implications ?? []}
+        suggestedAction={report.structured?.recommended_action ?? null}
       />
     </main>
   );

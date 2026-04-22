@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { ActionCard } from "@/components/ActionCard";
 
 // ── Agent definitions ─────────────────────────────────────────────────────────
 const AGENTS = [
@@ -307,10 +308,8 @@ export default function GlobalChatWidget() {
 
                       {/* Action */}
                       {msg.action && (
-                        <div
-                          className={`border-l-2 ${currentAgent.accent} pl-2.5 ${currentAgent.color} text-sm leading-relaxed`}
-                        >
-                          ▶ {msg.action}
+                        <div className="mt-2">
+                          <ActionCard raw={msg.action} />
                         </div>
                       )}
                     </>

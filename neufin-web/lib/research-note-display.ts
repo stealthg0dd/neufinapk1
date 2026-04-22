@@ -10,8 +10,8 @@ export type DisplayResearchNote = {
   readTimeMinutes: number;
   sectors: string[];
   whyPortfolioMatters: string | null;
-  portfolioImplications: string[];
-  suggestedNextAction: string | null;
+  portfolioImplications: Array<string | object>;
+  suggestedNextAction: string | object | null;
 };
 
 function confidenceToPct(v: number | undefined): number | null {

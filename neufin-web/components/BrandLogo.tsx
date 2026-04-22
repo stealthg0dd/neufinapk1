@@ -24,24 +24,24 @@ const VARIANTS: Record<
   { width: number; height: number; className: string }
 > = {
   "marketing-header": {
-    width: 200,
-    height: 52,
-    className: "h-[3.25rem] w-auto sm:h-14",
+    width: 160,
+    height: 44,
+    className: "h-[2.375rem] w-auto sm:h-11",
   },
   "marketing-nav": {
-    width: 200,
-    height: 52,
-    className: "h-[3.25rem] w-auto sm:h-14",
+    width: 160,
+    height: 44,
+    className: "h-[2.375rem] w-auto sm:h-11",
   },
   "marketing-footer-dark": {
-    width: 200,
-    height: 52,
-    className: "h-14 w-auto sm:h-16 brightness-0 invert",
+    width: 180,
+    height: 50,
+    className: "h-[3.125rem] w-auto brightness-0 invert",
   },
   "marketing-footer-light": {
-    width: 200,
-    height: 52,
-    className: "h-12 w-auto sm:h-14",
+    width: 180,
+    height: 50,
+    className: "h-[3.125rem] w-auto",
   },
   "marketing-compact": {
     width: 176,

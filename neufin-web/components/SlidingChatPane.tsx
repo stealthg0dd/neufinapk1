@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { Send, X, Bot, User } from "lucide-react";
+import { ActionCard } from "@/components/ActionCard";
 
 interface Position {
   symbol: string;
@@ -142,11 +143,8 @@ function StreamingBubble({ msg }: { msg: Message }) {
         )}
 
         {isDone && msg.action && (
-          <div
-            className="border-l-2 border-emerald-600 pl-2 text-sm leading-snug text-emerald-400"
-            style={{ fontFamily: MONO }}
-          >
-            ▶ {msg.action}
+          <div style={{ fontFamily: MONO }}>
+            <ActionCard raw={msg.action} />
           </div>
         )}
 

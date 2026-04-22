@@ -35,11 +35,11 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
   },
   title: {
-    default: "NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence",
+    default: "NeuFin — Behavioral Finance Intelligence | IC-Grade Portfolio Analysis",
     template: "%s | NeuFin",
   },
   description:
-    "NeuFin's 7-agent AI swarm analyzes your portfolio for behavioral biases, market regime risk, and alpha opportunities — delivering institutional-grade IC briefings in 60 seconds. Free to try.",
+    "7 AI agents deliver Investment Committee-grade behavioral finance analysis in 60 seconds. Built for IFAs, robo-advisors, and wealth platforms. MAS · MiFID II aligned.",
   keywords: [
     "portfolio analysis AI",
     "behavioral finance",
@@ -84,9 +84,9 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://www.neufin.ai",
     siteName: "NeuFin",
-    title: "NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence",
+    title: "NeuFin — Behavioral Finance Intelligence | IC-Grade Portfolio Analysis",
     description:
-      "7 specialized AI agents analyze your portfolio for behavioral biases, market regime risk, and alpha — IC-grade briefings in 60 seconds. Try free.",
+      "7 AI agents deliver Investment Committee-grade behavioral finance analysis in 60 seconds. Built for IFAs, robo-advisors, and wealth platforms. MAS · MiFID II aligned.",
     images: [
       {
         url: "/og-image.png",
@@ -98,14 +98,11 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "NeuFin — 7 AI Agents for IC-Grade Portfolio Intelligence",
+    title: "NeuFin — Behavioral Finance Intelligence | IC-Grade Portfolio Analysis",
     description:
-      "Upload your portfolio. Get IC-grade behavioral finance analysis in 60 seconds. Powered by 7 specialized AI agents.",
+      "7 AI agents deliver Investment Committee-grade behavioral finance analysis in 60 seconds. Built for IFAs, robo-advisors, and wealth platforms. MAS · MiFID II aligned.",
     images: ["/og-image.png"],
     creator: "@neufin_ai",
-  },
-  verification: {
-    google: "ADD_GOOGLE_SEARCH_CONSOLE_TOKEN_HERE",
   },
   alternates: {
     canonical: "https://www.neufin.ai",

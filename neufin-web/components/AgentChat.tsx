@@ -12,6 +12,7 @@
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { apiFetch } from "@/lib/api-client";
+import { ActionCard } from "@/components/ActionCard";
 
 const MONO = "'Fira Code','JetBrains Mono','Courier New',monospace";
 const A = "#F5A623";
@@ -420,15 +421,8 @@ export default function AgentChat({
 
                     {/* Recommended action */}
                     {msg.action && (
-                      <div
-                        style={{
-                          borderLeft: `2px solid ${G}`,
-                          paddingLeft: 8,
-                          color: G,
-                          fontSize: 12,
-                        }}
-                      >
-                        Action: {msg.action}
+                      <div style={{ maxWidth: "100%" }}>
+                        <ActionCard raw={msg.action} />
                       </div>
                     )}
 

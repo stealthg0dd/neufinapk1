@@ -144,7 +144,7 @@ RISK_FREE = {"VN": 0.080, "US": 0.045, "SG": 0.036, "DEFAULT": 0.045}
 
 FTSE_UPGRADE = (
     "FTSE Russell EM upgrade confirmed: effective September 21, 2026. "
-    "Expected capital inflows: $1.5–3B into Vietnamese equities. "
+    "Expected capital inflows: $1.5-3B into Vietnamese equities. "
     "Pre-upgrade positioning window: NOW."
 )
 SBV_STANCE = (
@@ -403,7 +403,7 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
                 "consider VCB.VN (Vietcombank — lower beta, state-backed) or "
                 "GAS.VN (Petrovietnam Gas — defensive sector) as rebalancing "
                 "destinations. Alternatively, consider adding VN government bonds "
-                "(VGBs) with 3–5 year duration at current SBV accommodative stance."
+                "(VGBs) with 3-5 year duration at current SBV accommodative stance."
             ),
             "qualitative_scenarios": [
                 [
@@ -665,7 +665,7 @@ def detect_structural_biases(
                 ),
                 "severity": "HIGH",
                 "mitigation": (
-                    "Consider 10–15% allocation to regional ETF or VN-listed "
+                    "Consider 10-15% allocation to regional ETF or VN-listed "
                     "international exposure to reduce home-country risk."
                 ),
             }
@@ -689,7 +689,7 @@ def detect_structural_biases(
                     ),
                     "severity": "HIGH",
                     "mitigation": (
-                        f"Trim {symbol} toward 30–35% to bring within institutional "
+                        f"Trim {symbol} toward 30-35% to bring within institutional "
                         "concentration guidelines."
                     ),
                 }
@@ -732,7 +732,7 @@ def detect_structural_biases(
                 ),
                 "severity": "MEDIUM",
                 "mitigation": (
-                    "Consider rotating 10–15% from brokerage names (VCI, SSI) "
+                    "Consider rotating 10-15% from brokerage names (VCI, SSI) "
                     "into Materials (HPG) or State-backed defensive (GAS, PLX) "
                     "to reduce financial sector concentration."
                 ),
@@ -765,8 +765,8 @@ def _fetch_live_market_context(ctx: dict[str, Any]) -> dict[str, str]:
         benchmark_price = get_price_with_fallback(benchmark_symbol)
         if benchmark_price.price and benchmark_price.price > 0:
             vn_index_level = f"{benchmark_price.price:,.2f}"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("pdf.vn_context_benchmark_price_failed", error=str(exc))
 
     try:
         benchmark_hist = _fetch_prices([benchmark_symbol], "1y")
@@ -780,15 +780,15 @@ def _fetch_live_market_context(ctx: dict[str, Any]) -> dict[str, str]:
                     last = float(year_series.iloc[-1])
                     if first > 0:
                         vn_index_ytd = f"{((last / first) - 1) * 100:+.2f}% YTD"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("pdf.vn_context_benchmark_ytd_failed", error=str(exc))
 
     try:
         fx_quote = get_price_with_fallback("VNDUSD")
         if fx_quote.price and fx_quote.price > 0:
             vnd_usd_spot = f"{fx_quote.price:.6f}"
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("pdf.vn_context_fx_failed", error=str(exc))
 
     return {
         "benchmark_label": benchmark_label,
@@ -3090,7 +3090,6 @@ def _page_behavioral_dna(
     items.append(Spacer(1, 10))
 
     items.append(Paragraph("DETECTED BEHAVIORAL BIASES", st["h3"]))
-    market_code = _market_code_from_ctx(ctx, ctx.get("positions") or [])
     biases = list(ctx.get("structural_biases") or [])
     if biases:
         for b in biases:

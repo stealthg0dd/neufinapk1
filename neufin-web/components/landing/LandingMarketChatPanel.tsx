@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { ActionCard } from "@/components/ActionCard";
 
 const AGENTS = [
   {
@@ -278,10 +279,8 @@ export default function LandingMarketChatPanel() {
                           </div>
                         )}
                       {msg.action ? (
-                        <div
-                          className={`mt-2 border-l-2 pl-2.5 text-sm leading-relaxed ${currentAgent.accent} ${currentAgent.color}`}
-                        >
-                          ▶ {msg.action}
+                        <div className="mt-2">
+                          <ActionCard raw={msg.action} />
                         </div>
                       ) : null}
                     </>
