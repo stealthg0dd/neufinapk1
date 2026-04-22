@@ -13,6 +13,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import ast
 import json
 import math
 import random
@@ -39,6 +40,66 @@ logger = structlog.get_logger("neufin.research")
 router = APIRouter(prefix="/api/research", tags=["research"])
 
 
+def sanitize_implication(raw: Any) -> dict[str, str]:
+    """Convert any implication format to a clean dict."""
+    if isinstance(raw, dict):
+        horizon = str(raw.get("time_horizon", raw.get("horizon", "")) or "").replace(
+            "_", " "
+        )
+        severity = str(
+            raw.get("severity", raw.get("priority", "MEDIUM")) or "MEDIUM"
+        ).upper()
+        if severity not in {"HIGH", "MEDIUM", "LOW", "INFO"}:
+            severity = "INFO"
+        return {
+            "action": str(raw.get("action", raw.get("text", "")) or ""),
+            "rationale": str(raw.get("rationale", raw.get("why", "")) or ""),
+            "time_horizon": horizon,
+            "severity": severity,
+        }
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            return sanitize_implication(parsed)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            pass
+        try:
+            parsed = ast.literal_eval(raw)
+            return sanitize_implication(parsed)
+        except (ValueError, SyntaxError):
+            pass
+        return {
+            "action": raw,
+            "rationale": "",
+            "time_horizon": "",
+            "severity": "INFO",
+        }
+    return {
+        "action": str(raw),
+        "rationale": "",
+        "time_horizon": "",
+        "severity": "INFO",
+    }
+
+
+def _sanitize_structured_implications(data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize implication fields on structured research payloads."""
+    out = dict(data)
+
+    raw_implications = out.get("portfolio_implications")
+    if isinstance(raw_implications, list):
+        out["portfolio_implications"] = [
+            sanitize_implication(item) for item in raw_implications
+        ]
+    elif raw_implications:
+        out["portfolio_implications"] = [sanitize_implication(raw_implications)]
+
+    if out.get("recommended_action") is not None:
+        out["recommended_action"] = sanitize_implication(out.get("recommended_action"))
+
+    return out
+
+
 def _dict_to_markdown(data: dict) -> str:
     """Convert a structured research note dict to clean markdown prose.
 
@@ -54,10 +115,32 @@ def _dict_to_markdown(data: dict) -> str:
             return
         lines.append(f"## {heading}\n")
         if isinstance(value, str):
-            lines.append(value.strip())
+            if heading in ("Portfolio Implications", "Recommended Action"):
+                item = sanitize_implication(value)
+                details = [item["action"]]
+                if item["rationale"]:
+                    details.append(f"Why: {item['rationale']}")
+                if item["time_horizon"]:
+                    details.append(f"Horizon: {item['time_horizon']}")
+                if item["severity"]:
+                    details.append(f"Severity: {item['severity']}")
+                lines.append(f"- {' — '.join([d for d in details if d])}")
+            else:
+                lines.append(value.strip())
         elif isinstance(value, list):
             for item in value:
                 if isinstance(item, dict):
+                    if heading in ("Portfolio Implications", "Recommended Action"):
+                        normalized = sanitize_implication(item)
+                        details = [normalized["action"]]
+                        if normalized["rationale"]:
+                            details.append(f"Why: {normalized['rationale']}")
+                        if normalized["time_horizon"]:
+                            details.append(f"Horizon: {normalized['time_horizon']}")
+                        if normalized["severity"]:
+                            details.append(f"Severity: {normalized['severity']}")
+                        lines.append(f"- {' — '.join([d for d in details if d])}")
+                        continue
                     # Flatten common dict shapes
                     parts = []
                     for k in (
@@ -71,7 +154,11 @@ def _dict_to_markdown(data: dict) -> str:
                         if item.get(k):
                             parts.append(str(item[k]).strip())
                     support = item.get("data_support") or item.get("evidence") or ""
-                    bullet = " — ".join(parts) if parts else str(item)
+                    bullet = (
+                        " — ".join(parts)
+                        if parts
+                        else json.dumps(item, ensure_ascii=False)
+                    )
                     lines.append(f"- {bullet}")
                     if support:
                         lines.append(f"  *{support}*")
@@ -893,7 +980,7 @@ async def get_blog_note(slug: str):
     note_slug = str(note.get("slug") or "").strip() or slugify(title)
     content = note.get("content") or note.get("body") or note.get("full_content") or ""
     if isinstance(content, dict):
-        content = _dict_to_markdown(content)
+        content = _dict_to_markdown(_sanitize_structured_implications(content))
     elif isinstance(content, str):
         # Content might be a JSON-encoded dict stored as a string
         stripped = content.strip()
@@ -901,7 +988,9 @@ async def get_blog_note(slug: str):
             try:
                 parsed = json.loads(stripped)
                 if isinstance(parsed, dict):
-                    content = _dict_to_markdown(parsed)
+                    content = _dict_to_markdown(
+                        _sanitize_structured_implications(parsed)
+                    )
             except (json.JSONDecodeError, ValueError):
                 pass
     else:
@@ -988,6 +1077,10 @@ async def get_note(note_id: str, user: JWTUser = Depends(get_current_user)):
                 note["full_content"] = json.loads(note["full_content"])
             except (json.JSONDecodeError, TypeError):
                 pass
+        if isinstance(note.get("full_content"), dict):
+            note["full_content"] = _sanitize_structured_implications(
+                note["full_content"]
+            )
 
         return note
     except HTTPException:

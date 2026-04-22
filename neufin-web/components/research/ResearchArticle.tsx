@@ -3,7 +3,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import { ActionCard } from "@/components/ActionCard";
 
 const researchSchema = {
   ...defaultSchema,
@@ -40,6 +39,174 @@ export type ResearchArticleProps = {
   implicationItems?: Array<string | object>;
   suggestedAction?: string | object | null;
 };
+
+// Safe implication parser — handles Python dicts, JSON strings, and plain text.
+function safeParseImplication(raw: unknown): {
+  action: string;
+  rationale: string;
+  horizon: string;
+  severity: "HIGH" | "MEDIUM" | "LOW" | "INFO";
+} {
+  const fallback = {
+    action: "",
+    rationale: "",
+    horizon: "",
+    severity: "INFO" as const,
+  };
+  if (!raw) return fallback;
+
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const r = raw as Record<string, unknown>;
+    const severityRaw = String(
+      r.severity ?? r.priority ?? "MEDIUM",
+    ).toUpperCase();
+    const severity =
+      severityRaw === "HIGH" || severityRaw === "MEDIUM" || severityRaw === "LOW"
+        ? severityRaw
+        : "INFO";
+    return {
+      action: String(r.action ?? r.text ?? r.signal ?? ""),
+      rationale: String(r.rationale ?? r.why ?? r.reason ?? ""),
+      horizon: String(r.time_horizon ?? r.horizon ?? r.timeframe ?? ""),
+      severity,
+    };
+  }
+
+  if (typeof raw !== "string") {
+    return { ...fallback, action: String(raw) };
+  }
+
+  let cleaned = raw.trim();
+  cleaned = cleaned
+    .replace(/'/g, '"')
+    .replace(/([{,]\s*)"(\w+)"\s*:/g, '$1"$2":')
+    .replace(/:\s*"([^"]*)"([,}])/g, ':"$1"$2');
+
+  try {
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const severityRaw = String(
+      parsed.severity ?? parsed.priority ?? "MEDIUM",
+    ).toUpperCase();
+    const severity =
+      severityRaw === "HIGH" || severityRaw === "MEDIUM" || severityRaw === "LOW"
+        ? severityRaw
+        : "INFO";
+    return {
+      action: String(parsed.action ?? parsed.text ?? raw),
+      rationale: String(parsed.rationale ?? parsed.why ?? ""),
+      horizon: String(parsed.time_horizon ?? parsed.horizon ?? ""),
+      severity,
+    };
+  } catch {
+    const actionMatch = raw.match(/['"]action['"]\s*:\s*['"]([^'"]+)['"]/i);
+    const rationaleMatch = raw.match(
+      /['"]rationale['"]\s*:\s*['"]([^'"]+)['"]/i,
+    );
+    return {
+      action: actionMatch ? actionMatch[1] : raw.replace(/[{}']/g, "").trim(),
+      rationale: rationaleMatch ? rationaleMatch[1] : "",
+      horizon: "",
+      severity: "INFO",
+    };
+  }
+}
+
+function ImplicationCard({ raw }: { raw: unknown }) {
+  const item = safeParseImplication(raw);
+  if (!item.action) return null;
+
+  const colors = {
+    HIGH: {
+      border: "#ef4444",
+      bg: "rgba(239,68,68,0.06)",
+      badge: "rgba(239,68,68,0.15)",
+      text: "#f87171",
+    },
+    MEDIUM: {
+      border: "#f59e0b",
+      bg: "rgba(245,158,11,0.06)",
+      badge: "rgba(245,158,11,0.15)",
+      text: "#fbbf24",
+    },
+    LOW: {
+      border: "#22c55e",
+      bg: "rgba(34,197,94,0.06)",
+      badge: "rgba(34,197,94,0.15)",
+      text: "#4ade80",
+    },
+    INFO: {
+      border: "#22d3ee",
+      bg: "rgba(34,211,238,0.06)",
+      badge: "rgba(34,211,238,0.15)",
+      text: "#67e8f9",
+    },
+  };
+  const c = colors[item.severity] || colors.INFO;
+
+  return (
+    <div
+      style={{
+        borderLeft: `3px solid ${c.border}`,
+        background: c.bg,
+        borderRadius: "0 6px 6px 0",
+        padding: "12px 16px",
+        margin: "10px 0",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "6px",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            background: c.badge,
+            color: c.text,
+            padding: "2px 8px",
+            borderRadius: "3px",
+          }}
+        >
+          {item.severity}
+        </span>
+        {item.horizon && (
+          <span style={{ fontSize: "11px", color: "#64748b" }}>
+            ⏱ {item.horizon.replace(/_/g, " ")}
+          </span>
+        )}
+      </div>
+      <p
+        style={{
+          fontSize: "14px",
+          color: "#e2e8f0",
+          fontWeight: 500,
+          margin: "0 0 4px 0",
+          lineHeight: 1.5,
+        }}
+      >
+        {item.action}
+      </p>
+      {item.rationale && (
+        <p
+          style={{
+            fontSize: "12px",
+            color: "#64748b",
+            margin: 0,
+            lineHeight: 1.5,
+          }}
+        >
+          Why: {item.rationale}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function displayRegime(regime: string | null | undefined) {
   if (!regime) return "Neutral";
@@ -229,14 +396,23 @@ export function ResearchArticle({
 
         {implicationItems.length > 0 || suggestedAction ? (
           <section className="mb-8 rounded-md border border-border bg-surface p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Actionable Implications
-            </p>
-            <div className="mt-3">
+            <div style={{ marginTop: "24px" }}>
+              <h3
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "#475569",
+                  marginBottom: "12px",
+                }}
+              >
+                Implication Actions
+              </h3>
               {implicationItems.map((item, index) => (
-                <ActionCard key={index} raw={item} />
+                <ImplicationCard key={index} raw={item} />
               ))}
-              {suggestedAction ? <ActionCard raw={suggestedAction} /> : null}
+              {suggestedAction ? <ImplicationCard raw={suggestedAction} /> : null}
             </div>
           </section>
         ) : null}
