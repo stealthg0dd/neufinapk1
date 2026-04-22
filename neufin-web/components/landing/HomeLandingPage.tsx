@@ -1043,7 +1043,9 @@ export default function HomeLandingPage({
         <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 md:py-16">
           <div className="mb-12 grid grid-cols-2 gap-10 sm:gap-12 lg:grid-cols-4">
             <div className="col-span-2 lg:col-span-1">
-              <NeuFinLogo variant="footer-on-dark" className="mb-5" />
+              <div className="mb-5">
+                <NeuFinLogo variant="footer-on-dark" />
+              </div>
               <p className="mb-4 text-sm leading-[1.7] text-lp-on-dark-muted">
                 Institutional-grade portfolio intelligence for advisors, IFAs,
                 and wealth platforms. Built for the people who cannot afford to
