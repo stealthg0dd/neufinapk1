@@ -179,7 +179,9 @@ async def invalidate_subscription_status_cache(
     if not expected_key or internal_key != expected_key:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    user_ids = [str(user_id).strip() for user_id in body.user_ids if str(user_id).strip()]
+    user_ids = [
+        str(user_id).strip() for user_id in body.user_ids if str(user_id).strip()
+    ]
     for user_id in user_ids:
         invalidate_subscription_cache(user_id)
 

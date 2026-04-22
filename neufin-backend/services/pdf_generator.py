@@ -490,7 +490,9 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
     }
 
 
-def _market_code_from_ctx(ctx: dict, positions: list[dict[str, Any]] | None = None) -> str:
+def _market_code_from_ctx(
+    ctx: dict, positions: list[dict[str, Any]] | None = None
+) -> str:
     region = ctx.get("region_profile") or {}
     code = str(region.get("primary_market") or "").strip().upper()
     if code:
@@ -533,7 +535,9 @@ def _compute_risk_metric_labels(
 ) -> dict[str, tuple[str, str]]:
     market_code = _market_code_from_ctx(ctx, positions)
     total_value = float(ctx.get("total_value") or metrics.get("total_value") or 0)
-    weighted_beta = max(float(ctx.get("weighted_beta") or metrics.get("weighted_beta") or 1.0), 0.1)
+    weighted_beta = max(
+        float(ctx.get("weighted_beta") or metrics.get("weighted_beta") or 1.0), 0.1
+    )
     regime_label = str(ctx.get("regime_label") or "Market-Neutral")
     daily_vol = MARKET_DAILY_VOL.get(market_code, MARKET_DAILY_VOL["DEFAULT"])
 
@@ -568,7 +572,9 @@ def _compute_risk_metric_labels(
     try:
         if drawdown_raw is not None:
             drawdown_numeric = abs(float(drawdown_raw))
-            drawdown_numeric = drawdown_numeric / 100 if drawdown_numeric > 1 else drawdown_numeric
+            drawdown_numeric = (
+                drawdown_numeric / 100 if drawdown_numeric > 1 else drawdown_numeric
+            )
     except (TypeError, ValueError):
         drawdown_numeric = None
     if drawdown_numeric is not None:
@@ -603,16 +609,16 @@ def _compute_risk_metric_labels(
             day_of_year = max(1, datetime.datetime.now().timetuple().tm_yday)
             ytd_return_annualised = (1 + ytd_return) ** (365.0 / day_of_year) - 1
             rf = RISK_FREE.get(market_code, RISK_FREE["DEFAULT"])
-            ann_vol = daily_vol * (252 ** 0.5)
+            ann_vol = daily_vol * (252**0.5)
             sharpe_est = (ytd_return_annualised - rf) / ann_vol if ann_vol else 0.0
-            sharpe_label = (
-                f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
-            )
+            sharpe_label = f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
             sharpe_status = "Estimated"
         else:
             sharpe_label = "Requires cost basis — upload to calculate"
             sharpe_status = (
-                "Input Needed" if not _portfolio_has_cost_basis(positions) else "Unavailable"
+                "Input Needed"
+                if not _portfolio_has_cost_basis(positions)
+                else "Unavailable"
             )
 
     return {
@@ -801,9 +807,16 @@ def _fetch_live_market_context(ctx: dict[str, Any]) -> dict[str, str]:
 
 
 def _infer_market_code(symbol: str, pos: dict) -> str:
-    market_code = str(
-        pos.get("market_code") or pos.get("country_code") or pos.get("exchange") or ""
-    ).strip().upper()
+    market_code = (
+        str(
+            pos.get("market_code")
+            or pos.get("country_code")
+            or pos.get("exchange")
+            or ""
+        )
+        .strip()
+        .upper()
+    )
     symbol_upper = symbol.strip().upper()
     if symbol_upper.endswith(".VN") or market_code in {"VN", "HOSE", "HNX", "UPCOM"}:
         return "VN"
@@ -832,9 +845,11 @@ def _position_price_usd(pos: dict, market_code: str) -> float:
     if native_price <= 0:
         return 0.0
 
-    currency = str(
-        pos.get("currency") or pos.get("local_currency") or pos.get("ccy") or "USD"
-    ).strip().upper()
+    currency = (
+        str(pos.get("currency") or pos.get("local_currency") or pos.get("ccy") or "USD")
+        .strip()
+        .upper()
+    )
     try:
         fx_rate = float(pos.get("fx_rate") or 0)
     except (TypeError, ValueError):
@@ -3333,9 +3348,7 @@ def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -
     if market_code == "VN":
         live_ctx = _fetch_live_market_context(ctx)
         month_year = datetime.datetime.now().strftime("%B %Y").upper()
-        items.append(
-            Paragraph(f"VIETNAM MARKET CONTEXT — {month_year}", st["h3"])
-        )
+        items.append(Paragraph(f"VIETNAM MARKET CONTEXT — {month_year}", st["h3"]))
         vn_body = [
             [
                 Paragraph(
@@ -3861,7 +3874,9 @@ def _page_stress_testing(
 
         qualitative_rows = defensive.get("qualitative_scenarios")
         if qualitative_rows:
-            qualitative_data = [["Scenario", "Historical", "Est. Impact", "Primary Risk"]]
+            qualitative_data = [
+                ["Scenario", "Historical", "Est. Impact", "Primary Risk"]
+            ]
             qualitative_data.extend(qualitative_rows)
         else:
             qualitative_data = [
@@ -4180,7 +4195,9 @@ def _page_alpha_opportunities(
                 )
             items.append(Spacer(1, 8))
     else:
-        defensive = get_defensive_alternatives(_market_code_from_ctx(ctx, ctx.get("positions") or []))
+        defensive = get_defensive_alternatives(
+            _market_code_from_ctx(ctx, ctx.get("positions") or [])
+        )
         for title, desc, conf in [
             (
                 "Defensive Rotation",
@@ -4879,15 +4896,28 @@ def _page_agent_attribution(
     items.append(Spacer(1, 8))
 
     # VN market context in methodology appendix
-    if ctx.get("is_sea_region") and (ctx.get("region_profile") or {}).get(
-        "primary_market", ""
-    ).upper() == "VN":
+    if (
+        ctx.get("is_sea_region")
+        and (ctx.get("region_profile") or {}).get("primary_market", "").upper() == "VN"
+    ):
         items.append(Paragraph("VIETNAM MARKET CONTEXT", st["h3"]))
         vn_ctx_rows = [
-            ["Exchange hours", "HOSE 09:00\u201311:30 / 13:00\u201314:30 ICT (UTC+7). HNX closes 15:00."],
-            ["Daily price limits", "\u00b17% for most HOSE stocks; \u00b110% for newly listed; \u00b15% for UpCoM."],
-            ["Foreign ownership limits", "Sector-specific FOL: typically 49% for non-banking; lower for banking/insurance/defence."],
-            ["Currency & settlement", "VND (Vietnamese Dong). T+2 settlement on HOSE. FX rate per SBV reference or TwelveData."],
+            [
+                "Exchange hours",
+                "HOSE 09:00\u201311:30 / 13:00\u201314:30 ICT (UTC+7). HNX closes 15:00.",
+            ],
+            [
+                "Daily price limits",
+                "\u00b17% for most HOSE stocks; \u00b110% for newly listed; \u00b15% for UpCoM.",
+            ],
+            [
+                "Foreign ownership limits",
+                "Sector-specific FOL: typically 49% for non-banking; lower for banking/insurance/defence.",
+            ],
+            [
+                "Currency & settlement",
+                "VND (Vietnamese Dong). T+2 settlement on HOSE. FX rate per SBV reference or TwelveData.",
+            ],
         ]
         items.append(Table(vn_ctx_rows, colWidths=[130, cw - 130], style=_tbl_std(pal)))
         items.append(Spacer(1, 8))
@@ -4967,16 +4997,21 @@ def _build_pdf_sync(
 
     # VN-specific footer note (built once, reused per page in _make_hf_callback)
     now = datetime.datetime.utcnow()
-    if ctx.get("is_sea_region") and (ctx.get("region_profile") or {}).get(
-        "primary_market", ""
-    ).upper() == "VN":
+    if (
+        ctx.get("is_sea_region")
+        and (ctx.get("region_profile") or {}).get("primary_market", "").upper() == "VN"
+    ):
         _vn_positions = ctx.get("positions") or []
         _vn_fx_vals = [
             float(p.get("fx_rate") or 0)
             for p in _vn_positions
             if float(p.get("fx_rate") or 0) > 0
         ]
-        _vn_fx_str = f"VNDUSD {_vn_fx_vals[-1]:.6f}" if _vn_fx_vals else "VNDUSD: see position data"
+        _vn_fx_str = (
+            f"VNDUSD {_vn_fx_vals[-1]:.6f}"
+            if _vn_fx_vals
+            else "VNDUSD: see position data"
+        )
         ctx["vn_footer_note"] = (
             f"Prices as of {now.strftime('%Y-%m-%d')} \u00b7 VN-Index benchmark"
             f" \u00b7 {_vn_fx_str} \u00b7 Source: TwelveData / Yahoo Finance"

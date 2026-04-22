@@ -743,9 +743,11 @@ async def auth_middleware(request: Request, call_next):
         if _metrics_token:
             if _auth_hdr != f"Bearer {_metrics_token}":
                 from starlette.responses import Response as _Resp
+
                 return _Resp(status_code=401, content="Unauthorized")
         elif _is_production:
             from starlette.responses import Response as _Resp
+
             return _Resp(status_code=404, content="Not Found")
 
     # ── Soft JWT attachment ────────────────────────────────────────────────────
