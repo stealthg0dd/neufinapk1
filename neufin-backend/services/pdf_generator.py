@@ -34,6 +34,7 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
@@ -109,6 +110,7 @@ ACCENT_AMBER = HexColor("#F5A623")
 ACCENT_RED = HexColor("#EF4444")
 ACCENT_PUR = HexColor("#8B5CF6")
 ACCENT_SLATE = HexColor("#64748B")
+IC_NAVY = HexColor("#0D1117")
 
 # Pie/donut chart ring colors (shared)
 CHART_COLORS = [
@@ -997,6 +999,96 @@ def _amber_banner_table(text: str, p: dict, st: dict, cw: float) -> Table:
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ]
         ),
+    )
+
+
+class NumberedCanvas(pdf_canvas.Canvas):
+    """Canvas that exposes total page count to onPage callbacks."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states: list[dict[str, Any]] = []
+        self._page_count = 0
+
+    def showPage(self):  # noqa: N802 - ReportLab Canvas API
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self._page_count = total_pages
+            super().showPage()
+        super().save()
+
+
+def _scaled_logo_dims(
+    logo_bytes: bytes | None, target_height: float, max_width: float
+) -> tuple[float, float] | None:
+    if not logo_bytes:
+        return None
+    try:
+        width, height = ImageReader(io.BytesIO(logo_bytes)).getSize()
+    except Exception as e:
+        logger.warning("pdf.logo_dimensions_failed", error=str(e))
+        return None
+    if not width or not height:
+        return None
+    scale = target_height / float(height)
+    scaled_width = float(width) * scale
+    scaled_height = target_height
+    if scaled_width > max_width:
+        scale = max_width / float(width)
+        scaled_width = max_width
+        scaled_height = float(height) * scale
+    return scaled_width, scaled_height
+
+
+def _logo_flowable(
+    logo_bytes: bytes | None,
+    target_height: float,
+    max_width: float,
+    fallback_label: str,
+    text_color: HexColor,
+) -> Any:
+    dims = _scaled_logo_dims(logo_bytes, target_height, max_width)
+    if dims and logo_bytes:
+        width, height = dims
+        return Image(io.BytesIO(logo_bytes), width=width, height=height)
+    return Paragraph(
+        f'<font name="Helvetica-Bold" size="16" color="{_hex(text_color)}">{_xml(fallback_label[:42])}</font>',
+        ParagraphStyle(
+            "logo-fallback",
+            fontName="Helvetica-Bold",
+            fontSize=16,
+            leading=18,
+        ),
+    )
+
+
+def _draw_report_footer(
+    canvas,
+    ctx: dict,
+    pal: dict,
+    report_date: str,
+):
+    footer_y = MARGIN - 2
+    canvas.setStrokeColor(IC_NAVY)
+    canvas.setLineWidth(0.8)
+    canvas.line(MARGIN, footer_y + 14, A4_W - MARGIN, footer_y + 14)
+    disclaimer = (
+        "For informational purposes only. Not investment advice. "
+        "NeuFin OÜ (EU) / NeuFin Inc. (US). "
+        "Advisor is responsible for validating all inputs before IC presentation."
+    )
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(pal["text_mut"])
+    canvas.drawString(MARGIN, footer_y, disclaimer[:220])
+    canvas.drawRightString(
+        A4_W - MARGIN,
+        footer_y,
+        f"{ctx.get('report_run_id') or '—'} · {report_date}",
     )
 
 
@@ -1963,6 +2055,7 @@ def _build_report_context(
         # Advisor
         "advisor_name": advisor_config.get("advisor_name") or "NeuFin Intelligence",
         "firm_name": advisor_config.get("firm_name") or "",
+        "client_name": advisor_config.get("client_name") or "",
         "advisor_email": advisor_config.get("advisor_email") or "info@neufin.ai",
         "white_label": bool(advisor_config.get("white_label")),
         "report_run_id": advisor_config.get("report_run_id") or "—",
@@ -2176,9 +2269,9 @@ def _make_cover_callback(
     report_date: str,
 ) -> Any:
     """Returns an onPage callback that draws the cover page directly on canvas."""
-    WHITE = HexColor("#FFFFFF")
     firm_name = ctx["firm_name"] or ctx["advisor_name"]
     client_name = advisor_config.get("client_name") or "Confidential"
+    report_id = str(ctx.get("report_run_id") or "—")
     total_value = ctx["total_value"]
     portfolio_name = ctx["portfolio_name"]
     verdict = ctx["verdict"]
@@ -2195,52 +2288,86 @@ def _make_cover_callback(
         labels.get("cover_subtitle")
         or "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations"
     )
+    header_style = ParagraphStyle(
+        "cover-header-cell",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=11,
+    )
 
     def callback(canvas, doc):
         canvas.saveState()
         # Background
         canvas.setFillColor(pal["bg"])
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-
-        # ── RESTRICTED banner ───────────────────────────────────────────────
-        canvas.setFillColor(ACCENT_RED)
-        canvas.rect(0, A4_H - 22, A4_W, 22, fill=1, stroke=0)
-        canvas.setFont("Helvetica-Bold", 7)
-        canvas.setFillColor(WHITE)
-        canvas.drawCentredString(
-            A4_W / 2, A4_H - 14, "RESTRICTED — INVESTMENT COMMITTEE USE ONLY"
+        header_y = A4_H - 114
+        col_widths = [CONTENT_W * 0.30, CONTENT_W * 0.40, CONTENT_W * 0.30]
+        header_table = Table(
+            [
+                [
+                    _logo_flowable(
+                        logo_bytes,
+                        target_height=60,
+                        max_width=col_widths[0] - 12,
+                        fallback_label=firm_name,
+                        text_color=pal["text_pri"],
+                    ),
+                    Paragraph(
+                        '<para align="center"><font name="Helvetica-Bold" size="14" color="#0D1117">'
+                        "PORTFOLIO INTELLIGENCE REPORT"
+                        "</font></para>",
+                        header_style,
+                    ),
+                    [
+                        Paragraph(
+                            f'<para align="right"><font name="Helvetica" size="9" color="{_hex(pal["text_pri"])}">Report ID: {_xml(report_id)}</font></para>',
+                            header_style,
+                        ),
+                        Paragraph(
+                            f'<para align="right"><font name="Helvetica" size="9" color="{_hex(pal["text_pri"])}">Generated: {_xml(report_date)}</font></para>',
+                            header_style,
+                        ),
+                        Paragraph(
+                            '<para align="right"><font name="Helvetica-Bold" size="9" color="#CC0000">RESTRICTED - IC USE ONLY</font></para>',
+                            header_style,
+                        ),
+                    ],
+                ]
+            ],
+            colWidths=col_widths,
+            rowHeights=[68],
         )
-        # Report state ribbon (draft / review — not IC-final)
+        header_table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                    ("ALIGN", (1, 0), (1, 0), "CENTER"),
+                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+                ]
+            )
+        )
+        header_table.wrapOn(canvas, CONTENT_W, 68)
+        header_table.drawOn(canvas, MARGIN, header_y)
+        canvas.setStrokeColor(IC_NAVY)
+        canvas.setLineWidth(1)
+        canvas.line(MARGIN, header_y - 6, A4_W - MARGIN, header_y - 6)
+
         if report_state != REPORT_FINAL:
             canvas.setFillColor(ACCENT_AMBER)
-            canvas.rect(0, A4_H - 44, A4_W, 22, fill=1, stroke=0)
+            canvas.rect(MARGIN, header_y - 26, CONTENT_W, 16, fill=1, stroke=0)
             canvas.setFont("Helvetica-Bold", 7)
             canvas.setFillColor(HexColor("#0F172A"))
             state_msg = (
-                "DRAFT — DATA INCOMPLETE · NOT FOR EXTERNAL IC DISTRIBUTION"
+                "DRAFT - DATA INCOMPLETE · NOT FOR EXTERNAL IC DISTRIBUTION"
                 if report_state == REPORT_DRAFT
-                else "ADVISOR REVIEW — VERIFY INPUTS BEFORE IC PRESENTATION"
+                else "ADVISOR REVIEW - VERIFY INPUTS BEFORE IC PRESENTATION"
             )
-            canvas.drawCentredString(A4_W / 2, A4_H - 36, state_msg)
-            y_logo = A4_H - 55 - 22
-        else:
-            y_logo = A4_H - 55
-
-        # ── Logo / firm name (top-left) ─────────────────────────────────────
-        if logo_bytes:
-            try:
-                ir = ImageReader(io.BytesIO(logo_bytes))
-                canvas.drawImage(
-                    ir, MARGIN, y_logo - 35, width=120, height=34, mask="auto"
-                )
-            except Exception:
-                canvas.setFont("Helvetica-Bold", 16)
-                canvas.setFillColor(pal["text_pri"])
-                canvas.drawString(MARGIN, y_logo - 12, firm_name[:40])
-        else:
-            canvas.setFont("Helvetica-Bold", 16)
-            canvas.setFillColor(pal["text_pri"])
-            canvas.drawString(MARGIN, y_logo - 12, firm_name[:40])
+            canvas.drawCentredString(A4_W / 2, header_y - 21, state_msg)
 
         # ── Report title (centred) ──────────────────────────────────────────
         _light_cover = pal["theme"] in ("light", "white")
@@ -2332,50 +2459,26 @@ def _make_cover_callback(
             canvas.setFillColor(pal["text_mut"])
             canvas.drawCentredString(x_c, strip_y - 16, label)
 
-        # ── Footer ──────────────────────────────────────────────────────────
-        canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(pal["text_mut"])
-        disc = (
-            "This report is generated by NeuFin AI and is provided for informational purposes only. "
-            "Not investment advice. NeuFin OÜ (EU). "
-            + (
-                f"{firm_name} is responsible for validating these insights."
-                if firm_name
-                else ""
-            )
-        )
-        canvas.drawCentredString(A4_W / 2, MARGIN - 4, disc[:400])
-
-        if ctx["white_label"]:
-            # White-labeled: show firm attribution instead of NeuFin branding
-            footer_text = (
-                f"Prepared by {firm_name} · Confidential"
-                if firm_name
-                else "Confidential"
-            )
-            canvas.setFont("Helvetica-Bold", 8)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawCentredString(A4_W / 2, MARGIN + 12, footer_text)
-        else:
-            canvas.setFont("Helvetica-Bold", 8)
-            canvas.setFillColor(
-                pal["text_mut"] if pal["theme"] in ("light", "white") else ACCENT_TEAL
-            )
-            canvas.drawCentredString(
-                A4_W / 2, MARGIN + 12, "Powered by NeuFin Intelligence"
-            )
+        _draw_report_footer(canvas, ctx, pal, report_date)
 
         canvas.restoreState()
 
     return callback
 
 
-def _make_hf_callback(ctx: dict, pal: dict, firm_name: str) -> Any:
+def _make_hf_callback(
+    ctx: dict,
+    pal: dict,
+    firm_name: str,
+    logo_bytes: bytes | None,
+    report_date: str,
+) -> Any:
     """Header/footer onPage callback for body pages."""
-    disc = "For informational purposes only. Not investment advice. NeuFin OÜ (EU)." + (
-        f" {firm_name} is responsible for validating these insights."
-        if firm_name
-        else ""
+    report_id = str(ctx.get("report_run_id") or "—")
+    client_identifier = (
+        str(ctx.get("client_name") or "").strip()
+        or str(ctx.get("portfolio_name") or "").strip()
+        or "Confidential"
     )
 
     def callback(canvas, doc):
@@ -2383,27 +2486,39 @@ def _make_hf_callback(ctx: dict, pal: dict, firm_name: str) -> Any:
         # Background fill (essential for dark theme)
         canvas.setFillColor(pal["bg"])
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-        # Header rule — minimal on light themes
-        is_light = pal["theme"] in ("light", "white")
-        canvas.setStrokeColor(pal["border"] if is_light else ACCENT_TEAL)
-        canvas.setLineWidth(0.75 if is_light else 2)
-        canvas.line(MARGIN, A4_H - MARGIN, A4_W - MARGIN, A4_H - MARGIN)
-        # Header text
-        canvas.setFont("Helvetica-Bold", 8)
-        canvas.setFillColor(pal["text_pri"])
-        canvas.drawString(MARGIN, A4_H - MARGIN - 13, "NEUFIN PORTFOLIO INTELLIGENCE")
-        canvas.setFont("Helvetica", 8)
+        header_y = A4_H - MARGIN - 2
+        canvas.setStrokeColor(IC_NAVY)
+        canvas.setLineWidth(0.9)
+        canvas.line(MARGIN, header_y, A4_W - MARGIN, header_y)
+        dims = _scaled_logo_dims(logo_bytes, target_height=30, max_width=160)
+        if dims and logo_bytes:
+            width, height = dims
+            canvas.drawImage(
+                ImageReader(io.BytesIO(logo_bytes)),
+                MARGIN,
+                header_y - 34,
+                width=width,
+                height=height,
+                mask="auto",
+            )
+        else:
+            canvas.setFont("Helvetica-Bold", 12)
+            canvas.setFillColor(pal["text_pri"])
+            canvas.drawString(MARGIN, header_y - 20, firm_name[:32])
+        total_pages = getattr(canvas, "_page_count", 0) or doc.page
+        canvas.setFont("Helvetica", 9)
         canvas.setFillColor(pal["text_mut"])
-        canvas.drawRightString(A4_W - MARGIN, A4_H - MARGIN - 13, f"Page {doc.page}")
-        # Footer
-        canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(pal["text_mut"])
-        canvas.drawString(MARGIN, MARGIN - 4, disc[:200])
-        # VN-specific market context line above disclaimer
+        canvas.drawRightString(
+            A4_W - MARGIN,
+            header_y - 18,
+            f"{client_identifier} · {report_id} · Page {doc.page} of {total_pages}",
+        )
         vn_note = ctx.get("vn_footer_note")
         if vn_note:
             canvas.setFont("Helvetica", 6)
-            canvas.drawString(MARGIN, MARGIN + 8, str(vn_note)[:220])
+            canvas.setFillColor(pal["text_mut"])
+            canvas.drawString(MARGIN, MARGIN + 10, str(vn_note)[:220])
+        _draw_report_footer(canvas, ctx, pal, report_date)
         canvas.restoreState()
 
     return callback
@@ -2419,23 +2534,36 @@ def _ic_body_section_header(
 ) -> list:
     """Section number, rule, and title block (institutional body pages)."""
     out: list = []
-    rule = Table(
-        [[""]],
+    header_title = _xml(title)
+    if section_num:
+        header_title = f"{_xml(section_num)}. {header_title}"
+    banner = Table(
+        [
+            [
+                Paragraph(
+                    f'<font name="Helvetica-Bold" size="12" color="#FFFFFF">{header_title}</font>',
+                    st["body"],
+                )
+            ]
+        ],
         colWidths=[cw],
-        rowHeights=[0.75],
-        style=TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.75, pal["border"])]),
+        rowHeights=[24],
     )
-    out.append(rule)
-    out.append(Spacer(1, 10))
-    num_c = _hex(pal["text_mut"])
-    ttl_c = _hex(pal["text_pri"])
-    title_pc = (
-        f'<font name="Helvetica" size="8" color="{num_c}">{_xml(section_num)}</font>'
-        f'<br/><font name="Helvetica-Bold" size="12" color="{ttl_c}">{_xml(title)}</font>'
+    banner.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), IC_NAVY),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
     )
-    out.append(Paragraph(title_pc, st["body"]))
+    out.append(banner)
     if subtitle:
-        out.append(Spacer(1, 3))
+        out.append(Spacer(1, 6))
         out.append(Paragraph(_xml(subtitle), st["muted8"]))
     out.append(Spacer(1, 12))
     return out
@@ -4918,7 +5046,7 @@ def _build_pdf_sync(
     )
 
     cover_cb = _make_cover_callback(ctx, pal, logo_bytes, advisor_config, report_date)
-    body_cb = _make_hf_callback(ctx, pal, firm_name)
+    body_cb = _make_hf_callback(ctx, pal, firm_name, logo_bytes, report_date)
 
     cover_frame = Frame(0, 0, A4_W, A4_H, id="cover")
     body_frame = Frame(
@@ -4973,7 +5101,7 @@ def _build_pdf_sync(
     _add_page(_page_agent_attribution, ctx, extra, pal, st, cw)
 
     try:
-        doc.build(elems)
+        doc.build(elems, canvasmaker=NumberedCanvas)
     except Exception as e:
         logger.error("pdf.doc_build_failed", error=str(e), exc_info=True)
         try:
