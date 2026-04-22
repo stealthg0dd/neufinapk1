@@ -14,6 +14,7 @@ Also callable on-demand via POST /api/research/generate.
 
 from __future__ import annotations
 
+import ast
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -136,6 +137,79 @@ NOTE_TYPE_INSTRUCTIONS = {
 }
 
 
+def _sanitize_implication(raw: Any) -> dict[str, str]:
+    """Normalize implication payloads from dict / JSON string / Python dict string."""
+    fallback = {
+        "action": "",
+        "rationale": "",
+        "time_horizon": "",
+        "severity": "INFO",
+    }
+    if raw is None:
+        return fallback
+
+    if isinstance(raw, dict):
+        horizon = str(raw.get("time_horizon", raw.get("horizon", "")) or "").replace(
+            "_", " "
+        )
+        severity = str(
+            raw.get("severity", raw.get("priority", "MEDIUM")) or "MEDIUM"
+        ).upper()
+        if severity not in {"HIGH", "MEDIUM", "LOW", "INFO"}:
+            severity = "INFO"
+        return {
+            "action": str(raw.get("action", raw.get("text", "")) or ""),
+            "rationale": str(raw.get("rationale", raw.get("why", "")) or ""),
+            "time_horizon": horizon,
+            "severity": severity,
+        }
+
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return fallback
+        try:
+            return _sanitize_implication(json.loads(text))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+        try:
+            return _sanitize_implication(ast.literal_eval(text))
+        except (ValueError, SyntaxError):
+            return {
+                "action": text,
+                "rationale": "",
+                "time_horizon": "",
+                "severity": "INFO",
+            }
+
+    return {
+        "action": str(raw),
+        "rationale": "",
+        "time_horizon": "",
+        "severity": "INFO",
+    }
+
+
+def _sanitize_implication_fields(payload: dict[str, Any]) -> dict[str, Any]:
+    """Ensure implication-like fields are always clean dict/list structures."""
+    out = dict(payload)
+
+    raw_implications = out.get("portfolio_implications")
+    if isinstance(raw_implications, list):
+        out["portfolio_implications"] = [
+            _sanitize_implication(item) for item in raw_implications
+        ]
+    elif raw_implications:
+        out["portfolio_implications"] = [_sanitize_implication(raw_implications)]
+    else:
+        out["portfolio_implications"] = []
+
+    if out.get("recommended_action") is not None:
+        out["recommended_action"] = _sanitize_implication(out.get("recommended_action"))
+
+    return out
+
+
 async def generate_research_note(
     note_type: str = "macro_outlook",
     context_days: int = 7,
@@ -205,6 +279,8 @@ Return ONLY valid JSON — no markdown, no preamble:
     except Exception as exc:
         logger.error("synthesiser.ai_failed", error=str(exc))
         raise
+
+    result = _sanitize_implication_fields(result)
 
     # Extract fields with safe defaults
     title: str = result.get(
