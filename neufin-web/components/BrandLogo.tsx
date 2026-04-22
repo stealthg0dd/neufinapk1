@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import clsx from "clsx";
+import type { CSSProperties } from "react";
 
 /**
  * Single source for NeuFin wordmark sizing across marketing, auth, shell, and upload.
@@ -21,27 +22,47 @@ export type BrandLogoVariant =
 
 const VARIANTS: Record<
   BrandLogoVariant,
-  { width: number; height: number; className: string }
+  { width: number; height: number; className: string; style?: CSSProperties }
 > = {
   "marketing-header": {
-    width: 160,
-    height: 40,
-    className: "h-10 w-auto",
+    width: 140,
+    height: 36,
+    className: "object-contain",
+    style: {
+      width: "140px",
+      height: "36px",
+      minWidth: "140px",
+      minHeight: "36px",
+    },
   },
   "marketing-nav": {
-    width: 160,
-    height: 40,
-    className: "h-10 w-auto",
+    width: 140,
+    height: 36,
+    className: "object-contain",
+    style: {
+      width: "140px",
+      height: "36px",
+      minWidth: "140px",
+      minHeight: "36px",
+    },
   },
   "marketing-footer-dark": {
-    width: 180,
-    height: 50,
-    className: "h-[3.125rem] w-auto brightness-0 invert",
+    width: 160,
+    height: 40,
+    className: "object-contain",
+    style: {
+      width: "160px",
+      height: "40px",
+    },
   },
   "marketing-footer-light": {
-    width: 180,
-    height: 45,
-    className: "h-[45px] w-auto",
+    width: 160,
+    height: 40,
+    className: "object-contain",
+    style: {
+      width: "160px",
+      height: "40px",
+    },
   },
   "marketing-compact": {
     width: 176,
@@ -127,6 +148,7 @@ export function BrandLogo({
       width={resolved.width}
       height={resolved.height}
       className={clsx(resolved.className, className)}
+      style={resolved.style}
       priority={
         priority ??
         (variant
