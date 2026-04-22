@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import { ActionCard } from "@/components/ActionCard";
 
 const researchSchema = {
   ...defaultSchema,
@@ -36,6 +37,8 @@ export type ResearchArticleProps = {
   publishedAt: string;
   signals?: ResearchSignal[];
   assetTickers?: string[];
+  implicationItems?: Array<string | object>;
+  suggestedAction?: string | object | null;
 };
 
 function displayRegime(regime: string | null | undefined) {
@@ -164,6 +167,8 @@ export function ResearchArticle({
   publishedAt,
   signals = [],
   assetTickers = [],
+  implicationItems = [],
+  suggestedAction = null,
 }: ResearchArticleProps) {
   const confidence = normalizeConfidence(confidenceScore);
   const minutes = readTime(markdown, summary);
@@ -221,6 +226,20 @@ export function ResearchArticle({
           ) : null}
           <hr className="mt-8 border-border" />
         </header>
+
+        {implicationItems.length > 0 || suggestedAction ? (
+          <section className="mb-8 rounded-md border border-border bg-surface p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Actionable Implications
+            </p>
+            <div className="mt-3">
+              {implicationItems.map((item, index) => (
+                <ActionCard key={index} raw={item} />
+              ))}
+              {suggestedAction ? <ActionCard raw={suggestedAction} /> : null}
+            </div>
+          </section>
+        ) : null}
 
         <div className="mb-8 lg:hidden">
           <details className="rounded-md border border-border bg-surface">

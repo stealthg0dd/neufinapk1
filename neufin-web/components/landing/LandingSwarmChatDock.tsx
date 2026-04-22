@@ -13,6 +13,7 @@ import React, {
   KeyboardEvent,
 } from "react";
 import { MessageCircle, X, Send } from "lucide-react";
+import { ActionCard } from "@/components/ActionCard";
 
 const STARTERS = [
   "What does the 7-agent swarm do?",
@@ -248,9 +249,7 @@ export default function LandingSwarmChatDock() {
                           </div>
                         )}
                       {msg.action ? (
-                        <p className="border-l-2 border-[#1EB8CC]/50 pl-2 text-xs font-medium text-[#0F172A]">
-                          {msg.action}
-                        </p>
+                        <ActionCard raw={msg.action} />
                       ) : null}
                     </>
                   )}

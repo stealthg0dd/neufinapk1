@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { getSupabaseClient } from "@/lib/supabase";
+import { ActionCard } from "@/components/ActionCard";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface Position {
@@ -324,13 +325,8 @@ export default function CommandPalette({
 
               {/* Action */}
               {result.response.recommended_action && (
-                <div className="flex items-start gap-2 bg-[#00FF00]/5 border border-[#00FF00]/20 rounded px-3 py-2">
-                  <span className="text-[#00FF00] text-sm shrink-0 mt-0.5">
-                    ▶ ACTION
-                  </span>
-                  <span className="text-[#aaffaa] text-sm">
-                    {result.response.recommended_action}
-                  </span>
+                <div className="mt-2">
+                  <ActionCard raw={result.response.recommended_action} />
                 </div>
               )}
 

@@ -51,6 +51,10 @@ export const SIDEBAR_NAV = {
   account: [item("billing")],
 } as const;
 
+// TODO Phase 3: remove CTech AG internal pages entirely.
+// Intentionally excluded from customer nav:
+// /dashboard/cos, /dashboard/agent-os, /dashboard/alerts, /dashboard/analytics, /dashboard/deals
+
 /** Compact top nav for AppHeader (authenticated product surfaces) */
 export const APP_HEADER_PRIMARY_NAV: ProductNavItem[] = [
   item("overview"),

@@ -109,6 +109,7 @@ export async function POST(req: NextRequest) {
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getSession();
   const sessionToken = sessionData.session?.access_token ?? null;
+  const userId = sessionData.session?.user.id ?? null;
   let token = sessionToken ?? authHeaderToken ?? null;
 
   if (!token) {
@@ -179,6 +180,7 @@ export async function POST(req: NextRequest) {
     portfolio_id: body.portfolio_id,
     positions: body.positions,
     advisor_id: body.advisor_id ?? "anonymous",
+    supabase_user_id: userId,
     ref_token: body.ref_token,
     success_url:
       typeof body.success_url === "string" && body.success_url.length > 0

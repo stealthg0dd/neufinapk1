@@ -69,7 +69,9 @@ class TestPushRequest(BaseModel):
 
 
 @router.post("/register", status_code=201)
-async def register_push_token(req: RegisterRequest, _user: JWTUser = Depends(get_current_user)):
+async def register_push_token(
+    req: RegisterRequest, _user: JWTUser = Depends(get_current_user)
+):
     """
     Upsert a push token + symbol list into `push_alert_subscriptions`.
     On conflict (same token), update symbols and user_label.
@@ -88,7 +90,9 @@ async def register_push_token(req: RegisterRequest, _user: JWTUser = Depends(get
 
 
 @router.get("/recent")
-async def get_recent_alerts(limit: int = 20, _user: JWTUser = Depends(get_current_user)):
+async def get_recent_alerts(
+    limit: int = 20, _user: JWTUser = Depends(get_current_user)
+):
     """Return the last *limit* macro-shift alert records."""
     sb = get_supabase_client()
     rows = (
@@ -102,7 +106,9 @@ async def get_recent_alerts(limit: int = 20, _user: JWTUser = Depends(get_curren
 
 
 @router.post("/test")
-async def test_push(req: TestPushRequest, bg: BackgroundTasks, _admin: JWTUser = Depends(get_admin_user)):
+async def test_push(
+    req: TestPushRequest, bg: BackgroundTasks, _admin: JWTUser = Depends(get_admin_user)
+):
     """Send a single test push notification. Dev use only."""
     bg.add_task(
         _send_expo_messages,

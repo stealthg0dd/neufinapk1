@@ -67,10 +67,14 @@ export async function submitLead(body: {
 export async function getSubscriptionStatus(
   token?: string | null,
 ): Promise<{
+  plan?: string;
   status: "trial" | "active" | "expired";
   days_remaining?: number;
+  onboarding_completed?: boolean;
+  is_admin?: boolean;
+  usage?: Record<string, unknown>;
 }> {
-  const res = await fetch(`${API}/api/auth/subscription-status`, {
+  const res = await fetch(`${API}/api/subscription/status`, {
     headers: authHeaders(token),
   });
   if (!res.ok) throw new Error("Could not fetch subscription status");
@@ -112,7 +116,7 @@ function resolveServerFetchOrigin(): string {
   }
   const vercel = process.env.VERCEL_URL?.trim();
   if (vercel) return `https://${vercel}`;
-  return "";
+  return "https://www.neufin.ai";
 }
 
 /** Research + server fetches: use explicit API base, else same-origin absolute URL on Vercel. */

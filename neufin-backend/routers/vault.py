@@ -16,11 +16,12 @@ GET  /api/subscription/status    → current user's plan + monthly usage (auth r
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 import stripe
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from config import (
@@ -34,6 +35,7 @@ from database import claim_guest_data, supabase
 from services.auth_dependency import (
     get_current_user,
     get_subscription_status as get_sub_status,
+    invalidate_subscription_cache,
 )
 from services.jwt_auth import JWTUser
 
@@ -100,6 +102,10 @@ stripe.api_key = STRIPE_SECRET_KEY
 plans_router = APIRouter(tags=["subscription"])
 
 
+class SubscriptionCacheInvalidateRequest(BaseModel):
+    user_ids: list[str]
+
+
 @plans_router.get("/api/plans")
 async def get_plans():
     """Return all subscription plans and their features (public, no auth required)."""
@@ -161,6 +167,25 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         "is_admin": bool(data.get("is_admin") or False),
         "role": data.get("role") or "user",
     }
+
+
+@plans_router.post("/api/subscription/invalidate-cache")
+async def invalidate_subscription_status_cache(
+    body: SubscriptionCacheInvalidateRequest, request: Request
+):
+    """Internal endpoint for cache busting after webhook-driven subscription updates."""
+    internal_key = request.headers.get("x-neufin-internal-key") or ""
+    expected_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not expected_key or internal_key != expected_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    user_ids = [
+        str(user_id).strip() for user_id in body.user_ids if str(user_id).strip()
+    ]
+    for user_id in user_ids:
+        invalidate_subscription_cache(user_id)
+
+    return {"ok": True, "invalidated": len(user_ids)}
 
 
 # ── Vault router (authenticated, /api/vault prefix) ───────────────────────────

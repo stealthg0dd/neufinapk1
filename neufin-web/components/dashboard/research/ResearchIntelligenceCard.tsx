@@ -17,6 +17,7 @@ import {
   isResearchSaved,
   toggleSavedResearchId,
 } from "@/lib/research-saved";
+import { ActionCard } from "@/components/ActionCard";
 
 function regimePillClass(r: string | null): string {
   const k = (r || "").toLowerCase();
@@ -143,22 +144,17 @@ export function ResearchIntelligenceCard({
       )}
 
       {display.portfolioImplications.length > 0 && (
-        <ul className="mt-3 space-y-1 text-sm text-navy">
+        <div className="mt-3">
           {display.portfolioImplications.slice(0, 3).map((line, i) => (
-            <li key={i} className="flex gap-2">
-              <span className="text-primary" aria-hidden>
-                →
-              </span>
-              <span>{line}</span>
-            </li>
+            <ActionCard key={i} raw={line} />
           ))}
-        </ul>
+        </div>
       )}
 
       {display.suggestedNextAction && (
-        <p className="mt-3 text-sm font-medium text-primary-dark">
-          Next: {display.suggestedNextAction}
-        </p>
+        <div className="mt-3">
+          <ActionCard raw={display.suggestedNextAction} />
+        </div>
       )}
 
       <div className="mt-4 flex flex-wrap gap-2 border-t border-border-light pt-3">

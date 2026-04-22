@@ -116,14 +116,15 @@ def _get_user_plan(user_id: str) -> str:
     """Return the user's active plan tier ('free', 'retail', 'advisor', 'enterprise')."""
     try:
         result = (
-            supabase.table("subscriptions")
-            .select("plan")
-            .eq("user_id", user_id)
-            .eq("status", "active")
-            .limit(1)
+            supabase.table("user_profiles")
+            .select("subscription_tier")
+            .eq("id", user_id)
+            .single()
             .execute()
         )
-        return result.data[0]["plan"] if result.data else "free"
+        if result.data:
+            return result.data.get("subscription_tier", "free")
+        return "free"
     except Exception:
         return "free"
 
