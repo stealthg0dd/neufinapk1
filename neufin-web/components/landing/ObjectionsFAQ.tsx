@@ -6,15 +6,14 @@ import { OBJECTION_FAQ } from "@/lib/objections-content";
 export function ObjectionsFAQ() {
   return (
     <section
-      className="bg-lp-elevated py-20 md:py-24"
+      className="bg-lp-elevated py-20 sm:py-28"
       id="faq"
       aria-labelledby="faq-heading"
     >
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <h2
           id="faq-heading"
-          className="text-center font-bold tracking-tight text-foreground"
-          style={{ fontSize: "clamp(22px, 2.5vw, 30px)" }}
+          className="text-center text-2xl sm:text-3xl font-bold tracking-tight text-foreground"
         >
           Common questions
         </h2>

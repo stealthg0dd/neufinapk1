@@ -18,19 +18,18 @@ export function SampleOutputsGallery() {
 
   return (
     <section
-      className="relative border-y border-lp-border bg-white py-20 md:py-24"
+      className="relative border-y border-lp-border bg-white py-20 sm:py-28"
       id="samples"
       aria-labelledby="samples-heading"
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-12 text-center md:text-left">
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-primary">
             Sample outputs
           </p>
           <h2
             id="samples-heading"
-            className="font-bold tracking-tight text-foreground"
-            style={{ fontSize: "clamp(24px, 2.8vw, 36px)" }}
+            className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground"
           >
             See what committees receive
           </h2>

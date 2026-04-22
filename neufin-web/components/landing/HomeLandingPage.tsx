@@ -469,12 +469,12 @@ export default function HomeLandingPage({
         </section>
 
         {/* Metrics */}
-        <section className="relative overflow-hidden border-y border-lp-border bg-lp-elevated py-12 md:py-14">
+        <section className="relative overflow-hidden border-y border-lp-border bg-lp-elevated py-20 sm:py-28">
           <div
             className="landing-animated-grid pointer-events-none absolute inset-0 opacity-[0.22]"
             aria-hidden
           />
-          <div className="relative z-10 mx-auto max-w-7xl px-6">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 gap-8 lg:grid-cols-4">
               {(
                 [
@@ -507,7 +507,7 @@ export default function HomeLandingPage({
         <SampleOutputsGallery />
 
         {/* Seven agents */}
-        <section className="relative bg-white py-24 md:py-28" id="demo">
+        <section className="relative bg-white py-20 sm:py-28" id="demo">
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute inset-0 flex items-center justify-center px-4 py-8">
               <div className="relative h-[min(72vh,820px)] w-full max-w-6xl opacity-[0.15]">
@@ -531,7 +531,7 @@ export default function HomeLandingPage({
             className="pointer-events-none absolute bottom-[18%] right-[8%] z-0 h-40 w-40 rounded-full bg-[#1EB8CC]/8 blur-3xl"
             aria-hidden
           />
-          <div className="relative z-10 mx-auto max-w-7xl px-6">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-16 text-center">
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
@@ -546,8 +546,7 @@ export default function HomeLandingPage({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.08 }}
-                className="mb-4 font-bold leading-tight tracking-tight text-foreground"
-                style={{ fontSize: "clamp(28px, 3.5vw, 44px)" }}
+                className="mb-4 text-3xl sm:text-4xl font-bold leading-tight tracking-tight text-foreground"
               >
                 Seven specialists. One Investment Committee.
               </motion.h2>
@@ -652,7 +651,7 @@ export default function HomeLandingPage({
         </section>
 
         {/* Value proposition */}
-        <section className="relative overflow-hidden bg-lp-elevated py-24 md:py-28">
+        <section className="relative overflow-hidden bg-lp-elevated py-20 sm:py-28">
           <div
             className="pointer-events-none absolute -left-16 top-24 h-64 w-64 rounded-full bg-[#1EB8CC]/8 blur-3xl"
             aria-hidden
@@ -661,7 +660,7 @@ export default function HomeLandingPage({
             className="pointer-events-none absolute bottom-16 right-0 h-52 w-52 rounded-full bg-[#1EB8CC]/6 blur-3xl"
             aria-hidden
           />
-          <div className="relative z-10 mx-auto max-w-7xl px-6">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 items-center gap-16 lg:grid-cols-2 lg:gap-20">
               <motion.div
                 initial={{ opacity: 0, x: -24 }}
@@ -677,10 +676,7 @@ export default function HomeLandingPage({
                 <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-primary">
                   For Advisors
                 </p>
-                <h2
-                  className="mb-6 font-bold leading-tight tracking-tight text-foreground"
-                  style={{ fontSize: "clamp(24px, 2.8vw, 36px)" }}
-                >
+                <h2 className="mb-6 text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-foreground">
                   IC-grade client intelligence without the manual report grind.
                 </h2>
                 <div className="space-y-4">
@@ -735,10 +731,7 @@ export default function HomeLandingPage({
                 <p className="mb-4 text-xs font-bold uppercase tracking-[0.15em] text-[#8B5CF6]">
                   For Platforms
                 </p>
-                <h2
-                  className="mb-6 font-bold leading-tight tracking-tight text-foreground"
-                  style={{ fontSize: "clamp(24px, 2.8vw, 36px)" }}
-                >
+                <h2 className="mb-6 text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-foreground">
                   Behavioral intelligence through your stack — without a
                   six-month build.
                 </h2>
@@ -786,13 +779,10 @@ export default function HomeLandingPage({
         <ObjectionsFAQ />
 
         {/* Pricing — data and hrefs preserved */}
-        <section className="bg-white py-24 md:py-28" id="pricing">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <section className="bg-white py-20 sm:py-28" id="pricing">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-14 text-center md:mb-16">
-              <h2
-                className="mb-3 font-bold tracking-tight text-foreground md:mb-4"
-                style={{ fontSize: "clamp(28px, 3vw, 42px)" }}
-              >
+              <h2 className="mb-3 text-3xl sm:text-4xl font-bold tracking-tight text-foreground md:mb-4">
                 Simple, transparent pricing
               </h2>
               <p className="mx-auto max-w-2xl text-[17px] leading-relaxed text-slate2">
@@ -929,13 +919,13 @@ export default function HomeLandingPage({
         </section>
 
         {/* Live market intelligence — regime + research teaser preserved */}
-        <section className="bg-shell py-20 md:py-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <section className="bg-shell py-20 sm:py-28">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-12 text-center">
               <p className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-primary">
                 Live Market Intelligence
               </p>
-              <h2 className="mb-2 text-[clamp(1.5rem,4vw,1.875rem)] font-bold text-lp-on-dark">
+              <h2 className="mb-2 text-2xl sm:text-3xl font-bold text-lp-on-dark">
                 Real-time regime monitoring
               </h2>
               <p className="text-[15px] text-lp-on-dark-muted">
@@ -1006,10 +996,10 @@ export default function HomeLandingPage({
         </section>
 
         {/* Regulatory */}
-        <section className="bg-lp-elevated py-20 md:py-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <section className="bg-lp-elevated py-20 sm:py-28">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-10 text-center md:mb-12">
-              <h2 className="text-[clamp(22px,2.5vw,28px)] font-bold text-foreground">
+              <h2 className="text-2xl sm:text-3xl font-bold text-foreground">
                 Regulatory footprint
               </h2>
               <p className="mt-2 max-w-2xl mx-auto text-[15px] leading-relaxed text-lp-muted">
