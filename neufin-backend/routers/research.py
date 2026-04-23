@@ -979,8 +979,10 @@ async def get_blog_note(slug: str):
     summary = str(note.get("executive_summary") or "")
     note_slug = str(note.get("slug") or "").strip() or slugify(title)
     content = note.get("content") or note.get("body") or note.get("full_content") or ""
+    structured: dict[str, Any] | None = None
     if isinstance(content, dict):
-        content = _dict_to_markdown(_sanitize_structured_implications(content))
+        structured = _sanitize_structured_implications(content)
+        content = _dict_to_markdown(structured)
     elif isinstance(content, str):
         # Content might be a JSON-encoded dict stored as a string
         stripped = content.strip()
@@ -988,9 +990,8 @@ async def get_blog_note(slug: str):
             try:
                 parsed = json.loads(stripped)
                 if isinstance(parsed, dict):
-                    content = _dict_to_markdown(
-                        _sanitize_structured_implications(parsed)
-                    )
+                    structured = _sanitize_structured_implications(parsed)
+                    content = _dict_to_markdown(structured)
             except (json.JSONDecodeError, ValueError):
                 pass
     else:
@@ -1037,12 +1038,13 @@ async def get_blog_note(slug: str):
             ds = []
     macro_signal_count = len(ds) if isinstance(ds, list) else 0
 
-    return {
+    article = {
         "id": note.get("id"),
         "slug": note_slug,
         "title": title,
         "executive_summary": summary,
         "content": content,
+        "structured": structured,
         "note_type": note.get("note_type"),
         "regime": note.get("regime"),
         "confidence_score": note.get("confidence_score"),
@@ -1053,6 +1055,39 @@ async def get_blog_note(slug: str):
         "related_notes": related,
         "macro_signal_count": macro_signal_count,
     }
+
+    import ast, json as _json
+
+    def _clean_implications(raw_list):
+        result = []
+        for item in (raw_list or []):
+            if isinstance(item, dict):
+                result.append(item)
+                continue
+            if not isinstance(item, str):
+                continue
+            try:
+                result.append(_json.loads(item))
+            except Exception:
+                try:
+                    result.append(ast.literal_eval(item))
+                except Exception:
+                    result.append(
+                        {
+                            "action": item,
+                            "rationale": "",
+                            "time_horizon": "",
+                            "severity": "INFO",
+                        }
+                    )
+        return result
+
+    if article.get("structured") and article["structured"].get("portfolio_implications"):
+        article["structured"]["portfolio_implications"] = _clean_implications(
+            article["structured"]["portfolio_implications"]
+        )
+
+    return article
 
 
 @router.get("/notes/{note_id}")
