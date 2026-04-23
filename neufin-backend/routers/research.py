@@ -1061,7 +1061,7 @@ async def get_blog_note(slug: str):
 
     def _clean_implications(raw_list):
         result = []
-        for item in (raw_list or []):
+        for item in raw_list or []:
             if isinstance(item, dict):
                 result.append(item)
                 continue
@@ -1083,7 +1083,9 @@ async def get_blog_note(slug: str):
                     )
         return result
 
-    if article.get("structured") and article["structured"].get("portfolio_implications"):
+    if article.get("structured") and article["structured"].get(
+        "portfolio_implications"
+    ):
         article["structured"]["portfolio_implications"] = _clean_implications(
             article["structured"]["portfolio_implications"]
         )
