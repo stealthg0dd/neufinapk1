@@ -1056,7 +1056,8 @@ async def get_blog_note(slug: str):
         "macro_signal_count": macro_signal_count,
     }
 
-    import ast, json as _json
+    import ast
+    import json as _json
 
     def _clean_implications(raw_list):
         result = []
