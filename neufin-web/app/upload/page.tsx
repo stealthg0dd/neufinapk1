@@ -112,10 +112,10 @@ export default function UploadPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-shell text-shell-fg">
-        <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <nav className="border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-10">
           <div className="mx-auto flex h-16 w-full max-w-2xl items-center gap-4 px-4 sm:px-6">
-            <BrandLogo variant="shell-inverted" href={null} priority />
+            <BrandLogo variant="marketing-nav" href={null} priority />
           </div>
         </nav>
         <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
@@ -126,7 +126,7 @@ export default function UploadPage() {
                 <span className="inline-block w-3.5 h-3.5 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
                 AI is analyzing your portfolio…
               </div>
-              <p className="text-xs text-shell-subtle">
+              <p className="text-xs text-muted-foreground">
                 This usually takes 5–10 seconds
               </p>
             </div>
@@ -168,26 +168,26 @@ export default function UploadPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-shell text-shell-fg">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Suspense fallback={null}>
         <RefCapture />
       </Suspense>
-      <nav className="border-b border-shell-border/60 bg-shell-deep/80 backdrop-blur-sm sticky top-0 z-10">
+      <nav className="border-b border-border bg-background/90 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto flex h-16 w-full max-w-2xl items-center gap-4 px-4 sm:px-6">
           <Link
             href="/"
-            className="text-sm text-shell-muted transition-colors hover:text-white"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             ← Back
           </Link>
-          <BrandLogo variant="shell-inverted" href="/" />
+          <BrandLogo variant="marketing-nav" href="/" />
         </div>
       </nav>
 
       <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-10">
         <div className="w-full max-w-2xl">
-          <h1 className="text-3xl font-bold mb-2 text-shell-fg">Upload your portfolio</h1>
-          <p className="text-shell-muted mb-4">
+          <h1 className="text-3xl font-bold mb-2 text-foreground">Upload your portfolio</h1>
+          <p className="text-muted-foreground mb-4">
             CSV with columns: <code className="text-primary">symbol</code>,{" "}
             <code className="text-primary">shares</code>, and optional{" "}
             <code className="text-primary">cost_basis</code>
@@ -227,7 +227,7 @@ export default function UploadPage() {
             }}
             onDragLeave={() => setDragging(false)}
             className={`relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200
-              ${dragging ? "border-primary bg-primary/5" : "border-shell-border hover:border-shell-muted hover:bg-shell/50"}
+              ${dragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-surface-2"}
               ${file ? "border-green-600/60 bg-green-500/5" : ""}`}
           >
             <input
@@ -241,17 +241,17 @@ export default function UploadPage() {
               <>
                 <div className="text-4xl mb-3">✅</div>
                 <p className="font-semibold text-green-400">{file.name}</p>
-                <p className="text-sm text-shell-subtle mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {(file.size / 1024).toFixed(1)} KB · Ready to analyze
                 </p>
               </>
             ) : (
               <>
                 <div className="text-4xl mb-3">📂</div>
-                <p className="font-semibold text-shell-fg/90">
+                <p className="font-semibold text-foreground">
                   Drop your CSV here
                 </p>
-                <p className="text-sm text-shell-subtle mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   or click to browse
                 </p>
               </>
@@ -260,7 +260,7 @@ export default function UploadPage() {
 
           {/* Error */}
           {error && (
-            <div className="mt-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg text-red-400 text-sm">
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
               {error}
             </div>
           )}
@@ -273,7 +273,7 @@ export default function UploadPage() {
                 <p className="font-semibold text-[#38BDF8]">
                   Detected Vietnamese portfolio
                 </p>
-                <p className="mt-0.5 text-shell-fg/80 leading-relaxed">
+                <p className="mt-0.5 text-foreground/80 leading-relaxed">
                   We support HOSE/HNX tickers, VND→USD conversion, and VN-Index
                   benchmarking. Add a{" "}
                   <code className="text-primary font-mono">cost_basis_vnd</code>{" "}
@@ -297,18 +297,18 @@ export default function UploadPage() {
             <button
               type="button"
               onClick={downloadSample}
-              className="btn-outline-on-dark w-full py-3 text-sm"
+              className="btn-secondary w-full py-3 text-sm"
             >
               Download sample CSV
             </button>
           </div>
 
           {/* Format hint */}
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.06] p-5 text-sm text-shell-fg shadow-sm backdrop-blur-sm">
-            <p className="text-shell-fg/90 font-medium mb-2">
+          <div className="mt-6 rounded-xl border border-border bg-surface-2 p-5 text-sm text-foreground shadow-sm">
+            <p className="text-foreground font-medium mb-2">
               Expected CSV format:
             </p>
-            <pre className="text-xs text-shell-muted font-mono leading-relaxed">
+            <pre className="text-xs text-muted-foreground font-mono leading-relaxed">
               {SAMPLE_CSV.trim()}
             </pre>
           </div>
