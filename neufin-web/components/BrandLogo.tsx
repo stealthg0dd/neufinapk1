@@ -145,16 +145,15 @@ export function BrandLogo({
     <Image
       src="/logo.png"
       alt="NeuFin"
-      width={resolved.width}
-      height={resolved.height}
-      className={clsx(resolved.className, className)}
-      style={resolved.style}
-      priority={
-        priority ??
-        (variant
-          ? variant.startsWith("marketing") || variant === "app-header"
-          : size === "lg" || size === "xl")
-      }
+      width={148}
+      height={38}
+      priority
+      style={{
+        width: "148px",
+        height: "38px",
+        objectFit: "contain",
+        display: "block",
+      }}
     />
   );
 

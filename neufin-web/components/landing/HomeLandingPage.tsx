@@ -285,11 +285,11 @@ export default function HomeLandingPage({
                     style={{
                       fontSize: "11px",
                       fontWeight: 600,
-                      letterSpacing: "0.14em",
+                      letterSpacing: "0.13em",
                       textTransform: "uppercase",
                       color: "#0ea5e9",
-                      marginBottom: "16px",
                       lineHeight: 1,
+                      marginBottom: "14px",
                     }}
                   >
                     Behavioral Finance Intelligence Platform
