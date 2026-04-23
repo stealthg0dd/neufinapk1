@@ -111,9 +111,12 @@ export default function PricingPageClient() {
     <div className="flex min-h-screen flex-col bg-[var(--bg-app)]">
       <nav className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/95 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 min-h-[4rem] flex items-center justify-between gap-3 py-1 md:min-h-[4.25rem]">
-          <Link href="/" className="shrink-0 flex-none py-1">
-            <NeuFinLogo variant="header" priority />
-          </Link>
+          <NeuFinLogo
+            variant="header"
+            priority
+            href="/"
+            className="shrink-0 flex-none py-1"
+          />
           <div className="flex gap-2">
             <Link href="/upload" className="btn-secondary px-3 py-2 text-sm">
               Analysis
