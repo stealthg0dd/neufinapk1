@@ -124,11 +124,7 @@ function AuthScreenInner({ initialMode }: { initialMode: "login" | "signup" }) {
     // (neufin.ai, www.neufin.ai, or neufin-web.vercel.app).
     // A mismatched redirectTo causes Supabase to fall back to implicit flow
     // (landing on /#access_token= instead of /auth/callback?code=).
-    const CANONICAL_ORIGIN =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (typeof window !== "undefined"
-        ? window.location.origin
-        : "https://www.neufin.ai");
+    const CANONICAL_ORIGIN = process.env.NEXT_PUBLIC_APP_URL || 'https://www.neufin.ai';
     const redirectTo = `${CANONICAL_ORIGIN}/auth/callback?next=${encodeURIComponent(next)}`;
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",

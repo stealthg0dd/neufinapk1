@@ -104,9 +104,6 @@ export const metadata: Metadata = {
     images: ["/og-image.png"],
     creator: "@neufin_ai",
   },
-  verification: {
-    google: "ADD_GOOGLE_SEARCH_CONSOLE_TOKEN_HERE",
-  },
   alternates: {
     canonical: "https://www.neufin.ai",
   },

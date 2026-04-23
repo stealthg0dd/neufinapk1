@@ -25,43 +25,47 @@ const VARIANTS: Record<
   { width: number; height: number; className: string; style?: CSSProperties }
 > = {
   "marketing-header": {
-    width: 140,
-    height: 36,
+    width: 160,
+    height: 40,
     className: "object-contain",
     style: {
-      width: "140px",
-      height: "36px",
-      minWidth: "140px",
-      minHeight: "36px",
+      width: "160px",
+      height: "40px",
+      minWidth: "160px",
+      minHeight: "40px",
+      display: "block",
     },
   },
   "marketing-nav": {
-    width: 140,
-    height: 36,
+    width: 160,
+    height: 40,
     className: "object-contain",
     style: {
-      width: "140px",
-      height: "36px",
-      minWidth: "140px",
-      minHeight: "36px",
+      width: "160px",
+      height: "40px",
+      minWidth: "160px",
+      minHeight: "40px",
+      display: "block",
     },
   },
   "marketing-footer-dark": {
-    width: 160,
-    height: 40,
+    width: 180,
+    height: 45,
     className: "object-contain",
     style: {
-      width: "160px",
-      height: "40px",
+      width: "180px",
+      height: "45px",
+      display: "block",
     },
   },
   "marketing-footer-light": {
-    width: 160,
-    height: 40,
+    width: 180,
+    height: 45,
     className: "object-contain",
     style: {
-      width: "160px",
-      height: "40px",
+      width: "180px",
+      height: "45px",
+      display: "block",
     },
   },
   "marketing-compact": {
@@ -163,7 +167,7 @@ export function BrandLogo({
   }
 
   return (
-    <Link href={href} className="inline-flex shrink-0 items-center">
+    <Link href={href} className="inline-flex shrink-0 items-center" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
       {img}
     </Link>
   );
