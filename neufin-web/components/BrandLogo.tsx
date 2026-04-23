@@ -25,27 +25,23 @@ const VARIANTS: Record<
   { width: number; height: number; className: string; style?: CSSProperties }
 > = {
   "marketing-header": {
-    width: 160,
-    height: 40,
+    width: 140,
+    height: 36,
     className: "object-contain",
     style: {
-      width: "160px",
-      height: "40px",
-      minWidth: "160px",
-      minHeight: "40px",
-      display: "block",
+      width: "140px",
+      height: "36px",
+      objectFit: "contain",
     },
   },
   "marketing-nav": {
-    width: 160,
-    height: 40,
+    width: 140,
+    height: 36,
     className: "object-contain",
     style: {
-      width: "160px",
-      height: "40px",
-      minWidth: "160px",
-      minHeight: "40px",
-      display: "block",
+      width: "140px",
+      height: "36px",
+      objectFit: "contain",
     },
   },
   "marketing-footer-dark": {
@@ -167,7 +163,11 @@ export function BrandLogo({
   }
 
   return (
-    <Link href={href} className="inline-flex shrink-0 items-center" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+    <Link
+      href={href}
+      className="inline-flex shrink-0 items-center"
+      style={{ display: "flex", alignItems: "center", flexShrink: 0, minWidth: "140px" }}
+    >
       {img}
     </Link>
   );
