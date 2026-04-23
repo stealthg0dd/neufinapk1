@@ -238,12 +238,7 @@ export default function HomeLandingPage({
         }`}
       >
         <div className="mx-auto flex min-h-[4rem] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:min-h-[4.25rem]">
-          <Link
-            href="/"
-            className="flex flex-shrink-0 flex-none items-center py-1"
-          >
-            <NeuFinLogo variant="header" priority />
-          </Link>
+          <NeuFinLogo variant="header" priority href="/" />
           <div className="hidden items-center gap-8 md:flex">
             {navLinks.map(({ label, href }) => (
               <Link

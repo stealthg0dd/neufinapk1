@@ -21,13 +21,12 @@ export default function LandingNav() {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/90 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex min-h-[4rem] items-center justify-between gap-3 py-1 md:min-h-[4.25rem]">
-          <Link
+          <NeuFinLogo
+            variant="nav"
+            priority
             href="/"
             className="flex min-w-0 flex-none items-center py-1"
-            onClick={() => setOpen(false)}
-          >
-            <NeuFinLogo variant="nav" priority />
-          </Link>
+          />
 
           <div className="hidden flex-1 items-center justify-center gap-8 md:flex">
             {LINKS.map(({ href, label }) => (
