@@ -42,6 +42,14 @@
   --amber: #f5a623;
   --border-accent: var(--primary);
 
+  /* Typography scale */
+  --font-size-base: 16px;
+  --font-size-sm: 14px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 28px;
+  --font-size-3xl: 36px;
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -94,7 +102,7 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: var(--font-size-base);
   -webkit-text-size-adjust: 100%;
   color-scheme: light;
 }
@@ -102,6 +110,7 @@ html {
 body {
   background: var(--bg);
   color: var(--text-primary);
+  font-size: 1rem;
   line-height: 1.65;
   font-family: var(--font-sans), Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
