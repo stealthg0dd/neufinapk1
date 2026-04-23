@@ -281,18 +281,19 @@ export default function HomeLandingPage({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
               <div className="flex flex-col gap-5">
                 <div className="inline-flex">
-                  <span
+                  <p
                     style={{
                       fontSize: "11px",
                       fontWeight: 600,
-                      letterSpacing: "0.12em",
+                      letterSpacing: "0.14em",
                       textTransform: "uppercase",
-                      color: "#22d3ee",
+                      color: "#0ea5e9",
+                      marginBottom: "16px",
                       lineHeight: 1,
                     }}
                   >
                     Behavioral Finance Intelligence Platform
-                  </span>
+                  </p>
                 </div>
 
                 <h1
