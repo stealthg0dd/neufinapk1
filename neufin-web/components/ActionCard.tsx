@@ -21,12 +21,12 @@ export function ActionCard({ raw }: { raw: string | object }) {
           {item.severity}
         </span>
         {item.time_horizon ? (
-          <span className="text-xs text-gray-400">⏱ {item.time_horizon}</span>
+          <span className="text-xs text-[#52607a]">⏱ {item.time_horizon}</span>
         ) : null}
       </div>
-      <p className="text-sm font-medium text-white">{item.action}</p>
+      <p className="text-sm font-medium text-[#0f172a]">{item.action}</p>
       {item.rationale ? (
-        <p className="mt-1 text-xs text-gray-400">Why: {item.rationale}</p>
+        <p className="mt-1 text-xs text-[#52607a]">Why: {item.rationale}</p>
       ) : null}
     </div>
   );
