@@ -1,5 +1,5 @@
 # NeuFin Frontend & Dashboard Audit
-**Date:** 10 April 2026  
+**Date:** 10 April 2026
 **Scope:** `neufin-web/` primary audit, with linked backend causes in `neufin-backend/`
 
 ---
@@ -353,7 +353,7 @@ Different pages store/read different localStorage keys and route users to differ
 
 ## Final Conclusion
 
-**This is not primarily a backend capability problem.**  
+**This is not primarily a backend capability problem.**
 It is a **frontend orchestration, routing, and async UX problem**.
 
 The underlying platform already contains:

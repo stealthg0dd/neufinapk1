@@ -1,4 +1,3 @@
-
 import os
 import re
 from pathlib import Path
@@ -6,9 +5,11 @@ from pathlib import Path
 try:
     from detectors import Issue
 except ImportError:
+
     class Issue:  # pragma: no cover - fallback for standalone self-test
         def __init__(self, **kwargs):
             self.__dict__.update(kwargs)
+
 
 # Standardized REPO_ROOT for Railway
 REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
@@ -160,7 +161,9 @@ def self_test() -> None:
     src = Path(__file__).read_text(encoding="utf-8", errors="ignore")
     for pattern, label, _fix in SECRET_PATTERNS:
         if pattern.search(src):
-            raise AssertionError(f"Self-test failed: pattern '{label}' matched in secret_scanner.py.")
+            raise AssertionError(
+                f"Self-test failed: pattern '{label}' matched in secret_scanner.py."
+            )
     print("[Self-test] secret_scanner.py: PASS")
 
 

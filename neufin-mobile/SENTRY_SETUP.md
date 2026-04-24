@@ -90,8 +90,8 @@ Or add to `eas.json` postBuild hook:
 
 ## Recommended Alert Rules (create in Sentry UI)
 
-1. **New crash** — any new `fatal` issue → PagerDuty + Slack #mobile-crashes  
-2. **Crash-free rate drop** — `< 99.5 %` over 1 h → Slack #mobile-crashes  
-3. **ANR spike** — `> 3 ANR events` in 10 min → email  
-4. **New issue on release** — on new app version → Slack #mobile-releases  
-5. **Error spike** — `> 20 errors/min` → Slack #alerts  
+1. **New crash** — any new `fatal` issue → PagerDuty + Slack #mobile-crashes
+2. **Crash-free rate drop** — `< 99.5 %` over 1 h → Slack #mobile-crashes
+3. **ANR spike** — `> 3 ANR events` in 10 min → email
+4. **New issue on release** — on new app version → Slack #mobile-releases
+5. **Error spike** — `> 20 errors/min` → Slack #alerts

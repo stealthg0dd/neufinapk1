@@ -38,7 +38,7 @@ class LLMFixResult(TypedDict):
     diff: str
     root_cause: str
     test_cmd: str
-    risk: str           # low | medium | high
+    risk: str  # low | medium | high
     requires_human: bool
     method: str
     tokens_used: int
@@ -55,20 +55,26 @@ def _read_context(issue: dict) -> str:
     lineno = int(issue.get("line", 1))
     start = max(0, lineno - CONTEXT_LINES - 1)
     end = min(len(lines), lineno + CONTEXT_LINES)
-    return "\n".join(f"{i + 1}: {line}" for i, line in enumerate(lines[start:end], start=start))
+    return "\n".join(
+        f"{i + 1}: {line}" for i, line in enumerate(lines[start:end], start=start)
+    )
 
 
 def _parse_response(text: str) -> tuple[str, str, str, str, bool]:
     """Extract (root_cause, diff, test_cmd, risk, requires_human) from LLM output."""
 
     def _section(label: str) -> str:
-        m = re.search(rf"{label}:\s*(.+?)(?=\n[1-9A-Z]|\Z)", text, re.DOTALL | re.IGNORECASE)
+        m = re.search(
+            rf"{label}:\s*(.+?)(?=\n[1-9A-Z]|\Z)", text, re.DOTALL | re.IGNORECASE
+        )
         return m.group(1).strip() if m else ""
 
     root_cause = _section("ROOT_CAUSE")
     test_cmd = _section("TEST")
     risk_raw = _section("RISK").lower()
-    risk = "high" if "high" in risk_raw else ("medium" if "medium" in risk_raw else "low")
+    risk = (
+        "high" if "high" in risk_raw else ("medium" if "medium" in risk_raw else "low")
+    )
     requires_human = "REQUIRES_HUMAN_REVIEW" in text or risk == "high"
 
     # Extract diff block
@@ -87,7 +93,9 @@ async def generate_fix(issue: dict) -> LLMFixResult:
     """
     sev = issue.get("severity", "low")
     if sev not in ("critical", "high"):
-        raise ValueError(f"generate_fix called for low-severity issue {issue.get('id')} — skipped")
+        raise ValueError(
+            f"generate_fix called for low-severity issue {issue.get('id')} — skipped"
+        )
 
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     context = _read_context(issue)
@@ -114,13 +122,15 @@ async def generate_fix(issue: dict) -> LLMFixResult:
     tokens = message.usage.input_tokens + message.usage.output_tokens
     root_cause, diff, test_cmd, risk, requires_human = _parse_response(raw)
 
-    log.info({
-        "action": "llm_fix_generated",
-        "issue_id": issue.get("id"),
-        "tokens": tokens,
-        "risk": risk,
-        "requires_human": requires_human,
-    })
+    log.info(
+        {
+            "action": "llm_fix_generated",
+            "issue_id": issue.get("id"),
+            "tokens": tokens,
+            "risk": risk,
+            "requires_human": requires_human,
+        }
+    )
 
     return LLMFixResult(
         diff=diff,

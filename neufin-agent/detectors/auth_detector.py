@@ -18,7 +18,10 @@ PATTERNS: list[tuple[re.Pattern, str, str, str, bool, bool]] = [
         True,
     ),
     (
-        re.compile(r"useEffect\s*\(\s*\(\s*\)\s*=>.*?router\.(push|replace)\s*\(['\"].*?login", re.DOTALL),
+        re.compile(
+            r"useEffect\s*\(\s*\(\s*\)\s*=>.*?router\.(push|replace)\s*\(['\"].*?login",
+            re.DOTALL,
+        ),
         "useEffect redirect to /login conflicts with Next.js middleware auth guard",
         "high",
         "Remove client-side redirect; rely on middleware.ts for route protection",
@@ -43,7 +46,19 @@ PATTERNS: list[tuple[re.Pattern, str, str, str, bool, bool]] = [
     ),
 ]
 
-SKIP_DIRS = {".git", ".next", "node_modules", "__pycache__", ".venv", "build", "dist", ".expo", "android", "ios", ".gradle"}
+SKIP_DIRS = {
+    ".git",
+    ".next",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+    ".expo",
+    "android",
+    "ios",
+    ".gradle",
+}
 
 
 async def scan() -> list[Issue]:
@@ -62,7 +77,8 @@ async def scan() -> list[Issue]:
 
     # Check for AuthProvider-like files that are missing onAuthStateChange
     auth_provider_files = [
-        p for p in web_dir.rglob("*.tsx")
+        p
+        for p in web_dir.rglob("*.tsx")
         if "auth" in p.name.lower() or "provider" in p.name.lower()
         if not any(s in p.parts for s in SKIP_DIRS)
     ]

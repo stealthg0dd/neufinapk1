@@ -15,13 +15,14 @@ import sys
 # Load .env in local dev; Railway injects vars directly into the environment
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
 
-PASS  = "\033[92m[LIVE_TEST_PASSED]\033[0m"
-FAIL  = "\033[91m[LIVE_TEST_FAILED]\033[0m"
-SKIP  = "\033[93m[LIVE_TEST_SKIPPED]\033[0m"
+PASS = "\033[92m[LIVE_TEST_PASSED]\033[0m"
+FAIL = "\033[91m[LIVE_TEST_FAILED]\033[0m"
+SKIP = "\033[93m[LIVE_TEST_SKIPPED]\033[0m"
 results: list[bool] = []
 
 
@@ -38,6 +39,7 @@ api_key = _require("ANTHROPIC_API_KEY")
 if api_key:
     try:
         from anthropic import Anthropic
+
         client = Anthropic(api_key=api_key)
         msg = client.messages.create(
             model="claude-haiku-4-5-20251001",
@@ -58,6 +60,7 @@ gemini_key = _require("GEMINI_KEY")
 if gemini_key:
     try:
         from google import genai as google_genai
+
         gclient = google_genai.Client(api_key=gemini_key)
         resp = gclient.models.generate_content(
             model="gemini-1.5-flash",
@@ -80,6 +83,7 @@ if not supa_key:
 if supa_url and supa_key:
     try:
         from supabase import create_client
+
         db = create_client(supa_url, supa_key)
         # Lightweight probe: read one row from any table we own
         db.table("swarm_reports").select("id").limit(1).execute()
@@ -96,6 +100,7 @@ poly_key = _require("POLYGON_API_KEY")
 if poly_key:
     try:
         import requests
+
         r = requests.get(
             "https://api.polygon.io/v2/aggs/ticker/AAPL/prev",
             params={"apiKey": poly_key},
@@ -117,7 +122,7 @@ if poly_key:
 # ── Summary ───────────────────────────────────────────────────────────────────
 print("\n" + "─" * 55)
 passed = sum(results)
-total  = len(results)
+total = len(results)
 if total == 0:
     print("⚠  No providers tested (all API keys missing). Set env vars and retry.")
     sys.exit(1)
@@ -125,5 +130,7 @@ elif passed == total:
     print(f"✅  ALL {total}/{total} provider tests passed — ready for production.")
     sys.exit(0)
 else:
-    print(f"❌  {passed}/{total} provider tests passed — fix failures before deploying.")
+    print(
+        f"❌  {passed}/{total} provider tests passed — fix failures before deploying."
+    )
     sys.exit(1)

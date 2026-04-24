@@ -119,7 +119,9 @@ async def init_db() -> None:
         await db.commit()
 
 
-async def cache_root_cause(issue_id: str, root_cause: str, confidence: str = "medium") -> None:
+async def cache_root_cause(
+    issue_id: str, root_cause: str, confidence: str = "medium"
+) -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             "UPDATE issues SET root_cause = ?, root_cause_confidence = ? WHERE id = ?",
@@ -129,6 +131,7 @@ async def cache_root_cause(issue_id: str, root_cause: str, confidence: str = "me
 
 
 # ── Issue CRUD ────────────────────────────────────────────────────────────
+
 
 async def upsert_issues(issues: list[dict]) -> None:
     """Insert or update issues; preserve status if already fixed/dismissed."""
@@ -171,7 +174,8 @@ async def upsert_issues(issues: list[dict]) -> None:
                     "suggested_fix": issue.get("suggested_fix", ""),
                     "auto_fixable": int(bool(issue.get("auto_fixable", False))),
                     "requires_human": int(bool(issue.get("requires_human", False))),
-                    "detected_at": issue.get("detected_at") or datetime.now(UTC).isoformat(),
+                    "detected_at": issue.get("detected_at")
+                    or datetime.now(UTC).isoformat(),
                     "repo": issue.get("repo", ""),
                     "source": issue.get("source", "scanner"),
                     "sentry_url": issue.get("sentry_url", ""),
@@ -239,6 +243,7 @@ async def dismiss_issue(issue_id: str, reason: str = "") -> None:
 
 # ── Fix history (new schema) ──────────────────────────────────────────────
 
+
 async def record_fix(
     issue_id: str,
     method: str,
@@ -264,8 +269,20 @@ async def record_fix(
                  commit_sha, tsc_before, tsc_after, method, success)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (fix_id, issue_id, method, diff, now, status,
-             pr_url, commit_sha, tsc_before, tsc_after, method, int(success)),
+            (
+                fix_id,
+                issue_id,
+                method,
+                diff,
+                now,
+                status,
+                pr_url,
+                commit_sha,
+                tsc_before,
+                tsc_after,
+                method,
+                int(success),
+            ),
         )
         # Legacy fix_history for backwards compat
         await db.execute(
@@ -289,6 +306,7 @@ async def get_fix_history(limit: int = 100) -> list[dict]:
 
 
 # ── Scan runs ─────────────────────────────────────────────────────────────
+
 
 async def begin_scan_run() -> str:
     run_id = str(uuid.uuid4())
@@ -359,6 +377,7 @@ async def get_recent_scan_runs(days: int = 7) -> list[dict]:
 
 # ── Health score algorithm ────────────────────────────────────────────────
 
+
 async def compute_health_score(issues: list[dict], repo: str) -> int:
     """
     Start at 100. Deduct per issue. Apply bonuses.
@@ -405,6 +424,7 @@ async def compute_health_score(issues: list[dict], repo: str) -> int:
 
 # ── False positive / agent memory ─────────────────────────────────────────
 
+
 async def add_false_positive(
     pattern: str,
     issue_type: str | None = None,
@@ -419,7 +439,14 @@ async def add_false_positive(
                 (id, pattern, type, file_glob, reason, dismissed_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (fp_id, pattern, issue_type, file_glob, reason, datetime.now(UTC).isoformat()),
+            (
+                fp_id,
+                pattern,
+                issue_type,
+                file_glob,
+                reason,
+                datetime.now(UTC).isoformat(),
+            ),
         )
         await db.commit()
     return fp_id
@@ -435,12 +462,15 @@ async def get_false_positives() -> list[dict]:
 def _is_false_positive(issue: dict, fps: list[dict]) -> bool:
     import fnmatch
     import re as _re
+
     for fp in fps:
         # Type filter
         if fp.get("type") and fp["type"] != issue.get("type"):
             continue
         # File glob filter
-        if fp.get("file_glob") and not fnmatch.fnmatch(issue.get("file", ""), fp["file_glob"]):
+        if fp.get("file_glob") and not fnmatch.fnmatch(
+            issue.get("file", ""), fp["file_glob"]
+        ):
             continue
         # Pattern match against message
         try:
@@ -453,6 +483,7 @@ def _is_false_positive(issue: dict, fps: list[dict]) -> bool:
 
 
 # ── Weekly trend report data ───────────────────────────────────────────────
+
 
 async def get_recently_resolved(since_iso: str) -> list[dict]:
     """Return issues that were fixed or dismissed after `since_iso`."""
@@ -468,8 +499,6 @@ async def get_recently_resolved(since_iso: str) -> list[dict]:
             (since_iso,),
         )
         return [dict(r) for r in await cur.fetchall()]
-
-
 
     """
     Aggregate last 7 days of scan_runs to produce trend report data.
@@ -515,7 +544,9 @@ async def get_recently_resolved(since_iso: str) -> list[dict]:
             (since_7d,),
         )
         fix_row = await cur.fetchone()
-        fix_rate = (fix_row["ok"] / fix_row["total"]) if fix_row and fix_row["total"] else 0.0
+        fix_rate = (
+            (fix_row["ok"] / fix_row["total"]) if fix_row and fix_row["total"] else 0.0
+        )
 
         # PRs awaiting review
         cur = await db.execute(

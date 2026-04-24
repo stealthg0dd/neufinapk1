@@ -1,7 +1,7 @@
 # Staging Deployment Test Report
 
-**Date:** 2026-03-27  
-**Branch:** `staging`  
+**Date:** 2026-03-27
+**Branch:** `staging`
 **Commits tested:** `94c45c1` (latest)
 
 ---

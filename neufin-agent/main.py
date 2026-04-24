@@ -46,16 +46,20 @@ from core.router_sync import register_agent, heartbeat_loop
 load_dotenv()
 
 # Validate all required env vars at startup — fails fast via SystemExit if missing
-from core.config import settings  # noqa: E402  (import after load_dotenv)
 
 _AGENT_SENTRY_ENV: str = os.getenv("ENVIRONMENT", "production")
 _AGENT_SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
-_AGENT_PII_KEYS: frozenset = frozenset({"password", "token", "api_key", "fernet_key", "secret"})
+_AGENT_PII_KEYS: frozenset = frozenset(
+    {"password", "token", "api_key", "fernet_key", "secret"}
+)
 
 
 def _agent_scrub(obj: object) -> object:
     if isinstance(obj, dict):
-        return {k: "[REDACTED]" if k.lower() in _AGENT_PII_KEYS else _agent_scrub(v) for k, v in obj.items()}
+        return {
+            k: "[REDACTED]" if k.lower() in _AGENT_PII_KEYS else _agent_scrub(v)
+            for k, v in obj.items()
+        }
     return [_agent_scrub(i) for i in obj] if isinstance(obj, list) else obj
 
 
@@ -72,30 +76,43 @@ sentry_sdk.init(
         FastApiIntegration(),
         LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
     ],
-    traces_sample_rate=1.0 if _AGENT_SENTRY_ENV in ("development", "dev", "local") else 0.2,
+    traces_sample_rate=(
+        1.0 if _AGENT_SENTRY_ENV in ("development", "dev", "local") else 0.2
+    ),
     profiles_sample_rate=0.1,
     environment=_AGENT_SENTRY_ENV,
-    release=os.getenv("GIT_COMMIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or "unknown",
+    release=os.getenv("GIT_COMMIT_SHA")
+    or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+    or "unknown",
     send_default_pii=False,
     before_send=_agent_before_send,
 )
 sentry_sdk.set_tags({"service": "neufin-agent", "company": "neufin"})
 
+
 # ── Structured JSON logging ────────────────────────────────────────────────
 class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        return json.dumps({
-            "ts": datetime.now(UTC).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "msg": record.getMessage(),
-            **({"exc": self.formatException(record.exc_info)} if record.exc_info else {}),
-        })
+        return json.dumps(
+            {
+                "ts": datetime.now(UTC).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "msg": record.getMessage(),
+                **(
+                    {"exc": self.formatException(record.exc_info)}
+                    if record.exc_info
+                    else {}
+                ),
+            }
+        )
+
 
 handler = logging.StreamHandler(sys.stdout)
 handler.setFormatter(JSONFormatter())
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), handlers=[handler])
 log = logging.getLogger("neufin-agent")
+
 
 # ── Git Sync Logic (Railway Fix) ──────────────────────────────────────────
 def sync_repository():
@@ -103,26 +120,32 @@ def sync_repository():
     repo = os.getenv("GITHUB_REPO", "stealthg0dd/neufinapk1")
     token = os.getenv("GITHUB_TOKEN", "")
     repo_path = Path("/app/repo_to_scan")
-    
+
     # Ensure parent dir exists
     repo_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     if not repo_path.exists() or not any(repo_path.iterdir()):
         log.info({"action": "repo_clone_start", "repo": repo})
         try:
-            clone_url = f"https://{token}@github.com/{repo}.git" if token else f"https://github.com/{repo}.git"
+            clone_url = (
+                f"https://{token}@github.com/{repo}.git"
+                if token
+                else f"https://github.com/{repo}.git"
+            )
             subprocess.run(["git", "clone", clone_url, str(repo_path)], check=True)
             log.info({"action": "repo_clone_success", "path": str(repo_path)})
         except subprocess.CalledProcessError as e:
             log.error({"action": "repo_clone_failed", "error": str(e)})
     else:
         log.info({"action": "repo_exists", "path": str(repo_path)})
-    
+
     # Set the environment variable so core.scanner knows where to look
     os.environ["REPO_ROOT"] = str(repo_path.absolute())
 
+
 # ── MCP Server ─────────────────────────────────────────────────────────────
 mcp = FastMCP("neufin-code-health")
+
 
 @mcp.tool()
 async def run_full_scan() -> dict:
@@ -132,11 +155,13 @@ async def run_full_scan() -> dict:
     log.info({"action": "scan_complete", "issues": len(report.get("issues", []))})
     return report
 
+
 @mcp.tool()
 async def get_latest_errors(limit: int = 50) -> dict:
     """Return the last N detected issues from the audit log."""
     issues = await get_open_issues(limit=limit)
     return {"issues": issues, "count": len(issues)}
+
 
 @mcp.tool()
 async def apply_fix(issue_id: str) -> dict:
@@ -145,11 +170,13 @@ async def apply_fix(issue_id: str) -> dict:
     result = await _apply_fix(issue_id)
     return result
 
+
 @mcp.tool()
 async def get_audit_log(limit: int = 100) -> dict:
     """Return fix history from the audit log."""
     history = await get_fix_history(limit=limit)
     return {"history": history, "count": len(history)}
+
 
 @mcp.tool()
 async def dismiss_issue_tool(issue_id: str, reason: str = "") -> dict:
@@ -181,11 +208,16 @@ async def get_health_score() -> dict:
     report_path = Path(__file__).parent / "health_report.json"
     if report_path.exists():
         data = json.loads(report_path.read_text())
-        return {"scores": data.get("scores", {}), "generated_at": data.get("generated_at")}
+        return {
+            "scores": data.get("scores", {}),
+            "generated_at": data.get("generated_at"),
+        }
     return {"scores": {}, "generated_at": None, "note": "No scan run yet"}
+
 
 # ── Scheduler ─────────────────────────────────────────────────────────────
 scheduler = AsyncIOScheduler()
+
 
 async def scheduled_scan():
     # Safety check for repository presence
@@ -225,6 +257,7 @@ async def weekly_trend_job():
         sentry_sdk.capture_exception(e)
         log.error({"action": "weekly_trend_error", "error": str(e)})
 
+
 # ── App lifespan ───────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -241,12 +274,16 @@ async def lifespan(app: FastAPI):
     interval = int(os.getenv("SCAN_INTERVAL_HOURS", "6"))
     scheduler.add_job(scheduled_scan, "interval", hours=interval, id="full_scan")
     scheduler.add_job(check_railway_health, "interval", minutes=5, id="railway_health")
-    scheduler.add_job(check_vercel_analytics, "interval", hours=1, id="vercel_analytics")
+    scheduler.add_job(
+        check_vercel_analytics, "interval", hours=1, id="vercel_analytics"
+    )
     scheduler.add_job(poll_sentry_issues, "interval", minutes=5, id="sentry_poll")
     # 08:30 SGT = 00:30 UTC daily
     scheduler.add_job(daily_summary_job, "cron", hour=0, minute=30, id="daily_summary")
     # Weekly trend: Monday 00:00 UTC (08:00 SGT Mon)
-    scheduler.add_job(weekly_trend_job, "cron", day_of_week="mon", hour=0, minute=0, id="weekly_trend")
+    scheduler.add_job(
+        weekly_trend_job, "cron", day_of_week="mon", hour=0, minute=0, id="weekly_trend"
+    )
     scheduler.start()
     log.info({"action": "scheduler_started", "interval_hours": interval})
 
@@ -260,6 +297,7 @@ async def lifespan(app: FastAPI):
 
     scheduler.shutdown()
     log.info({"action": "shutdown"})
+
 
 # ── FastAPI App ────────────────────────────────────────────────────────────
 app = FastAPI(title="Neufin Code Health Agent", lifespan=lifespan)
@@ -275,6 +313,7 @@ app.add_middleware(
 
 # Mount MCP server
 app.mount("/mcp", mcp.streamable_http_app())
+
 
 @app.get("/health")
 @app.get("/api/health")
@@ -319,10 +358,12 @@ async def trigger_scan():
         "note": "Use POST /api/scan/trigger",
     }
 
+
 @app.get("/api/errors")
 async def errors(limit: int = 50):
     issues = await get_open_issues(limit=limit)
     return {"issues": issues, "count": len(issues)}
+
 
 @app.post("/api/issues/{issue_id}/dismiss")
 async def dismiss(issue_id: str, reason: str = ""):
@@ -331,7 +372,9 @@ async def dismiss(issue_id: str, reason: str = ""):
 
 
 @app.post("/api/false-positives")
-async def create_false_positive(pattern: str, issue_type: str = "", file_glob: str = "", reason: str = ""):
+async def create_false_positive(
+    pattern: str, issue_type: str = "", file_glob: str = "", reason: str = ""
+):
     fp_id = await add_false_positive(
         pattern,
         issue_type=issue_type or None,
@@ -350,6 +393,7 @@ async def weekly_trend():
 async def runtime_summary(hours: int = 24):
     return await get_runtime_summary(hours=hours)
 
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     widget = Path(__file__).parent / "dashboard" / "widget.html"
@@ -357,6 +401,7 @@ async def dashboard():
 
 
 # ── Triage endpoints ───────────────────────────────────────────────────────
+
 
 class ChatRequest(BaseModel):
     question: str
@@ -388,14 +433,19 @@ async def analyze_issue_endpoint(issue_id: str):
             start = max(0, line_no - 10)
             end = min(len(lines), line_no + 11)
             code_context = "\n".join(
-                f"{start + i + 1}: {line_text}" for i, line_text in enumerate(lines[start:end])
+                f"{start + i + 1}: {line_text}"
+                for i, line_text in enumerate(lines[start:end])
             )
     except Exception:
         pass
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return {"root_cause": "ANTHROPIC_API_KEY not set", "confidence": "low", "cached": False}
+        return {
+            "root_cause": "ANTHROPIC_API_KEY not set",
+            "confidence": "low",
+            "cached": False,
+        }
 
     try:
         import anthropic
@@ -409,25 +459,33 @@ async def analyze_issue_endpoint(issue_id: str):
                     "You are a senior engineer reviewing a bug in the Neufin codebase "
                     "(FastAPI + Next.js + Expo). Be concise. Reply in one sentence."
                 ),
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        f"Issue: {issue['message']}\n"
-                        f"File: {issue['file']}\n"
-                        f"Code:\n{code_context}\n\n"
-                        "What is the root cause in one sentence?"
-                    ),
-                }],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Issue: {issue['message']}\n"
+                            f"File: {issue['file']}\n"
+                            f"Code:\n{code_context}\n\n"
+                            "What is the root cause in one sentence?"
+                        ),
+                    }
+                ],
             )
             return resp.content[0].text.strip()
 
         root_cause = await asyncio.to_thread(_call)
-        confidence = "high" if issue.get("severity") in ("critical", "high") else "medium"
+        confidence = (
+            "high" if issue.get("severity") in ("critical", "high") else "medium"
+        )
         await cache_root_cause(issue_id, root_cause, confidence)
         return {"root_cause": root_cause, "confidence": confidence, "cached": False}
     except Exception as exc:
         log.error({"action": "analyze_error", "issue_id": issue_id, "error": str(exc)})
-        return {"root_cause": f"Analysis error: {exc}", "confidence": "low", "cached": False}
+        return {
+            "root_cause": f"Analysis error: {exc}",
+            "confidence": "low",
+            "cached": False,
+        }
 
 
 @app.post("/api/issues/{issue_id}/chat")
@@ -452,7 +510,8 @@ async def chat_issue_endpoint(issue_id: str, body: ChatRequest):
             start = max(0, line_no - 15)
             end = min(len(lines), line_no + 16)
             code_context = "\n".join(
-                f"{start + i + 1}: {line_text}" for i, line_text in enumerate(lines[start:end])
+                f"{start + i + 1}: {line_text}"
+                for i, line_text in enumerate(lines[start:end])
             )
     except Exception:
         pass
@@ -481,7 +540,10 @@ async def chat_issue_endpoint(issue_id: str, body: ChatRequest):
                     "Answer concisely and practically. Max 300 tokens."
                 ),
                 messages=[
-                    {"role": "user", "content": f"Context:\n{context_block}\n\nQuestion: {body.question}"},
+                    {
+                        "role": "user",
+                        "content": f"Context:\n{context_block}\n\nQuestion: {body.question}",
+                    },
                 ],
             )
             return resp.content[0].text.strip()
@@ -508,8 +570,20 @@ async def apply_safe_endpoint():
             applied += 1
         else:
             failed += 1
-    log.info({"action": "apply_safe_all", "applied": applied, "failed": failed, "skipped": skipped})
-    return {"applied": applied, "failed": failed, "skipped": skipped, "total": len(safe_issues)}
+    log.info(
+        {
+            "action": "apply_safe_all",
+            "applied": applied,
+            "failed": failed,
+            "skipped": skipped,
+        }
+    )
+    return {
+        "applied": applied,
+        "failed": failed,
+        "skipped": skipped,
+        "total": len(safe_issues),
+    }
 
 
 @app.post("/api/fixes/{issue_id}/create-pr")
@@ -546,6 +620,7 @@ async def scan_file_endpoint(path: str = Query(..., description="Relative file p
 
     issue_dicts = [i.to_dict() if hasattr(i, "to_dict") else i for i in raw_issues]
     from core.audit_log import upsert_issues
+
     await upsert_issues(issue_dicts)
 
     log.info({"action": "scan_file", "path": path, "issues_found": len(issue_dicts)})
