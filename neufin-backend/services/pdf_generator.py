@@ -2474,6 +2474,49 @@ def _make_cover_callback(
             canvas.setFillColor(pal["text_mut"])
             canvas.drawCentredString(x_c, strip_y - 16, label)
 
+        # ── IC Readiness badge ───────────────────────────────────────────────
+        ic = ctx.get("ic_readiness") or {}
+        ic_tier = str(ic.get("tier") or "DRAFT")
+        ic_score = int(ic.get("score") or 0)
+        ic_color_hex = str(ic.get("tier_color") or "FF4444")
+        ic_flags = ic.get("flags") or []
+
+        badge_y = strip_y - 58
+        badge_color = HexColor(f"#{ic_color_hex}")
+        canvas.setFillColor(badge_color)
+        canvas.roundRect(MARGIN, badge_y - 8, 130, 22, 3, fill=1, stroke=0)
+        canvas.setFont("Helvetica-Bold", 9)
+        canvas.setFillColor(HexColor("#FFFFFF"))
+        canvas.drawString(MARGIN + 8, badge_y + 2, f"IC READINESS: {ic_tier}")
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(pal["text_mut"])
+        canvas.drawString(MARGIN + 145, badge_y + 2, f"Score: {ic_score}/100")
+
+        if ic_flags:
+            flag_x = MARGIN + 220
+            for flag in ic_flags[:3]:
+                flag_status = str(flag.get("status") or "")
+                flag_item = str(flag.get("item") or "")
+                flag_col = ACCENT_RED if flag_status == "MISSING" else ACCENT_AMBER
+                canvas.setFillColor(flag_col)
+                canvas.roundRect(flag_x, badge_y - 4, 6, 14, 1, fill=1, stroke=0)
+                canvas.setFont("Helvetica", 7)
+                canvas.setFillColor(pal["text_mut"])
+                canvas.drawString(flag_x + 10, badge_y + 2, f"{flag_item}: {flag_status}")
+                flag_x += 130
+
+        if ic_tier == "DRAFT":
+            banner_y = badge_y - 26
+            canvas.setFillColor(HexColor("#FF4444"))
+            canvas.rect(MARGIN, banner_y - 4, CONTENT_W, 16, fill=1, stroke=0)
+            canvas.setFont("Helvetica-Bold", 7)
+            canvas.setFillColor(HexColor("#FFFFFF"))
+            canvas.drawCentredString(
+                A4_W / 2,
+                banner_y + 1,
+                "DRAFT OUTPUT — Not for IC distribution until all red items resolved",
+            )
+
         _draw_report_footer(canvas, ctx, pal, report_date)
 
         canvas.restoreState()
@@ -4969,6 +5012,95 @@ def _page_agent_attribution(
     return items
 
 
+# ─── IC READINESS SCORING ─────────────────────────────────────────────────────
+
+
+def compute_ic_readiness(ctx: dict) -> dict:
+    """
+    Score completeness of report inputs and return tier + checklist flags.
+
+    Tier:
+      IC-READY       score >= 90   (green)
+      ADVISOR-READY  score >= 60   (amber)
+      DRAFT          score < 60    (red)
+    """
+    score = 0
+    flags: list[dict] = []
+
+    # Core data — 60 pts total
+    positions = ctx.get("positions") or []
+    if positions:
+        score += 20
+    else:
+        flags.append(
+            {
+                "item": "Portfolio positions",
+                "status": "MISSING",
+                "impact": "Cannot generate any analysis",
+            }
+        )
+
+    prices_fresh = ctx.get("prices_fresh", True)  # assume fresh unless told otherwise
+    if prices_fresh:
+        score += 15
+    else:
+        flags.append(
+            {
+                "item": "Market prices",
+                "status": "STALE",
+                "impact": "Valuations may be inaccurate",
+            }
+        )
+
+    if ctx.get("cost_basis_provided"):
+        score += 15
+    else:
+        flags.append(
+            {
+                "item": "Cost basis",
+                "status": "MISSING",
+                "impact": "Tax analysis unavailable",
+            }
+        )
+
+    if ctx.get("benchmark_set"):
+        score += 10
+    else:
+        flags.append(
+            {
+                "item": "Benchmark",
+                "status": "DEFAULT",
+                "impact": "Using broad index — not mandate-specific",
+            }
+        )
+
+    # Swarm IC — 40 pts
+    if ctx.get("swarm_available"):
+        score += 40
+    else:
+        flags.append(
+            {
+                "item": "Swarm IC Analysis",
+                "status": "NOT RUN",
+                "impact": "Multi-agent synthesis unavailable — DNA-only output",
+            }
+        )
+
+    if score >= 90:
+        tier, tier_color = "IC-READY", "00C851"
+    elif score >= 60:
+        tier, tier_color = "ADVISOR-READY", "FFB300"
+    else:
+        tier, tier_color = "DRAFT", "FF4444"
+
+    return {
+        "score": score,
+        "tier": tier,
+        "tier_color": tier_color,
+        "flags": flags,
+    }
+
+
 # ─── MAIN SYNC PDF BUILDER ────────────────────────────────────────────────────
 
 
@@ -4994,6 +5126,21 @@ def _build_pdf_sync(
     ctx["swarm_available"] = swarm_data_present
     ctx["report_state"] = assess_report_state(ctx)
     ctx["section_confidence"] = build_section_confidence(ctx)
+
+    # IC Readiness — scored from ctx inputs
+    _positions_raw = portfolio_data.get("positions") or portfolio_data.get("positions_with_basis") or []
+    _has_cost_basis = any(
+        (p.get("cost_basis") or p.get("cost_per_share")) is not None
+        for p in (_positions_raw if isinstance(_positions_raw, list) else [])
+    )
+    ic_ctx = {
+        "positions": ctx.get("positions") or _positions_raw,
+        "prices_fresh": True,
+        "cost_basis_provided": _has_cost_basis,
+        "benchmark_set": bool(ctx.get("portfolio_benchmark") or ctx.get("benchmark")),
+        "swarm_available": swarm_data_present,
+    }
+    ctx["ic_readiness"] = compute_ic_readiness(ic_ctx)
 
     # VN-specific footer note (built once, reused per page in _make_hf_callback)
     now = datetime.datetime.utcnow()
