@@ -972,6 +972,29 @@ export default function ResultsContent() {
               </motion.div>
             )}
 
+            {/* ── Swarm IC upgrade CTA ────────────────────────────────────── */}
+            <motion.div variants={fadeUp}>
+              <div className="rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 to-surface-2 p-5 text-center space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-400">
+                  Upgrade to Swarm IC
+                </p>
+                <p className="text-base font-bold text-navy">
+                  Your DNA score is ready. Now get the full Investment Committee
+                  briefing.
+                </p>
+                <p className="text-sm text-muted2">
+                  7 AI agents cross-examine your portfolio with macro regime
+                  context, exact trade sizing, and tax-lot optimisation.
+                </p>
+                <Link
+                  href="/dashboard/swarm"
+                  className="inline-block rounded-xl bg-amber-500 px-8 py-3 text-sm font-bold text-white transition-colors hover:bg-amber-600"
+                >
+                  Run 7-Agent Swarm Analysis →
+                </Link>
+              </div>
+            </motion.div>
+
             {/* ── Dashboard CTA ───────────────────────────────────────────── */}
             <motion.div variants={fadeUp} className="text-center pb-6">
               <Link

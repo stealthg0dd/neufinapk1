@@ -2474,6 +2474,49 @@ def _make_cover_callback(
             canvas.setFillColor(pal["text_mut"])
             canvas.drawCentredString(x_c, strip_y - 16, label)
 
+        # ── IC Readiness badge ───────────────────────────────────────────────
+        ic = ctx.get("ic_readiness") or {}
+        ic_tier = str(ic.get("tier") or "DRAFT")
+        ic_score = int(ic.get("score") or 0)
+        ic_color_hex = str(ic.get("tier_color") or "FF4444")
+        ic_flags = ic.get("flags") or []
+
+        badge_y = strip_y - 58
+        badge_color = HexColor(f"#{ic_color_hex}")
+        canvas.setFillColor(badge_color)
+        canvas.roundRect(MARGIN, badge_y - 8, 130, 22, 3, fill=1, stroke=0)
+        canvas.setFont("Helvetica-Bold", 9)
+        canvas.setFillColor(HexColor("#FFFFFF"))
+        canvas.drawString(MARGIN + 8, badge_y + 2, f"IC READINESS: {ic_tier}")
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(pal["text_mut"])
+        canvas.drawString(MARGIN + 145, badge_y + 2, f"Score: {ic_score}/100")
+
+        if ic_flags:
+            flag_x = MARGIN + 220
+            for flag in ic_flags[:3]:
+                flag_status = str(flag.get("status") or "")
+                flag_item = str(flag.get("item") or "")
+                flag_col = ACCENT_RED if flag_status == "MISSING" else ACCENT_AMBER
+                canvas.setFillColor(flag_col)
+                canvas.roundRect(flag_x, badge_y - 4, 6, 14, 1, fill=1, stroke=0)
+                canvas.setFont("Helvetica", 7)
+                canvas.setFillColor(pal["text_mut"])
+                canvas.drawString(flag_x + 10, badge_y + 2, f"{flag_item}: {flag_status}")
+                flag_x += 130
+
+        if ic_tier == "DRAFT":
+            banner_y = badge_y - 26
+            canvas.setFillColor(HexColor("#FF4444"))
+            canvas.rect(MARGIN, banner_y - 4, CONTENT_W, 16, fill=1, stroke=0)
+            canvas.setFont("Helvetica-Bold", 7)
+            canvas.setFillColor(HexColor("#FFFFFF"))
+            canvas.drawCentredString(
+                A4_W / 2,
+                banner_y + 1,
+                "DRAFT OUTPUT — Not for IC distribution until all red items resolved",
+            )
+
         _draw_report_footer(canvas, ctx, pal, report_date)
 
         canvas.restoreState()
@@ -3628,6 +3671,285 @@ def _page_risk_correlation(
                 cw,
             )
         )
+    return items
+
+
+# ─── PAGE 5b — LIQUIDITY ANALYSIS ────────────────────────────────────────────
+
+VN_ADV_USD: dict[str, float] = {
+    "VCI.VN": 12_000_000,
+    "HPG.VN": 25_000_000,
+    "VPB.VN": 18_000_000,
+    "MBB.VN": 15_000_000,
+    "SSI.VN": 8_000_000,
+    "LCG.VN": 2_000_000,
+    "DEFAULT": 5_000_000,
+}
+
+
+def _compute_liquidity_metrics(
+    positions: list[dict], portfolio_aum_usd: float, market_code: str
+) -> list[dict]:
+    """Return per-position liquidity metrics using hardcoded ADV benchmarks."""
+    rows: list[dict] = []
+    for pos in positions:
+        sym = str(pos.get("symbol") or pos.get("ticker") or "").upper()
+        weight = float(pos.get("weight") or 0)
+        pos_value_usd = weight * portfolio_aum_usd
+        if pos_value_usd <= 0:
+            continue
+        adv = VN_ADV_USD.get(sym, VN_ADV_USD["DEFAULT"])
+        pct_of_adv = (pos_value_usd / adv) * 100 if adv > 0 else 0
+        days_normal = pos_value_usd / (adv * 0.20) if adv > 0 else 0
+        days_stress = pos_value_usd / (adv * 0.05) if adv > 0 else 0
+        if days_normal > 30:
+            status = "ILLIQUID"
+        elif days_normal > 5:
+            status = "CAUTION"
+        else:
+            status = "LIQUID"
+        rows.append(
+            {
+                "symbol": sym,
+                "pos_m": round(pos_value_usd / 1_000_000, 2),
+                "adv_m": round(adv / 1_000_000, 2),
+                "pct_adv": round(pct_of_adv, 0),
+                "days_normal": round(days_normal, 1),
+                "days_stress": round(days_stress, 1),
+                "status": status,
+            }
+        )
+    rows.sort(key=lambda r: r["days_normal"], reverse=True)
+    return rows
+
+
+def _page_liquidity_analysis(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    items: list = []
+    items.extend(
+        _ic_body_section_header(
+            "4b",
+            "LIQUIDITY ANALYSIS",
+            "Position sizing vs average daily volume",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    positions = ctx.get("positions") or []
+    aum = float(ctx.get("total_value") or 0)
+    region = ctx.get("region_profile") or {}
+    market_code = str(region.get("primary_market") or "US")
+
+    rows = _compute_liquidity_metrics(positions, aum, market_code)
+    if not rows:
+        items.append(
+            Paragraph(
+                "Liquidity data unavailable for this portfolio.", st["muted"]
+            )
+        )
+        return items
+
+    # Table
+    headers = ["Symbol", "Position (M)", "ADV (M)", "% of ADV", "Days Normal", "Days Stress", "Status"]
+    col_w = [cw * w for w in [0.14, 0.13, 0.10, 0.12, 0.14, 0.14, 0.14]]
+
+    def _status_color(s: str) -> str:
+        return "#EF4444" if s == "ILLIQUID" else "#F5A623" if s == "CAUTION" else "#22C55E"
+
+    table_data = [[Paragraph(h, st["label"]) for h in headers]]
+    for r in rows[:10]:
+        sc = _status_color(r["status"])
+        table_data.append(
+            [
+                Paragraph(r["symbol"], st["body"]),
+                Paragraph(f"${r['pos_m']:,.1f}M", st["body"]),
+                Paragraph(f"${r['adv_m']:,.1f}M", st["body"]),
+                Paragraph(f"{int(r['pct_adv']):,}%", st["body"]),
+                Paragraph(f"{r['days_normal']:.1f}d", st["body"]),
+                Paragraph(f"{r['days_stress']:.1f}d", st["body"]),
+                Paragraph(
+                    r["status"],
+                    ParagraphStyle(
+                        f"liq_status_{r['symbol']}",
+                        parent=st["body"],
+                        textColor=HexColor(sc),
+                        fontName="Helvetica-Bold",
+                        fontSize=9,
+                    ),
+                ),
+            ]
+        )
+
+    tbl = Table(table_data, colWidths=col_w, repeatRows=1)
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), pal["card"]),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.5, pal["border"]),
+                ("LINEBELOW", (0, 1), (-1, -1), 0.3, pal["border"]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    items.append(tbl)
+    items.append(Spacer(1, 6))
+
+    # Liquidity summary sentence
+    illiquid = [r for r in rows if r["status"] == "ILLIQUID"]
+    total_days_normal = max((r["days_normal"] for r in rows), default=0)
+    total_days_stress = max((r["days_stress"] for r in rows), default=0)
+
+    if illiquid:
+        worst = illiquid[0]
+        summary = (
+            f"Portfolio liquidity horizon: ~{total_days_normal:.0f} days under normal "
+            f"conditions, ~{total_days_stress:.0f} days under stress conditions. "
+            f"{worst['symbol']} would require ~{worst['days_normal']:.0f} months to "
+            f"exit at 20% ADV participation without market impact. "
+            f"This is a material institutional risk at current sizing."
+        )
+    else:
+        summary = (
+            f"Portfolio liquidity horizon: ~{total_days_normal:.0f} days under normal "
+            f"conditions. No positions are classified as illiquid at current sizing."
+        )
+
+    items.append(Paragraph(summary, st["body_sm"]))
+    items.append(Spacer(1, 8))
+    return items
+
+
+# ─── PAGE 5c — SECTOR ATTRIBUTION ─────────────────────────────────────────────
+
+VN_INDEX_SECTOR_WEIGHTS: dict[str, float] = {
+    "Securities": 0.08,
+    "Banking": 0.35,
+    "Materials": 0.12,
+    "Construction": 0.05,
+    "Energy": 0.08,
+    "Other": 0.32,
+}
+
+_SECTOR_MAP: dict[str, str] = {
+    "VCI.VN": "Securities",
+    "SSI.VN": "Securities",
+    "VPB.VN": "Banking",
+    "MBB.VN": "Banking",
+    "BID.VN": "Banking",
+    "VCB.VN": "Banking",
+    "HPG.VN": "Materials",
+    "LCG.VN": "Construction",
+    "GAS.VN": "Energy",
+}
+
+
+def _classify_sector(sym: str) -> str:
+    return _SECTOR_MAP.get(sym.upper(), "Other")
+
+
+def _page_sector_attribution(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    items: list = []
+    items.extend(
+        _ic_body_section_header(
+            "4c",
+            "SECTOR ATTRIBUTION",
+            "Active bets vs VN-Index benchmark",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    positions = ctx.get("positions") or []
+    if not positions:
+        items.append(Paragraph("No position data available.", st["muted"]))
+        return items
+
+    # Aggregate sector weights
+    sector_weights: dict[str, float] = {}
+    for pos in positions:
+        sym = str(pos.get("symbol") or "").upper()
+        w = float(pos.get("weight") or 0)
+        sector = _classify_sector(sym)
+        sector_weights[sector] = sector_weights.get(sector, 0) + w
+
+    # Table
+    headers = ["Sector", "Portfolio%", "VN-Index%", "Active Bet", "Risk Contribution%"]
+    col_w = [cw * w for w in [0.22, 0.16, 0.16, 0.22, 0.24]]
+
+    table_data = [[Paragraph(h, st["label"]) for h in headers]]
+    largest_bet: tuple[str, float] = ("", 0.0)
+
+    for sector in sorted(sector_weights, key=lambda s: sector_weights[s], reverse=True):
+        port_w = sector_weights[sector]
+        bench_w = VN_INDEX_SECTOR_WEIGHTS.get(sector, VN_INDEX_SECTOR_WEIGHTS["Other"])
+        active = port_w - bench_w
+        risk_contrib = round(port_w * port_w * 100, 2)
+        active_pct_str = f"{active*100:+.1f}%"
+        active_color = "#EF4444" if active > 0.15 else "#F5A623" if active > 0.05 else "#22C55E" if active < 0 else "#64748B"
+        if abs(active) > abs(largest_bet[1]):
+            largest_bet = (sector, active)
+        table_data.append(
+            [
+                Paragraph(sector, st["body"]),
+                Paragraph(f"{port_w*100:.1f}%", st["body"]),
+                Paragraph(f"{bench_w*100:.1f}%", st["body"]),
+                Paragraph(
+                    active_pct_str,
+                    ParagraphStyle(
+                        f"active_bet_{sector}",
+                        parent=st["body"],
+                        textColor=HexColor(active_color),
+                        fontName="Helvetica-Bold",
+                        fontSize=9,
+                    ),
+                ),
+                Paragraph(f"{risk_contrib:.2f}%", st["body"]),
+            ]
+        )
+
+    tbl = Table(table_data, colWidths=col_w, repeatRows=1)
+    tbl.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), pal["card"]),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.5, pal["border"]),
+                ("LINEBELOW", (0, 1), (-1, -1), 0.3, pal["border"]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    items.append(tbl)
+    items.append(Spacer(1, 6))
+
+    # IC-grade narrative for the largest active bet
+    if largest_bet[0] and abs(largest_bet[1]) > 0.10:
+        sector_name = largest_bet[0]
+        active_val = largest_bet[1]
+        bench_val = VN_INDEX_SECTOR_WEIGHTS.get(sector_name, VN_INDEX_SECTOR_WEIGHTS["Other"])
+        port_val = sector_weights.get(sector_name, 0)
+        direction = "overweight" if active_val > 0 else "underweight"
+        narrative = (
+            f"This portfolio has a {abs(active_val)*100:.1f}% active {direction} in "
+            f"{sector_name.lower()} vs VN-Index ({port_val*100:.1f}% vs {bench_val*100:.1f}% benchmark). "
+            f"This is a high-conviction directional bet, not diversification. "
+            f"IC should validate whether this active exposure is intentional and within mandate limits."
+        )
+        items.append(Paragraph(narrative, st["body_sm"]))
+    items.append(Spacer(1, 8))
     return items
 
 
@@ -4969,6 +5291,95 @@ def _page_agent_attribution(
     return items
 
 
+# ─── IC READINESS SCORING ─────────────────────────────────────────────────────
+
+
+def compute_ic_readiness(ctx: dict) -> dict:
+    """
+    Score completeness of report inputs and return tier + checklist flags.
+
+    Tier:
+      IC-READY       score >= 90   (green)
+      ADVISOR-READY  score >= 60   (amber)
+      DRAFT          score < 60    (red)
+    """
+    score = 0
+    flags: list[dict] = []
+
+    # Core data — 60 pts total
+    positions = ctx.get("positions") or []
+    if positions:
+        score += 20
+    else:
+        flags.append(
+            {
+                "item": "Portfolio positions",
+                "status": "MISSING",
+                "impact": "Cannot generate any analysis",
+            }
+        )
+
+    prices_fresh = ctx.get("prices_fresh", True)  # assume fresh unless told otherwise
+    if prices_fresh:
+        score += 15
+    else:
+        flags.append(
+            {
+                "item": "Market prices",
+                "status": "STALE",
+                "impact": "Valuations may be inaccurate",
+            }
+        )
+
+    if ctx.get("cost_basis_provided"):
+        score += 15
+    else:
+        flags.append(
+            {
+                "item": "Cost basis",
+                "status": "MISSING",
+                "impact": "Tax analysis unavailable",
+            }
+        )
+
+    if ctx.get("benchmark_set"):
+        score += 10
+    else:
+        flags.append(
+            {
+                "item": "Benchmark",
+                "status": "DEFAULT",
+                "impact": "Using broad index — not mandate-specific",
+            }
+        )
+
+    # Swarm IC — 40 pts
+    if ctx.get("swarm_available"):
+        score += 40
+    else:
+        flags.append(
+            {
+                "item": "Swarm IC Analysis",
+                "status": "NOT RUN",
+                "impact": "Multi-agent synthesis unavailable — DNA-only output",
+            }
+        )
+
+    if score >= 90:
+        tier, tier_color = "IC-READY", "00C851"
+    elif score >= 60:
+        tier, tier_color = "ADVISOR-READY", "FFB300"
+    else:
+        tier, tier_color = "DRAFT", "FF4444"
+
+    return {
+        "score": score,
+        "tier": tier,
+        "tier_color": tier_color,
+        "flags": flags,
+    }
+
+
 # ─── MAIN SYNC PDF BUILDER ────────────────────────────────────────────────────
 
 
@@ -4994,6 +5405,21 @@ def _build_pdf_sync(
     ctx["swarm_available"] = swarm_data_present
     ctx["report_state"] = assess_report_state(ctx)
     ctx["section_confidence"] = build_section_confidence(ctx)
+
+    # IC Readiness — scored from ctx inputs
+    _positions_raw = portfolio_data.get("positions") or portfolio_data.get("positions_with_basis") or []
+    _has_cost_basis = any(
+        (p.get("cost_basis") or p.get("cost_per_share")) is not None
+        for p in (_positions_raw if isinstance(_positions_raw, list) else [])
+    )
+    ic_ctx = {
+        "positions": ctx.get("positions") or _positions_raw,
+        "prices_fresh": True,
+        "cost_basis_provided": _has_cost_basis,
+        "benchmark_set": bool(ctx.get("portfolio_benchmark") or ctx.get("benchmark")),
+        "swarm_available": swarm_data_present,
+    }
+    ctx["ic_readiness"] = compute_ic_readiness(ic_ctx)
 
     # VN-specific footer note (built once, reused per page in _make_hf_callback)
     now = datetime.datetime.utcnow()
@@ -5126,6 +5552,8 @@ def _build_pdf_sync(
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
     _add_page(_page_macro_regime, ctx, extra, pal, st, cw)
     _add_page(_page_risk_correlation, ctx, extra, pal, st, cw)
+    _add_page(_page_liquidity_analysis, ctx, extra, pal, st, cw)
+    _add_page(_page_sector_attribution, ctx, extra, pal, st, cw)
     if ctx.get("quant_modes_selected"):
         _add_page(_page_quant_model_outputs, ctx, extra, pal, st, cw)
     _add_page(_page_behavioral_dna, ctx, extra, pal, st, cw)

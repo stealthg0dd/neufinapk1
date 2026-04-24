@@ -10,6 +10,7 @@ export type DashboardTabId =
   | "swarm"
   | "research"
   | "quant"
+  | "attribution"
   | "reports"
   | "billing";
 
@@ -47,6 +48,7 @@ export const DASHBOARD_WORKFLOW_ORDER: DashboardTabId[] = [
   "swarm",
   "research",
   "quant",
+  "attribution",
   "reports",
   "billing",
 ];
@@ -155,6 +157,21 @@ export const DASHBOARD_TABS: Record<DashboardTabId, DashboardTabDefinition> = {
     nextInJourney: {
       tabId: "reports",
       reason: "Snapshot quant view into client deliverable.",
+    },
+  },
+  attribution: {
+    id: "attribution",
+    path: "/dashboard/attribution",
+    label: "Attribution",
+    section: "insights",
+    jobToBeDone:
+      "Decompose portfolio risk and return into factor contributions — market beta, concentration, sector, and idiosyncratic.",
+    entryStates: ["ready", "empty_no_portfolio"],
+    keyDataObjects: ["metrics", "positions[]", "portfolio_id"],
+    primaryCta: "Drill factor / export / link to report",
+    nextInJourney: {
+      tabId: "reports",
+      reason: "Snapshot attribution view into client deliverable.",
     },
   },
   reports: {

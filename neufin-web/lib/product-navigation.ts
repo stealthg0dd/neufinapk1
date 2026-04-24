@@ -13,6 +13,7 @@ import {
   Code2,
   FileText,
   CreditCard,
+  BarChart3,
 } from "lucide-react";
 import { DASHBOARD_TABS, type DashboardTabId } from "@/lib/dashboard-ia";
 
@@ -23,6 +24,7 @@ const TAB_ICONS: Record<DashboardTabId, LucideIcon> = {
   swarm: Bot,
   research: BookOpen,
   quant: Code2,
+  attribution: BarChart3,
   reports: FileText,
   billing: CreditCard,
 };
@@ -47,7 +49,7 @@ function item(tabId: DashboardTabId): ProductNavItem {
 /** Sidebar: three groups matching IA sections */
 export const SIDEBAR_NAV = {
   overview: [item("overview"), item("actions"), item("portfolio"), item("swarm")],
-  insights: [item("research"), item("quant"), item("reports")],
+  insights: [item("research"), item("quant"), item("attribution"), item("reports")],
   account: [item("billing")],
 } as const;
 
