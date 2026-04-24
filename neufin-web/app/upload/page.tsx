@@ -283,6 +283,68 @@ export default function UploadPage() {
             </div>
           )}
 
+          {/* ── DNA → Swarm two-step explainer ─────────────────────────── */}
+          <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-start gap-4 rounded-xl border border-border bg-surface-2 p-4">
+            {/* Step 1 */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                Step 1 · DNA Analysis
+              </p>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Free · ~5 seconds
+              </p>
+              <ul className="space-y-1">
+                {[
+                  "Behavioral fingerprint (47 biases)",
+                  "Concentration & correlation score",
+                  "Investor archetype classification",
+                  "Basic rebalancing signals",
+                  "Churn risk score",
+                ].map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-1.5 text-xs text-foreground/80"
+                  >
+                    <span className="mt-0.5 text-emerald-500">✓</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex items-center justify-center pt-6">
+              <span className="text-xl text-primary font-bold">→</span>
+            </div>
+
+            {/* Step 2 */}
+            <div className="space-y-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-500">
+                Step 2 · Swarm IC
+              </p>
+              <p className="text-xs font-semibold text-muted-foreground">
+                Advisor tier · ~60 seconds
+              </p>
+              <ul className="space-y-1">
+                {[
+                  "7 AI agents cross-examine portfolio",
+                  "Macro regime alignment check",
+                  "Tax-lot optimisation",
+                  "Full IC memo",
+                  "White-label PDF export",
+                ].map((item) => (
+                  <li
+                    key={item}
+                    className="flex items-start gap-1.5 text-xs text-foreground/80"
+                  >
+                    <span className="mt-0.5 text-amber-400">✦</span>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
           {/* Actions */}
           <div className="mt-6 flex flex-col gap-3">
             <button

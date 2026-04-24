@@ -1536,6 +1536,41 @@ export default function SwarmPage() {
         <FinancialModelSelector />
       </div>
 
+      {/* ── DNA → Swarm explainer ─────────────────────────────────────── */}
+      <div className="max-w-[1600px] mx-auto px-4 pb-2">
+        <div className="rounded-xl border border-amber-400/25 bg-amber-50/60 px-5 py-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-600 mb-1">
+            What Swarm IC adds beyond DNA
+          </p>
+          <p className="text-sm text-navy leading-relaxed">
+            <strong>DNA</strong> tells you{" "}
+            <span className="text-primary font-semibold">
+              WHAT your portfolio looks like
+            </span>
+            . &nbsp;
+            <strong>Swarm IC</strong> tells you{" "}
+            <span className="text-amber-600 font-semibold">
+              WHY it&apos;s structured that way and WHAT to do about it
+            </span>{" "}
+            — with specific trade recommendations from 7 independent AI agents.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted2">
+            {[
+              "Macro regime cross-validation",
+              "Tax-lot optimisation",
+              "Exact trade sizing + notional cost",
+              "7 agents · independent second opinion",
+              "IC-grade PDF export",
+            ].map((f) => (
+              <span key={f} className="flex items-center gap-1">
+                <span className="text-amber-500">✦</span>
+                {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Main 3-column layout */}
       <div className="max-w-[1600px] mx-auto px-4 py-5 grid grid-cols-1 xl:grid-cols-12 gap-4">
         {/* Agent trace terminal */}
