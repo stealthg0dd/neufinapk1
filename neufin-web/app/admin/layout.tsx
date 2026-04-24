@@ -10,7 +10,8 @@ function backendBase(): string {
 async function checkAdminAccess(token: string): Promise<"ok" | "unauthorized" | "forbidden"> {
   const base = backendBase().trim().replace(/\/$/, "");
   if (!base) {
-    return "ok";
+    // Never grant access if API URL is not configured
+    throw new Error("NEXT_PUBLIC_API_URL is required for admin access");
   }
 
   try {
