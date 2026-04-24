@@ -1581,6 +1581,53 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     return result
 
 
+def compute_churn_risk(dna_result: dict) -> dict:
+    """
+    Churn risk = probability this investor exits after a 10%+ market correction.
+
+    Correlates with: concentration (HHI), high-severity behavioral biases,
+    and regime mismatch. Returns score 0-100, level, narrative, and drivers.
+    """
+    score = 0.0
+
+    # Concentration component (0-30 pts) — HHI 0.30+ = 30pts max
+    hhi = float(dna_result.get("hhi") or 0)
+    score += min(30.0, hhi * 100.0)
+
+    # Behavioral bias component (0-40 pts) — 15pts per HIGH-severity bias
+    biases: list[dict] = dna_result.get("structural_biases") or []
+    high_biases = [b for b in biases if str(b.get("severity") or "").upper() == "HIGH"]
+    score += min(40.0, len(high_biases) * 15.0)
+
+    # Regime mismatch (0-30 pts) — concentrated portfolio in risk-off = high churn
+    regime = str(dna_result.get("regime_label") or "Market-Neutral")
+    if regime in ("Risk-Off", "Stagflation"):
+        score += 20.0
+    elif regime == "Transition":
+        score += 10.0
+
+    score = round(min(100.0, score))
+    if score < 33:
+        level = "LOW"
+    elif score < 66:
+        level = "MEDIUM"
+    else:
+        level = "HIGH"
+
+    drivers = [b.get("name", "") for b in high_biases if b.get("name")]
+
+    return {
+        "churn_risk_score": int(score),
+        "churn_risk_level": level,
+        "churn_risk_narrative": (
+            f"This investor has a {level.lower()} probability of exiting positions "
+            f"during the next 10%+ market correction based on concentration "
+            f"(HHI {hhi:.2f}) and behavioral bias profile."
+        ),
+        "churn_risk_drivers": drivers,
+    }
+
+
 def canonical_metrics_for_institutional_report(
     portfolio_data: dict,
     dna_data: dict | None,

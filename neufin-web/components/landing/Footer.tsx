@@ -21,7 +21,9 @@ const FOOTER_LINKS = {
   Legal: [
     { href: "/terms-and-conditions", label: "Terms" },
     { href: "/privacy", label: "Privacy" },
-    { href: "https://status.neufin.ai", label: "Status", external: true },
+    { href: "/legal/dpa", label: "DPA" },
+    { href: "/security", label: "Security" },
+    { href: "/status", label: "Status" },
   ],
 } as const;
 

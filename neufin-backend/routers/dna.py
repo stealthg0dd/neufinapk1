@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import time
 import uuid
+from typing import Any
 
 import pandas as pd
 import structlog
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
 
 from config import APP_BASE_URL
+from core.config import settings
 from database import supabase
 from services.ai_router import get_ai_analysis
-from services.calculator import calculate_portfolio_metrics
+from services.calculator import calculate_portfolio_metrics, compute_churn_risk
 from services.portfolio_region import dna_archetype_overlay
 from services.quant_model_engine import analyze_financial_modes
 
@@ -121,6 +125,17 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
         metrics.get("positions") or positions,
         str(analysis.get("investor_type") or "Balanced Growth Investor"),
     )
+
+    # Churn risk uses HHI + biases from metrics + regime from quant
+    churn_input = {
+        "hhi": metrics.get("hhi", 0),
+        "structural_biases": metrics.get("structural_biases") or [],
+        "regime_label": (quant_result or {}).get("regime_context", {}).get("regime")
+        if quant_result
+        else None,
+    }
+    churn = compute_churn_risk(churn_input)
+    analysis.update(churn)
 
     share_token = str(uuid.uuid4())[:8]
 
@@ -267,3 +282,239 @@ async def get_leaderboard(limit: int = 10):
         return payload
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+# ── Batch Portfolio Analysis ───────────────────────────────────────────────────
+
+_BATCH_MAX_SIZE = 1000
+_BATCH_RATE_LIMIT: dict[str, float] = {}  # api_key → last_batch_ts
+_BATCH_RATE_WINDOW = 60.0  # 1 batch per minute per key
+
+# In-process fallback store (Redis is primary when REDIS_URL is set)
+_batch_store: dict[str, dict[str, Any]] = {}
+
+_BATCH_REDIS_TTL = 3600  # 1 hour
+_background_tasks: set = set()  # prevent GC of fire-and-forget tasks (RUF006)
+
+
+def _get_batch_redis():
+    """Return a Redis client if configured, else None."""
+    url = getattr(settings, "REDIS_URL", "") or ""
+    if not url:
+        return None
+    try:
+        import redis as _redis_lib
+
+        r = _redis_lib.from_url(url, decode_responses=True, socket_connect_timeout=2)
+        r.ping()
+        return r
+    except Exception:
+        return None
+
+
+def _batch_set(batch_id: str, data: dict) -> None:
+    r = _get_batch_redis()
+    serialised = json.dumps(data)
+    if r:
+        r.setex(f"neufin:batch:{batch_id}", _BATCH_REDIS_TTL, serialised)
+    _batch_store[batch_id] = data
+
+
+def _batch_get(batch_id: str) -> dict | None:
+    r = _get_batch_redis()
+    if r:
+        raw = r.get(f"neufin:batch:{batch_id}")
+        if raw:
+            return json.loads(raw)
+    return _batch_store.get(batch_id)
+
+
+class BatchPosition(BaseModel):
+    symbol: str
+    shares: float
+    cost_basis: float | None = None
+
+
+class BatchPortfolioItem(BaseModel):
+    portfolio_id: str
+    positions: list[BatchPosition]
+
+
+class BatchRequest(BaseModel):
+    portfolios: list[BatchPortfolioItem] = Field(..., max_length=_BATCH_MAX_SIZE)
+    market_code: str = "US"
+    include_churn_risk: bool = True
+    api_key: str | None = None
+
+
+async def _process_single(item: BatchPortfolioItem, include_churn: bool) -> dict:
+    """Compute DNA metrics for one portfolio item in the batch."""
+    try:
+        positions = [p.model_dump() for p in item.positions]
+        metrics = calculate_portfolio_metrics(positions)
+        result: dict[str, Any] = {
+            "portfolio_id": item.portfolio_id,
+            "status": "ok",
+            "dna_score": metrics.get("dna_score"),
+            "hhi": metrics.get("hhi"),
+            "weighted_beta": metrics.get("weighted_beta"),
+            "num_positions": metrics.get("num_positions"),
+            "total_value": metrics.get("total_value"),
+        }
+        if include_churn:
+            churn = compute_churn_risk(
+                {"hhi": metrics.get("hhi", 0), "structural_biases": []}
+            )
+            result.update(churn)
+        return result
+    except Exception as exc:
+        return {
+            "portfolio_id": item.portfolio_id,
+            "status": "error",
+            "error": str(exc),
+        }
+
+
+async def _run_batch(batch_id: str, req: BatchRequest) -> None:
+    """Background task: process all portfolios, update state as results arrive."""
+    total = len(req.portfolios)
+    completed = 0
+    results: list[dict] = []
+
+    _batch_set(
+        batch_id,
+        {
+            "batch_id": batch_id,
+            "status": "processing",
+            "total": total,
+            "completed": 0,
+            "results": [],
+        },
+    )
+
+    # Process in chunks of 50 to avoid overwhelming the price feed
+    chunk_size = 50
+    for i in range(0, total, chunk_size):
+        chunk = req.portfolios[i : i + chunk_size]
+        chunk_results = await asyncio.gather(
+            *[_process_single(item, req.include_churn_risk) for item in chunk],
+            return_exceptions=False,
+        )
+        results.extend(chunk_results)
+        completed += len(chunk)
+        _batch_set(
+            batch_id,
+            {
+                "batch_id": batch_id,
+                "status": "processing" if completed < total else "complete",
+                "total": total,
+                "completed": completed,
+                "results": results,
+            },
+        )
+        # Brief yield to avoid starving other requests
+        await asyncio.sleep(0)
+
+    _batch_set(
+        batch_id,
+        {
+            "batch_id": batch_id,
+            "status": "complete",
+            "total": total,
+            "completed": total,
+            "results": results,
+        },
+    )
+
+
+@router.post("/batch")
+async def submit_batch(req: BatchRequest):
+    """
+    Submit up to 1000 portfolios for async DNA analysis.
+    Requires enterprise API key. Rate limit: 1 batch/minute per key.
+    Returns a batch_id for polling status and results.
+    """
+    api_key = req.api_key or ""
+    if not api_key:
+        raise HTTPException(status_code=401, detail="api_key is required for batch analysis.")
+
+    # Rate limit: 1 batch per 60s per API key
+    now = time.monotonic()
+    last = _BATCH_RATE_LIMIT.get(api_key, 0.0)
+    if now - last < _BATCH_RATE_WINDOW:
+        retry_after = int(_BATCH_RATE_WINDOW - (now - last)) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit: 1 batch per minute. Retry after {retry_after}s.",
+        )
+    _BATCH_RATE_LIMIT[api_key] = now
+
+    if len(req.portfolios) > _BATCH_MAX_SIZE:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Maximum batch size is {_BATCH_MAX_SIZE} portfolios.",
+        )
+    if not req.portfolios:
+        raise HTTPException(status_code=422, detail="portfolios array cannot be empty.")
+
+    batch_id = f"batch_{uuid.uuid4().hex[:12]}"
+    estimated_seconds = max(5, len(req.portfolios) // 20)
+
+    # Fire-and-forget background processing — task ref kept to prevent GC
+    _task = asyncio.create_task(_run_batch(batch_id, req))
+    _background_tasks.add(_task)
+    _task.add_done_callback(_background_tasks.discard)
+
+    return {
+        "batch_id": batch_id,
+        "total": len(req.portfolios),
+        "estimated_seconds": estimated_seconds,
+        "status_url": f"/api/dna/batch/{batch_id}/status",
+        "results_url": f"/api/dna/batch/{batch_id}/results",
+    }
+
+
+@router.get("/batch/{batch_id}/status")
+async def get_batch_status(batch_id: str):
+    """Poll batch processing progress. Returns completed count and current status."""
+    state = _batch_get(batch_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Batch not found.")
+    return {
+        "batch_id": batch_id,
+        "status": state.get("status", "unknown"),
+        "total": state.get("total", 0),
+        "completed": state.get("completed", 0),
+        "pct_complete": round(
+            state.get("completed", 0) / max(state.get("total", 1), 1) * 100, 1
+        ),
+    }
+
+
+@router.get("/batch/{batch_id}/results")
+async def get_batch_results(
+    batch_id: str,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+):
+    """
+    Retrieve full batch results (paginated).
+    Available as soon as status == 'complete'.
+    """
+    state = _batch_get(batch_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Batch not found.")
+    if state.get("status") != "complete":
+        raise HTTPException(
+            status_code=202,
+            detail=f"Batch still processing ({state.get('completed', 0)}/{state.get('total', 0)} complete).",
+        )
+    results: list[dict] = state.get("results") or []
+    page = results[offset : offset + limit]
+    return {
+        "batch_id": batch_id,
+        "total": len(results),
+        "offset": offset,
+        "limit": limit,
+        "results": page,
+    }

@@ -204,6 +204,56 @@ export default function AdminUserDetailPage() {
         >
           Set plan → free / expired
         </button>
+        {/* ── Admin Access Management ─────────────────────────────────── */}
+        <div className="mt-2 border-t border-zinc-800 pt-3">
+          <p className="text-xs text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
+            Admin Management
+          </p>
+          {u.role === "admin" ? (
+            <button
+              type="button"
+              disabled={!!busy}
+              className="rounded-lg border border-amber-700/60 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50 text-amber-200 w-full"
+              onClick={() => {
+                if (
+                  !confirm(
+                    `Revoke admin access from ${u.email}? They will be downgraded to advisor tier.`,
+                  )
+                )
+                  return;
+                void doAction("Revoke admin", async () => {
+                  await apiPost(`/api/admin/users/${id}/plan`, {
+                    role: "advisor",
+                  });
+                });
+              }}
+            >
+              Revoke Admin Access
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!!busy}
+              className="rounded-lg border border-sky-700/60 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50 text-sky-200 w-full"
+              onClick={() => {
+                if (
+                  !confirm(
+                    `Grant admin access to ${u.email}? This gives full system access.`,
+                  )
+                )
+                  return;
+                void doAction("Grant admin", async () => {
+                  await apiPost(`/api/admin/users/${id}/plan`, {
+                    role: "admin",
+                  });
+                });
+              }}
+            >
+              Grant Admin Access
+            </button>
+          )}
+        </div>
+
         <button
           type="button"
           disabled={!!busy}

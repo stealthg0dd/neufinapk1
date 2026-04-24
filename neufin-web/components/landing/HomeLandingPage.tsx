@@ -628,7 +628,49 @@ export default function HomeLandingPage({
               ))}
             </div>
 
-            <div className="mt-16 text-center">
+            {/* DNA vs Swarm IC comparison table */}
+            <div className="mt-14 overflow-hidden rounded-2xl border border-lp-border bg-lp-card">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-lp-border">
+                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-lp-muted">
+                      Feature
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[#1EB8CC]">
+                      DNA Score
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-amber-400">
+                      Swarm IC
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ["Time", "5 seconds", "60 seconds"],
+                    ["Behavioral biases", "✓", "✓ + cross-validated"],
+                    ["Regime analysis", "Basic", "7-agent macro synthesis"],
+                    ["Trade recommendations", "Generic", "Exact sizing + tax cost"],
+                    ["PDF export", "✗", "✓ White-labeled"],
+                    ["Churn risk score", "✓", "✓ + narrative explanation"],
+                  ].map(([feature, dna, swarm]) => (
+                    <tr
+                      key={feature}
+                      className="border-b border-lp-border/50 last:border-0"
+                    >
+                      <td className="px-4 py-2.5 text-lp-text">{feature}</td>
+                      <td className="px-4 py-2.5 text-center text-[#CBD5E1]">
+                        {dna}
+                      </td>
+                      <td className="px-4 py-2.5 text-center font-medium text-amber-300">
+                        {swarm}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-10 text-center">
               <Link href="/upload" className="lp-btn-dark-fill gap-3">
                 Upload Portfolio — It&apos;s Free
                 <span className="font-bold text-primary">→</span>
