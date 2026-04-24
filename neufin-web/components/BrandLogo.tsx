@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import clsx from "clsx";
 import type { CSSProperties } from "react";
@@ -142,19 +141,33 @@ export function BrandLogo({
       };
 
   const img = (
-    <Image
-      src="/logo.png"
-      alt="NeuFin"
-      width={148}
-      height={38}
-      priority
-      style={{
-        width: "148px",
-        height: "38px",
-        objectFit: "contain",
-        display: "block",
-      }}
-    />
+    <svg
+      viewBox="0 0 420 80"
+      width={180}
+      height={34}
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="Neufin AI"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      <g transform="translate(0,12) scale(0.314)">
+        <rect x="0" y="0" width="46" height="175" rx="4" fill="#EDE8E1" />
+        <polygon points="10,0 54,0 98,175 54,175" fill="#2C2C2C" />
+        <rect x="90" y="0" width="46" height="175" rx="4" fill="#3A5BF0" />
+        <rect x="90" y="0" width="120" height="44" rx="4" fill="#3A5BF0" />
+        <rect x="90" y="62" width="90" height="40" rx="4" fill="#3A5BF0" />
+      </g>
+      <text
+        x="74"
+        y="50"
+        fontFamily="'Helvetica Neue', Arial, sans-serif"
+        fontSize="36"
+        fontWeight="300"
+        letterSpacing="1.5"
+        fill="#3A5BF0"
+      >
+        Neufin AI
+      </text>
+    </svg>
   );
 
   if (href === null) {
