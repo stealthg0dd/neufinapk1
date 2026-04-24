@@ -26,9 +26,7 @@ _HEADERS = {
     "x-api-key": _API_KEY,
 }
 _VERSION: str = (
-    os.getenv("GIT_COMMIT_SHA")
-    or os.getenv("RAILWAY_GIT_COMMIT_SHA")
-    or "unknown"
+    os.getenv("GIT_COMMIT_SHA") or os.getenv("RAILWAY_GIT_COMMIT_SHA") or "unknown"
 )
 
 
@@ -36,12 +34,20 @@ async def _post(path: str, payload: dict) -> dict:
     """POST to router-system; swallows exceptions so the agent never crashes."""
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            r = await client.post(f"{_ROUTER_URL}{path}", json=payload, headers=_HEADERS)
+            r = await client.post(
+                f"{_ROUTER_URL}{path}", json=payload, headers=_HEADERS
+            )
             r.raise_for_status()
             return r.json() if r.content else {}
     except httpx.HTTPStatusError as exc:
-        log.warning({"action": "router_sync_http_error", "path": path,
-                     "status": exc.response.status_code, "body": exc.response.text[:200]})
+        log.warning(
+            {
+                "action": "router_sync_http_error",
+                "path": path,
+                "status": exc.response.status_code,
+                "body": exc.response.text[:200],
+            }
+        )
     except Exception as exc:
         log.warning({"action": "router_sync_error", "path": path, "error": str(exc)})
     return {}
@@ -66,7 +72,13 @@ async def register_agent() -> None:
         "registered_at": datetime.now(UTC).isoformat(),
     }
     result = await _post("/api/register", payload)
-    log.info({"action": "agent_registered", "health_url": payload["health_url"], "result": result})
+    log.info(
+        {
+            "action": "agent_registered",
+            "health_url": payload["health_url"],
+            "result": result,
+        }
+    )
 
 
 async def post_scan_results(report: dict) -> None:
@@ -86,7 +98,13 @@ async def post_scan_results(report: dict) -> None:
         "version": _VERSION,
     }
     result = await _post("/api/repos/neufin-backend/scans", payload)
-    log.info({"action": "scan_results_posted", "run_id": report.get("run_id"), "result": result})
+    log.info(
+        {
+            "action": "scan_results_posted",
+            "run_id": report.get("run_id"),
+            "result": result,
+        }
+    )
 
 
 async def _heartbeat_once() -> None:

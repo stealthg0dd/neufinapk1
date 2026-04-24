@@ -18,7 +18,7 @@ This document describes the monitoring setup for all three layers of the Neufin 
 
 ### What's captured
 - **All unhandled exceptions** — automatic via SDK integration
-- **User context** — `user_id` and `email` attached on every authenticated request  
+- **User context** — `user_id` and `email` attached on every authenticated request
   (backend: auth middleware; web: `AuthProvider`; mobile: `onAuthStateChange`)
 - **Endpoint tag** — `endpoint = /api/…` tagged per backend request
 - **Stripe failures** — subscription upgrade/downgrade exceptions captured with `stripe_event_type` tag
@@ -59,10 +59,10 @@ Core Web Vitals are reported automatically via the `WebVitals` client component 
 | INP    | < 200 ms| < 500 ms          | ≥ 500 ms|
 
 ### Where metrics flow
-1. **PostHog** — `web_vital` event with `metric_name`, `metric_value`, `metric_rating`, `page_url`  
+1. **PostHog** — `web_vital` event with `metric_name`, `metric_value`, `metric_rating`, `page_url`
    → Query in PostHog: filter `event = web_vital`, group by `metric_name`
 
-2. **Sentry** — `captureMessage` at `warning` level for any **poor** metric  
+2. **Sentry** — `captureMessage` at `warning` level for any **poor** metric
    → Shows in Sentry Issues filtered by `tag:web_vital`
 
 3. **Console** — verbose in `NODE_ENV=development`
@@ -129,7 +129,7 @@ In Railway dashboard → Project → Deployments → Logs:
 | CPU > 80% for 5 min | Slack |
 
 ### Health check
-Railway pings `GET /health` every 30s (configured in `railway.toml`).  
+Railway pings `GET /health` every 30s (configured in `railway.toml`).
 Manual check: `curl https://neufin101-production.up.railway.app/health`
 
 ---

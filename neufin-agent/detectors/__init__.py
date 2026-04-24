@@ -6,7 +6,9 @@ import uuid
 @dataclass
 class Issue:
     severity: str  # critical|high|medium|low
-    type: str      # type_error|auth_bug|secret|mock_data|api_drift|performance|runtime_error
+    type: (
+        str  # type_error|auth_bug|secret|mock_data|api_drift|performance|runtime_error
+    )
     file: str
     message: str
     suggested_fix: str
@@ -19,10 +21,10 @@ class Issue:
     resolved_at: str | None = None
     resolution: str | None = None
     # Runtime / Sentry enrichment
-    source: str = "scanner"         # "scanner" | "sentry" | "runtime_monitor"
-    sentry_url: str = ""            # Permalink to the Sentry issue
-    occurrences: int = 1            # How many times this error fired
-    affected_users: int = 0         # Unique users impacted
+    source: str = "scanner"  # "scanner" | "sentry" | "runtime_monitor"
+    sentry_url: str = ""  # Permalink to the Sentry issue
+    occurrences: int = 1  # How many times this error fired
+    affected_users: int = 0  # Unique users impacted
 
     def to_dict(self) -> dict:
         return {

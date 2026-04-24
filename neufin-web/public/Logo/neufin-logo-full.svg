@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <!-- White background -->
+  <rect width="500" height="500" fill="#ffffff"/>
+
+  <!-- ═══ NF MARK (centred at 250,220) ═══ -->
+  <g transform="translate(145, 80)">
+
+    <!-- Off-white N left stroke (wide rectangle) -->
+    <rect x="0" y="0" width="52" height="175" rx="4" fill="#EDE8E1"/>
+
+    <!-- Dark diagonal slash (the N counter-diagonal) -->
+    <polygon points="12,0 58,0 104,175 58,175" fill="#2C2C2C"/>
+
+    <!-- Blue F vertical stroke -->
+    <rect x="92" y="0" width="52" height="175" rx="4" fill="#3A5BF0"/>
+
+    <!-- Blue F top crossbar -->
+    <rect x="92" y="0" width="122" height="48" rx="4" fill="#3A5BF0"/>
+
+    <!-- Blue F mid crossbar -->
+    <rect x="92" y="64" width="95" height="44" rx="4" fill="#3A5BF0"/>
+
+  </g>
+
+  <!-- ═══ WORDMARK: Neufin AI ═══ -->
+  <text
+    x="250" y="330"
+    text-anchor="middle"
+    font-family="'Helvetica Neue', 'Arial', sans-serif"
+    font-size="52"
+    font-weight="300"
+    letter-spacing="2"
+    fill="#3A5BF0"
+  >Neufin AI</text>
+
+  <!-- ═══ TAGLINE ═══ -->
+  <text
+    x="250" y="368"
+    text-anchor="middle"
+    font-family="'Helvetica Neue', 'Arial', sans-serif"
+    font-size="16"
+    font-weight="400"
+    letter-spacing="3.5"
+    fill="#AAAAAA"
+  >NEURAL POWERED FINANCE UNLOCKED</text>
+</svg>

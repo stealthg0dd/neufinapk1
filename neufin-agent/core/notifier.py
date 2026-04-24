@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 import logging
@@ -18,8 +17,8 @@ SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK_URL", "")
 # HIGH      → #neufin-dev
 # MEDIUM/LOW→ digest only
 SLACK_WEBHOOK_ALERTS = os.getenv("SLACK_WEBHOOK_NEUFIN_ALERTS", "")
-SLACK_WEBHOOK_DEV    = os.getenv("SLACK_WEBHOOK_NEUFIN_DEV", "")
-SLACK_WEBHOOK_CMD    = os.getenv("SLACK_WEBHOOK_CTECH_COMMAND", "")
+SLACK_WEBHOOK_DEV = os.getenv("SLACK_WEBHOOK_NEUFIN_DEV", "")
+SLACK_WEBHOOK_CMD = os.getenv("SLACK_WEBHOOK_CTECH_COMMAND", "")
 
 # In-memory Slack throttling to prevent noisy startup bursts.
 _SLACK_SENT_AT: dict[str, float] = {}
@@ -78,7 +77,9 @@ def get_notifier_throttle_counters() -> dict:
     now = time.time()
     seconds_until_window_reset = 0
     if _CRIT_WINDOW_START:
-        seconds_until_window_reset = max(0, int(window_seconds - (now - _CRIT_WINDOW_START)))
+        seconds_until_window_reset = max(
+            0, int(window_seconds - (now - _CRIT_WINDOW_START))
+        )
 
     return {
         "enabled": bool(os.getenv("SLACK_WEBHOOK_URL")),
@@ -95,6 +96,7 @@ def get_notifier_throttle_counters() -> dict:
         },
     }
 
+
 async def send_slack(text: str):
     await _post_slack({"text": text})
 
@@ -109,6 +111,7 @@ async def _post_slack_to(url: str, payload: dict) -> None:
             r.raise_for_status()
     except Exception as exc:
         log.error({"action": "slack_error", "error": str(exc)})
+
 
 # --- GitHub Actions CI Webhook ---
 @router.post("/webhooks/github-actions")
@@ -126,8 +129,11 @@ async def github_actions_webhook(payload: dict):
         await send_slack(message)
         # Auto-trigger a scan to diagnose
         from core.scanner import run_all_detectors
+
         asyncio.create_task(run_all_detectors())
     return {"received": True}
+
+
 """
 notifier.py — Slack webhook alerts + SMTP email for critical issues.
 
@@ -156,10 +162,15 @@ ALERT_EMAIL = os.getenv("ALERT_EMAIL", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", SMTP_USER)
 
 
-
 # ── Internal Slack helpers ────────────────────────────────────────────────
 def _sev_emoji(sev: str) -> str:
-    return {"critical": ":rotating_light:", "high": ":warning:", "medium": ":large_yellow_circle:", "low": ":white_circle:"}.get(sev, ":question:")
+    return {
+        "critical": ":rotating_light:",
+        "high": ":warning:",
+        "medium": ":large_yellow_circle:",
+        "low": ":white_circle:",
+    }.get(sev, ":question:")
+
 
 def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
     if not all([SMTP_HOST, SMTP_USER, SMTP_PASS, ALERT_EMAIL]):
@@ -171,6 +182,7 @@ def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         import smtplib
+
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = FROM_EMAIL
@@ -186,6 +198,7 @@ def _send_email(subject: str, body_text: str, body_html: str = "") -> None:
         log.info({"action": "email_sent", "to": ALERT_EMAIL, "subject": subject})
     except Exception as exc:
         log.error({"action": "email_error", "error": str(exc)})
+
 
 async def _post_slack(payload: dict) -> None:
     if not SLACK_WEBHOOK:
@@ -204,10 +217,13 @@ async def _post_slack(payload: dict) -> None:
 
 # ── Public API ────────────────────────────────────────────────────────────
 
+
 async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") -> None:
     """Immediate alert for CRITICAL issues — posts to #neufin-alerts + #ctech-command + email."""
     # Require at least one critical channel before throttle check
-    if not any([SLACK_WEBHOOK_ALERTS, SLACK_WEBHOOK_CMD, os.getenv("SLACK_WEBHOOK_URL")]):
+    if not any(
+        [SLACK_WEBHOOK_ALERTS, SLACK_WEBHOOK_CMD, os.getenv("SLACK_WEBHOOK_URL")]
+    ):
         _THROTTLE_COUNTERS["skipped_no_webhook"] += 1
         return
 
@@ -248,7 +264,8 @@ async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") 
         subject = f"\U0001f6a8 [Neufin Agent] Critical: {message[:80]}"
         pr_line = f"PR       : {pr_url}\n" if pr_url else ""
         stack_line = f"Stack trace:\n{stack_trace}\n" if stack_trace else ""
-        body = textwrap.dedent(f"""
+        body = textwrap.dedent(
+            f"""
             CRITICAL issue detected by Neufin Code Health Agent.
 
             Severity : {sev.upper()}
@@ -260,7 +277,8 @@ async def notify_critical(issue: dict, pr_url: str = "", stack_trace: str = "") 
             → Dashboard: {DASHBOARD_URL}
             Issue ID: {issue.get('id', '?')}
             Generated: {datetime.now(UTC).isoformat()}
-        """)
+        """
+        )
         _send_email(subject, body)
 
 
@@ -291,9 +309,9 @@ async def notify_high(issue: dict, pr_url: str = "") -> None:
         await _post_slack(payload)
 
 
-
-
-async def notify_fix_applied(issue: dict, pr_url: str = "", method: str = "auto") -> None:
+async def notify_fix_applied(
+    issue: dict, pr_url: str = "", method: str = "auto"
+) -> None:
     if not os.getenv("SLACK_WEBHOOK_URL"):
         _THROTTLE_COUNTERS["skipped_no_webhook"] += 1
         return
@@ -375,7 +393,11 @@ async def send_weekly_trend(trend: dict) -> None:
 
     def _delta_str(d: dict) -> str:
         delta = d["delta"]
-        arrow = "✅ Improving" if delta > 0 else ("⚠️ Degrading" if delta < 0 else "→ Stable")
+        arrow = (
+            "✅ Improving"
+            if delta > 0
+            else ("⚠️ Degrading" if delta < 0 else "→ Stable")
+        )
         sign = "+" if delta > 0 else ""
         return f"{d['start']} → {d['end']} ({sign}{delta}) {arrow}"
 
@@ -416,8 +438,12 @@ async def send_weekly_trend(trend: dict) -> None:
     _send_email(subject, body)
 
 
-async def send_daily_summary(report: dict, auto_fixed: int = 0, prs_open: int = 0,
-                             open_findings: list[dict] | None = None) -> None:
+async def send_daily_summary(
+    report: dict,
+    auto_fixed: int = 0,
+    prs_open: int = 0,
+    open_findings: list[dict] | None = None,
+) -> None:
     """
     Daily digest — 08:30 SGT (00:30 UTC). Posts to #neufin-dev.
     Includes per-repo scores, counts, top 5 open findings,
@@ -437,7 +463,11 @@ async def send_daily_summary(report: dict, auto_fixed: int = 0, prs_open: int = 
     def _score_emoji(v) -> str:
         if not isinstance(v, int):
             return ":grey_question:"
-        return ":large_green_circle:" if v >= 80 else (":large_yellow_circle:" if v >= 60 else ":red_circle:")
+        return (
+            ":large_green_circle:"
+            if v >= 80
+            else (":large_yellow_circle:" if v >= 60 else ":red_circle:")
+        )
 
     # Build top-5 findings block
     top_block = ""
@@ -452,7 +482,9 @@ async def send_daily_summary(report: dict, auto_fixed: int = 0, prs_open: int = 
         top_block = "\n*Top open findings:*\n" + "\n".join(lines)
 
     # Unresolved CRITICAL/HIGH notice
-    unresolved = [f for f in (open_findings or []) if f.get("severity") in ("critical", "high")]
+    unresolved = [
+        f for f in (open_findings or []) if f.get("severity") in ("critical", "high")
+    ]
     alert_block = ""
     if unresolved:
         alert_block = (
@@ -482,4 +514,3 @@ async def send_daily_summary(report: dict, auto_fixed: int = 0, prs_open: int = 
 
 # Backward-compat alias — send_daily_summary used to be the daily job name
 send_daily_digest = send_daily_summary
-

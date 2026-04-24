@@ -61,11 +61,11 @@ ENVIRONMENT=production           # defaults to "production" if unset
 
 ## Recommended Alert Rules (create in Sentry UI)
 
-1. **Scan failure** — issue title contains "scheduled_scan_error" → Slack #agent-alerts  
-2. **New issue** — any new unhandled exception → Slack #agent-alerts  
-3. **Error rate > 5 %** — over 10 min window → email  
-4. **Notification failure** — "daily_summary_error" or "weekly_trend_error" → email  
-5. **High latency scan** — `p95(transaction.duration) > 30 000ms` → email  
+1. **Scan failure** — issue title contains "scheduled_scan_error" → Slack #agent-alerts
+2. **New issue** — any new unhandled exception → Slack #agent-alerts
+3. **Error rate > 5 %** — over 10 min window → email
+4. **Notification failure** — "daily_summary_error" or "weekly_trend_error" → email
+5. **High latency scan** — `p95(transaction.duration) > 30 000ms` → email
 
 ## Local Testing
 

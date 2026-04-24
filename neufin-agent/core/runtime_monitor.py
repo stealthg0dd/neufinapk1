@@ -131,11 +131,7 @@ _SENTRY_LEVEL_SEVERITY: dict[str, str] = {
 
 def _classify_sentry(event: dict) -> str:
     """Derive severity from exception type first, fall back to Sentry level."""
-    exc_type = (
-        event.get("exception", {})
-        .get("values", [{}])[0]
-        .get("type", "")
-    )
+    exc_type = event.get("exception", {}).get("values", [{}])[0].get("type", "")
     for pattern, sev in _EXCEPTION_SEVERITY.items():
         if pattern.lower() in exc_type.lower():
             return sev
@@ -159,6 +155,7 @@ def _extract_stack(event: dict) -> str:
 
 # ── Sentry webhook ─────────────────────────────────────────────────────────
 
+
 @router.post("/sentry")
 async def receive_sentry_event(request: Request) -> dict:
     try:
@@ -171,22 +168,28 @@ async def receive_sentry_event(request: Request) -> dict:
     #   Error Alert: {action, data: {event: {...}}}
     #   Legacy:      raw event dict
     data_block = payload.get("data", {})
-    event = data_block.get("event") or data_block.get("issue") or payload.get("event") or payload
+    event = (
+        data_block.get("event")
+        or data_block.get("issue")
+        or payload.get("event")
+        or payload
+    )
 
     severity = _classify_sentry(event)
-    title    = event.get("title", event.get("message", "Unknown error"))
-    culprit  = event.get("culprit", "unknown")
-    project  = event.get("project", event.get("project_slug", payload.get("project", "unknown")))
+    title = event.get("title", event.get("message", "Unknown error"))
+    culprit = event.get("culprit", "unknown")
+    project = event.get(
+        "project", event.get("project_slug", payload.get("project", "unknown"))
+    )
     environment = event.get("environment", "production")
-    user_id  = (
-        event.get("user", {}).get("id", "")
-        or event.get("user", {}).get("email", "")
+    user_id = event.get("user", {}).get("id", "") or event.get("user", {}).get(
+        "email", ""
     )
 
     # Sentry issue-level fields (present in Issue Alert payloads)
-    sentry_url    = event.get("permalink", event.get("url", ""))
-    occurrences   = int(event.get("count", event.get("times_seen", 1)) or 1)
-    affected_users= int(event.get("userCount", event.get("users_seen", 0)) or 0)
+    sentry_url = event.get("permalink", event.get("url", ""))
+    occurrences = int(event.get("count", event.get("times_seen", 1)) or 1)
+    affected_users = int(event.get("userCount", event.get("users_seen", 0)) or 0)
 
     # File + line from innermost frame
     frames = (
@@ -196,8 +199,8 @@ async def receive_sentry_event(request: Request) -> dict:
         .get("frames", [])
     ) or event.get("stacktrace", {}).get("frames", [])
     top = frames[-1] if frames else {}
-    file_path  = top.get("filename", culprit)
-    line       = top.get("lineno", 0)
+    file_path = top.get("filename", culprit)
+    line = top.get("lineno", 0)
     stack_trace = _extract_stack(event)
 
     # Upgrade severity if many users are affected
@@ -237,27 +240,33 @@ async def receive_sentry_event(request: Request) -> dict:
     if severity == "critical" and file_path and file_path != "unknown":
         from pathlib import Path as _Path
         import detectors.secret_scanner as _secret
+
         repo_root = _Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
         abs_path = repo_root / file_path
         if abs_path.exists():
             raw: list = []
             _secret._scan_file(abs_path, project, raw)
             if raw:
-                await upsert_issues([i.to_dict() if hasattr(i, "to_dict") else i for i in raw])
+                await upsert_issues(
+                    [i.to_dict() if hasattr(i, "to_dict") else i for i in raw]
+                )
 
-    log.info({
-        "action": "sentry_ingested",
-        "severity": severity,
-        "file": file_path,
-        "project": project,
-        "env": environment,
-        "occurrences": occurrences,
-        "affected_users": affected_users,
-    })
+    log.info(
+        {
+            "action": "sentry_ingested",
+            "severity": severity,
+            "file": file_path,
+            "project": project,
+            "env": environment,
+            "occurrences": occurrences,
+            "affected_users": affected_users,
+        }
+    )
     return {"status": "ok", "issue_id": issue.id, "severity": severity}
 
 
 # ── Mobile crash webhook ───────────────────────────────────────────────────
+
 
 @router.post("/mobile")
 async def receive_mobile_crash(request: Request) -> dict:
@@ -309,11 +318,18 @@ async def receive_mobile_crash(request: Request) -> dict:
     if severity in ("critical", "high"):
         await notify_critical(issue.to_dict())
 
-    log.info({"action": "mobile_crash_ingested", "severity": severity, "crash_free": crash_free_rate})
+    log.info(
+        {
+            "action": "mobile_crash_ingested",
+            "severity": severity,
+            "crash_free": crash_free_rate,
+        }
+    )
     return {"status": "ok", "issue_id": issue.id, "severity": severity}
 
 
 # ── Sentry REST API poller ────────────────────────────────────────────────
+
 
 async def poll_sentry_issues() -> list[dict]:
     """Fetch unresolved Sentry issues every 5 min and merge into agent DB."""
@@ -321,15 +337,22 @@ async def poll_sentry_issues() -> list[dict]:
     sentry_auth_token = os.getenv("SENTRY_AUTH_TOKEN", "")
     sentry_org = os.getenv("SENTRY_ORG", "")
     sentry_projects: dict[str, str] = {
-        "neufin-backend": os.getenv("SENTRY_PROJECT_neufin_backend") or os.getenv("SENTRY_PROJECT_BACKEND", ""),
-        "neufin-web": os.getenv("SENTRY_PROJECT_neufin_web") or os.getenv("SENTRY_PROJECT_WEB", ""),
+        "neufin-backend": os.getenv("SENTRY_PROJECT_neufin_backend")
+        or os.getenv("SENTRY_PROJECT_BACKEND", ""),
+        "neufin-web": os.getenv("SENTRY_PROJECT_neufin_web")
+        or os.getenv("SENTRY_PROJECT_WEB", ""),
     }
 
     if not sentry_auth_token or not sentry_org:
         _sentry_poll_health["status"] = "skipped"
         _sentry_poll_health["last_error"] = "SENTRY_AUTH_TOKEN or SENTRY_ORG not set"
         _sentry_poll_health["last_ingested_count"] = 0
-        log.debug({"action": "sentry_poll_skip", "reason": "SENTRY_AUTH_TOKEN or SENTRY_ORG not set"})
+        log.debug(
+            {
+                "action": "sentry_poll_skip",
+                "reason": "SENTRY_AUTH_TOKEN or SENTRY_ORG not set",
+            }
+        )
         return []
 
     headers = {"Authorization": f"Bearer {sentry_auth_token}"}
@@ -353,22 +376,30 @@ async def poll_sentry_issues() -> list[dict]:
         except Exception as e:
             _sentry_poll_health["status"] = "error"
             _sentry_poll_health["last_error"] = str(e)
-            log.error({"action": "sentry_poll_error", "project": project, "error": str(e)})
+            log.error(
+                {"action": "sentry_poll_error", "project": project, "error": str(e)}
+            )
             continue
 
         for si in sentry_items:
-            level_map = {"fatal": "critical", "error": "high", "warning": "medium", "info": "low", "debug": "low"}
+            level_map = {
+                "fatal": "critical",
+                "error": "high",
+                "warning": "medium",
+                "info": "low",
+                "debug": "low",
+            }
             severity = level_map.get(si.get("level", "error"), "high")
 
             # Extract file from metadata (what Sentry stores as the crash location)
-            meta     = si.get("metadata", {})
+            meta = si.get("metadata", {})
             file_path = meta.get("filename", si.get("culprit", "unknown"))
-            line_no   = meta.get("lineno", 0)
+            line_no = meta.get("lineno", 0)
 
-            occurrences    = int(si.get("count", 1) or 1)
+            occurrences = int(si.get("count", 1) or 1)
             affected_users = int(si.get("userCount", 0) or 0)
-            sentry_url     = si.get("permalink", "")
-            sentry_id      = f"sentry_{si['id']}"
+            sentry_url = si.get("permalink", "")
+            sentry_id = f"sentry_{si['id']}"
 
             # Upgrade severity if user impact is high
             if affected_users >= 10 and severity != "critical":
@@ -399,15 +430,21 @@ async def poll_sentry_issues() -> list[dict]:
 
     if new_issues:
         await upsert_issues(new_issues)
-        critical = [i for i in new_issues if i["severity"] == "critical" and i.get("affected_users", 0) > 0]
+        critical = [
+            i
+            for i in new_issues
+            if i["severity"] == "critical" and i.get("affected_users", 0) > 0
+        ]
         for iss in critical:
             await notify_critical(iss)
 
-    log.info({
-        "action": "sentry_poll_complete",
-        "ingested": len(new_issues),
-        "projects": [p for p in sentry_projects.values() if p],
-    })
+    log.info(
+        {
+            "action": "sentry_poll_complete",
+            "ingested": len(new_issues),
+            "projects": [p for p in sentry_projects.values() if p],
+        }
+    )
     _sentry_poll_health["status"] = "ok"
     _sentry_poll_health["last_success_at"] = datetime.now(UTC).isoformat()
     _sentry_poll_health["last_ingested_count"] = len(new_issues)
@@ -420,12 +457,17 @@ def get_sentry_poll_health() -> dict:
     """Return last Sentry poll health snapshot for dashboard/API visibility."""
     return {
         **_sentry_poll_health,
-        "configured": bool(os.getenv("SENTRY_DSN") and os.getenv("SENTRY_AUTH_TOKEN") and os.getenv("SENTRY_ORG")),
+        "configured": bool(
+            os.getenv("SENTRY_DSN")
+            and os.getenv("SENTRY_AUTH_TOKEN")
+            and os.getenv("SENTRY_ORG")
+        ),
         "generated_at": datetime.now(UTC).isoformat(),
     }
 
 
 # ── Railway health poller ──────────────────────────────────────────────────
+
 
 async def check_railway_health() -> None:
     global _railway_consecutive_failures
@@ -466,11 +508,13 @@ async def check_railway_health() -> None:
 
     except Exception as e:
         _railway_consecutive_failures += 1
-        log.error({
-            "action": "railway_health_fail",
-            "consecutive": _railway_consecutive_failures,
-            "error": str(e),
-        })
+        log.error(
+            {
+                "action": "railway_health_fail",
+                "consecutive": _railway_consecutive_failures,
+                "error": str(e),
+            }
+        )
 
         issue = Issue(
             severity="critical" if _railway_consecutive_failures >= 3 else "high",
@@ -492,9 +536,15 @@ async def check_railway_health() -> None:
 
 # ── Vercel analytics poller ────────────────────────────────────────────────
 
+
 async def check_vercel_analytics() -> None:
     if not VERCEL_TOKEN or not VERCEL_PROJECT_ID:
-        log.warning({"action": "vercel_skip", "reason": "VERCEL_TOKEN or VERCEL_PROJECT_ID not set"})
+        log.warning(
+            {
+                "action": "vercel_skip",
+                "reason": "VERCEL_TOKEN or VERCEL_PROJECT_ID not set",
+            }
+        )
         return
 
     headers = {"Authorization": f"Bearer {VERCEL_TOKEN}"}
@@ -530,17 +580,19 @@ async def check_vercel_analytics() -> None:
             vitals = vitals_resp.json()
             lcp = vitals.get("lcp", {}).get("p75")
             if lcp and lcp > 3000:
-                issues.append(Issue(
-                    severity="medium",
-                    type="performance",
-                    file="neufin-web/app/layout.tsx",
-                    line=0,
-                    message=f"LCP p75 = {lcp}ms — exceeds 3s threshold",
-                    suggested_fix="Audit largest contentful element; add <Image priority> or preload hint",
-                    auto_fixable=False,
-                    requires_human=False,
-                    repo="neufin-web",
-                ))
+                issues.append(
+                    Issue(
+                        severity="medium",
+                        type="performance",
+                        file="neufin-web/app/layout.tsx",
+                        line=0,
+                        message=f"LCP p75 = {lcp}ms — exceeds 3s threshold",
+                        suggested_fix="Audit largest contentful element; add <Image priority> or preload hint",
+                        auto_fixable=False,
+                        requires_human=False,
+                        repo="neufin-web",
+                    )
+                )
         except Exception:
             pass
 
@@ -557,17 +609,19 @@ async def check_vercel_analytics() -> None:
                 sev = None
 
             if sev:
-                issues.append(Issue(
-                    severity=sev,
-                    type="runtime_error",
-                    file="neufin-web",
-                    line=0,
-                    message=f"Vercel error rate {error_rate:.1%} — above threshold",
-                    suggested_fix="Check Vercel Function logs for 5xx pattern",
-                    auto_fixable=False,
-                    requires_human=sev == "critical",
-                    repo="neufin-web",
-                ))
+                issues.append(
+                    Issue(
+                        severity=sev,
+                        type="runtime_error",
+                        file="neufin-web",
+                        line=0,
+                        message=f"Vercel error rate {error_rate:.1%} — above threshold",
+                        suggested_fix="Check Vercel Function logs for 5xx pattern",
+                        auto_fixable=False,
+                        requires_human=sev == "critical",
+                        repo="neufin-web",
+                    )
+                )
         except Exception:
             pass
 
@@ -583,6 +637,7 @@ async def check_vercel_analytics() -> None:
 
 
 # ── Runtime summary endpoint ───────────────────────────────────────────────
+
 
 async def get_runtime_summary(hours: int = 24) -> dict:
     """Return error counts by severity for the last N hours, with trend."""
