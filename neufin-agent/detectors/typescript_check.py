@@ -10,15 +10,15 @@ REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 
 # (error_code, severity, auto_fixable)
 TS_SEVERITY: dict[str, tuple[str, bool]] = {
-    "TS2339": ("high", False),   # Property 'x' does not exist on type
-    "TS2304": ("high", False),   # Cannot find name 'x'
-    "TS2345": ("high", False),   # Argument of type 'x' is not assignable
-    "TS2322": ("high", False),   # Type 'x' is not assignable to type 'y'
+    "TS2339": ("high", False),  # Property 'x' does not exist on type
+    "TS2304": ("high", False),  # Cannot find name 'x'
+    "TS2345": ("high", False),  # Argument of type 'x' is not assignable
+    "TS2322": ("high", False),  # Type 'x' is not assignable to type 'y'
     "TS7006": ("medium", True),  # Parameter 'x' implicitly has an 'any' type
     "TS7005": ("medium", True),  # Variable 'x' implicitly has an 'any' type
-    "TS6133": ("low", True),     # 'x' is declared but its value is never read
-    "TS2531": ("medium", False), # Object is possibly 'null'
-    "TS2532": ("medium", False), # Object is possibly 'undefined'
+    "TS6133": ("low", True),  # 'x' is declared but its value is never read
+    "TS2531": ("medium", False),  # Object is possibly 'null'
+    "TS2532": ("medium", False),  # Object is possibly 'undefined'
 }
 
 # Lines like: src/file.ts(42,10): error TS2339: Property 'x' does not exist
@@ -58,9 +58,7 @@ async def scan() -> list[Issue]:
                 line=int(line_str),
                 message=f"{error_code}: {message.strip()}",
                 suggested_fix=(
-                    "Add explicit type annotation"
-                    if auto
-                    else "Resolve type mismatch"
+                    "Add explicit type annotation" if auto else "Resolve type mismatch"
                 ),
                 auto_fixable=auto,
                 requires_human=not auto,

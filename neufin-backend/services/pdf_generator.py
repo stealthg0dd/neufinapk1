@@ -2502,7 +2502,9 @@ def _make_cover_callback(
                 canvas.roundRect(flag_x, badge_y - 4, 6, 14, 1, fill=1, stroke=0)
                 canvas.setFont("Helvetica", 7)
                 canvas.setFillColor(pal["text_mut"])
-                canvas.drawString(flag_x + 10, badge_y + 2, f"{flag_item}: {flag_status}")
+                canvas.drawString(
+                    flag_x + 10, badge_y + 2, f"{flag_item}: {flag_status}"
+                )
                 flag_x += 130
 
         if ic_tier == "DRAFT":
@@ -3746,18 +3748,26 @@ def _page_liquidity_analysis(
     rows = _compute_liquidity_metrics(positions, aum, market_code)
     if not rows:
         items.append(
-            Paragraph(
-                "Liquidity data unavailable for this portfolio.", st["muted"]
-            )
+            Paragraph("Liquidity data unavailable for this portfolio.", st["muted"])
         )
         return items
 
     # Table
-    headers = ["Symbol", "Position (M)", "ADV (M)", "% of ADV", "Days Normal", "Days Stress", "Status"]
+    headers = [
+        "Symbol",
+        "Position (M)",
+        "ADV (M)",
+        "% of ADV",
+        "Days Normal",
+        "Days Stress",
+        "Status",
+    ]
     col_w = [cw * w for w in [0.14, 0.13, 0.10, 0.12, 0.14, 0.14, 0.14]]
 
     def _status_color(s: str) -> str:
-        return "#EF4444" if s == "ILLIQUID" else "#F5A623" if s == "CAUTION" else "#22C55E"
+        return (
+            "#EF4444" if s == "ILLIQUID" else "#F5A623" if s == "CAUTION" else "#22C55E"
+        )
 
     table_data = [[Paragraph(h, st["label"]) for h in headers]]
     for r in rows[:10]:
@@ -3895,7 +3905,11 @@ def _page_sector_attribution(
         active = port_w - bench_w
         risk_contrib = round(port_w * port_w * 100, 2)
         active_pct_str = f"{active*100:+.1f}%"
-        active_color = "#EF4444" if active > 0.15 else "#F5A623" if active > 0.05 else "#22C55E" if active < 0 else "#64748B"
+        active_color = (
+            "#EF4444"
+            if active > 0.15
+            else "#F5A623" if active > 0.05 else "#22C55E" if active < 0 else "#64748B"
+        )
         if abs(active) > abs(largest_bet[1]):
             largest_bet = (sector, active)
         table_data.append(
@@ -3939,7 +3953,9 @@ def _page_sector_attribution(
     if largest_bet[0] and abs(largest_bet[1]) > 0.10:
         sector_name = largest_bet[0]
         active_val = largest_bet[1]
-        bench_val = VN_INDEX_SECTOR_WEIGHTS.get(sector_name, VN_INDEX_SECTOR_WEIGHTS["Other"])
+        bench_val = VN_INDEX_SECTOR_WEIGHTS.get(
+            sector_name, VN_INDEX_SECTOR_WEIGHTS["Other"]
+        )
         port_val = sector_weights.get(sector_name, 0)
         direction = "overweight" if active_val > 0 else "underweight"
         narrative = (
@@ -5407,7 +5423,11 @@ def _build_pdf_sync(
     ctx["section_confidence"] = build_section_confidence(ctx)
 
     # IC Readiness — scored from ctx inputs
-    _positions_raw = portfolio_data.get("positions") or portfolio_data.get("positions_with_basis") or []
+    _positions_raw = (
+        portfolio_data.get("positions")
+        or portfolio_data.get("positions_with_basis")
+        or []
+    )
     _has_cost_basis = any(
         (p.get("cost_basis") or p.get("cost_per_share")) is not None
         for p in (_positions_raw if isinstance(_positions_raw, list) else [])

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 175" width="210" height="175">
+  <!-- Off-white N left stroke -->
+  <rect x="0" y="0" width="46" height="175" rx="4" fill="#EDE8E1"/>
+  <!-- Dark diagonal (N counter) -->
+  <polygon points="10,0 54,0 98,175 54,175" fill="#2C2C2C"/>
+  <!-- Blue F vertical stroke -->
+  <rect x="90" y="0" width="46" height="175" rx="4" fill="#3A5BF0"/>
+  <!-- Blue F top crossbar -->
+  <rect x="90" y="0" width="120" height="44" rx="4" fill="#3A5BF0"/>
+  <!-- Blue F mid crossbar -->
+  <rect x="90" y="62" width="90" height="40" rx="4" fill="#3A5BF0"/>
+</svg>

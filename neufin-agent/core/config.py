@@ -19,32 +19,58 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="allow",        # allow arbitrary extra env vars (Railway injects many)
+        extra="allow",  # allow arbitrary extra env vars (Railway injects many)
         case_sensitive=True,
     )
 
     # ── Required ────────────────────────────────────────────────────────────
-    GITHUB_TOKEN: str = Field(..., description="GitHub PAT for issue creation and repo access")
-    GITHUB_ORG: str = Field(default="stealthg0dd", description="GitHub org/owner for issue creation")
-    GITHUB_REPO: str = Field(default="stealthg0dd/neufinapk1", description="Full repo path owner/repo")
+    GITHUB_TOKEN: str = Field(
+        ..., description="GitHub PAT for issue creation and repo access"
+    )
+    GITHUB_ORG: str = Field(
+        default="stealthg0dd", description="GitHub org/owner for issue creation"
+    )
+    GITHUB_REPO: str = Field(
+        default="stealthg0dd/neufinapk1", description="Full repo path owner/repo"
+    )
 
     SUPABASE_URL: str = Field(..., description="Supabase project URL")
-    SUPABASE_SERVICE_KEY: str = Field(..., description="Supabase service role key (not anon key)")
+    SUPABASE_SERVICE_KEY: str = Field(
+        ..., description="Supabase service role key (not anon key)"
+    )
 
-    SLACK_WEBHOOK_NEUFIN_ALERTS: str = Field(..., description="Slack webhook — #neufin-alerts (CRITICAL)")
-    SLACK_WEBHOOK_NEUFIN_DEV: str = Field(..., description="Slack webhook — #neufin-dev (HIGH + digests)")
-    SLACK_WEBHOOK_CTECH_COMMAND: str = Field(..., description="Slack webhook — #ctech-command (CRITICAL)")
+    SLACK_WEBHOOK_NEUFIN_ALERTS: str = Field(
+        ..., description="Slack webhook — #neufin-alerts (CRITICAL)"
+    )
+    SLACK_WEBHOOK_NEUFIN_DEV: str = Field(
+        ..., description="Slack webhook — #neufin-dev (HIGH + digests)"
+    )
+    SLACK_WEBHOOK_CTECH_COMMAND: str = Field(
+        ..., description="Slack webhook — #ctech-command (CRITICAL)"
+    )
 
-    SENTRY_DSN: str = Field(..., description="Sentry DSN for neufin-agent instrumentation")
-    SENTRY_AUTH_TOKEN: str = Field(..., description="Sentry auth token for release tracking")
+    SENTRY_DSN: str = Field(
+        ..., description="Sentry DSN for neufin-agent instrumentation"
+    )
+    SENTRY_AUTH_TOKEN: str = Field(
+        ..., description="Sentry auth token for release tracking"
+    )
 
-    AGENT_OS_URL: str = Field(..., description="Router-system base URL (ctech-production.up.railway.app)")
-    AGENT_OS_API_KEY: str = Field(..., description="Bearer token for router-system API calls")
+    AGENT_OS_URL: str = Field(
+        ..., description="Router-system base URL (ctech-production.up.railway.app)"
+    )
+    AGENT_OS_API_KEY: str = Field(
+        ..., description="Bearer token for router-system API calls"
+    )
 
     # ── Optional / backward-compat ──────────────────────────────────────────
-    SLACK_WEBHOOK_URL: str = Field(default="", description="Legacy single Slack webhook (backward compat)")
+    SLACK_WEBHOOK_URL: str = Field(
+        default="", description="Legacy single Slack webhook (backward compat)"
+    )
 
-    ANTHROPIC_API_KEY: str = Field(default="", description="Anthropic API key for LLM fix generation")
+    ANTHROPIC_API_KEY: str = Field(
+        default="", description="Anthropic API key for LLM fix generation"
+    )
     DASHBOARD_URL: str = Field(default="http://localhost:8001/dashboard")
     ENVIRONMENT: str = Field(default="production")
     SCAN_INTERVAL_HOURS: int = Field(default=6)
@@ -67,7 +93,9 @@ class Settings(BaseSettings):
     # Vercel / Railway runtime monitor
     VERCEL_TOKEN: str = Field(default="")
     VERCEL_PROJECT_ID: str = Field(default="")
-    RAILWAY_HEALTH_URL: str = Field(default="https://neufin101-production.up.railway.app/health")
+    RAILWAY_HEALTH_URL: str = Field(
+        default="https://neufin101-production.up.railway.app/health"
+    )
 
 
 def _load() -> Settings:

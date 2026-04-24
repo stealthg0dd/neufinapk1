@@ -62,12 +62,22 @@ async def _upsert(table: str, rows: list[dict]) -> None:
                 headers=_HEADERS,
             )
             if r.status_code not in (200, 201):
-                log.warning({"action": "supabase_upsert_warn", "table": table,
-                             "status": r.status_code, "body": r.text[:300]})
+                log.warning(
+                    {
+                        "action": "supabase_upsert_warn",
+                        "table": table,
+                        "status": r.status_code,
+                        "body": r.text[:300],
+                    }
+                )
             else:
-                log.info({"action": "supabase_upsert_ok", "table": table, "rows": len(rows)})
+                log.info(
+                    {"action": "supabase_upsert_ok", "table": table, "rows": len(rows)}
+                )
     except Exception as exc:
-        log.error({"action": "supabase_upsert_error", "table": table, "error": str(exc)})
+        log.error(
+            {"action": "supabase_upsert_error", "table": table, "error": str(exc)}
+        )
 
 
 async def write_findings(scan_run_id: str, findings: list[dict]) -> None:
@@ -124,9 +134,16 @@ async def mark_finding_resolved(finding_id: str) -> None:
                 headers={**_HEADERS, "Prefer": "return=minimal"},
             )
             if r.status_code not in (200, 204):
-                log.warning({"action": "supabase_resolve_warn",
-                             "id": finding_id, "status": r.status_code})
+                log.warning(
+                    {
+                        "action": "supabase_resolve_warn",
+                        "id": finding_id,
+                        "status": r.status_code,
+                    }
+                )
             else:
                 log.info({"action": "supabase_finding_resolved", "id": finding_id})
     except Exception as exc:
-        log.error({"action": "supabase_resolve_error", "id": finding_id, "error": str(exc)})
+        log.error(
+            {"action": "supabase_resolve_error", "id": finding_id, "error": str(exc)}
+        )

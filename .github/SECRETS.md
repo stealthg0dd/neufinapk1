@@ -121,4 +121,3 @@ gh secret set STRIPE_SECRET_KEY_TEST         --body "sk_test_..."
 gh secret set CODECOV_TOKEN                  --body "<codecov-token>"
 gh secret set POSTHOG_KEY                    --body "phc_..."
 ```
-

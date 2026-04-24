@@ -30,7 +30,7 @@ CI_FIX_TEMPLATES = [
         "safe": False,
         "auto_apply": False,
         "creates_pr": True,
-    }
+    },
 ]
 """
 fix_engine.py — Template-first, LLM-fallback fix engine.
@@ -59,12 +59,12 @@ _CRITICAL_PATH_PATTERNS: list[re.Pattern] = [
 # Issue types/codes that are safe to apply without PR review.
 
 _SAFE_PATTERNS: list[re.Pattern] = [
-    re.compile(r"F401"),          # unused import
-    re.compile(r"TS6133"),        # declared but never read
-    re.compile(r"TS7006"),        # implicit any (add : unknown)
+    re.compile(r"F401"),  # unused import
+    re.compile(r"TS6133"),  # declared but never read
+    re.compile(r"TS7006"),  # implicit any (add : unknown)
     re.compile(r"console\.log"),  # stray console.log
-    re.compile(r"W291|W293"),     # trailing whitespace
-    re.compile(r"I001"),          # import sort
+    re.compile(r"W291|W293"),  # trailing whitespace
+    re.compile(r"I001"),  # import sort
 ]
 
 
@@ -79,13 +79,16 @@ def _is_safe_auto_apply(issue: dict) -> bool:
 
 # ── Template loading ───────────────────────────────────────────────────────
 
+
 def _load_templates() -> list[dict]:
     templates: list[dict] = []
     for f in TEMPLATES_DIR.glob("*.json"):
         try:
             templates.append(json.loads(f.read_text()))
         except Exception as exc:
-            log.warning({"action": "template_load_error", "file": f.name, "error": str(exc)})
+            log.warning(
+                {"action": "template_load_error", "file": f.name, "error": str(exc)}
+            )
     return templates
 
 
@@ -111,6 +114,7 @@ def _match_template(issue: dict, templates: list[dict]) -> dict | None:
 
 
 # ── TypeScript baseline check ──────────────────────────────────────────────
+
 
 async def _tsc_error_count(cwd: Path) -> int:
     """Return number of tsc errors (0 = clean)."""
@@ -168,6 +172,7 @@ def _git_commit(issue_id: str, description: str) -> bool:
 
 # ── Main apply_fix entrypoint ──────────────────────────────────────────────
 
+
 async def apply_fix(issue_id: str) -> dict:
     issues = await get_open_issues(limit=1000)
     issue = next((i for i in issues if i["id"] == issue_id), None)
@@ -178,7 +183,9 @@ async def apply_fix(issue_id: str) -> dict:
 
     # Hard block: critical-path files never auto-fix
     if _is_critical_path(file_path):
-        log.info({"action": "critical_path_block", "issue_id": issue_id, "file": file_path})
+        log.info(
+            {"action": "critical_path_block", "issue_id": issue_id, "file": file_path}
+        )
         return {
             "success": False,
             "method": "blocked",
@@ -206,12 +213,18 @@ async def apply_fix(issue_id: str) -> dict:
 
         if fix_type == "alert_only":
             log.info({"action": "template_alert_only", "issue_id": issue_id})
-            return {"success": True, "method": "template_alert", "issue_id": issue_id,
-                    "note": template.get("description", "")}
+            return {
+                "success": True,
+                "method": "template_alert",
+                "issue_id": issue_id,
+                "note": template.get("description", ""),
+            }
 
         if not safe:
             # Create a PR for human review instead
-            return await _create_review_pr(issue, template.get("description", issue.get("message", "")))
+            return await _create_review_pr(
+                issue, template.get("description", issue.get("message", ""))
+            )
 
         # Run ruff autofix for safe template with command
         if template.get("command"):
@@ -223,7 +236,9 @@ async def apply_fix(issue_id: str) -> dict:
             if success:
                 _git_commit(issue_id, template.get("description", "template fix"))
                 await mark_fixed(issue_id)
-            log.info({"action": "template_fix", "issue_id": issue_id, "success": success})
+            log.info(
+                {"action": "template_fix", "issue_id": issue_id, "success": success}
+            )
             return {"success": success, "method": "template", "issue_id": issue_id}
 
     # ── LLM path ───────────────────────────────────────────────────────────
@@ -241,7 +256,12 @@ async def apply_fix(issue_id: str) -> dict:
         result: LLMFixResult = await generate_fix(issue)
     except Exception as exc:
         log.error({"action": "llm_fix_error", "issue_id": issue_id, "error": str(exc)})
-        return {"success": False, "method": "llm", "error": str(exc), "issue_id": issue_id}
+        return {
+            "success": False,
+            "method": "llm",
+            "error": str(exc),
+            "issue_id": issue_id,
+        }
 
     diff = result["diff"]
     risk = result.get("risk", "medium")
@@ -250,7 +270,9 @@ async def apply_fix(issue_id: str) -> dict:
     if requires_human or risk == "high":
         # Don't auto-apply — open PR for review
         await record_fix(issue_id, "llm", diff, "", False)
-        return await _create_review_pr(issue, result.get("root_cause", issue.get("message", "")), diff=diff)
+        return await _create_review_pr(
+            issue, result.get("root_cause", issue.get("message", "")), diff=diff
+        )
 
     if risk == "medium":
         # Open PR but don't auto-commit
@@ -271,14 +293,28 @@ async def apply_fix(issue_id: str) -> dict:
             ),
         )
         await record_fix(issue_id, "llm_pr", diff, pr_url, True)
-        log.info({"action": "llm_pr_created", "issue_id": issue_id, "pr": pr_url, "risk": risk})
-        return {"success": True, "method": "llm_pr", "pr_url": pr_url, "issue_id": issue_id}
+        log.info(
+            {
+                "action": "llm_pr_created",
+                "issue_id": issue_id,
+                "pr": pr_url,
+                "risk": risk,
+            }
+        )
+        return {
+            "success": True,
+            "method": "llm_pr",
+            "pr_url": pr_url,
+            "issue_id": issue_id,
+        }
 
     # risk == "low" — attempt auto-apply with tsc guard
     return await _apply_with_tsc_guard(issue, diff, result)
 
 
-async def _apply_with_tsc_guard(issue: dict, diff: str, llm_result: LLMFixResult) -> dict:
+async def _apply_with_tsc_guard(
+    issue: dict, diff: str, llm_result: LLMFixResult
+) -> dict:
     """Apply diff, run tsc before/after, revert if new errors introduced."""
     issue_id = issue["id"]
     web_dir = REPO_ROOT / "neufin-web"
@@ -290,16 +326,23 @@ async def _apply_with_tsc_guard(issue: dict, diff: str, llm_result: LLMFixResult
     if not applied:
         log.error({"action": "diff_apply_failed", "issue_id": issue_id})
         await record_fix(issue_id, "llm", diff, "", False)
-        return {"success": False, "method": "llm", "message": "git apply failed", "issue_id": issue_id}
+        return {
+            "success": False,
+            "method": "llm",
+            "message": "git apply failed",
+            "issue_id": issue_id,
+        }
 
     after = await _tsc_error_count(web_dir)
     if after > baseline:
-        log.warning({
-            "action": "fix_reverted",
-            "issue_id": issue_id,
-            "baseline_errors": baseline,
-            "after_errors": after,
-        })
+        log.warning(
+            {
+                "action": "fix_reverted",
+                "issue_id": issue_id,
+                "baseline_errors": baseline,
+                "after_errors": after,
+            }
+        )
         _revert_diff(diff)
         await record_fix(issue_id, "llm", diff, "", False)
         return {
@@ -309,12 +352,21 @@ async def _apply_with_tsc_guard(issue: dict, diff: str, llm_result: LLMFixResult
             "issue_id": issue_id,
         }
 
-    committed = _git_commit(issue_id, llm_result.get("root_cause", issue.get("message", ""))[:60])
+    committed = _git_commit(
+        issue_id, llm_result.get("root_cause", issue.get("message", ""))[:60]
+    )
     await record_fix(issue_id, "llm_auto", diff, "", committed)
     if committed:
         await mark_fixed(issue_id)
 
-    log.info({"action": "fix_applied", "issue_id": issue_id, "committed": committed, "risk": "low"})
+    log.info(
+        {
+            "action": "fix_applied",
+            "issue_id": issue_id,
+            "committed": committed,
+            "risk": "low",
+        }
+    )
     return {
         "success": True,
         "method": "llm_auto",
@@ -343,7 +395,12 @@ async def _create_review_pr(issue: dict, description: str, diff: str = "") -> di
     )
     await record_fix(issue["id"], "review_pr", diff, pr_url, False)
     log.info({"action": "review_pr_created", "issue_id": issue["id"], "pr": pr_url})
-    return {"success": True, "method": "review_pr", "pr_url": pr_url, "issue_id": issue["id"]}
+    return {
+        "success": True,
+        "method": "review_pr",
+        "pr_url": pr_url,
+        "issue_id": issue["id"],
+    }
 
 
 async def can_auto_fix(issue: dict) -> bool:

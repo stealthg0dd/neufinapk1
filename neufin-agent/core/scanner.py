@@ -16,7 +16,10 @@ from core.audit_log import (
 )
 from core.notifier import notify_scan_complete, notify_critical, notify_high
 from core.supabase_persistence import write_findings, write_scan_run
-from core.github_issues import process_findings as gh_process_findings, close_resolved_issues
+from core.github_issues import (
+    process_findings as gh_process_findings,
+    close_resolved_issues,
+)
 from core.router_sync import post_scan_results
 import detectors.typescript_check as typescript_check
 import detectors.python_check as python_check
@@ -71,7 +74,9 @@ def _publish_scan_issues_to_sentry(issues: list[dict]) -> int:
                     issue.get("file", "unknown"),
                     str(issue.get("line", 0)),
                 ]
-                sentry_sdk.capture_message(issue.get("message", "Scanner issue"), level="error")
+                sentry_sdk.capture_message(
+                    issue.get("message", "Scanner issue"), level="error"
+                )
             sent += 1
         except Exception as exc:
             log.error({"action": "sentry_issue_publish_error", "error": str(exc)})
@@ -81,12 +86,16 @@ def _publish_scan_issues_to_sentry(issues: list[dict]) -> int:
 async def run_all_detectors() -> dict:
     # Safety check: if the repo isn't there, we can't scan.
     if not REPO_ROOT.exists():
-        log.error({"action": "scan_aborted", "reason": f"Directory {REPO_ROOT} not found"})
+        log.error(
+            {"action": "scan_aborted", "reason": f"Directory {REPO_ROOT} not found"}
+        )
         return {"error": "Repository root not found", "path": str(REPO_ROOT)}
 
     started_at = datetime.now(UTC).isoformat()
     run_id = await begin_scan_run()
-    log.info({"action": "detectors_start", "run_id": run_id, "scanning_path": str(REPO_ROOT)})
+    log.info(
+        {"action": "detectors_start", "run_id": run_id, "scanning_path": str(REPO_ROOT)}
+    )
 
     # Gather results from all specialized detectors
     results = await asyncio.gather(
@@ -110,9 +119,15 @@ async def run_all_detectors() -> dict:
     issues: list[dict] = []
     for i, r in enumerate(results):
         if isinstance(r, Exception):
-            log.error({"action": "detector_fail", "detector": detector_names[i], "error": str(r)})
+            log.error(
+                {
+                    "action": "detector_fail",
+                    "detector": detector_names[i],
+                    "error": str(r),
+                }
+            )
         else:
-            issues.extend([i.to_dict() if hasattr(i, 'to_dict') else i for i in r])
+            issues.extend([i.to_dict() if hasattr(i, "to_dict") else i for i in r])
 
     counts = {
         sev: sum(1 for i in issues if i.get("severity") == sev)

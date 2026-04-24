@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, UTC
 
 from github import Github
-from github.GithubException import GithubException, UnknownObjectException
+from github.GithubException import GithubException
 
 from core.config import settings
 
@@ -24,11 +24,11 @@ _BASE_LABELS = ["neufin-agent", "automated"]
 _SEVERITY_LABELS = ["critical", "high", "medium", "low"]
 _LABEL_COLORS: dict[str, str] = {
     "neufin-agent": "0075ca",
-    "automated":    "e4e669",
-    "critical":     "d93f0b",
-    "high":         "e99695",
-    "medium":       "f9d0c4",
-    "low":          "c2e0c6",
+    "automated": "e4e669",
+    "critical": "d93f0b",
+    "high": "e99695",
+    "medium": "f9d0c4",
+    "low": "c2e0c6",
 }
 
 
@@ -51,7 +51,13 @@ def _ensure_labels(repo) -> None:
                 log.info({"action": "gh_label_created", "label": name})
             except GithubException as exc:
                 if exc.status != 422:  # 422 = already exists (race)
-                    log.warning({"action": "gh_label_create_failed", "label": name, "error": str(exc)})
+                    log.warning(
+                        {
+                            "action": "gh_label_create_failed",
+                            "label": name,
+                            "error": str(exc),
+                        }
+                    )
 
 
 def _issue_title(finding: dict) -> str:
@@ -109,8 +115,13 @@ def _process_findings_sync(findings: list[dict]) -> None:
         title = _issue_title(finding)
         existing = _find_open_issue(repo, title)
         if existing:
-            log.info({"action": "gh_issue_duplicate_skipped",
-                      "title": title, "issue_number": existing.number})
+            log.info(
+                {
+                    "action": "gh_issue_duplicate_skipped",
+                    "title": title,
+                    "issue_number": existing.number,
+                }
+            )
             continue
 
         severity = finding.get("severity", "high")
@@ -121,9 +132,13 @@ def _process_findings_sync(findings: list[dict]) -> None:
                 body=_issue_body(finding),
                 labels=labels,
             )
-            log.info({"action": "gh_issue_created", "number": issue.number, "title": title})
+            log.info(
+                {"action": "gh_issue_created", "number": issue.number, "title": title}
+            )
         except GithubException as exc:
-            log.error({"action": "gh_issue_create_failed", "title": title, "error": str(exc)})
+            log.error(
+                {"action": "gh_issue_create_failed", "title": title, "error": str(exc)}
+            )
 
 
 def _close_resolved_sync(resolved_findings: list[dict]) -> None:
@@ -146,10 +161,17 @@ def _close_resolved_sync(resolved_findings: list[dict]) -> None:
                 f"Resolution: `{finding.get('resolution', 'auto_fixed')}`"
             )
             issue.edit(state="closed")
-            log.info({"action": "gh_issue_closed", "number": issue.number, "title": title})
+            log.info(
+                {"action": "gh_issue_closed", "number": issue.number, "title": title}
+            )
         except GithubException as exc:
-            log.error({"action": "gh_issue_close_failed",
-                       "number": issue.number, "error": str(exc)})
+            log.error(
+                {
+                    "action": "gh_issue_close_failed",
+                    "number": issue.number,
+                    "error": str(exc),
+                }
+            )
 
 
 async def process_findings(findings: list[dict]) -> None:

@@ -7,7 +7,19 @@ from detectors import Issue
 # Standardized REPO_ROOT for Railway
 REPO_ROOT = Path(os.getenv("REPO_ROOT", "/app/repo_to_scan"))
 
-SKIP_DIRS = {".git", ".next", "node_modules", "__pycache__", ".venv", "build", "dist", ".expo", "android", "ios", ".gradle"}
+SKIP_DIRS = {
+    ".git",
+    ".next",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+    ".expo",
+    "android",
+    "ios",
+    ".gradle",
+}
 
 # (compiled_pattern, message)
 CHECKS: list[tuple[re.Pattern, str]] = [
@@ -20,7 +32,9 @@ CHECKS: list[tuple[re.Pattern, str]] = [
         "Hardcoded ticker symbol — breaks with real portfolio data",
     ),
     (
-        re.compile(r'["\'][a-zA-Z0-9._%+\-]+@(?:example|test|demo|fake)\.[a-zA-Z]{2,}["\']'),
+        re.compile(
+            r'["\'][a-zA-Z0-9._%+\-]+@(?:example|test|demo|fake)\.[a-zA-Z]{2,}["\']'
+        ),
         "Hardcoded test/demo email address",
     ),
     (

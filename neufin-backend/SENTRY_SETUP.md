@@ -71,11 +71,11 @@ sentry-cli releases finalize <sha>
 
 ## Recommended Alert Rules (create in Sentry UI)
 
-1. **High error rate** — `error rate > 5 %` over 5 min → Slack #alerts  
-2. **New issue** — any new unhandled exception → Slack #alerts  
-3. **P95 latency** — `p95(transaction.duration) > 3000ms` → email  
-4. **Crash-free sessions drop** — `< 99 %` over 1 h → PagerDuty  
-5. **Sentry quota** — `> 80 % of monthly quota used` → email  
+1. **High error rate** — `error rate > 5 %` over 5 min → Slack #alerts
+2. **New issue** — any new unhandled exception → Slack #alerts
+3. **P95 latency** — `p95(transaction.duration) > 3000ms` → email
+4. **Crash-free sessions drop** — `< 99 %` over 1 h → PagerDuty
+5. **Sentry quota** — `> 80 % of monthly quota used` → email
 
 ## Local Testing
 

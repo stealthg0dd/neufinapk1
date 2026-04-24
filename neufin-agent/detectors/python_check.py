@@ -13,10 +13,11 @@ log = logging.getLogger("neufin-agent.python_check")
 # ruff codes that can be auto-fixed
 RUFF_AUTO_FIX = {"E501", "F401", "F811", "W291", "W293", "W292", "I001", "UP"}
 
+
 # ruff codes → severity
 def _ruff_severity(code: str) -> str:
     if code.startswith("S"):
-        return "high"   # bandit-style security via ruff
+        return "high"  # bandit-style security via ruff
     if code.startswith("F"):
         return "medium"
     return "low"
@@ -25,11 +26,20 @@ def _ruff_severity(code: str) -> str:
 async def _run_ruff() -> list[Issue]:
     backend = REPO_ROOT / "neufin-backend"
     if not backend.exists():
-        log.warning({"action": "python_check_skip", "reason": "backend_not_found", "path": str(backend)})
+        log.warning(
+            {
+                "action": "python_check_skip",
+                "reason": "backend_not_found",
+                "path": str(backend),
+            }
+        )
         return []
     try:
         proc = await asyncio.create_subprocess_exec(
-            "ruff", "check", str(backend), "--output-format=json",
+            "ruff",
+            "check",
+            str(backend),
+            "--output-format=json",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -74,8 +84,13 @@ async def _run_bandit() -> list[Issue]:
         return []
     try:
         proc = await asyncio.create_subprocess_exec(
-            "bandit", "-r", str(backend), "-f", "json",
-            "-x", str(backend / "tests"),
+            "bandit",
+            "-r",
+            str(backend),
+            "-f",
+            "json",
+            "-x",
+            str(backend / "tests"),
             "--quiet",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -101,7 +116,11 @@ async def _run_bandit() -> list[Issue]:
         issues.append(
             Issue(
                 severity=sev,
-                type="auth_bug" if "auth" in r.get("issue_text", "").lower() else "type_error",
+                type=(
+                    "auth_bug"
+                    if "auth" in r.get("issue_text", "").lower()
+                    else "type_error"
+                ),
                 file=rel,
                 line=r.get("line_number", 0),
                 message=f"B{r.get('test_id', '???')}: {r.get('issue_text', '')}",

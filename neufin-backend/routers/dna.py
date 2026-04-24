@@ -130,9 +130,11 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
     churn_input = {
         "hhi": metrics.get("hhi", 0),
         "structural_biases": metrics.get("structural_biases") or [],
-        "regime_label": (quant_result or {}).get("regime_context", {}).get("regime")
-        if quant_result
-        else None,
+        "regime_label": (
+            (quant_result or {}).get("regime_context", {}).get("regime")
+            if quant_result
+            else None
+        ),
     }
     churn = compute_churn_risk(churn_input)
     analysis.update(churn)
@@ -436,7 +438,9 @@ async def submit_batch(req: BatchRequest):
     """
     api_key = req.api_key or ""
     if not api_key:
-        raise HTTPException(status_code=401, detail="api_key is required for batch analysis.")
+        raise HTTPException(
+            status_code=401, detail="api_key is required for batch analysis."
+        )
 
     # Rate limit: 1 batch per 60s per API key
     now = time.monotonic()
