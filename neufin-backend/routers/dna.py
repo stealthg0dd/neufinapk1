@@ -294,6 +294,7 @@ _BATCH_RATE_WINDOW = 60.0  # 1 batch per minute per key
 _batch_store: dict[str, dict[str, Any]] = {}
 
 _BATCH_REDIS_TTL = 3600  # 1 hour
+_background_tasks: set = set()  # prevent GC of fire-and-forget tasks (RUF006)
 
 
 def _get_batch_redis():
@@ -459,8 +460,10 @@ async def submit_batch(req: BatchRequest):
     batch_id = f"batch_{uuid.uuid4().hex[:12]}"
     estimated_seconds = max(5, len(req.portfolios) // 20)
 
-    # Fire-and-forget background processing
-    asyncio.create_task(_run_batch(batch_id, req))
+    # Fire-and-forget background processing — task ref kept to prevent GC
+    _task = asyncio.create_task(_run_batch(batch_id, req))
+    _background_tasks.add(_task)
+    _task.add_done_callback(_background_tasks.discard)
 
     return {
         "batch_id": batch_id,
