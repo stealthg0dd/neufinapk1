@@ -34,7 +34,7 @@ stripe==11.4.1
 
 # Validation — pydantic >=2.11.7 required by realtime==2.28.0
 pydantic==2.11.7
-pydantic-settings==2.7.1
+pydantic-settings==2.14.0
 
 # Agentic Swarm
 langgraph==1.0.10
