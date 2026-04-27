@@ -1,0 +1,138 @@
+# Manual only: run from Actions → "Promote Staging to Production".
+#
+# GitHub Environments (repo Settings → Environments — not committed as files):
+#   - production: required reviewers, deployment branches = main only
+#   - staging: no reviewers, deployment branches = develop only (optional; for UI parity)
+#
+# The merge-to-main job uses environment: production so Approvals appear before git merge.
+
+name: Promote Staging to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: >
+          Type PROMOTE to confirm you have tested staging.neufin.ai
+          and are ready to deploy to www.neufin.ai
+        required: true
+        type: string
+      release_notes:
+        description: Brief description of what is being promoted
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  validate-intent:
+    name: Validate promotion intent
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "PROMOTE" ]; then
+            echo "Confirmation failed. Type PROMOTE to proceed."
+            exit 1
+          fi
+          echo "Confirmed. Promoting develop to main."
+          echo "Release notes: ${{ github.event.inputs.release_notes }}"
+
+  merge-to-main:
+    name: Merge develop into main
+    runs-on: ubuntu-latest
+    needs: validate-intent
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "NeuFin Release Bot"
+          git config user.email "releases@neufin.ai"
+
+      - name: Merge develop into main
+        env:
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+        run: |
+          git checkout main
+          git pull origin main
+          git merge origin/develop --no-ff \
+            -m "chore(release): promote develop to production" \
+            -m "Release notes: ${RELEASE_NOTES:-}" \
+            -m "Triggered by: ${{ github.actor }}" \
+            -m "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push origin main
+
+  verify-production:
+    name: Verify production health
+    runs-on: ubuntu-latest
+    needs: merge-to-main
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Railway and Vercel to deploy
+        run: |
+          echo "Waiting 90 seconds for both platforms to deploy..."
+          sleep 90
+
+      - name: Check Railway production health
+        run: |
+          for i in 1 2 3 4 5; do
+            STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+              https://neufin101-production.up.railway.app/health \
+              || echo "000")
+            echo "Attempt $i — Railway: $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Railway production healthy."
+              break
+            fi
+            if [ "$i" = "5" ]; then
+              echo "Railway health check failed after 5 attempts."
+              exit 1
+            fi
+            sleep 20
+          done
+
+      - name: Check Vercel production
+        run: |
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" \
+            https://www.neufin.ai || echo "000")
+          echo "Vercel production: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Vercel production check failed."
+            exit 1
+          fi
+
+  notify-success:
+    name: Notify release success
+    runs-on: ubuntu-latest
+    needs: verify-production
+    if: success()
+    steps:
+      - name: Post to Slack
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "Production deploy successful. www.neufin.ai is live.\nRelease: ${{ github.event.inputs.release_notes }}\nBy: ${{ github.actor }}"
+            }' || true
+
+  notify-failure:
+    name: Notify release failure
+    runs-on: ubuntu-latest
+    needs: [merge-to-main, verify-production]
+    if: ${{ always() && (needs.merge-to-main.result == 'failure' || needs.merge-to-main.result == 'cancelled' || needs.verify-production.result == 'failure' || needs.verify-production.result == 'cancelled') }}
+    steps:
+      - name: Post failure to Slack
+        run: |
+          curl -s -X POST "${{ secrets.SLACK_WEBHOOK_NEUFIN_DEV }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "PRODUCTION DEPLOY FAILED. Check GitHub Actions immediately.\nBy: ${{ github.actor }}"
+            }' || true
