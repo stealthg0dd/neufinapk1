@@ -36,7 +36,7 @@
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "resend": "^6.10.0",
+    "resend": "^6.12.2",
     "stripe": "^21.0.1"
   },
   "devDependencies": {
