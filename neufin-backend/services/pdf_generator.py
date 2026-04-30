@@ -83,11 +83,26 @@ except ImportError:
 logger = structlog.get_logger("neufin.pdf_generator")
 
 A4_W, A4_H = A4
-MARGIN = 40
-CONTENT_W = A4_W - 2 * MARGIN
+LEFT_MARGIN = 70
+RIGHT_MARGIN = 70
+TOP_MARGIN = 56
+BOTTOM_MARGIN = 56
+MARGIN = LEFT_MARGIN
+CONTENT_W = A4_W - LEFT_MARGIN - RIGHT_MARGIN
 
 
 # ─── DESIGN SYSTEM ────────────────────────────────────────────────────────────
+# Goldman memo palette
+NAVY = HexColor("#0F172A")
+TEAL = HexColor("#1EB8CC")
+RED = HexColor("#DB3131")
+AMBER = HexColor("#F59E0A")
+GREEN = HexColor("#22B84C")
+LGRAY = HexColor("#F5F8FC")
+DGRAY = HexColor("#334155")
+MGRAY = HexColor("#737373")
+WHITE = HexColor("#FFFFFF")
+
 # Dark theme
 DARK_BG = HexColor("#0B0F14")
 DARK_CARD = HexColor("#161D2E")
@@ -97,21 +112,21 @@ DARK_TEXT_MUT = HexColor("#64748B")
 DARK_TEXT_BOD = HexColor("#CBD5E1")
 
 # White theme
-WHITE_BG = HexColor("#FFFFFF")
-WHITE_CARD = HexColor("#F8FAFC")
-WHITE_BORDER = HexColor("#E2E8F0")
-WHITE_TEXT_PRI = HexColor("#0F172A")
-WHITE_TEXT_MUT = HexColor("#475569")
-WHITE_TEXT_BOD = HexColor("#334155")
+WHITE_BG = WHITE
+WHITE_CARD = WHITE
+WHITE_BORDER = LGRAY
+WHITE_TEXT_PRI = NAVY
+WHITE_TEXT_MUT = MGRAY
+WHITE_TEXT_BOD = DGRAY
 
 # Shared accents (both themes)
-ACCENT_TEAL = HexColor("#1EB8CC")
-ACCENT_GREEN = HexColor("#22C55E")
-ACCENT_AMBER = HexColor("#F5A623")
-ACCENT_RED = HexColor("#EF4444")
+ACCENT_TEAL = TEAL
+ACCENT_GREEN = GREEN
+ACCENT_AMBER = AMBER
+ACCENT_RED = RED
 ACCENT_PUR = HexColor("#8B5CF6")
 ACCENT_SLATE = HexColor("#64748B")
-IC_NAVY = HexColor("#0D1117")
+IC_NAVY = NAVY
 
 # Pie/donut chart ring colors (shared)
 CHART_COLORS = [
@@ -193,9 +208,9 @@ def _palette(theme: str) -> dict:
         "purple": ACCENT_PUR,
         # hex strings for matplotlib / canvas.setFillColor(HexColor(...))
         "bg_hex": "#0B0F14" if dark else "#FFFFFF",
-        "card_hex": "#161D2E" if dark else "#F8FAFC",
+        "card_hex": "#161D2E" if dark else "#FFFFFF",
         "text_hex": "#F0F4FF" if dark else "#0F172A",
-        "mut_hex": "#64748B" if dark else "#475569",
+        "mut_hex": "#64748B" if dark else "#737373",
     }
 
 
@@ -237,38 +252,38 @@ def _styles(p: dict) -> dict:
     B = p["text_bod"]
     M = p["text_mut"]
     T = p["teal"]
-    use_light = t in ("light", "white")
-    h3_color = B if use_light else T
 
     return {
         "h1": ps("h1", fontName="Helvetica-Bold", fontSize=18, textColor=W, leading=22),
-        "h2": ps("h2", fontName="Helvetica-Bold", fontSize=14, textColor=W, leading=18),
+        "h2": ps("h2", fontName="Helvetica-Bold", fontSize=12, textColor=T, leading=15),
         "h3": ps(
             "h3",
             fontName="Helvetica-Bold",
-            fontSize=12,
-            textColor=h3_color,
-            leading=15,
-            spaceAfter=3,
+            fontSize=10,
+            textColor=W,
+            leading=12,
+            spaceAfter=2,
         ),
-        "body": ps("bd", fontName="Helvetica", fontSize=11, textColor=B, leading=15),
+        "body": ps("bd", fontName="Helvetica", fontSize=9, textColor=B, leading=12),
         "body_b": ps(
-            "bdb", fontName="Helvetica-Bold", fontSize=11, textColor=B, leading=15
+            "bdb", fontName="Helvetica-Bold", fontSize=9, textColor=W, leading=12
         ),
-        "body_sm": ps("bsm", fontName="Helvetica", fontSize=9, textColor=B, leading=12),
+        "body_sm": ps("bsm", fontName="Helvetica", fontSize=8, textColor=B, leading=10),
         "muted": ps(
-            "mt", fontName="Helvetica-Oblique", fontSize=9, textColor=M, leading=12
+            "mt", fontName="Helvetica-Oblique", fontSize=8, textColor=M, leading=10
         ),
-        "muted8": ps("m8", fontName="Helvetica", fontSize=8, textColor=M, leading=10),
+        "muted8": ps(
+            "m8", fontName="Helvetica-Oblique", fontSize=8, textColor=M, leading=10
+        ),
         "label": ps(
-            "lb", fontName="Helvetica-Bold", fontSize=8, textColor=M, leading=10
+            "lb", fontName="Helvetica-Bold", fontSize=9, textColor=B, leading=11
         ),
         "center": ps(
             "cn",
             fontName="Helvetica",
-            fontSize=11,
+            fontSize=9,
             textColor=B,
-            leading=15,
+            leading=12,
             alignment=TA_CENTER,
         ),
         "center_b": ps(
@@ -276,7 +291,7 @@ def _styles(p: dict) -> dict:
             fontName="Helvetica-Bold",
             fontSize=11,
             textColor=W,
-            leading=15,
+            leading=13,
             alignment=TA_CENTER,
         ),
         "amber_warn": ps(
@@ -1180,52 +1195,38 @@ def _build_execution_actions(
 
 
 def _tbl_std(p: dict, header_accent: HexColor | None = None) -> TableStyle:
-    """Standard table — light themes use neutral header and black type (IC style)."""
-    if p["theme"] in ("light", "white"):
-        hdr_bg = HexColor("#F4F4F5")
-        hdr_fg = p["text_pri"]
-        return TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), hdr_bg),
-                ("TEXTCOLOR", (0, 0), (-1, 0), hdr_fg),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [p["bg"], p["bg"]]),
-                ("GRID", (0, 0), (-1, -1), 0.25, p["border"]),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-            ]
-        )
-    hdr = header_accent or p["teal"]
+    """Goldman memo table: navy header, minimal borders, readable black body text."""
+    hdr = header_accent or IC_NAVY
     return TableStyle(
         [
             ("BACKGROUND", (0, 0), (-1, 0), hdr),
-            ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [p["bg"], p["card"]]),
-            ("GRID", (0, 0), (-1, -1), 0.25, p["border"]),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("TEXTCOLOR", (0, 1), (-1, -1), HexColor("#141414")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, LGRAY]),
+            ("GRID", (0, 0), (-1, -1), 0.3, LGRAY),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("ALIGN", (0, 1), (0, -1), "RIGHT"),
+            ("ALIGN", (1, 1), (-1, -1), "LEFT"),
         ]
     )
 
 
 def _card_box(p: dict, accent: HexColor, padding: int = 8) -> TableStyle:
-    """Card-style table with colored left border."""
+    """Minimal memo table box."""
     return TableStyle(
         [
-            ("BACKGROUND", (0, 0), (-1, -1), p["card"]),
-            ("BOX", (0, 0), (-1, -1), 0.5, p["border"]),
-            ("LINEBEFORE", (0, 0), (0, -1), 3, accent),
+            ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+            ("BOX", (0, 0), (-1, -1), 0.3, LGRAY),
             ("TOPPADDING", (0, 0), (-1, -1), padding),
             ("BOTTOMPADDING", (0, 0), (-1, -1), padding),
-            ("LEFTPADDING", (0, 0), (-1, -1), padding + 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), padding),
         ]
     )
@@ -1319,20 +1320,17 @@ def _draw_report_footer(
     pal: dict,
     report_date: str,
 ):
-    footer_y = MARGIN - 2
-    canvas.setStrokeColor(IC_NAVY)
-    canvas.setLineWidth(0.8)
-    canvas.line(MARGIN, footer_y + 14, A4_W - MARGIN, footer_y + 14)
+    footer_y = BOTTOM_MARGIN - 4
     disclaimer = (
         "For informational purposes only. Not investment advice. "
         "NeuFin OÜ (EU) / NeuFin Inc. (US). "
         "Advisor is responsible for validating all inputs before IC presentation."
     )
     canvas.setFont("Helvetica", 8)
-    canvas.setFillColor(pal["text_mut"])
-    canvas.drawString(MARGIN, footer_y, disclaimer[:220])
+    canvas.setFillColor(MGRAY)
+    canvas.drawString(LEFT_MARGIN, footer_y, disclaimer[:220])
     canvas.drawRightString(
-        A4_W - MARGIN,
+        A4_W - RIGHT_MARGIN,
         footer_y,
         f"{ctx.get('report_run_id') or '—'} · {report_date}",
     )
@@ -2440,10 +2438,10 @@ def _generate_emergency_pdf(
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN,
-        bottomMargin=MARGIN,
+        rightMargin=RIGHT_MARGIN,
+        leftMargin=LEFT_MARGIN,
+        topMargin=TOP_MARGIN,
+        bottomMargin=BOTTOM_MARGIN,
     )
     base = getSampleStyleSheet()
     title = advisor_config.get("advisor_name") or "NeuFin Intelligence"
@@ -2490,10 +2488,10 @@ def build_swarm_ic_export_pdf(swarm_row: dict) -> bytes:
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN,
-        bottomMargin=MARGIN,
+        rightMargin=RIGHT_MARGIN,
+        leftMargin=LEFT_MARGIN,
+        topMargin=TOP_MARGIN,
+        bottomMargin=BOTTOM_MARGIN,
     )
     story: list = []
     story.append(Paragraph("<b>NEUFIN</b> &nbsp;|&nbsp; Swarm IC Analysis", st["h1"]))
@@ -2585,271 +2583,76 @@ def _make_cover_callback(
     advisor_config: dict,
     report_date: str,
 ) -> Any:
-    """Returns an onPage callback that draws the cover page directly on canvas."""
+    """Returns an onPage callback that draws a clean Goldman-style cover page."""
     firm_name = ctx["firm_name"] or ctx["advisor_name"]
-    client_name = advisor_config.get("client_name") or "Confidential"
-    report_id = str(ctx.get("report_run_id") or "—")
     total_value = ctx["total_value"]
     portfolio_name = ctx["portfolio_name"]
-    verdict = ctx["verdict"]
-    verdict_color = HexColor(ctx["verdict_color"])
-    dna_score = ctx["dna_score"]
-    regime = ctx["regime_label"] or "Pending IC Analysis"
-    beta = ctx["weighted_beta"]
-    sr = ctx.get("sharpe_ratio")
-    if sr is not None:
-        sharpe_str = _fnum(sr)
-    else:
-        sharpe_proxy = _compute_sharpe_proxy(
-            float(beta or 1.0),
-            _market_code_from_ctx(ctx, ctx.get("positions") or []),
-            str(ctx.get("regime_label") or "Market-Neutral"),
-        )
-        sharpe_str = f"{sharpe_proxy['sharpe_proxy']:.2f} proxy"
-    report_state = str(ctx.get("report_state") or REPORT_DRAFT)
     labels = ctx.get("section_labels") or {}
     cover_title = str(labels.get("cover_title") or "PORTFOLIO INTELLIGENCE REPORT")
-    cover_subtitle = str(
-        labels.get("cover_subtitle")
-        or "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations"
-    )
-    header_style = ParagraphStyle(
-        "cover-header-cell",
-        fontName="Helvetica",
-        fontSize=9,
-        leading=11,
-    )
 
     def callback(canvas, doc):
         canvas.saveState()
-        # Background
-        canvas.setFillColor(pal["bg"])
+        canvas.setFillColor(WHITE)
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-        # DRAFT/NOT IC READY banner — RED, full-width, top of page 1 (Ha #5)
-        ic_inner = ctx.get("ic_readiness") or {}
-        ic_tier_inner = str(ic_inner.get("tier") or "DRAFT")
-        if ic_tier_inner != "IC-READY":
-            banner_msg = (
-                "DRAFT — NOT IC READY: Swarm IC analysis required before committee distribution"
-                if ic_tier_inner == "DRAFT"
-                else "ADVISOR REVIEW — Not for external IC distribution without Swarm IC validation"
+
+        top_y = A4_H - TOP_MARGIN
+        dims = _scaled_logo_dims(logo_bytes, target_height=36, max_width=120)
+        if dims and logo_bytes:
+            logo_w, logo_h = dims
+            canvas.drawImage(
+                ImageReader(io.BytesIO(logo_bytes)),
+                LEFT_MARGIN,
+                top_y - logo_h,
+                width=logo_w,
+                height=logo_h,
+                mask="auto",
             )
-            canvas.setFillColor(ACCENT_RED)
-            canvas.rect(0, A4_H - 28, A4_W, 28, fill=1, stroke=0)
-            canvas.setFont("Helvetica-Bold", 9)
-            canvas.setFillColor(HexColor("#FFFFFF"))
-            canvas.drawCentredString(A4_W / 2, A4_H - 16, banner_msg)
-        header_y = A4_H - 114
-        col_widths = [CONTENT_W * 0.30, CONTENT_W * 0.40, CONTENT_W * 0.30]
-        header_table = Table(
-            [
-                [
-                    _logo_flowable(
-                        logo_bytes,
-                        target_height=60,
-                        max_width=col_widths[0] - 12,
-                        fallback_label=firm_name,
-                        text_color=pal["text_pri"],
-                    ),
-                    Paragraph(
-                        '<para align="center"><font name="Helvetica-Bold" size="14" color="#0D1117">'
-                        "PORTFOLIO INTELLIGENCE REPORT"
-                        "</font></para>",
-                        header_style,
-                    ),
-                    [
-                        Paragraph(
-                            f'<para align="right"><font name="Helvetica" size="9" color="{_hex(pal["text_pri"])}">Report ID: {_xml(report_id)}</font></para>',
-                            header_style,
-                        ),
-                        Paragraph(
-                            f'<para align="right"><font name="Helvetica" size="9" color="{_hex(pal["text_pri"])}">Generated: {_xml(report_date)}</font></para>',
-                            header_style,
-                        ),
-                        Paragraph(
-                            '<para align="right"><font name="Helvetica-Bold" size="9" color="#CC0000">RESTRICTED - IC USE ONLY</font></para>',
-                            header_style,
-                        ),
-                    ],
-                ]
-            ],
-            colWidths=col_widths,
-            rowHeights=[68],
-        )
-        header_table.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                    ("ALIGN", (1, 0), (1, 0), "CENTER"),
-                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ]
-            )
-        )
-        header_table.wrapOn(canvas, CONTENT_W, 68)
-        header_table.drawOn(canvas, MARGIN, header_y)
-        canvas.setStrokeColor(IC_NAVY)
-        canvas.setLineWidth(1)
-        canvas.line(MARGIN, header_y - 6, A4_W - MARGIN, header_y - 6)
-
-        if report_state != REPORT_FINAL:
-            canvas.setFillColor(ACCENT_AMBER)
-            canvas.rect(MARGIN, header_y - 26, CONTENT_W, 16, fill=1, stroke=0)
-            canvas.setFont("Helvetica-Bold", 7)
-            canvas.setFillColor(HexColor("#0F172A"))
-            state_msg = (
-                "DRAFT - DATA INCOMPLETE · NOT FOR EXTERNAL IC DISTRIBUTION"
-                if report_state == REPORT_DRAFT
-                else "ADVISOR REVIEW - VERIFY INPUTS BEFORE IC PRESENTATION"
-            )
-            canvas.drawCentredString(A4_W / 2, header_y - 21, state_msg)
-
-        # ── Report title (centred) ──────────────────────────────────────────
-        _light_cover = pal["theme"] in ("light", "white")
-        canvas.setFont("Helvetica-Bold", 24)
-        canvas.setFillColor(pal["text_pri"] if _light_cover else ACCENT_TEAL)
-        canvas.drawCentredString(A4_W / 2, A4_H / 2 + 70, cover_title)
-        canvas.setFont("Helvetica", 12)
-        canvas.setFillColor(pal["text_mut"])
-        canvas.drawCentredString(
-            A4_W / 2,
-            A4_H / 2 + 46,
-            cover_subtitle,
-        )
-
-        # ── Horizontal rule ─────────────────────────────────────────────────
-        canvas.setStrokeColor(pal["border"] if _light_cover else ACCENT_TEAL)
-        canvas.setLineWidth(1.0 if _light_cover else 1.5)
-        canvas.line(A4_W * 0.18, A4_H / 2 + 30, A4_W * 0.82, A4_H / 2 + 30)
-
-        # ── 3-column metadata grid ──────────────────────────────────────────
-        meta = [
-            ("Portfolio", portfolio_name[:38]),
-            ("Client", client_name[:38]),
-            ("Total Value", f"${total_value:,.0f}"),
-            ("Report Date", report_date),
-            ("Advisor", ctx["advisor_name"][:38]),
-            ("Firm", firm_name[:38] if firm_name else "—"),
-        ]
-        xs = [MARGIN + 10, A4_W / 3 + 10, A4_W * 2 / 3 + 10]
-        y0 = A4_H / 2 + 10
-        for i, (label, val) in enumerate(meta):
-            col = i % 3
-            row = i // 3
-            x = xs[col]
-            y = y0 - row * 28
-            canvas.setFont("Helvetica", 7)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawString(x, y, label.upper())
-            canvas.setFont("Helvetica-Bold", 10)
-            canvas.setFillColor(pal["text_pri"])
-            canvas.drawString(x, y - 12, val)
-
-        # ── Verdict box ─────────────────────────────────────────────────────
-        vbox_y = A4_H / 2 - 65
-        canvas.setStrokeColor(verdict_color)
-        canvas.setLineWidth(2)
-        canvas.roundRect(MARGIN, vbox_y - 26, CONTENT_W, 52, 4, fill=0, stroke=1)
-        canvas.setFillColor(verdict_color)
-        canvas.setFont("Helvetica-Bold", 15)
-        canvas.drawCentredString(
-            A4_W / 2, vbox_y + 14, f"PORTFOLIO VERDICT:  {verdict}"
-        )
-        canvas.setFont("Helvetica", 9)
-        canvas.setFillColor(pal["text_mut"])
-        canvas.drawCentredString(
-            A4_W / 2, vbox_y - 6, str(ctx.get("verdict_desc") or "")[:240]
-        )
-
-        # ── 4-metric strip ──────────────────────────────────────────────────
-        strip_y = vbox_y - 65
-        if dna_score <= 40:
-            dna_col = ACCENT_RED
-        elif dna_score <= 70:
-            dna_col = ACCENT_AMBER
         else:
-            dna_col = ACCENT_GREEN
+            canvas.setFont("Helvetica-Bold", 16)
+            canvas.setFillColor(NAVY)
+            canvas.drawString(LEFT_MARGIN, top_y - 28, firm_name[:34])
 
-        metrics_strip = [
-            (str(dna_score), "/ 100", "PORTFOLIO DNA", dna_col),
-            (regime[:16], "", "MACRO REGIME", ACCENT_AMBER),
-            (f"{beta:.2f}", "", "WEIGHTED BETA", ACCENT_TEAL),
-            (sharpe_str, "", "SHARPE RATIO", ACCENT_GREEN),
-        ]
-        col_w = CONTENT_W / 4
-        for i, (val, suffix, label, col) in enumerate(metrics_strip):
-            x_c = MARGIN + i * col_w + col_w / 2
-            canvas.setFillColor(pal["card"])
-            canvas.roundRect(
-                MARGIN + i * col_w + 4, strip_y - 30, col_w - 8, 58, 3, fill=1, stroke=0
-            )
-            canvas.setFont("Helvetica-Bold", 18)
-            canvas.setFillColor(col)
-            canvas.drawCentredString(x_c, strip_y + 14, val[:14])
-            if suffix:
-                canvas.setFont("Helvetica", 9)
-                canvas.setFillColor(pal["text_mut"])
-                canvas.drawCentredString(x_c, strip_y + 1, suffix)
-            canvas.setFont("Helvetica", 7)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawCentredString(x_c, strip_y - 16, label)
+        rule_y = top_y - 52
+        canvas.setStrokeColor(TEAL)
+        canvas.setLineWidth(1)
+        canvas.line(LEFT_MARGIN, rule_y, A4_W - RIGHT_MARGIN, rule_y)
 
-        # ── IC Readiness badge ───────────────────────────────────────────────
+        title_y = A4_H / 2 + 86
+        canvas.setFont("Helvetica-Bold", 24)
+        canvas.setFillColor(NAVY)
+        canvas.drawCentredString(A4_W / 2, title_y, cover_title)
+
+        meta_line = f"{portfolio_name}  |  ${total_value:,.0f} AUM  |  {report_date}"
+        canvas.setFont("Helvetica", 11)
+        canvas.setFillColor(MGRAY)
+        canvas.drawCentredString(A4_W / 2, title_y - 28, meta_line[:105])
+
         ic = ctx.get("ic_readiness") or {}
         ic_tier = str(ic.get("tier") or "DRAFT")
         ic_score = int(ic.get("score") or 0)
-        ic_color_hex = str(ic.get("tier_color") or "FF4444")
-        ic_flags = ic.get("flags") or []
-
-        badge_y = strip_y - 58
-        badge_color = HexColor(f"#{ic_color_hex}")
-        canvas.setFillColor(badge_color)
-        canvas.roundRect(MARGIN, badge_y - 8, 130, 22, 3, fill=1, stroke=0)
-        canvas.setFont("Helvetica-Bold", 9)
-        canvas.setFillColor(HexColor("#FFFFFF"))
         if ic_tier == "IC-READY":
-            ic_display = f"IC READINESS: IC-READY ({ic_score}%)"
+            badge_color = GREEN
         elif ic_tier == "ADVISOR-READY":
-            ic_display = f"IC READINESS: ADVISOR-READY ({ic_score}%) — Swarm IC required for IC-READY"
+            badge_color = AMBER
         else:
-            ic_display = (
-                f"IC READINESS: DRAFT ({ic_score}%) — Swarm IC required for IC-READY"
-            )
-        canvas.drawString(MARGIN + 8, badge_y + 2, ic_display[:80])
+            badge_color = RED
+        badge_text = f"{ic_tier}  |  {ic_score}%"
+        badge_w = max(118, canvas.stringWidth(badge_text, "Helvetica-Bold", 9) + 26)
+        badge_x = (A4_W - badge_w) / 2
+        badge_y = title_y - 72
+        canvas.setFillColor(badge_color)
+        canvas.roundRect(badge_x, badge_y - 8, badge_w, 22, 10, fill=1, stroke=0)
+        canvas.setFont("Helvetica-Bold", 9)
+        canvas.setFillColor(WHITE)
+        canvas.drawCentredString(A4_W / 2, badge_y - 1, badge_text)
 
-        if ic_flags:
-            flag_x = MARGIN + 220
-            for flag in ic_flags[:3]:
-                flag_status = str(flag.get("status") or "")
-                flag_item = str(flag.get("item") or "")
-                flag_col = ACCENT_RED if flag_status == "MISSING" else ACCENT_AMBER
-                canvas.setFillColor(flag_col)
-                canvas.roundRect(flag_x, badge_y - 4, 6, 14, 1, fill=1, stroke=0)
-                canvas.setFont("Helvetica", 7)
-                canvas.setFillColor(pal["text_mut"])
-                canvas.drawString(
-                    flag_x + 10, badge_y + 2, f"{flag_item}: {flag_status}"
-                )
-                flag_x += 130
-
-        if ic_tier == "DRAFT":
-            banner_y = badge_y - 26
-            canvas.setFillColor(HexColor("#FF4444"))
-            canvas.rect(MARGIN, banner_y - 4, CONTENT_W, 16, fill=1, stroke=0)
-            canvas.setFont("Helvetica-Bold", 7)
-            canvas.setFillColor(HexColor("#FFFFFF"))
-            canvas.drawCentredString(
-                A4_W / 2,
-                banner_y + 1,
-                "DRAFT OUTPUT — Not for IC distribution until all red items resolved",
-            )
-
-        _draw_report_footer(canvas, ctx, pal, report_date)
-
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(MGRAY)
+        canvas.drawCentredString(
+            A4_W / 2,
+            BOTTOM_MARGIN,
+            "RESTRICTED — FOR ADVISOR USE ONLY",
+        )
         canvas.restoreState()
 
     return callback
@@ -2872,41 +2675,37 @@ def _make_hf_callback(
 
     def callback(canvas, doc):
         canvas.saveState()
-        # Background fill (essential for dark theme)
-        canvas.setFillColor(pal["bg"])
+        canvas.setFillColor(WHITE)
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-        header_y = A4_H - MARGIN - 2
-        canvas.setStrokeColor(IC_NAVY)
-        canvas.setLineWidth(0.9)
-        canvas.line(MARGIN, header_y, A4_W - MARGIN, header_y)
-        dims = _scaled_logo_dims(logo_bytes, target_height=30, max_width=160)
+        header_y = A4_H - TOP_MARGIN + 10
+        dims = _scaled_logo_dims(logo_bytes, target_height=24, max_width=120)
         if dims and logo_bytes:
             width, height = dims
             canvas.drawImage(
                 ImageReader(io.BytesIO(logo_bytes)),
-                MARGIN,
-                header_y - 34,
+                LEFT_MARGIN,
+                header_y - 26,
                 width=width,
                 height=height,
                 mask="auto",
             )
         else:
-            canvas.setFont("Helvetica-Bold", 12)
-            canvas.setFillColor(pal["text_pri"])
-            canvas.drawString(MARGIN, header_y - 20, firm_name[:32])
+            canvas.setFont("Helvetica-Bold", 10)
+            canvas.setFillColor(NAVY)
+            canvas.drawString(LEFT_MARGIN, header_y - 18, firm_name[:32])
         total_pages = getattr(canvas, "_page_count", 0) or doc.page
-        canvas.setFont("Helvetica", 9)
-        canvas.setFillColor(pal["text_mut"])
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(MGRAY)
         canvas.drawRightString(
-            A4_W - MARGIN,
+            A4_W - RIGHT_MARGIN,
             header_y - 18,
             f"{client_identifier} · {report_id} · Page {doc.page} of {total_pages}",
         )
         vn_note = ctx.get("vn_footer_note")
         if vn_note:
             canvas.setFont("Helvetica", 6)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawString(MARGIN, MARGIN + 10, str(vn_note)[:220])
+            canvas.setFillColor(MGRAY)
+            canvas.drawString(LEFT_MARGIN, BOTTOM_MARGIN + 10, str(vn_note)[:220])
         _draw_report_footer(canvas, ctx, pal, report_date)
         canvas.restoreState()
 
@@ -2921,40 +2720,21 @@ def _ic_body_section_header(
     st: dict,
     cw: float,
 ) -> list:
-    """Section number, rule, and title block (institutional body pages)."""
+    """Goldman-style memo section header: teal text and whitespace."""
     out: list = []
     header_title = _xml(title)
     if section_num:
         header_title = f"{_xml(section_num)}. {header_title}"
-    banner = Table(
-        [
-            [
-                Paragraph(
-                    f'<font name="Helvetica-Bold" size="12" color="#FFFFFF">{header_title}</font>',
-                    st["body"],
-                )
-            ]
-        ],
-        colWidths=[cw],
-        rowHeights=[24],
-    )
-    banner.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), IC_NAVY),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]
+    out.append(
+        Paragraph(
+            f'<font name="Helvetica-Bold" size="12" color="{_hex(TEAL)}">{header_title}</font>',
+            st["h2"],
         )
     )
-    out.append(banner)
     if subtitle:
-        out.append(Spacer(1, 6))
+        out.append(Spacer(1, 4))
         out.append(Paragraph(_xml(subtitle), st["muted8"]))
-    out.append(Spacer(1, 12))
+    out.append(Spacer(1, 18))
     return out
 
 
@@ -6898,10 +6678,10 @@ def _build_pdf_sync(
     doc = BaseDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN + 18,
-        bottomMargin=MARGIN + 22,
+        rightMargin=RIGHT_MARGIN,
+        leftMargin=LEFT_MARGIN,
+        topMargin=TOP_MARGIN,
+        bottomMargin=BOTTOM_MARGIN,
     )
 
     cover_cb = _make_cover_callback(ctx, pal, logo_bytes, advisor_config, report_date)
@@ -6909,10 +6689,10 @@ def _build_pdf_sync(
 
     cover_frame = Frame(0, 0, A4_W, A4_H, id="cover")
     body_frame = Frame(
-        MARGIN,
-        MARGIN + 20,
+        LEFT_MARGIN,
+        BOTTOM_MARGIN + 20,
         cw,
-        A4_H - 2 * MARGIN - 60,
+        A4_H - TOP_MARGIN - BOTTOM_MARGIN - 60,
         id="body",
     )
     doc.addPageTemplates(
