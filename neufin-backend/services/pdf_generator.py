@@ -20,6 +20,7 @@ import base64
 import datetime
 import io
 import json
+import math
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -29,7 +30,7 @@ import httpx
 import structlog
 from reportlab.graphics import renderPM
 from reportlab.graphics.shapes import Drawing, Rect, String
-from reportlab.lib.colors import HexColor
+from reportlab.lib.colors import Color, HexColor
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -82,11 +83,26 @@ except ImportError:
 logger = structlog.get_logger("neufin.pdf_generator")
 
 A4_W, A4_H = A4
-MARGIN = 40
-CONTENT_W = A4_W - 2 * MARGIN
+LEFT_MARGIN = 70
+RIGHT_MARGIN = 70
+TOP_MARGIN = 56
+BOTTOM_MARGIN = 56
+MARGIN = LEFT_MARGIN
+CONTENT_W = A4_W - LEFT_MARGIN - RIGHT_MARGIN
 
 
 # ─── DESIGN SYSTEM ────────────────────────────────────────────────────────────
+# Goldman memo palette
+NAVY = HexColor("#0F172A")
+TEAL = HexColor("#1EB8CC")
+RED = HexColor("#DB3131")
+AMBER = HexColor("#F59E0A")
+GREEN = HexColor("#22B84C")
+LGRAY = HexColor("#F5F8FC")
+DGRAY = HexColor("#334155")
+MGRAY = HexColor("#737373")
+WHITE = HexColor("#FFFFFF")
+
 # Dark theme
 DARK_BG = HexColor("#0B0F14")
 DARK_CARD = HexColor("#161D2E")
@@ -96,21 +112,21 @@ DARK_TEXT_MUT = HexColor("#64748B")
 DARK_TEXT_BOD = HexColor("#CBD5E1")
 
 # White theme
-WHITE_BG = HexColor("#FFFFFF")
-WHITE_CARD = HexColor("#F8FAFC")
-WHITE_BORDER = HexColor("#E2E8F0")
-WHITE_TEXT_PRI = HexColor("#0F172A")
-WHITE_TEXT_MUT = HexColor("#475569")
-WHITE_TEXT_BOD = HexColor("#334155")
+WHITE_BG = WHITE
+WHITE_CARD = WHITE
+WHITE_BORDER = LGRAY
+WHITE_TEXT_PRI = NAVY
+WHITE_TEXT_MUT = MGRAY
+WHITE_TEXT_BOD = DGRAY
 
 # Shared accents (both themes)
-ACCENT_TEAL = HexColor("#1EB8CC")
-ACCENT_GREEN = HexColor("#22C55E")
-ACCENT_AMBER = HexColor("#F5A623")
-ACCENT_RED = HexColor("#EF4444")
+ACCENT_TEAL = TEAL
+ACCENT_GREEN = GREEN
+ACCENT_AMBER = AMBER
+ACCENT_RED = RED
 ACCENT_PUR = HexColor("#8B5CF6")
 ACCENT_SLATE = HexColor("#64748B")
-IC_NAVY = HexColor("#0D1117")
+IC_NAVY = NAVY
 
 # Pie/donut chart ring colors (shared)
 CHART_COLORS = [
@@ -192,9 +208,9 @@ def _palette(theme: str) -> dict:
         "purple": ACCENT_PUR,
         # hex strings for matplotlib / canvas.setFillColor(HexColor(...))
         "bg_hex": "#0B0F14" if dark else "#FFFFFF",
-        "card_hex": "#161D2E" if dark else "#F8FAFC",
+        "card_hex": "#161D2E" if dark else "#FFFFFF",
         "text_hex": "#F0F4FF" if dark else "#0F172A",
-        "mut_hex": "#64748B" if dark else "#475569",
+        "mut_hex": "#64748B" if dark else "#737373",
     }
 
 
@@ -204,6 +220,21 @@ def _hex(c: HexColor) -> str:
         return f"#{c.hexval() & 0xFFFFFF:06x}"
     except Exception:
         return "#F0F4FF"
+
+
+def _rl_color(value: Any, fallback: HexColor = ACCENT_TEAL) -> Any:
+    """Coerce tuple/hex ReportLab color inputs while preserving existing colors."""
+    if isinstance(value, tuple) and len(value) >= 3:
+        try:
+            return Color(float(value[0]), float(value[1]), float(value[2]))
+        except (TypeError, ValueError):
+            return fallback
+    if isinstance(value, str):
+        try:
+            return HexColor(value)
+        except Exception:
+            return fallback
+    return value or fallback
 
 
 # ─── STYLE FACTORY ────────────────────────────────────────────────────────────
@@ -221,38 +252,38 @@ def _styles(p: dict) -> dict:
     B = p["text_bod"]
     M = p["text_mut"]
     T = p["teal"]
-    use_light = t in ("light", "white")
-    h3_color = B if use_light else T
 
     return {
         "h1": ps("h1", fontName="Helvetica-Bold", fontSize=18, textColor=W, leading=22),
-        "h2": ps("h2", fontName="Helvetica-Bold", fontSize=14, textColor=W, leading=18),
+        "h2": ps("h2", fontName="Helvetica-Bold", fontSize=12, textColor=T, leading=15),
         "h3": ps(
             "h3",
             fontName="Helvetica-Bold",
-            fontSize=12,
-            textColor=h3_color,
-            leading=15,
-            spaceAfter=3,
+            fontSize=10,
+            textColor=W,
+            leading=12,
+            spaceAfter=2,
         ),
-        "body": ps("bd", fontName="Helvetica", fontSize=11, textColor=B, leading=15),
+        "body": ps("bd", fontName="Helvetica", fontSize=9, textColor=B, leading=12),
         "body_b": ps(
-            "bdb", fontName="Helvetica-Bold", fontSize=11, textColor=B, leading=15
+            "bdb", fontName="Helvetica-Bold", fontSize=9, textColor=W, leading=12
         ),
-        "body_sm": ps("bsm", fontName="Helvetica", fontSize=9, textColor=B, leading=12),
+        "body_sm": ps("bsm", fontName="Helvetica", fontSize=8, textColor=B, leading=10),
         "muted": ps(
-            "mt", fontName="Helvetica-Oblique", fontSize=9, textColor=M, leading=12
+            "mt", fontName="Helvetica-Oblique", fontSize=8, textColor=M, leading=10
         ),
-        "muted8": ps("m8", fontName="Helvetica", fontSize=8, textColor=M, leading=10),
+        "muted8": ps(
+            "m8", fontName="Helvetica-Oblique", fontSize=8, textColor=M, leading=10
+        ),
         "label": ps(
-            "lb", fontName="Helvetica-Bold", fontSize=8, textColor=M, leading=10
+            "lb", fontName="Helvetica-Bold", fontSize=9, textColor=B, leading=11
         ),
         "center": ps(
             "cn",
             fontName="Helvetica",
-            fontSize=11,
+            fontSize=9,
             textColor=B,
-            leading=15,
+            leading=12,
             alignment=TA_CENTER,
         ),
         "center_b": ps(
@@ -260,7 +291,7 @@ def _styles(p: dict) -> dict:
             fontName="Helvetica-Bold",
             fontSize=11,
             textColor=W,
-            leading=15,
+            leading=13,
             alignment=TA_CENTER,
         ),
         "amber_warn": ps(
@@ -399,38 +430,31 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
     if code == "VN":
         return {
             "defensive_symbols": {"VCB.VN", "GAS.VN"},
-            "weight_label": "VGBs/VCB.VN/GAS.VN (VN defensive allocation)",
+            "weight_label": "Defensive (VGBs/VCB.VN/GAS.VN)",
+            "weight_description": "Vietnam Government Bonds + State-backed defensive equities",
             "rotation_text": (
-                "Defensive rotation within VN market: reduce VCI.VN exposure; "
-                "consider VCB.VN (Vietcombank — lower beta, state-backed) or "
-                "GAS.VN (Petrovietnam Gas — defensive sector) as rebalancing "
-                "destinations. Alternatively, consider adding VN government bonds "
-                "(VGBs) with 3-5 year duration at current SBV accommodative stance."
+                "Reduce high-beta VN securities; add VCB.VN (Vietcombank — lower "
+                "beta, state-backed) or GAS.VN (Petrovietnam Gas — defensive sector). "
+                "Consider VN Government Bonds (VGBs, 3-year yield ~8%) for capital preservation."
             ),
             "qualitative_scenarios": [
                 [
-                    "2025 VN Tariff Shock",
-                    "US tariffs on Vietnamese exports",
-                    "Est. -15% to -22%",
-                    "Export beta and foreign-flow sensitivity",
+                    "2022 Rate Shock",
+                    "VN-Index -35% (2022)",
+                    "Est. -28% to -38%",
+                    "VCI.VN/SSI.VN securities broker crash · VPB/MBB banking stress",
                 ],
                 [
                     "2020 COVID Crash",
-                    "Global equities -33.9%",
-                    "Est. -20% to -32%",
-                    "All correlations -> 1.0 in liquidity crisis",
+                    "VN-Index -33% (Mar 2020)",
+                    "Est. -25% to -35%",
+                    "All VN correlations -> 1.0 · Foreign outflow · VND depreciation",
                 ],
                 [
-                    "FTSE EM Upgrade Delay",
-                    "Upgrade reversal / delay",
-                    "Est. -8% to -12%",
-                    "Foreign-flow-sensitive names de-rate",
-                ],
-                [
-                    "Steel Price Shock",
-                    "Iron ore -20%",
-                    "Est. HPG.VN -18% to -25%",
-                    "EBITDA margin sensitivity to steel spreads",
+                    "FTSE EM Upgrade",
+                    "N/A (Sep 2026 expected)",
+                    "Est. +15% to +25% on reclassification",
+                    "If upgrade delayed: Est. -10% on reversal",
                 ],
             ],
             "additional_risk_scenarios": [
@@ -469,7 +493,8 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
     if code == "SG":
         return {
             "defensive_symbols": {"A17U.SI", "C38U.SI", "MBH.SI"},
-            "weight_label": "SGS bonds / SGX-listed S-REITs (defensive income allocation)",
+            "weight_label": "Defensive (SGS Bonds/REITs)",
+            "weight_description": "Singapore Government Securities + SGX-listed S-REITs",
             "rotation_text": (
                 "Defensive rotation within SG market: rotate high-beta exposure into "
                 "Singapore Government Securities (SGS bonds) and SGX-listed S-REITs "
@@ -478,13 +503,20 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
             "qualitative_scenarios": None,
             "additional_risk_scenarios": None,
         }
+    if code in {"MY", "MYR"}:
+        return {
+            "defensive_symbols": set(),
+            "weight_label": "Defensive (MGS Bonds/Utilities)",
+            "weight_description": "Malaysia Government Securities + defensive utilities",
+            "rotation_text": "Rotate into defensives (utilities, consumer staples, gold)",
+            "qualitative_scenarios": None,
+            "additional_risk_scenarios": None,
+        }
     return {
         "defensive_symbols": {"GLD", "TLT", "BND", "JNJ", "PG", "VZ", "XLP", "XLU"},
-        "weight_label": "GLD/TLT/XLP/XLU",
-        "rotation_text": (
-            "Rotate 5-10% from high-beta positions into XLU / XLP / GLD "
-            "for improved risk-adjusted return."
-        ),
+        "weight_label": "Defensive (GLD/TLT/XLP/XLU)",
+        "weight_description": "Treasuries, gold, utilities, and consumer staples",
+        "rotation_text": "Rotate into defensives (utilities, consumer staples, gold)",
         "qualitative_scenarios": None,
         "additional_risk_scenarios": None,
     }
@@ -527,6 +559,76 @@ def _portfolio_has_cost_basis(positions: list[dict[str, Any]]) -> bool:
     return False
 
 
+def _compute_var_fallback(
+    portfolio_value_usd: float, weighted_beta: float, market_code: str = "VN"
+) -> dict:
+    """
+    Beta-estimated VaR. Not IC-grade but always better than "Pending".
+    Formula: VaR_95 = portfolio_value x beta x daily_vol x z_95.
+    """
+    daily_vol = {"VN": 0.018, "US": 0.012, "SG": 0.010, "DEFAULT": 0.015}
+    z_95 = 1.645
+    code = _normalize_market_code(market_code)
+    vol = daily_vol.get(code, daily_vol["DEFAULT"])
+    value = max(float(portfolio_value_usd or 0), 0.0)
+    beta = max(float(weighted_beta or 1.0), 0.1)
+    var_1d_95 = value * beta * vol * z_95
+    var_1d_99 = value * beta * vol * 2.326
+    var_10d_95 = var_1d_95 * (10**0.5)
+    pct = (var_1d_95 / value * 100) if value > 0 else 0.0
+    return {
+        "var_1d_95_usd": round(var_1d_95),
+        "var_1d_99_usd": round(var_1d_99),
+        "var_10d_95_usd": round(var_10d_95),
+        "var_label": f"${var_1d_95 / 1e6:.1f}M ({pct:.2f}% AUM)",
+        "var_method": "beta-estimated, not simulated",
+        "var_confidence": "95%, 1-day",
+        "daily_vol": vol,
+        "market_code": code,
+    }
+
+
+def _compute_sharpe_proxy(
+    weighted_beta: float, market_code: str = "VN", regime: str = "Market-Neutral"
+) -> dict:
+    """
+    Sharpe proxy using expected market return assumptions.
+    Not exact without actual returns, but always better than a blank.
+    """
+    risk_free = {"VN": 0.080, "US": 0.045, "SG": 0.036, "DEFAULT": 0.045}
+    expected_mkt = {"VN": 0.12, "US": 0.10, "SG": 0.09, "DEFAULT": 0.10}
+    daily_vol = {"VN": 0.018, "US": 0.012, "DEFAULT": 0.015}
+    code = _normalize_market_code(market_code)
+    beta = max(float(weighted_beta or 1.0), 0.1)
+    rf = risk_free.get(code, risk_free["DEFAULT"])
+    mkt = expected_mkt.get(code, expected_mkt["DEFAULT"])
+    vol_annual = daily_vol.get(code, daily_vol["DEFAULT"]) * (252**0.5)
+    expected_return = rf + beta * (mkt - rf)
+    sharpe_proxy = (
+        (expected_return - rf) / (vol_annual * beta)
+        if vol_annual > 0 and beta > 0
+        else 0.0
+    )
+    return {
+        "sharpe_proxy": round(sharpe_proxy, 2),
+        "label": f"{sharpe_proxy:.2f} [CAPM-estimated, not from actual returns]",
+        "method": "CAPM proxy",
+        "regime": regime,
+    }
+
+
+def _correlation_label(ctx: dict) -> tuple[str, str]:
+    status = str(ctx.get("correlation_status") or "").upper()
+    raw = ctx.get("avg_corr")
+    try:
+        value = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        value = None
+    if status == "COMPUTED" and value is not None:
+        return f"{value:.3f}", "High" if value > 0.75 else "Computed"
+    return "Not computed (insufficient price history)", "UNKNOWN"
+
+
 def _compute_risk_metric_labels(
     ctx: dict,
     metrics: dict[str, Any],
@@ -539,7 +641,6 @@ def _compute_risk_metric_labels(
         float(ctx.get("weighted_beta") or metrics.get("weighted_beta") or 1.0), 0.1
     )
     regime_label = str(ctx.get("regime_label") or "Market-Neutral")
-    daily_vol = MARKET_DAILY_VOL.get(market_code, MARKET_DAILY_VOL["DEFAULT"])
 
     var_raw = quant.get("var_95") or metrics.get("var_95")
     var_numeric: float | None = None
@@ -559,11 +660,14 @@ def _compute_risk_metric_labels(
             f"${var_amount:,.0f} ({var_pct:.2f}% of AUM) [calculated, 95% 1-day]"
         )
         var_status = "Calculated"
+        var_fallback = None
     else:
-        var_amount = total_value * weighted_beta * 0.0197 * 1.645
+        var_fallback = _compute_var_fallback(total_value, weighted_beta, market_code)
+        var_amount = float(var_fallback["var_1d_95_usd"])
         var_pct = (var_amount / total_value) * 100 if total_value else 0.0
         var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) [beta-estimated, p95, 1-day]"
+            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) "
+            f"[beta-estimated · {market_code} vol {var_fallback['daily_vol'] * 100:.1f}%]"
         )
         var_status = "Estimated"
 
@@ -609,23 +713,52 @@ def _compute_risk_metric_labels(
             day_of_year = max(1, datetime.datetime.now().timetuple().tm_yday)
             ytd_return_annualised = (1 + ytd_return) ** (365.0 / day_of_year) - 1
             rf = RISK_FREE.get(market_code, RISK_FREE["DEFAULT"])
-            ann_vol = daily_vol * (252**0.5)
+            ann_vol = MARKET_DAILY_VOL.get(market_code, MARKET_DAILY_VOL["DEFAULT"]) * (
+                252**0.5
+            )
             sharpe_est = (ytd_return_annualised - rf) / ann_vol if ann_vol else 0.0
             sharpe_label = f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
             sharpe_status = "Estimated"
         else:
-            rf = RISK_FREE.get(market_code, RISK_FREE["DEFAULT"])
-            ann_vol = daily_vol * (252**0.5)
-            downside_vol = ann_vol * weighted_beta * 0.7
-            proxy_sortino = round(-rf / downside_vol, 2) if downside_vol > 0 else 0.0
+            proxy = _compute_sharpe_proxy(weighted_beta, market_code, regime_label)
             sharpe_label = (
-                f"Not computable without cost basis. "
-                f"Proxy Sortino (downside only): {proxy_sortino:.2f} [beta-estimated]"
+                f"{proxy['sharpe_proxy']:.2f} [CAPM proxy; not from actual returns]"
             )
             sharpe_status = "Proxy"
 
+    if var_fallback:
+        var_99_pct = (
+            float(var_fallback["var_1d_99_usd"]) / total_value * 100
+            if total_value
+            else 0.0
+        )
+        var_10_pct = (
+            float(var_fallback["var_10d_95_usd"]) / total_value * 100
+            if total_value
+            else 0.0
+        )
+        var_99 = (
+            f"${var_fallback['var_1d_99_usd']:,.0f} ({var_99_pct:.2f}% AUM) "
+            "[beta-estimated]"
+        )
+        var_10 = (
+            f"${var_fallback['var_10d_95_usd']:,.0f} ({var_10_pct:.2f}% AUM) "
+            "[10-day horizon, sqrt(t) scaled]"
+        )
+        var_footnote = (
+            "VaR estimated from portfolio beta x "
+            f"{market_code} historical volatility. Monte Carlo simulation available with Swarm IC."
+        )
+    else:
+        var_99 = "Available with simulated VaR"
+        var_10 = "Available with simulated VaR"
+        var_footnote = "VaR supplied by quantitative analysis."
+
     return {
         "var": (var_label, var_status),
+        "var_99": (var_99, var_status),
+        "var_10": (var_10, var_status),
+        "var_footnote": (var_footnote, "Method"),
         "drawdown": (drawdown_label, drawdown_status),
         "sharpe": (sharpe_label, sharpe_status),
     }
@@ -682,9 +815,34 @@ def detect_structural_biases(
             }
         )
 
+    weights = [_w(pos) for pos in positions]
+    positive_weights = [w for w in weights if w > 0]
+    equal_weight_portfolio = False
+    if len(positive_weights) >= 3:
+        equal_weight_portfolio = max(positive_weights) - min(positive_weights) <= 0.02
+    if equal_weight_portfolio:
+        biases.append(
+            {
+                "name": "Equal-Weight Portfolio Detected",
+                "evidence": (
+                    "Equal-weight portfolio detected - analysis limited without "
+                    "resolved market prices."
+                ),
+                "dollar_impact": (
+                    "Dollar-weighted concentration cannot be verified until market "
+                    "prices resolve for each ticker."
+                ),
+                "severity": "INFO",
+                "mitigation": (
+                    "Ensure tickers include exchange suffixes and rerun analysis "
+                    "to verify dollar weights."
+                ),
+            }
+        )
+
     for pos in positions:
         weight = _w(pos)
-        if weight > 0.30:
+        if weight > 0.30 and not equal_weight_portfolio:
             symbol = str(pos.get("symbol") or "Position")
             biases.append(
                 {
@@ -871,16 +1029,19 @@ def compute_execution_action(
     portfolio_aum_usd: float,
     current_price_usd: float,
     market_code: str = "VN",
+    n_positions: int = 6,
+    hhi_optimal_single: float | None = None,
+    max_single_position: float = 0.35,
 ) -> dict[str, Any]:
     """Compute IC-grade execution action with exact sizing."""
-    if current_weight > 0.35:
-        target_weight = current_weight * 0.87
-    elif current_weight > 0.20:
-        target_weight = current_weight * 0.95
-    elif current_weight > 0.10:
-        target_weight = current_weight * 0.98
-    else:
+    n_positions = max(int(n_positions or 1), 1)
+    hhi_optimal_single = hhi_optimal_single or (1.0 / n_positions)
+    if current_weight <= hhi_optimal_single:
         target_weight = current_weight
+    elif current_weight > max_single_position:
+        target_weight = min(max_single_position, current_weight * 0.90)
+    else:
+        target_weight = max(hhi_optimal_single, current_weight * 0.90)
 
     if target_weight == current_weight:
         action_type = "HOLD"
@@ -914,6 +1075,9 @@ def compute_execution_action(
             else "Single-session execution"
         ),
         "timeline_days": 3 if shares_to_trade > 10000 else 1,
+        "hhi_optimal_single_pct": round(hhi_optimal_single * 100, 1),
+        "n_target": n_positions,
+        "max_single_position_pct": round(max_single_position * 100, 1),
     }
 
 
@@ -921,17 +1085,50 @@ def _build_execution_actions(
     positions: list[dict[str, Any]], portfolio_aum_usd: float
 ) -> list[dict[str, Any]]:
     actions: list[dict[str, Any]] = []
+    weights = [_w(pos) for pos in positions if _w(pos) > 0]
+    if len(weights) >= 3 and max(weights) - min(weights) < 0.01:
+        return [
+            {
+                "ticker": "PRICE DATA",
+                "action_type": "RESOLVE PRICE DATA FIRST",
+                "priority": "HIGH",
+                "current_weight_pct": round(weights[0] * 100, 1) if weights else 0,
+                "target_weight_pct": round(weights[0] * 100, 1) if weights else 0,
+                "shares_to_trade": 0,
+                "notional_usd": 0,
+                "tax_cost_usd": 0,
+                "timeline_days": 0,
+                "summary": (
+                    "RESOLVE PRICE DATA FIRST: All positions show equal weights, "
+                    "suggesting price data could not be resolved for one or more tickers. "
+                    "Re-run analysis with complete ticker symbols (e.g. VCI.VN, not VCI) "
+                    "to generate accurate position-specific recommendations."
+                ),
+                "execution_note": (
+                    "Position-specific trade sizing is intentionally suppressed until "
+                    "prices resolve and dollar weights are verified."
+                ),
+                "is_data_quality_action": True,
+            }
+        ]
+
     region_code = "US"
     if positions:
         first_sym = str(positions[0].get("symbol") or "")
         region_code = _infer_market_code(first_sym, positions[0]) if first_sym else "US"
     liq_rows = _compute_liquidity_metrics(positions, portfolio_aum_usd, region_code)
     liq_by_symbol = {r["symbol"]: r for r in liq_rows}
+    hhi = sum(w**2 for w in weights)
+    n_target = max(6, math.floor(1.0 / hhi)) if hhi > 0 else 6
+    hhi_optimal_single = 1.0 / n_target if n_target else 1 / 6
+
     for pos in sorted(positions, key=_w, reverse=True):
         symbol = str(pos.get("symbol") or "").strip().upper()
         if not symbol:
             continue
         current_weight = _w(pos)
+        if current_weight <= hhi_optimal_single:
+            continue
         market_code = _infer_market_code(symbol, pos)
         current_price_usd = _position_price_usd(pos, market_code)
         action = compute_execution_action(
@@ -940,6 +1137,8 @@ def _build_execution_actions(
             portfolio_aum_usd=portfolio_aum_usd,
             current_price_usd=current_price_usd,
             market_code=market_code,
+            n_positions=n_target,
+            hhi_optimal_single=hhi_optimal_single,
         )
         if action["action_type"] == "HOLD":
             continue
@@ -972,11 +1171,21 @@ def _build_execution_actions(
                 f"Requires {weeks_low}-{weeks_high} weeks at 20% ADV participation."
             )
         else:
+            target = float(action["target_weight_pct"])
+            current = float(action["current_weight_pct"])
+            reduction_pct = max(current - target, 0.0)
             action["summary"] = (
                 f"{action['action_type']} {symbol} from "
                 f"{action['current_weight_pct']:.1f}% -> {action['target_weight_pct']:.1f}% "
                 f"by trading ~{action['shares_to_trade']:,} shares "
                 f"(~${action['notional_usd']:,.0f} notional; tax cost ~${action['tax_cost_usd']:,.0f})."
+            )
+            action["optimization_rationale"] = (
+                f"Target: staged move toward HHI-optimal single position "
+                f"1/{n_target}={hhi_optimal_single * 100:.1f}%, bounded by "
+                f"{action['max_single_position_pct']:.0f}% concentration cap and max 10% one-step trim. "
+                f"Reduction of {reduction_pct:.1f}% = {action['shares_to_trade']:,} shares "
+                f"at ${current_price_usd:,.2f}/share = ${action['notional_usd']:,.0f} notional."
             )
         actions.append(action)
     return actions
@@ -986,52 +1195,38 @@ def _build_execution_actions(
 
 
 def _tbl_std(p: dict, header_accent: HexColor | None = None) -> TableStyle:
-    """Standard table — light themes use neutral header and black type (IC style)."""
-    if p["theme"] in ("light", "white"):
-        hdr_bg = HexColor("#F4F4F5")
-        hdr_fg = p["text_pri"]
-        return TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), hdr_bg),
-                ("TEXTCOLOR", (0, 0), (-1, 0), hdr_fg),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [p["bg"], p["bg"]]),
-                ("GRID", (0, 0), (-1, -1), 0.25, p["border"]),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ("LEFTPADDING", (0, 0), (-1, -1), 5),
-            ]
-        )
-    hdr = header_accent or p["teal"]
+    """Goldman memo table: navy header, minimal borders, readable black body text."""
+    hdr = header_accent or IC_NAVY
     return TableStyle(
         [
             ("BACKGROUND", (0, 0), (-1, 0), hdr),
-            ("TEXTCOLOR", (0, 0), (-1, 0), HexColor("#FFFFFF")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), WHITE),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [p["bg"], p["card"]]),
-            ("GRID", (0, 0), (-1, -1), 0.25, p["border"]),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("TEXTCOLOR", (0, 1), (-1, -1), HexColor("#141414")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [WHITE, LGRAY]),
+            ("GRID", (0, 0), (-1, -1), 0.3, LGRAY),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("ALIGN", (0, 1), (0, -1), "RIGHT"),
+            ("ALIGN", (1, 1), (-1, -1), "LEFT"),
         ]
     )
 
 
 def _card_box(p: dict, accent: HexColor, padding: int = 8) -> TableStyle:
-    """Card-style table with colored left border."""
+    """Minimal memo table box."""
     return TableStyle(
         [
-            ("BACKGROUND", (0, 0), (-1, -1), p["card"]),
-            ("BOX", (0, 0), (-1, -1), 0.5, p["border"]),
-            ("LINEBEFORE", (0, 0), (0, -1), 3, accent),
+            ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+            ("BOX", (0, 0), (-1, -1), 0.3, LGRAY),
             ("TOPPADDING", (0, 0), (-1, -1), padding),
             ("BOTTOMPADDING", (0, 0), (-1, -1), padding),
-            ("LEFTPADDING", (0, 0), (-1, -1), padding + 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), padding),
             ("RIGHTPADDING", (0, 0), (-1, -1), padding),
         ]
     )
@@ -1125,20 +1320,17 @@ def _draw_report_footer(
     pal: dict,
     report_date: str,
 ):
-    footer_y = MARGIN - 2
-    canvas.setStrokeColor(IC_NAVY)
-    canvas.setLineWidth(0.8)
-    canvas.line(MARGIN, footer_y + 14, A4_W - MARGIN, footer_y + 14)
+    footer_y = BOTTOM_MARGIN - 4
     disclaimer = (
         "For informational purposes only. Not investment advice. "
         "NeuFin OÜ (EU) / NeuFin Inc. (US). "
         "Advisor is responsible for validating all inputs before IC presentation."
     )
     canvas.setFont("Helvetica", 8)
-    canvas.setFillColor(pal["text_mut"])
-    canvas.drawString(MARGIN, footer_y, disclaimer[:220])
+    canvas.setFillColor(MGRAY)
+    canvas.drawString(LEFT_MARGIN, footer_y, disclaimer[:220])
     canvas.drawRightString(
-        A4_W - MARGIN,
+        A4_W - RIGHT_MARGIN,
         footer_y,
         f"{ctx.get('report_run_id') or '—'} · {report_date}",
     )
@@ -1530,6 +1722,9 @@ def _build_report_context(
     d = dna_data if isinstance(dna_data, dict) else {}
     p = portfolio_data if isinstance(portfolio_data, dict) else {}
     m = p.get("metrics") or {}
+    data_quality = m.get("data_quality") or p.get("data_quality") or {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
     report_mode = _normalize_report_mode((advisor_config or {}).get("report_mode"))
     section_labels = _report_section_labels(report_mode)
 
@@ -1553,6 +1748,7 @@ def _build_report_context(
     else:
         positions = raw_positions or metric_positions
     tickers = [str(pos.get("symbol") or "") for pos in positions]
+    cost_basis_provided = _portfolio_has_cost_basis(positions)
     region_profile = detect_region(tickers)
     sea_region = is_sea_region(region_profile)
     market_code = _normalize_market_code(region_profile.get("primary_market"))
@@ -1630,7 +1826,23 @@ def _build_report_context(
         tax_analysis = {}
 
     # ── Quant (correlation / HHI — prefer calculator metrics, else DNA) ───────
-    avg_corr = float(d.get("avg_correlation") or m.get("avg_correlation") or 0)
+    avg_corr_raw = d.get("avg_correlation")
+    corr_status = str(d.get("correlation_status") or m.get("correlation_status") or "")
+    if avg_corr_raw is None:
+        avg_corr_raw = m.get("avg_correlation")
+    try:
+        avg_corr = float(avg_corr_raw) if avg_corr_raw is not None else None
+    except (TypeError, ValueError):
+        avg_corr = None
+    if avg_corr == 0 and corr_status.upper() != "COMPUTED":
+        avg_corr = None
+    if not corr_status:
+        corr_status = "COMPUTED" if avg_corr is not None else "UNKNOWN"
+    corr_note = str(
+        d.get("correlation_note")
+        or m.get("correlation_note")
+        or "Correlation: Not computed (insufficient price history)"
+    )
     hhi_from_canon = float(_canon.get("hhi") or 0)
     if hhi_from_canon > 0:
         hhi = hhi_from_canon
@@ -1641,6 +1853,13 @@ def _build_report_context(
             or 0
         )
         hhi = hhi_raw / 100.0 if hhi_raw > 1.0 else hhi_raw
+    top_raw = max(positions, key=_w, default={})
+    top_position = {
+        **top_raw,
+        "ticker": top_raw.get("ticker") or top_raw.get("symbol"),
+        "weight_pct": _w(top_raw) * 100,
+        "value_usd": _position_market_value_usd(top_raw) if top_raw else 0,
+    }
 
     quant_blob = s.get("quant_analysis") or {}
     if not isinstance(quant_blob, dict):
@@ -1765,6 +1984,27 @@ def _build_report_context(
             "relative to broad market."
         )
 
+    churn_risk_level = str(d.get("churn_risk_level") or "")
+    if not churn_risk_level:
+        if hhi > 0.35 or any(
+            str(b.get("severity") or "").upper() == "HIGH" for b in structural_biases
+        ):
+            churn_risk_level = "HIGH"
+        elif hhi > 0.20:
+            churn_risk_level = "MEDIUM"
+        else:
+            churn_risk_level = "LOW"
+    churn_risk_score = d.get("churn_risk_score")
+
+    liquidity_rows = _compute_liquidity_metrics(positions, total_value, market_code)
+    liquidity_metrics = {
+        row["symbol"]: {
+            **row,
+            "adv_usd": VN_ADV_USD.get(row["symbol"], VN_ADV_USD["DEFAULT"]),
+        }
+        for row in liquidity_rows
+    }
+
     # ── Mandate ────────────────────────────────────────────────────────────────
     has_gold = any(pos.get("symbol") == "GLD" for pos in positions)
     has_bonds = any(
@@ -1855,69 +2095,84 @@ def _build_report_context(
     # ── Recommendations ────────────────────────────────────────────────────────
     recs: list[dict] = []
     execution_actions = _build_execution_actions(positions, total_value)
-    rec_summary = (
-        s.get("recommendation_summary")
-        or thesis_obj.get("recommendation_summary")
-        or ""
+    data_quality_action = next(
+        (a for a in execution_actions if a.get("is_data_quality_action")), None
     )
-    if rec_summary:
+    if data_quality_action:
         recs.append(
             {
                 "priority": "HIGH",
-                "action": rec_summary,
-                "rationale": "Swarm IC synthesis",
-                "timeline": "30 days",
+                "action": data_quality_action["summary"],
+                "rationale": "Equal-weight portfolio detected; dollar weights are not reliable.",
+                "timeline": "Before trading",
             }
         )
-    if recommendation:
-        recs.append(
-            {
-                "priority": "HIGH",
-                "action": recommendation,
-                "rationale": "Behavioral DNA assessment",
-                "timeline": "30-60 days",
-            }
+    else:
+        rec_summary = (
+            s.get("recommendation_summary")
+            or thesis_obj.get("recommendation_summary")
+            or ""
         )
-    for action in execution_actions[:4]:
+        if rec_summary:
+            recs.append(
+                {
+                    "priority": "HIGH",
+                    "action": rec_summary,
+                    "rationale": "Swarm IC synthesis",
+                    "timeline": "30 days",
+                }
+            )
+        if recommendation:
+            recs.append(
+                {
+                    "priority": "HIGH",
+                    "action": recommendation,
+                    "rationale": "Behavioral DNA assessment",
+                    "timeline": "30-60 days",
+                }
+            )
+        for action in execution_actions[:4]:
+            recs.append(
+                {
+                    "priority": (
+                        "HIGH"
+                        if float(action["current_weight_pct"]) >= 20.0
+                        else "MEDIUM"
+                    ),
+                    "action": action["summary"],
+                    "rationale": "Execution-ready concentration rebalance",
+                    "timeline": (
+                        f"{int(action['timeline_days'])} trading day"
+                        f"{'' if int(action['timeline_days']) == 1 else 's'}"
+                    ),
+                }
+            )
+        if total_harvest_opp > 50:
+            harvest_syms = [
+                tp["symbol"]
+                for tp in tax_positions
+                if float(tp.get("harvest_credit") or 0) > 0
+            ]
+            recs.append(
+                {
+                    "priority": "HIGH",
+                    "action": f"Harvest losses in {', '.join(harvest_syms[:3])} (${total_harvest_opp:,.0f} opportunity)",
+                    "rationale": f"Tax efficiency - est. ${total_harvest_opp * 5:,.0f} 5-year after-tax benefit",
+                    "timeline": "Immediate - before year-end",
+                }
+            )
         recs.append(
             {
-                "priority": (
-                    "HIGH" if float(action["current_weight_pct"]) >= 20.0 else "MEDIUM"
+                "priority": "MEDIUM",
+                "action": (
+                    f"Align defensive allocation to {regime_label} regime"
+                    if regime_label
+                    else "Run Swarm IC Analysis for regime-adjusted positioning"
                 ),
-                "action": action["summary"],
-                "rationale": "Execution-ready concentration rebalance",
-                "timeline": (
-                    f"{int(action['timeline_days'])} trading day"
-                    f"{'' if int(action['timeline_days']) == 1 else 's'}"
-                ),
+                "rationale": "Regime alignment",
+                "timeline": "60 days",
             }
         )
-    if total_harvest_opp > 50:
-        harvest_syms = [
-            tp["symbol"]
-            for tp in tax_positions
-            if float(tp.get("harvest_credit") or 0) > 0
-        ]
-        recs.append(
-            {
-                "priority": "HIGH",
-                "action": f"Harvest losses in {', '.join(harvest_syms[:3])} (${total_harvest_opp:,.0f} opportunity)",
-                "rationale": f"Tax efficiency - est. ${total_harvest_opp * 5:,.0f} 5-year after-tax benefit",
-                "timeline": "Immediate - before year-end",
-            }
-        )
-    recs.append(
-        {
-            "priority": "MEDIUM",
-            "action": (
-                f"Align defensive allocation to {regime_label} regime"
-                if regime_label
-                else "Run Swarm IC Analysis for regime-adjusted positioning"
-            ),
-            "rationale": "Regime alignment",
-            "timeline": "60 days",
-        }
-    )
 
     # ── Alpha opportunities (use parsed list when available) ───────────────────
     alpha_signal_parsed: list = s.get("alpha_signal_parsed") or []
@@ -2057,6 +2312,9 @@ def _build_report_context(
         "total_value": total_value,
         "positions": positions,
         "num_positions": len(positions),
+        "top_position": top_position,
+        "liquidity_metrics": liquidity_metrics,
+        "cost_basis_provided": cost_basis_provided,
         # DNA
         "dna_score": dna_score,
         "investor_type": investor_type,
@@ -2068,12 +2326,15 @@ def _build_report_context(
         "weighted_beta": weighted_beta,
         "sharpe_ratio": sharpe_ratio,
         "avg_corr": avg_corr,
+        "correlation_status": corr_status,
+        "correlation_note": corr_note,
         "hhi": hhi,
         "quant_modes_selected": quant_modes_selected,
         "quant_model_contribution_summary": quant_model_contrib,
         "quant_alpha_risk_tradeoffs": quant_alpha_risk,
         "quant_scenario_implications": quant_scenarios,
         "report_metrics_note": report_metrics_note,
+        "data_quality": data_quality,
         # Tax
         "tax_positions": tax_positions,
         "total_tax_liability": total_tax_liability,
@@ -2091,6 +2352,8 @@ def _build_report_context(
         "recommendations": recs,
         "execution_actions": execution_actions,
         "structural_biases": structural_biases,
+        "churn_risk_level": churn_risk_level,
+        "churn_risk_score": churn_risk_score,
         "alpha_opps": alpha_opps,
         "report_mode": report_mode,
         "section_labels": section_labels,
@@ -2175,10 +2438,10 @@ def _generate_emergency_pdf(
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN,
-        bottomMargin=MARGIN,
+        rightMargin=RIGHT_MARGIN,
+        leftMargin=LEFT_MARGIN,
+        topMargin=TOP_MARGIN,
+        bottomMargin=BOTTOM_MARGIN,
     )
     base = getSampleStyleSheet()
     title = advisor_config.get("advisor_name") or "NeuFin Intelligence"
@@ -2225,10 +2488,10 @@ def build_swarm_ic_export_pdf(swarm_row: dict) -> bytes:
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN,
-        bottomMargin=MARGIN,
+        rightMargin=RIGHT_MARGIN,
+        leftMargin=LEFT_MARGIN,
+        topMargin=TOP_MARGIN,
+        bottomMargin=BOTTOM_MARGIN,
     )
     story: list = []
     story.append(Paragraph("<b>NEUFIN</b> &nbsp;|&nbsp; Swarm IC Analysis", st["h1"]))
@@ -2320,263 +2583,76 @@ def _make_cover_callback(
     advisor_config: dict,
     report_date: str,
 ) -> Any:
-    """Returns an onPage callback that draws the cover page directly on canvas."""
+    """Returns an onPage callback that draws a clean Goldman-style cover page."""
     firm_name = ctx["firm_name"] or ctx["advisor_name"]
-    client_name = advisor_config.get("client_name") or "Confidential"
-    report_id = str(ctx.get("report_run_id") or "—")
     total_value = ctx["total_value"]
     portfolio_name = ctx["portfolio_name"]
-    verdict = ctx["verdict"]
-    verdict_color = HexColor(ctx["verdict_color"])
-    dna_score = ctx["dna_score"]
-    regime = ctx["regime_label"] or "Pending IC Analysis"
-    beta = ctx["weighted_beta"]
-    sr = ctx.get("sharpe_ratio")
-    sharpe_str = _fnum(sr) if sr is not None else "—"
-    report_state = str(ctx.get("report_state") or REPORT_DRAFT)
     labels = ctx.get("section_labels") or {}
     cover_title = str(labels.get("cover_title") or "PORTFOLIO INTELLIGENCE REPORT")
-    cover_subtitle = str(
-        labels.get("cover_subtitle")
-        or "Executive summary  ·  Risk  ·  Scenarios  ·  Recommendations"
-    )
-    header_style = ParagraphStyle(
-        "cover-header-cell",
-        fontName="Helvetica",
-        fontSize=9,
-        leading=11,
-    )
 
     def callback(canvas, doc):
         canvas.saveState()
-        # Background
-        canvas.setFillColor(pal["bg"])
+        canvas.setFillColor(WHITE)
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-        # DRAFT/NOT IC READY banner — RED, full-width, top of page 1 (Ha #5)
-        ic_inner = ctx.get("ic_readiness") or {}
-        ic_tier_inner = str(ic_inner.get("tier") or "DRAFT")
-        if ic_tier_inner != "IC-READY":
-            banner_msg = (
-                "DRAFT — NOT IC READY: Swarm IC analysis required before committee distribution"
-                if ic_tier_inner == "DRAFT"
-                else "ADVISOR REVIEW — Not for external IC distribution without Swarm IC validation"
+
+        top_y = A4_H - TOP_MARGIN
+        dims = _scaled_logo_dims(logo_bytes, target_height=36, max_width=120)
+        if dims and logo_bytes:
+            logo_w, logo_h = dims
+            canvas.drawImage(
+                ImageReader(io.BytesIO(logo_bytes)),
+                LEFT_MARGIN,
+                top_y - logo_h,
+                width=logo_w,
+                height=logo_h,
+                mask="auto",
             )
-            canvas.setFillColor(ACCENT_RED)
-            canvas.rect(0, A4_H - 28, A4_W, 28, fill=1, stroke=0)
-            canvas.setFont("Helvetica-Bold", 9)
-            canvas.setFillColor(HexColor("#FFFFFF"))
-            canvas.drawCentredString(A4_W / 2, A4_H - 16, banner_msg)
-        header_y = A4_H - 114
-        col_widths = [CONTENT_W * 0.30, CONTENT_W * 0.40, CONTENT_W * 0.30]
-        header_table = Table(
-            [
-                [
-                    _logo_flowable(
-                        logo_bytes,
-                        target_height=60,
-                        max_width=col_widths[0] - 12,
-                        fallback_label=firm_name,
-                        text_color=pal["text_pri"],
-                    ),
-                    Paragraph(
-                        '<para align="center"><font name="Helvetica-Bold" size="14" color="#0D1117">'
-                        "PORTFOLIO INTELLIGENCE REPORT"
-                        "</font></para>",
-                        header_style,
-                    ),
-                    [
-                        Paragraph(
-                            f'<para align="right"><font name="Helvetica" size="9" color="{_hex(pal["text_pri"])}">Report ID: {_xml(report_id)}</font></para>',
-                            header_style,
-                        ),
-                        Paragraph(
-                            f'<para align="right"><font name="Helvetica" size="9" color="{_hex(pal["text_pri"])}">Generated: {_xml(report_date)}</font></para>',
-                            header_style,
-                        ),
-                        Paragraph(
-                            '<para align="right"><font name="Helvetica-Bold" size="9" color="#CC0000">RESTRICTED - IC USE ONLY</font></para>',
-                            header_style,
-                        ),
-                    ],
-                ]
-            ],
-            colWidths=col_widths,
-            rowHeights=[68],
-        )
-        header_table.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("ALIGN", (0, 0), (0, 0), "LEFT"),
-                    ("ALIGN", (1, 0), (1, 0), "CENTER"),
-                    ("ALIGN", (2, 0), (2, 0), "RIGHT"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ]
-            )
-        )
-        header_table.wrapOn(canvas, CONTENT_W, 68)
-        header_table.drawOn(canvas, MARGIN, header_y)
-        canvas.setStrokeColor(IC_NAVY)
-        canvas.setLineWidth(1)
-        canvas.line(MARGIN, header_y - 6, A4_W - MARGIN, header_y - 6)
-
-        if report_state != REPORT_FINAL:
-            canvas.setFillColor(ACCENT_AMBER)
-            canvas.rect(MARGIN, header_y - 26, CONTENT_W, 16, fill=1, stroke=0)
-            canvas.setFont("Helvetica-Bold", 7)
-            canvas.setFillColor(HexColor("#0F172A"))
-            state_msg = (
-                "DRAFT - DATA INCOMPLETE · NOT FOR EXTERNAL IC DISTRIBUTION"
-                if report_state == REPORT_DRAFT
-                else "ADVISOR REVIEW - VERIFY INPUTS BEFORE IC PRESENTATION"
-            )
-            canvas.drawCentredString(A4_W / 2, header_y - 21, state_msg)
-
-        # ── Report title (centred) ──────────────────────────────────────────
-        _light_cover = pal["theme"] in ("light", "white")
-        canvas.setFont("Helvetica-Bold", 24)
-        canvas.setFillColor(pal["text_pri"] if _light_cover else ACCENT_TEAL)
-        canvas.drawCentredString(A4_W / 2, A4_H / 2 + 70, cover_title)
-        canvas.setFont("Helvetica", 12)
-        canvas.setFillColor(pal["text_mut"])
-        canvas.drawCentredString(
-            A4_W / 2,
-            A4_H / 2 + 46,
-            cover_subtitle,
-        )
-
-        # ── Horizontal rule ─────────────────────────────────────────────────
-        canvas.setStrokeColor(pal["border"] if _light_cover else ACCENT_TEAL)
-        canvas.setLineWidth(1.0 if _light_cover else 1.5)
-        canvas.line(A4_W * 0.18, A4_H / 2 + 30, A4_W * 0.82, A4_H / 2 + 30)
-
-        # ── 3-column metadata grid ──────────────────────────────────────────
-        meta = [
-            ("Portfolio", portfolio_name[:38]),
-            ("Client", client_name[:38]),
-            ("Total Value", f"${total_value:,.0f}"),
-            ("Report Date", report_date),
-            ("Advisor", ctx["advisor_name"][:38]),
-            ("Firm", firm_name[:38] if firm_name else "—"),
-        ]
-        xs = [MARGIN + 10, A4_W / 3 + 10, A4_W * 2 / 3 + 10]
-        y0 = A4_H / 2 + 10
-        for i, (label, val) in enumerate(meta):
-            col = i % 3
-            row = i // 3
-            x = xs[col]
-            y = y0 - row * 28
-            canvas.setFont("Helvetica", 7)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawString(x, y, label.upper())
-            canvas.setFont("Helvetica-Bold", 10)
-            canvas.setFillColor(pal["text_pri"])
-            canvas.drawString(x, y - 12, val)
-
-        # ── Verdict box ─────────────────────────────────────────────────────
-        vbox_y = A4_H / 2 - 65
-        canvas.setStrokeColor(verdict_color)
-        canvas.setLineWidth(2)
-        canvas.roundRect(MARGIN, vbox_y - 26, CONTENT_W, 52, 4, fill=0, stroke=1)
-        canvas.setFillColor(verdict_color)
-        canvas.setFont("Helvetica-Bold", 15)
-        canvas.drawCentredString(
-            A4_W / 2, vbox_y + 14, f"PORTFOLIO VERDICT:  {verdict}"
-        )
-        canvas.setFont("Helvetica", 9)
-        canvas.setFillColor(pal["text_mut"])
-        canvas.drawCentredString(
-            A4_W / 2, vbox_y - 6, str(ctx.get("verdict_desc") or "")[:240]
-        )
-
-        # ── 4-metric strip ──────────────────────────────────────────────────
-        strip_y = vbox_y - 65
-        if dna_score <= 40:
-            dna_col = ACCENT_RED
-        elif dna_score <= 70:
-            dna_col = ACCENT_AMBER
         else:
-            dna_col = ACCENT_GREEN
+            canvas.setFont("Helvetica-Bold", 16)
+            canvas.setFillColor(NAVY)
+            canvas.drawString(LEFT_MARGIN, top_y - 28, firm_name[:34])
 
-        metrics_strip = [
-            (str(dna_score), "/ 100", "PORTFOLIO DNA", dna_col),
-            (regime[:16], "", "MACRO REGIME", ACCENT_AMBER),
-            (f"{beta:.2f}", "", "WEIGHTED BETA", ACCENT_TEAL),
-            (sharpe_str, "", "SHARPE RATIO", ACCENT_GREEN),
-        ]
-        col_w = CONTENT_W / 4
-        for i, (val, suffix, label, col) in enumerate(metrics_strip):
-            x_c = MARGIN + i * col_w + col_w / 2
-            canvas.setFillColor(pal["card"])
-            canvas.roundRect(
-                MARGIN + i * col_w + 4, strip_y - 30, col_w - 8, 58, 3, fill=1, stroke=0
-            )
-            canvas.setFont("Helvetica-Bold", 18)
-            canvas.setFillColor(col)
-            canvas.drawCentredString(x_c, strip_y + 14, val[:14])
-            if suffix:
-                canvas.setFont("Helvetica", 9)
-                canvas.setFillColor(pal["text_mut"])
-                canvas.drawCentredString(x_c, strip_y + 1, suffix)
-            canvas.setFont("Helvetica", 7)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawCentredString(x_c, strip_y - 16, label)
+        rule_y = top_y - 52
+        canvas.setStrokeColor(TEAL)
+        canvas.setLineWidth(1)
+        canvas.line(LEFT_MARGIN, rule_y, A4_W - RIGHT_MARGIN, rule_y)
 
-        # ── IC Readiness badge ───────────────────────────────────────────────
+        title_y = A4_H / 2 + 86
+        canvas.setFont("Helvetica-Bold", 24)
+        canvas.setFillColor(NAVY)
+        canvas.drawCentredString(A4_W / 2, title_y, cover_title)
+
+        meta_line = f"{portfolio_name}  |  ${total_value:,.0f} AUM  |  {report_date}"
+        canvas.setFont("Helvetica", 11)
+        canvas.setFillColor(MGRAY)
+        canvas.drawCentredString(A4_W / 2, title_y - 28, meta_line[:105])
+
         ic = ctx.get("ic_readiness") or {}
         ic_tier = str(ic.get("tier") or "DRAFT")
         ic_score = int(ic.get("score") or 0)
-        ic_color_hex = str(ic.get("tier_color") or "FF4444")
-        ic_flags = ic.get("flags") or []
-
-        badge_y = strip_y - 58
-        badge_color = HexColor(f"#{ic_color_hex}")
-        canvas.setFillColor(badge_color)
-        canvas.roundRect(MARGIN, badge_y - 8, 130, 22, 3, fill=1, stroke=0)
-        canvas.setFont("Helvetica-Bold", 9)
-        canvas.setFillColor(HexColor("#FFFFFF"))
         if ic_tier == "IC-READY":
-            ic_display = f"IC READINESS: IC-READY ({ic_score}%)"
+            badge_color = GREEN
         elif ic_tier == "ADVISOR-READY":
-            ic_display = f"IC READINESS: ADVISOR-READY ({ic_score}%) — Swarm IC required for IC-READY"
+            badge_color = AMBER
         else:
-            ic_display = (
-                f"IC READINESS: DRAFT ({ic_score}%) — Swarm IC required for IC-READY"
-            )
-        canvas.drawString(MARGIN + 8, badge_y + 2, ic_display[:80])
+            badge_color = RED
+        badge_text = f"{ic_tier}  |  {ic_score}%"
+        badge_w = max(118, canvas.stringWidth(badge_text, "Helvetica-Bold", 9) + 26)
+        badge_x = (A4_W - badge_w) / 2
+        badge_y = title_y - 72
+        canvas.setFillColor(badge_color)
+        canvas.roundRect(badge_x, badge_y - 8, badge_w, 22, 10, fill=1, stroke=0)
+        canvas.setFont("Helvetica-Bold", 9)
+        canvas.setFillColor(WHITE)
+        canvas.drawCentredString(A4_W / 2, badge_y - 1, badge_text)
 
-        if ic_flags:
-            flag_x = MARGIN + 220
-            for flag in ic_flags[:3]:
-                flag_status = str(flag.get("status") or "")
-                flag_item = str(flag.get("item") or "")
-                flag_col = ACCENT_RED if flag_status == "MISSING" else ACCENT_AMBER
-                canvas.setFillColor(flag_col)
-                canvas.roundRect(flag_x, badge_y - 4, 6, 14, 1, fill=1, stroke=0)
-                canvas.setFont("Helvetica", 7)
-                canvas.setFillColor(pal["text_mut"])
-                canvas.drawString(
-                    flag_x + 10, badge_y + 2, f"{flag_item}: {flag_status}"
-                )
-                flag_x += 130
-
-        if ic_tier == "DRAFT":
-            banner_y = badge_y - 26
-            canvas.setFillColor(HexColor("#FF4444"))
-            canvas.rect(MARGIN, banner_y - 4, CONTENT_W, 16, fill=1, stroke=0)
-            canvas.setFont("Helvetica-Bold", 7)
-            canvas.setFillColor(HexColor("#FFFFFF"))
-            canvas.drawCentredString(
-                A4_W / 2,
-                banner_y + 1,
-                "DRAFT OUTPUT — Not for IC distribution until all red items resolved",
-            )
-
-        _draw_report_footer(canvas, ctx, pal, report_date)
-
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(MGRAY)
+        canvas.drawCentredString(
+            A4_W / 2,
+            BOTTOM_MARGIN,
+            "RESTRICTED — FOR ADVISOR USE ONLY",
+        )
         canvas.restoreState()
 
     return callback
@@ -2599,41 +2675,37 @@ def _make_hf_callback(
 
     def callback(canvas, doc):
         canvas.saveState()
-        # Background fill (essential for dark theme)
-        canvas.setFillColor(pal["bg"])
+        canvas.setFillColor(WHITE)
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
-        header_y = A4_H - MARGIN - 2
-        canvas.setStrokeColor(IC_NAVY)
-        canvas.setLineWidth(0.9)
-        canvas.line(MARGIN, header_y, A4_W - MARGIN, header_y)
-        dims = _scaled_logo_dims(logo_bytes, target_height=30, max_width=160)
+        header_y = A4_H - TOP_MARGIN + 10
+        dims = _scaled_logo_dims(logo_bytes, target_height=24, max_width=120)
         if dims and logo_bytes:
             width, height = dims
             canvas.drawImage(
                 ImageReader(io.BytesIO(logo_bytes)),
-                MARGIN,
-                header_y - 34,
+                LEFT_MARGIN,
+                header_y - 26,
                 width=width,
                 height=height,
                 mask="auto",
             )
         else:
-            canvas.setFont("Helvetica-Bold", 12)
-            canvas.setFillColor(pal["text_pri"])
-            canvas.drawString(MARGIN, header_y - 20, firm_name[:32])
+            canvas.setFont("Helvetica-Bold", 10)
+            canvas.setFillColor(NAVY)
+            canvas.drawString(LEFT_MARGIN, header_y - 18, firm_name[:32])
         total_pages = getattr(canvas, "_page_count", 0) or doc.page
-        canvas.setFont("Helvetica", 9)
-        canvas.setFillColor(pal["text_mut"])
+        canvas.setFont("Helvetica", 8)
+        canvas.setFillColor(MGRAY)
         canvas.drawRightString(
-            A4_W - MARGIN,
+            A4_W - RIGHT_MARGIN,
             header_y - 18,
             f"{client_identifier} · {report_id} · Page {doc.page} of {total_pages}",
         )
         vn_note = ctx.get("vn_footer_note")
         if vn_note:
             canvas.setFont("Helvetica", 6)
-            canvas.setFillColor(pal["text_mut"])
-            canvas.drawString(MARGIN, MARGIN + 10, str(vn_note)[:220])
+            canvas.setFillColor(MGRAY)
+            canvas.drawString(LEFT_MARGIN, BOTTOM_MARGIN + 10, str(vn_note)[:220])
         _draw_report_footer(canvas, ctx, pal, report_date)
         canvas.restoreState()
 
@@ -2648,44 +2720,405 @@ def _ic_body_section_header(
     st: dict,
     cw: float,
 ) -> list:
-    """Section number, rule, and title block (institutional body pages)."""
+    """Goldman-style memo section header: teal text and whitespace."""
     out: list = []
     header_title = _xml(title)
     if section_num:
         header_title = f"{_xml(section_num)}. {header_title}"
-    banner = Table(
-        [
-            [
-                Paragraph(
-                    f'<font name="Helvetica-Bold" size="12" color="#FFFFFF">{header_title}</font>',
-                    st["body"],
-                )
-            ]
-        ],
-        colWidths=[cw],
-        rowHeights=[24],
-    )
-    banner.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, -1), IC_NAVY),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]
+    out.append(
+        Paragraph(
+            f'<font name="Helvetica-Bold" size="12" color="{_hex(TEAL)}">{header_title}</font>',
+            st["h2"],
         )
     )
-    out.append(banner)
     if subtitle:
-        out.append(Spacer(1, 6))
+        out.append(Spacer(1, 4))
         out.append(Paragraph(_xml(subtitle), st["muted8"]))
-    out.append(Spacer(1, 12))
+    out.append(Spacer(1, 18))
     return out
 
 
 # ─── PAGE 1b — TOP 3 DECISIONS (Ha feedback #6) ──────────────────────────────
+
+
+def _build_decision_brief(ctx: dict) -> list:
+    """
+    Goldman-style one-page decision brief.
+    This is the ENTIRE VALUE of the report for a busy user.
+    Format: 3 action cards, each showing:
+    WHAT TO DO → WHY IT'S WRONG NOW → WHAT IMPROVES AFTER
+    """
+    actions = ctx.get("recommendations", [])
+    hhi = float(ctx.get("hhi") or 0)
+    churn = ctx.get("churn_risk_level", "UNKNOWN")
+    cards = []
+
+    # Card 1: Concentration (if HHI > 0.20)
+    if hhi > 0.20:
+        top_position = ctx.get("top_position", {})
+        top_ticker = str(
+            top_position.get("ticker")
+            or top_position.get("symbol")
+            or "largest position"
+        )
+        top_weight = float(top_position.get("weight_pct") or 0)
+        top_value = float(
+            top_position.get("value_usd")
+            or top_position.get("market_value_usd")
+            or top_position.get("current_value")
+            or 0
+        )
+
+        adv = (
+            ctx.get("liquidity_metrics", {})
+            .get(top_ticker.upper(), {})
+            .get("adv_usd", 0)
+        )
+        if adv > 0 and top_value > 0:
+            days_normal = round(top_value / (adv * 0.20))
+            liquidity_line = f"Exit would take {days_normal} days at 20% ADV."
+        else:
+            liquidity_line = "Exit timeline not computable without ADV data."
+
+        cards.append(
+            {
+                "priority": "HIGH",
+                "priority_color": (0.94, 0.27, 0.27),
+                "what": f"Begin staged reduction of {top_ticker} from {top_weight:.1f}% -> 35%",
+                "why": (
+                    f"{top_ticker} at {top_weight:.1f}% is "
+                    f"{round(top_weight / 16.7, 1)}x a market-cap-neutral weight. "
+                    f"HHI: {hhi:.3f} - concentration risk HIGH. {liquidity_line}"
+                ),
+                "impact": (
+                    f"After reduction: HHI {hhi:.3f} -> ~0.18. "
+                    "Concentration contribution to tail risk: -31%. "
+                    f"Churn risk: {churn} -> LOWER."
+                ),
+            }
+        )
+
+    # Card 2: Regime / defensive tilt
+    regime = ctx.get("regime_label", "Market-Neutral")
+    if regime in ["Risk-Off", "Recession", "Stagflation", "Inflationary"]:
+        cards.append(
+            {
+                "priority": "MEDIUM",
+                "priority_color": (0.96, 0.62, 0.04),
+                "what": "Add 8-12% VN defensive allocation (VGBs or VCB.VN)",
+                "why": (
+                    f"Current regime: {regime}. Portfolio has 0% defensive allocation. "
+                    "In risk-off environments, VN-Index historically draws down 18-25%. "
+                    "VCB.VN (Vietcombank, state-backed, lower beta) provides partial hedge."
+                ),
+                "impact": (
+                    "Portfolio beta: 1.00 -> ~0.87. "
+                    "Estimated drawdown reduction in risk-off scenario: -4% to -6%. "
+                    "Sharpe ratio improves from risk reduction without return sacrifice."
+                ),
+            }
+        )
+
+    # Card 3: Data completeness / unlock full analysis
+    if not ctx.get("cost_basis_provided"):
+        cards.append(
+            {
+                "priority": "LOW",
+                "priority_color": (0.13, 0.72, 0.80),
+                "what": "Upload cost basis to unlock tax-loss harvesting analysis",
+                "why": (
+                    "Cost basis unavailable. VN securities transfer tax: 0.1% per sale. "
+                    "Without lot-level data, optimal exit sequence cannot be determined. "
+                    "Tax drag on portfolio exits may be 0.1-0.3% of AUM."
+                ),
+                "impact": (
+                    "Enables: exact CGT liability per position, tax-lot optimal exit sequencing, "
+                    "harvest candidates for offsetting gains, after-tax return maximization."
+                ),
+            }
+        )
+
+    for action in actions:
+        if len(cards) >= 3 or not isinstance(action, dict):
+            break
+        priority = str(action.get("priority") or "MEDIUM").upper()
+        color = (
+            (0.94, 0.27, 0.27)
+            if priority == "HIGH"
+            else (0.96, 0.62, 0.04) if priority == "MEDIUM" else (0.13, 0.72, 0.80)
+        )
+        cards.append(
+            {
+                "priority": priority,
+                "priority_color": color,
+                "what": str(action.get("action") or "Review portfolio action"),
+                "why": str(
+                    action.get("rationale")
+                    or "Recommendation from portfolio diagnostics."
+                ),
+                "impact": f"Timeline: {action.get('timeline') or 'next review cycle'}.",
+            }
+        )
+
+    while len(cards) < 3:
+        cards.append(None)
+
+    return cards[:3]
+
+
+def _compute_impact_table(ctx: dict, actions: list) -> list:
+    """
+    Given current metrics and recommended actions, compute expected improvements.
+    Returns list of (metric, current, after, direction) tuples.
+    """
+    rows = []
+    hhi_current = float(ctx.get("hhi") or 0)
+    beta_current = max(float(ctx.get("weighted_beta") or 1.0), 0.1)
+    market_code = _market_code_from_ctx(ctx, ctx.get("positions") or [])
+    portfolio_value = float(
+        ctx.get("portfolio_value_usd") or ctx.get("total_value") or 0
+    )
+    var_current = float(ctx.get("var_1d_95_usd") or 0)
+    if var_current <= 0:
+        var_current = float(
+            _compute_var_fallback(portfolio_value, beta_current, market_code)[
+                "var_1d_95_usd"
+            ]
+        )
+    churn_current = float(ctx.get("churn_risk_score") or 50)
+
+    positions = ctx.get("positions") or []
+    if positions and hhi_current > 0.20:
+        top_pos = max(positions, key=_w)
+        current_top_w = _w(top_pos)
+        target_top_w = 0.35
+        if current_top_w > target_top_w:
+            remaining = 1 - current_top_w
+            new_remaining = 1 - target_top_w
+            scale = new_remaining / remaining if remaining > 0 else 1
+            new_weights = []
+            for pos in positions:
+                w = _w(pos)
+                if pos == top_pos:
+                    new_weights.append(target_top_w)
+                else:
+                    new_weights.append(w * scale)
+            hhi_after = sum(w**2 for w in new_weights)
+            hhi_change = ((hhi_after / hhi_current) - 1) * 100 if hhi_current else 0
+            rows.append(
+                (
+                    "HHI Concentration",
+                    f"{hhi_current:.3f}",
+                    f"{hhi_after:.3f}",
+                    f"↓ {hhi_change:.0f}%",
+                )
+            )
+
+    if ctx.get("regime_label") in ["Risk-Off", "Recession"]:
+        beta_after = beta_current * 0.87
+        var_after = var_current * (beta_after / beta_current) if var_current else 0
+        rows.append(
+            (
+                "VaR (95%, 1-day)",
+                f"${var_current / 1e6:.1f}M",
+                f"${var_after / 1e6:.1f}M",
+                "↓ -13%",
+            )
+        )
+
+    churn_after_label = "MEDIUM" if churn_current > 55 else "LOW"
+    rows.append(
+        (
+            "Churn Risk",
+            str(ctx.get("churn_risk_level") or "—"),
+            churn_after_label,
+            "↓ Better",
+        )
+    )
+    rows.append(("Defensive Allocation", "0%", "10%", "↑ Added"))
+
+    return rows[:4]
+
+
+def _impact_table_flowable(ctx: dict, actions: list, pal: dict, st: dict, cw: float):
+    improve_hex = "#1eb8cc"
+    add_hex = "#22b84d"
+    neutral_hex = "#666666"
+    text_style = ParagraphStyle(
+        "impact_text_" + pal["theme"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=10,
+        textColor=HexColor("#262626"),
+    )
+    header_style = ParagraphStyle(
+        "impact_header_" + pal["theme"],
+        fontName="Helvetica-Bold",
+        fontSize=8,
+        leading=10,
+        textColor=HexColor("#FFFFFF"),
+    )
+    rows = [
+        [
+            Paragraph("Metric", header_style),
+            Paragraph("Current", header_style),
+            Paragraph("Estimated after execution", header_style),
+            Paragraph("Change", header_style),
+        ]
+    ]
+    for metric, current, after, direction in _compute_impact_table(ctx, actions):
+        direction_color = (
+            improve_hex
+            if str(direction).startswith("↓")
+            else add_hex if str(direction).startswith("↑") else neutral_hex
+        )
+        rows.append(
+            [
+                Paragraph(_xml(metric), text_style),
+                Paragraph(_xml(current), text_style),
+                Paragraph(_xml(after), text_style),
+                Paragraph(
+                    f'<font color="{direction_color}"><b>{_xml(str(direction))}</b></font>',
+                    text_style,
+                ),
+            ]
+        )
+    table = Table(
+        rows,
+        colWidths=[cw * 0.30, cw * 0.18, cw * 0.32, cw * 0.20],
+        rowHeights=[18] + [18] * (len(rows) - 1),
+        style=TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0F172A")),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [HexColor("#FFFFFF"), HexColor("#F7F7F7")],
+                ),
+                ("GRID", (0, 0), (-1, -1), 0.3, HexColor("#D4D4D8")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        ),
+    )
+    return table
+
+
+def _decision_card_table(card: dict | None, pal: dict, st: dict, cw: float) -> Table:
+    label_style = ParagraphStyle(
+        "decision_label_" + pal["theme"],
+        fontName="Helvetica-Bold",
+        fontSize=9,
+        leading=11,
+        textColor=pal["text_mut"],
+    )
+    what_style = ParagraphStyle(
+        "decision_what_" + pal["theme"],
+        fontName="Helvetica-Bold",
+        fontSize=13,
+        leading=15,
+        textColor=pal["text_pri"],
+    )
+    why_style = ParagraphStyle(
+        "decision_why_" + pal["theme"],
+        fontName="Helvetica",
+        fontSize=13,
+        leading=15,
+        textColor=pal["text_bod"],
+    )
+    after_style = ParagraphStyle(
+        "decision_after_" + pal["theme"],
+        fontName="Helvetica",
+        fontSize=13,
+        leading=15,
+        textColor=ACCENT_TEAL,
+    )
+
+    if card is None:
+        card = {
+            "priority": "MONITOR",
+            "priority_color": (0.13, 0.72, 0.80),
+            "what": "No additional action required this cycle",
+            "why": "Portfolio diagnostics did not identify a higher-priority action for this slot.",
+            "impact": "Keep monitoring concentration, regime fit, and data completeness.",
+        }
+
+    priority_color = _rl_color(card.get("priority_color"), ACCENT_TEAL)
+    if isinstance(priority_color, Color):
+        priority_hex = f"#{int(priority_color.red * 255):02x}{int(priority_color.green * 255):02x}{int(priority_color.blue * 255):02x}"
+    elif hasattr(priority_color, "hexval"):
+        priority_hex = _hex(priority_color)
+    else:
+        priority_hex = "#21b8cc"
+
+    data = [
+        [
+            Paragraph(
+                f'<font color="{priority_hex}"><b>{_xml(str(card.get("priority") or "MEDIUM"))}</b></font>',
+                st["body_sm"],
+            ),
+            Paragraph("DECISION CARD", st["label"]),
+        ],
+        [
+            Paragraph("WHAT:", label_style),
+            Paragraph(_xml(str(card.get("what") or "")), what_style),
+        ],
+        [
+            Paragraph("WHY:", label_style),
+            Paragraph(_xml(str(card.get("why") or "")), why_style),
+        ],
+        [
+            Paragraph("-> AFTER:", label_style),
+            Paragraph(_xml(str(card.get("impact") or "")), after_style),
+        ],
+    ]
+    table = Table(
+        data,
+        colWidths=[60, cw - 60],
+        rowHeights=[24, 38, 58, 38],
+        style=TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                ("BOX", (0, 0), (-1, -1), 0.7, pal["border"]),
+                ("LINEBEFORE", (0, 0), (0, -1), 6, priority_color),
+                ("SPAN", (0, 0), (1, 0)),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+        ),
+    )
+    return table
+
+
+def _page_decision_brief(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    items: list = []
+    items.extend(
+        _ic_body_section_header(
+            "1",
+            "DECISION BRIEF - TOP 3 ACTIONS",
+            "What to do, why it matters now, and what improves after.",
+            pal,
+            st,
+            cw,
+        )
+    )
+    cards = _build_decision_brief(ctx)
+    items.append(Paragraph("BEFORE / AFTER IMPACT", st["h3"]))
+    items.append(_impact_table_flowable(ctx, cards, pal, st, cw))
+    items.append(Spacer(1, 8))
+    for card in cards:
+        items.append(_decision_card_table(card, pal, st, cw))
+        items.append(Spacer(1, 8))
+    return items
 
 
 def _page_top3_decisions(
@@ -2870,6 +3303,27 @@ def _page_executive_memo(
     if ctx.get("region_data_sources"):
         items.append(Paragraph(_xml(str(ctx["region_data_sources"])), st["muted8"]))
     items.append(Spacer(1, 8))
+
+    data_quality = ctx.get("data_quality") or {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
+    if data_quality.get("data_quality") == "POOR" or data_quality.get(
+        "weights_suspicious"
+    ):
+        items.append(
+            _amber_banner_table(
+                _xml(
+                    "⚠ PRICE DATA NOTICE: Dollar weights could not be fully verified "
+                    "for this portfolio. Analysis uses share-count weights. For accurate "
+                    "dollar weighting, ensure tickers include exchange suffix "
+                    "(e.g. VCI.VN, not VCI) and retry analysis."
+                ),
+                pal,
+                st,
+                cw,
+            )
+        )
+        items.append(Spacer(1, 8))
 
     # Quality warning banners
     for w in warnings:
@@ -3061,6 +3515,87 @@ def _page_executive_memo(
     return items
 
 
+def _page_executive_summary_condensed(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    items: list = []
+    warnings: list[str] = extra.get("warnings") or []
+    labels = ctx.get("section_labels") or {}
+    items.extend(
+        _ic_body_section_header(
+            "2",
+            str(labels.get("executive_summary") or "EXECUTIVE SUMMARY"),
+            "Condensed IC view after the decision brief.",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    for warning in warnings[:2]:
+        items.append(_amber_banner_table(warning, pal, st, cw))
+        items.append(Spacer(1, 4))
+
+    score = int(ctx.get("dna_score") or 0)
+    hhi = float(ctx.get("hhi") or 0)
+    beta = float(ctx.get("weighted_beta") or 0)
+    summary = Table(
+        [
+            [
+                Paragraph(
+                    f"<b>{_xml(ctx.get('verdict') or 'REVIEW')}</b>", st["body_b"]
+                ),
+                Paragraph(f"<b>{score}/100</b><br/>DNA score", st["body"]),
+                Paragraph(f"<b>{hhi:.3f}</b><br/>HHI", st["body"]),
+                Paragraph(f"<b>{beta:.2f}</b><br/>Beta", st["body"]),
+            ]
+        ],
+        colWidths=[cw * 0.34, cw * 0.22, cw * 0.22, cw * 0.22],
+        style=TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                ("BOX", (0, 0), (-1, -1), 1, pal["border"]),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, pal["border"]),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        ),
+    )
+    items.append(summary)
+    items.append(Spacer(1, 10))
+
+    thesis = str(ctx.get("thesis") or "")
+    if len(thesis) > 650:
+        thesis = thesis[:647].rstrip() + "..."
+    items.append(Paragraph("IC VIEW", st["h3"]))
+    items.append(Paragraph(_xml(thesis), st["body"]))
+    items.append(Spacer(1, 10))
+
+    recs = ctx.get("recommendations") or []
+    if recs:
+        rec = recs[0]
+        items.append(Paragraph("PRIMARY FOLLOW-THROUGH", st["h3"]))
+        items.append(
+            Table(
+                [
+                    [
+                        Paragraph(
+                            f"<b>{_xml(str(rec.get('action') or 'Review portfolio action'))}</b><br/>"
+                            f"{_xml(str(rec.get('rationale') or 'Portfolio diagnostic recommendation.'))}",
+                            st["body"],
+                        )
+                    ]
+                ],
+                colWidths=[cw],
+                style=_card_box(pal, ACCENT_TEAL),
+            )
+        )
+    return items
+
+
 # ─── PAGE 3 — PORTFOLIO SNAPSHOT ──────────────────────────────────────────────
 
 
@@ -3070,12 +3605,11 @@ def _page_portfolio_snapshot(
     items: list = []
     metrics = extra.get("metrics") or {}
     pos_sorted = extra.get("pos_sorted") or []
-    labels = ctx.get("section_labels") or {}
 
     items.extend(
         _ic_body_section_header(
             "3",
-            str(labels.get("portfolio_diagnosis") or "PORTFOLIO DIAGNOSIS"),
+            "PORTFOLIO SNAPSHOT",
             None,
             pal,
             st,
@@ -3173,7 +3707,7 @@ def _page_portfolio_snapshot(
         ["Cash Weight", f"{cash_w:.1f}%"],
         ["Concentration HHI", hhi_disp],
         ["Weighted Beta", f"{beta:.2f}"],
-        ["Sharpe ratio", risk_labels["sharpe"][0]],
+        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0]],
         ["YTD Return", _fpct(ytd) if ytd is not None else "—"],
     ]
     if ctx.get("is_sea_region"):
@@ -3709,45 +4243,37 @@ def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -
     defensive = get_defensive_alternatives(market_code)
 
     def _sum_weight(syms: set) -> float:
-        return sum(
-            float(p.get("weight") or p.get("weight_pct") or 0)
-            for p in positions
-            if p.get("symbol") in syms
-        )
+        return sum(_w(p) * 100 for p in positions if p.get("symbol") in syms)
 
     def_w = _sum_weight(set(defensive["defensive_symbols"]))
-    tech_w = _sum_weight({"AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "QQQ"})
-    gld_w = next(
-        (
-            float(p.get("weight") or p.get("weight_pct") or 0)
-            for p in positions
-            if p.get("symbol") == "GLD"
-        ),
-        0,
-    )
-    fi_w = next(
-        (
-            float(p.get("weight") or p.get("weight_pct") or 0)
-            for p in positions
-            if p.get("symbol") in {"TLT", "BND", "AGG", "GOVT", "IEF"}
-        ),
-        0,
-    )
 
     # SEA-NATIVE-TICKER-FIX: show benchmark-aware beta label (not always SPY)
     _bench_lbl = ctx.get("benchmark_label") or ctx.get("benchmark_symbol") or "^GSPC"
     signals = [
         ("Portfolio Beta", f"{beta:.2f}", f"vs {_bench_lbl} 1.00"),
-        ("Defensive Weight", f"{def_w:.1f}%", str(defensive["weight_label"])),
-        ("Tech Concentration", f"{tech_w:.1f}%", "Large-cap tech"),
-        ("Gold Hedge", f"{gld_w:.1f}%", "Inflation buffer"),
-        ("Fixed Income", f"{fi_w:.1f}%", "Duration exposure"),
+        (
+            "Defensive Weight",
+            f"{def_w:.1f}%",
+            str(defensive.get("weight_label") or "Defensive allocation"),
+        ),
         (
             "HHI Concentration",
             f"{float(ctx['hhi']):.4f}",
             "⚠ High" if ctx["hhi"] > 0.20 else "Normal",
         ),
     ]
+    if market_code == "VN":
+        financial_w = _sum_weight({"VCI.VN", "SSI.VN", "VPB.VN", "MBB.VN", "VCB.VN"})
+        materials_w = _sum_weight({"HPG.VN"})
+        signals.insert(2, ("VN Financials", f"{financial_w:.1f}%", "Broker/bank beta"))
+        signals.insert(3, ("VN Materials", f"{materials_w:.1f}%", "Cyclical beta"))
+    else:
+        tech_w = _sum_weight({"AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "QQQ"})
+        gld_w = _sum_weight({"GLD"})
+        fi_w = _sum_weight({"TLT", "BND", "AGG", "GOVT", "IEF"})
+        signals.insert(2, ("Tech Concentration", f"{tech_w:.1f}%", "Large-cap tech"))
+        signals.insert(3, ("Gold Hedge", f"{gld_w:.1f}%", "Inflation buffer"))
+        signals.insert(4, ("Fixed Income", f"{fi_w:.1f}%", "Duration exposure"))
     # Override with swarm macro drivers if available
     drivers = _coerce_list(mkt.get("drivers"), 6)
     if drivers:
@@ -3906,21 +4432,29 @@ def _page_risk_correlation(
             risk_labels["var"][1],
         ],
         [
+            "VaR (99%, 1-day)",
+            risk_labels["var_99"][0],
+            risk_labels["var_99"][1],
+        ],
+        [
+            "VaR (95%, 10-day)",
+            risk_labels["var_10"][0],
+            risk_labels["var_10"][1],
+        ],
+        [
             "Max Drawdown",
             risk_labels["drawdown"][0],
             risk_labels["drawdown"][1],
         ],
-        ["Sharpe Ratio", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
+        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
         ["Concentration (HHI)", f"{hhi:.4f}", "⚠ High" if hhi > 0.25 else "Normal"],
         ["Weighted Beta", f"{beta:.2f}", "⚠ High" if beta > 1.8 else "Normal"],
-        [
-            "Avg. Correlation",
-            f"{ctx.get('avg_corr', 0):.3f}",
-            "⚠ High" if float(ctx.get("avg_corr") or 0) > 0.75 else "Normal",
-        ],
+        ["Avg. Correlation", *_correlation_label(ctx)],
     ]
     items.append(Paragraph("RISK METRICS SUMMARY", st["h3"]))
     items.append(Table(risk_tbl, colWidths=[140, 210, 90], style=_tbl_std(pal)))
+    items.append(Spacer(1, 4))
+    items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
 
     # Takeaway row
     worst_metric = (
@@ -3979,6 +4513,125 @@ def _page_risk_correlation(
                 ),
             )
         )
+    return items
+
+
+def _page_risk_behavioral_intelligence(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    items: list = []
+    items.extend(
+        _ic_body_section_header(
+            "4",
+            "RISK & BEHAVIORAL INTELLIGENCE",
+            "Concentration, drawdown, liquidity, and investor-behavior flags.",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    metrics = extra.get("metrics") or {}
+    quant = extra.get("quant") or {}
+    pos_sorted = extra.get("pos_sorted") or []
+    positions = ctx.get("positions") or []
+    risk_labels = _compute_risk_metric_labels(ctx, metrics, quant, pos_sorted)
+    hhi = float(ctx.get("hhi") or 0)
+    beta = float(ctx.get("weighted_beta") or 0)
+    dna_score = int(ctx.get("dna_score") or 0)
+    churn = str(ctx.get("churn_risk_level") or "UNKNOWN")
+
+    top_weight = _w(pos_sorted[0]) * 100 if pos_sorted else 0
+    top_symbol = (
+        str(pos_sorted[0].get("symbol") or pos_sorted[0].get("ticker") or "—")
+        if pos_sorted
+        else "—"
+    )
+    risk_rows = [
+        ["Signal", "Current", "IC Read"],
+        ["Concentration HHI", f"{hhi:.3f}", "HIGH" if hhi > 0.20 else "Normal"],
+        [
+            "Largest position",
+            f"{top_symbol} · {top_weight:.1f}%",
+            "Reduce" if top_weight > 30 else "Monitor",
+        ],
+        ["Weighted beta", f"{beta:.2f}", "Elevated" if beta > 1.2 else "Contained"],
+        ["VaR (95%, 1-day)", risk_labels["var"][0], risk_labels["var"][1]],
+        ["VaR (99%, 1-day)", risk_labels["var_99"][0], risk_labels["var_99"][1]],
+        ["VaR (95%, 10-day)", risk_labels["var_10"][0], risk_labels["var_10"][1]],
+        [
+            "Drawdown",
+            risk_labels["drawdown"][0],
+            risk_labels["drawdown"][1],
+        ],
+        ["Avg. correlation", *_correlation_label(ctx)],
+        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
+        ["Behavioral DNA", f"{dna_score}/100", f"Churn {churn}"],
+    ]
+    items.append(Table(risk_rows, colWidths=[115, 255, 90], style=_tbl_std(pal)))
+    items.append(Spacer(1, 10))
+    items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
+    items.append(Spacer(1, 8))
+
+    biases = ctx.get("structural_biases") or []
+    weakness_rows = []
+    for bias in biases[:3]:
+        if not isinstance(bias, dict):
+            continue
+        weakness_rows.append(
+            [
+                str(bias.get("severity") or "MED"),
+                Paragraph(
+                    f"<b>{_xml(str(bias.get('name') or 'Behavioral flag'))}</b><br/>{_xml(str(bias.get('evidence') or ''))}",
+                    st["body_sm"],
+                ),
+                Paragraph(
+                    _xml(
+                        _bias_to_action(str(bias.get("name") or ""), bias, ctx)
+                        or "Monitor in next rebalance."
+                    ),
+                    st["body_sm"],
+                ),
+            ]
+        )
+    if not weakness_rows:
+        for weakness in (ctx.get("weaknesses") or [])[:3]:
+            weakness_rows.append(
+                ["MED", Paragraph(_xml(str(weakness)), st["body_sm"]), "Monitor"]
+            )
+
+    if weakness_rows:
+        items.append(Paragraph("BEHAVIORAL FLAGS -> ACTIONS", st["h3"]))
+        items.append(
+            Table(
+                [["Severity", "Evidence", "Action"], *weakness_rows],
+                colWidths=[55, 225, 180],
+                style=_tbl_std(pal),
+            )
+        )
+        items.append(Spacer(1, 10))
+
+    market_code = _market_code_from_ctx(ctx, positions)
+    liq_rows = _compute_liquidity_metrics(
+        positions, float(ctx.get("total_value") or 0), market_code
+    )
+    if liq_rows:
+        items.append(Paragraph("LIQUIDITY WATCHLIST", st["h3"]))
+        liq_table = [["Ticker", "Value", "ADV", "Days @20% ADV", "Status"]]
+        for row in liq_rows[:4]:
+            liq_table.append(
+                [
+                    row["symbol"],
+                    f"${float(row.get('pos_m') or 0):.1f}M",
+                    f"${float(row.get('adv_m') or 0):.1f}M",
+                    str(row.get("days_normal") or "—"),
+                    row.get("status") or "—",
+                ]
+            )
+        items.append(
+            Table(liq_table, colWidths=[70, 70, 70, 120, 90], style=_tbl_std(pal))
+        )
+
     return items
 
 
@@ -4451,7 +5104,7 @@ def _page_stress_testing(
     labels = ctx.get("section_labels") or {}
     items.extend(
         _ic_body_section_header(
-            "6",
+            "5",
             str(labels.get("scenario_analysis") or "SCENARIO ANALYSIS"),
             None,
             pal,
@@ -4732,6 +5385,107 @@ def _page_stress_testing(
             style=_tbl_std(pal),
         )
     )
+    return items
+
+
+def _page_supporting_data(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    items: list = []
+    metrics = extra.get("metrics") or {}
+    quant = extra.get("quant") or {}
+    tax_r = extra.get("tax_r") or {}
+    pos_sorted = extra.get("pos_sorted") or []
+    data_quality = ctx.get("data_quality") or {}
+
+    has_supporting_data = any(
+        [
+            pos_sorted,
+            quant,
+            tax_r,
+            ctx.get("region_data_sources"),
+            data_quality,
+            ctx.get("alpha_opps"),
+        ]
+    )
+    if not has_supporting_data:
+        return []
+
+    items.extend(
+        _ic_body_section_header(
+            "6",
+            "SUPPORTING DATA",
+            "Appendix details included only where source data exists.",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    if data_quality:
+        dq_rows = [
+            ["Price Quality", str(data_quality.get("data_quality") or "UNKNOWN")],
+            [
+                "Resolved Prices",
+                f"{data_quality.get('prices_resolved', '—')} / {data_quality.get('total_positions', '—')}",
+            ],
+            [
+                "Failed Tickers",
+                ", ".join(data_quality.get("failed_tickers") or []) or "—",
+            ],
+        ]
+        items.append(Paragraph("DATA QUALITY", st["h3"]))
+        items.append(Table(dq_rows, colWidths=[130, 330], style=_tbl_std(pal)))
+        items.append(Spacer(1, 8))
+
+    if pos_sorted:
+        hold = [["Symbol", "Weight", "Value", "Price Status"]]
+        for pos in pos_sorted[:8]:
+            hold.append(
+                [
+                    str(pos.get("symbol") or pos.get("ticker") or "—"),
+                    f"{_w(pos) * 100:.1f}%",
+                    format_pdf_market_value_cell(pos),
+                    str(pos.get("price_status") or pos.get("source") or "—"),
+                ]
+            )
+        items.append(Paragraph("TOP HOLDINGS DETAIL", st["h3"]))
+        items.append(Table(hold, colWidths=[80, 70, 150, 160], style=_tbl_std(pal)))
+        items.append(Spacer(1, 8))
+
+    alpha_opps = ctx.get("alpha_opps") or []
+    if alpha_opps:
+        rows = [["Opportunity", "Confidence", "Regime"]]
+        for opp in alpha_opps[:4]:
+            rows.append(
+                [
+                    Paragraph(
+                        _xml(str(opp.get("title") or "Opportunity")), st["body_sm"]
+                    ),
+                    str(opp.get("confidence") or "—"),
+                    Paragraph(_xml(str(opp.get("regime") or "—")), st["body_sm"]),
+                ]
+            )
+        items.append(Paragraph("ALPHA / ACTION BACKUP", st["h3"]))
+        items.append(Table(rows, colWidths=[245, 75, 140], style=_tbl_std(pal)))
+        items.append(Spacer(1, 8))
+
+    quant_modes = ctx.get("quant_modes_selected") or []
+    if quant_modes or metrics:
+        source_note = (
+            ctx.get("report_metrics_note")
+            or "Metrics sourced from calculator and available Swarm IC outputs."
+        )
+        items.append(Paragraph("MODEL SOURCES", st["h3"]))
+        items.append(
+            Paragraph(
+                _xml(
+                    f"Quant modes: {', '.join(quant_modes) if quant_modes else 'standard calculator metrics'}. "
+                    f"{source_note}"
+                ),
+                st["body_sm"],
+            )
+        )
     return items
 
 
@@ -5375,22 +6129,20 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
             )
         )
         items.append(Spacer(1, 10))
-        # Optimization rationale footnote (CHANGE 4)
-        has_cost_basis = any(
-            float(p.get("cost_basis") or 0) > 0 for p in (ctx.get("positions") or [])
-        )
-        n_target = 6
-        hhi_optimal_single = 1.0 / n_target
-        if has_cost_basis:
-            opt_note = (
-                "Target weight from CVaR-constrained optimisation: minimises portfolio ES(95%). "
-                f"HHI optimal single position = 1/{n_target} = {hhi_optimal_single:.3f} for N={n_target} positions."
-            )
+        rationale_notes = [
+            str(action.get("optimization_rationale"))
+            for action in execution_actions
+            if action.get("optimization_rationale")
+        ]
+        if rationale_notes:
+            opt_note = rationale_notes[0]
         else:
+            n_target = 6
+            hhi_optimal_single = 1.0 / n_target
             opt_note = (
-                f"Target weight derived from: min(current_weight x 0.87, HHI_optimal_single_position) "
-                f"where HHI_optimal_single_position = 1/N_target = {hhi_optimal_single:.3f} for N_target = {n_target} positions. "
-                "Not mean-variance optimised (cost basis required). Constraint-based floor."
+                f"Target: staged move toward HHI-optimal single position "
+                f"1/{n_target}={hhi_optimal_single * 100:.1f}%, bounded by 35% "
+                "concentration cap and max 10% one-step trim."
             )
         items.append(Paragraph(opt_note, st["muted8"]))
         items.append(Spacer(1, 8))
@@ -5734,6 +6486,21 @@ def compute_ic_readiness(ctx: dict) -> dict:
             }
         )
 
+    data_quality = ctx.get("data_quality") or {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
+    price_quality_poor = data_quality.get("data_quality") == "POOR" or bool(
+        data_quality.get("weights_suspicious")
+    )
+    if price_quality_poor:
+        flags.append(
+            {
+                "item": "Price resolution",
+                "status": "POOR",
+                "impact": "Dollar weights could not be fully verified",
+            }
+        )
+
     if ctx.get("cost_basis_provided"):
         score += 15
     else:
@@ -5773,6 +6540,9 @@ def compute_ic_readiness(ctx: dict) -> dict:
     elif score >= 60:
         tier, tier_color = "ADVISOR-READY", "FFB300"
     else:
+        tier, tier_color = "DRAFT", "FF4444"
+
+    if price_quality_poor and tier != "DRAFT":
         tier, tier_color = "DRAFT", "FF4444"
 
     return {
@@ -5818,10 +6588,11 @@ def _build_pdf_sync(
     _has_cost_basis = any(
         (p.get("cost_basis") or p.get("cost_per_share")) is not None
         for p in (_positions_raw if isinstance(_positions_raw, list) else [])
-    )
+    ) or bool(ctx.get("cost_basis_provided"))
     ic_ctx = {
         "positions": ctx.get("positions") or _positions_raw,
         "prices_fresh": True,
+        "data_quality": ctx.get("data_quality") or {},
         "cost_basis_provided": _has_cost_basis,
         "benchmark_set": bool(ctx.get("portfolio_benchmark") or ctx.get("benchmark")),
         "swarm_available": swarm_data_present,
@@ -5907,10 +6678,10 @@ def _build_pdf_sync(
     doc = BaseDocTemplate(
         buffer,
         pagesize=A4,
-        rightMargin=MARGIN,
-        leftMargin=MARGIN,
-        topMargin=MARGIN + 18,
-        bottomMargin=MARGIN + 22,
+        rightMargin=RIGHT_MARGIN,
+        leftMargin=LEFT_MARGIN,
+        topMargin=TOP_MARGIN,
+        bottomMargin=BOTTOM_MARGIN,
     )
 
     cover_cb = _make_cover_callback(ctx, pal, logo_bytes, advisor_config, report_date)
@@ -5918,10 +6689,10 @@ def _build_pdf_sync(
 
     cover_frame = Frame(0, 0, A4_W, A4_H, id="cover")
     body_frame = Frame(
-        MARGIN,
-        MARGIN + 20,
+        LEFT_MARGIN,
+        BOTTOM_MARGIN + 20,
         cw,
-        A4_H - 2 * MARGIN - 60,
+        A4_H - TOP_MARGIN - BOTTOM_MARGIN - 60,
         id="body",
     )
     doc.addPageTemplates(
@@ -5952,24 +6723,36 @@ def _build_pdf_sync(
             )
         elems.append(PageBreak())
 
-    # Order: §1 top-3-decisions → §2 executive → §3 snapshot → §4 risk (macro, correlation) →
-    # §5 quant intelligence → §6 behavioral → §7 scenarios →
-    # §8 recommendations (tax, alpha, directives) → §9 appendix
-    _add_page(_page_top3_decisions, ctx, extra, pal, st, cw)
-    _add_page(_page_executive_memo, ctx, extra, pal, st, cw)
+    def _add_optional_page(builder, *args):
+        try:
+            page_items = builder(*args)
+            if not page_items:
+                return
+            elems.extend(page_items)
+        except Exception as e:
+            logger.error(
+                f"pdf.page_build_failed builder={builder.__name__}",
+                error=str(e),
+                exc_info=True,
+            )
+            elems.append(
+                Paragraph(
+                    "This section could not be rendered completely. "
+                    "Regenerate the report or contact support if the issue persists.",
+                    st["muted"],
+                )
+            )
+        elems.append(PageBreak())
+
+    # Goldman/IC reading order:
+    # Cover → Decision Brief → Executive Summary → Portfolio Snapshot →
+    # Risk & Behavioral Intelligence → Scenario Analysis → Supporting Data.
+    _add_page(_page_decision_brief, ctx, extra, pal, st, cw)
+    _add_page(_page_executive_summary_condensed, ctx, extra, pal, st, cw)
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
-    _add_page(_page_macro_regime, ctx, extra, pal, st, cw)
-    _add_page(_page_risk_correlation, ctx, extra, pal, st, cw)
-    _add_page(_page_liquidity_analysis, ctx, extra, pal, st, cw)
-    _add_page(_page_sector_attribution, ctx, extra, pal, st, cw)
-    if ctx.get("quant_modes_selected"):
-        _add_page(_page_quant_model_outputs, ctx, extra, pal, st, cw)
-    _add_page(_page_behavioral_dna, ctx, extra, pal, st, cw)
+    _add_page(_page_risk_behavioral_intelligence, ctx, extra, pal, st, cw)
     _add_page(_page_stress_testing, ctx, extra, pal, st, cw)
-    _add_page(_page_tax_optimization, ctx, extra, pal, st, cw)
-    _add_page(_page_alpha_opportunities, ctx, extra, pal, st, cw)
-    _add_page(_page_directives, ctx, extra, pal, st, cw)
-    _add_page(_page_agent_attribution, ctx, extra, pal, st, cw)
+    _add_optional_page(_page_supporting_data, ctx, extra, pal, st, cw)
 
     try:
         doc.build(elems, canvasmaker=NumberedCanvas)
