@@ -1426,11 +1426,26 @@ def calculate_portfolio_metrics(positions: list) -> dict:
 
     # Annualised volatility (requires historical price DataFrame)
     volatility = 0.0
+    avg_correlation: float | None = None
+    correlation_status = "UNKNOWN"
+    correlation_note = "Correlation: Not computed (insufficient price history)"
     if returns is not None and not returns.empty:
         weights_series = df.set_index("symbol")["weight"]
         aligned_weights = weights_series.reindex(returns.columns).fillna(0)
         portfolio_returns = (returns * aligned_weights).sum(axis=1)
         volatility = float(portfolio_returns.std() * np.sqrt(252) * 100)
+        if len(returns) >= 30 and len(returns.columns) >= 2:
+            corr_matrix = returns.corr()
+            corr_values = corr_matrix.where(
+                np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
+            ).stack()
+            corr_values = corr_values.dropna()
+            if not corr_values.empty:
+                avg_correlation = float(corr_values.mean())
+                correlation_status = "COMPUTED"
+                correlation_note = "Pearson correlation computed from price history."
+        elif len(returns.columns) < 2:
+            correlation_note = "Correlation: Not computed (requires 2+ priced tickers)"
 
     pnl_pct = None
     if "cost_basis" in df.columns:
@@ -1639,6 +1654,11 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "weighted_beta": round(weighted_beta, 3),
         "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
+        "avg_correlation": (
+            round(avg_correlation, 3) if avg_correlation is not None else None
+        ),
+        "correlation_status": correlation_status,
+        "correlation_note": correlation_note,
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
         "positions": _enrich_positions_fx_hint(
             _records_nan_to_none(positions_out.to_dict("records"))

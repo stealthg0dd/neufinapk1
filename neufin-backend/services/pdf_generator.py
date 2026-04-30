@@ -414,38 +414,31 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
     if code == "VN":
         return {
             "defensive_symbols": {"VCB.VN", "GAS.VN"},
-            "weight_label": "VGBs/VCB.VN/GAS.VN (VN defensive allocation)",
+            "weight_label": "Defensive (VGBs/VCB.VN/GAS.VN)",
+            "weight_description": "Vietnam Government Bonds + State-backed defensive equities",
             "rotation_text": (
-                "Defensive rotation within VN market: reduce VCI.VN exposure; "
-                "consider VCB.VN (Vietcombank — lower beta, state-backed) or "
-                "GAS.VN (Petrovietnam Gas — defensive sector) as rebalancing "
-                "destinations. Alternatively, consider adding VN government bonds "
-                "(VGBs) with 3-5 year duration at current SBV accommodative stance."
+                "Reduce high-beta VN securities; add VCB.VN (Vietcombank — lower "
+                "beta, state-backed) or GAS.VN (Petrovietnam Gas — defensive sector). "
+                "Consider VN Government Bonds (VGBs, 3-year yield ~8%) for capital preservation."
             ),
             "qualitative_scenarios": [
                 [
-                    "2025 VN Tariff Shock",
-                    "US tariffs on Vietnamese exports",
-                    "Est. -15% to -22%",
-                    "Export beta and foreign-flow sensitivity",
+                    "2022 Rate Shock",
+                    "VN-Index -35% (2022)",
+                    "Est. -28% to -38%",
+                    "VCI.VN/SSI.VN securities broker crash · VPB/MBB banking stress",
                 ],
                 [
                     "2020 COVID Crash",
-                    "Global equities -33.9%",
-                    "Est. -20% to -32%",
-                    "All correlations -> 1.0 in liquidity crisis",
+                    "VN-Index -33% (Mar 2020)",
+                    "Est. -25% to -35%",
+                    "All VN correlations -> 1.0 · Foreign outflow · VND depreciation",
                 ],
                 [
-                    "FTSE EM Upgrade Delay",
-                    "Upgrade reversal / delay",
-                    "Est. -8% to -12%",
-                    "Foreign-flow-sensitive names de-rate",
-                ],
-                [
-                    "Steel Price Shock",
-                    "Iron ore -20%",
-                    "Est. HPG.VN -18% to -25%",
-                    "EBITDA margin sensitivity to steel spreads",
+                    "FTSE EM Upgrade",
+                    "N/A (Sep 2026 expected)",
+                    "Est. +15% to +25% on reclassification",
+                    "If upgrade delayed: Est. -10% on reversal",
                 ],
             ],
             "additional_risk_scenarios": [
@@ -484,7 +477,8 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
     if code == "SG":
         return {
             "defensive_symbols": {"A17U.SI", "C38U.SI", "MBH.SI"},
-            "weight_label": "SGS bonds / SGX-listed S-REITs (defensive income allocation)",
+            "weight_label": "Defensive (SGS Bonds/REITs)",
+            "weight_description": "Singapore Government Securities + SGX-listed S-REITs",
             "rotation_text": (
                 "Defensive rotation within SG market: rotate high-beta exposure into "
                 "Singapore Government Securities (SGS bonds) and SGX-listed S-REITs "
@@ -493,13 +487,20 @@ def get_defensive_alternatives(market_code: str) -> dict[str, Any]:
             "qualitative_scenarios": None,
             "additional_risk_scenarios": None,
         }
+    if code in {"MY", "MYR"}:
+        return {
+            "defensive_symbols": set(),
+            "weight_label": "Defensive (MGS Bonds/Utilities)",
+            "weight_description": "Malaysia Government Securities + defensive utilities",
+            "rotation_text": "Rotate into defensives (utilities, consumer staples, gold)",
+            "qualitative_scenarios": None,
+            "additional_risk_scenarios": None,
+        }
     return {
         "defensive_symbols": {"GLD", "TLT", "BND", "JNJ", "PG", "VZ", "XLP", "XLU"},
-        "weight_label": "GLD/TLT/XLP/XLU",
-        "rotation_text": (
-            "Rotate 5-10% from high-beta positions into XLU / XLP / GLD "
-            "for improved risk-adjusted return."
-        ),
+        "weight_label": "Defensive (GLD/TLT/XLP/XLU)",
+        "weight_description": "Treasuries, gold, utilities, and consumer staples",
+        "rotation_text": "Rotate into defensives (utilities, consumer staples, gold)",
         "qualitative_scenarios": None,
         "additional_risk_scenarios": None,
     }
@@ -542,6 +543,76 @@ def _portfolio_has_cost_basis(positions: list[dict[str, Any]]) -> bool:
     return False
 
 
+def _compute_var_fallback(
+    portfolio_value_usd: float, weighted_beta: float, market_code: str = "VN"
+) -> dict:
+    """
+    Beta-estimated VaR. Not IC-grade but always better than "Pending".
+    Formula: VaR_95 = portfolio_value x beta x daily_vol x z_95.
+    """
+    daily_vol = {"VN": 0.018, "US": 0.012, "SG": 0.010, "DEFAULT": 0.015}
+    z_95 = 1.645
+    code = _normalize_market_code(market_code)
+    vol = daily_vol.get(code, daily_vol["DEFAULT"])
+    value = max(float(portfolio_value_usd or 0), 0.0)
+    beta = max(float(weighted_beta or 1.0), 0.1)
+    var_1d_95 = value * beta * vol * z_95
+    var_1d_99 = value * beta * vol * 2.326
+    var_10d_95 = var_1d_95 * (10**0.5)
+    pct = (var_1d_95 / value * 100) if value > 0 else 0.0
+    return {
+        "var_1d_95_usd": round(var_1d_95),
+        "var_1d_99_usd": round(var_1d_99),
+        "var_10d_95_usd": round(var_10d_95),
+        "var_label": f"${var_1d_95 / 1e6:.1f}M ({pct:.2f}% AUM)",
+        "var_method": "beta-estimated, not simulated",
+        "var_confidence": "95%, 1-day",
+        "daily_vol": vol,
+        "market_code": code,
+    }
+
+
+def _compute_sharpe_proxy(
+    weighted_beta: float, market_code: str = "VN", regime: str = "Market-Neutral"
+) -> dict:
+    """
+    Sharpe proxy using expected market return assumptions.
+    Not exact without actual returns, but always better than a blank.
+    """
+    risk_free = {"VN": 0.080, "US": 0.045, "SG": 0.036, "DEFAULT": 0.045}
+    expected_mkt = {"VN": 0.12, "US": 0.10, "SG": 0.09, "DEFAULT": 0.10}
+    daily_vol = {"VN": 0.018, "US": 0.012, "DEFAULT": 0.015}
+    code = _normalize_market_code(market_code)
+    beta = max(float(weighted_beta or 1.0), 0.1)
+    rf = risk_free.get(code, risk_free["DEFAULT"])
+    mkt = expected_mkt.get(code, expected_mkt["DEFAULT"])
+    vol_annual = daily_vol.get(code, daily_vol["DEFAULT"]) * (252**0.5)
+    expected_return = rf + beta * (mkt - rf)
+    sharpe_proxy = (
+        (expected_return - rf) / (vol_annual * beta)
+        if vol_annual > 0 and beta > 0
+        else 0.0
+    )
+    return {
+        "sharpe_proxy": round(sharpe_proxy, 2),
+        "label": f"{sharpe_proxy:.2f} [CAPM-estimated, not from actual returns]",
+        "method": "CAPM proxy",
+        "regime": regime,
+    }
+
+
+def _correlation_label(ctx: dict) -> tuple[str, str]:
+    status = str(ctx.get("correlation_status") or "").upper()
+    raw = ctx.get("avg_corr")
+    try:
+        value = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        value = None
+    if status == "COMPUTED" and value is not None:
+        return f"{value:.3f}", "High" if value > 0.75 else "Computed"
+    return "Not computed (insufficient price history)", "UNKNOWN"
+
+
 def _compute_risk_metric_labels(
     ctx: dict,
     metrics: dict[str, Any],
@@ -554,7 +625,6 @@ def _compute_risk_metric_labels(
         float(ctx.get("weighted_beta") or metrics.get("weighted_beta") or 1.0), 0.1
     )
     regime_label = str(ctx.get("regime_label") or "Market-Neutral")
-    daily_vol = MARKET_DAILY_VOL.get(market_code, MARKET_DAILY_VOL["DEFAULT"])
 
     var_raw = quant.get("var_95") or metrics.get("var_95")
     var_numeric: float | None = None
@@ -574,11 +644,14 @@ def _compute_risk_metric_labels(
             f"${var_amount:,.0f} ({var_pct:.2f}% of AUM) [calculated, 95% 1-day]"
         )
         var_status = "Calculated"
+        var_fallback = None
     else:
-        var_amount = total_value * weighted_beta * 0.0197 * 1.645
+        var_fallback = _compute_var_fallback(total_value, weighted_beta, market_code)
+        var_amount = float(var_fallback["var_1d_95_usd"])
         var_pct = (var_amount / total_value) * 100 if total_value else 0.0
         var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) [beta-estimated, p95, 1-day]"
+            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) "
+            f"[beta-estimated · {market_code} vol {var_fallback['daily_vol'] * 100:.1f}%]"
         )
         var_status = "Estimated"
 
@@ -624,23 +697,52 @@ def _compute_risk_metric_labels(
             day_of_year = max(1, datetime.datetime.now().timetuple().tm_yday)
             ytd_return_annualised = (1 + ytd_return) ** (365.0 / day_of_year) - 1
             rf = RISK_FREE.get(market_code, RISK_FREE["DEFAULT"])
-            ann_vol = daily_vol * (252**0.5)
+            ann_vol = MARKET_DAILY_VOL.get(market_code, MARKET_DAILY_VOL["DEFAULT"]) * (
+                252**0.5
+            )
             sharpe_est = (ytd_return_annualised - rf) / ann_vol if ann_vol else 0.0
             sharpe_label = f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
             sharpe_status = "Estimated"
         else:
-            rf = RISK_FREE.get(market_code, RISK_FREE["DEFAULT"])
-            ann_vol = daily_vol * (252**0.5)
-            downside_vol = ann_vol * weighted_beta * 0.7
-            proxy_sortino = round(-rf / downside_vol, 2) if downside_vol > 0 else 0.0
+            proxy = _compute_sharpe_proxy(weighted_beta, market_code, regime_label)
             sharpe_label = (
-                f"Not computable without cost basis. "
-                f"Proxy Sortino (downside only): {proxy_sortino:.2f} [beta-estimated]"
+                f"{proxy['sharpe_proxy']:.2f} [CAPM proxy; not from actual returns]"
             )
             sharpe_status = "Proxy"
 
+    if var_fallback:
+        var_99_pct = (
+            float(var_fallback["var_1d_99_usd"]) / total_value * 100
+            if total_value
+            else 0.0
+        )
+        var_10_pct = (
+            float(var_fallback["var_10d_95_usd"]) / total_value * 100
+            if total_value
+            else 0.0
+        )
+        var_99 = (
+            f"${var_fallback['var_1d_99_usd']:,.0f} ({var_99_pct:.2f}% AUM) "
+            "[beta-estimated]"
+        )
+        var_10 = (
+            f"${var_fallback['var_10d_95_usd']:,.0f} ({var_10_pct:.2f}% AUM) "
+            "[10-day horizon, sqrt(t) scaled]"
+        )
+        var_footnote = (
+            "VaR estimated from portfolio beta x "
+            f"{market_code} historical volatility. Monte Carlo simulation available with Swarm IC."
+        )
+    else:
+        var_99 = "Available with simulated VaR"
+        var_10 = "Available with simulated VaR"
+        var_footnote = "VaR supplied by quantitative analysis."
+
     return {
         "var": (var_label, var_status),
+        "var_99": (var_99, var_status),
+        "var_10": (var_10, var_status),
+        "var_footnote": (var_footnote, "Method"),
         "drawdown": (drawdown_label, drawdown_status),
         "sharpe": (sharpe_label, sharpe_status),
     }
@@ -697,9 +799,34 @@ def detect_structural_biases(
             }
         )
 
+    weights = [_w(pos) for pos in positions]
+    positive_weights = [w for w in weights if w > 0]
+    equal_weight_portfolio = False
+    if len(positive_weights) >= 3:
+        equal_weight_portfolio = max(positive_weights) - min(positive_weights) <= 0.02
+    if equal_weight_portfolio:
+        biases.append(
+            {
+                "name": "Equal-Weight Portfolio Detected",
+                "evidence": (
+                    "Equal-weight portfolio detected - analysis limited without "
+                    "resolved market prices."
+                ),
+                "dollar_impact": (
+                    "Dollar-weighted concentration cannot be verified until market "
+                    "prices resolve for each ticker."
+                ),
+                "severity": "INFO",
+                "mitigation": (
+                    "Ensure tickers include exchange suffixes and rerun analysis "
+                    "to verify dollar weights."
+                ),
+            }
+        )
+
     for pos in positions:
         weight = _w(pos)
-        if weight > 0.30:
+        if weight > 0.30 and not equal_weight_portfolio:
             symbol = str(pos.get("symbol") or "Position")
             biases.append(
                 {
@@ -1649,7 +1776,23 @@ def _build_report_context(
         tax_analysis = {}
 
     # ── Quant (correlation / HHI — prefer calculator metrics, else DNA) ───────
-    avg_corr = float(d.get("avg_correlation") or m.get("avg_correlation") or 0)
+    avg_corr_raw = d.get("avg_correlation")
+    corr_status = str(d.get("correlation_status") or m.get("correlation_status") or "")
+    if avg_corr_raw is None:
+        avg_corr_raw = m.get("avg_correlation")
+    try:
+        avg_corr = float(avg_corr_raw) if avg_corr_raw is not None else None
+    except (TypeError, ValueError):
+        avg_corr = None
+    if avg_corr == 0 and corr_status.upper() != "COMPUTED":
+        avg_corr = None
+    if not corr_status:
+        corr_status = "COMPUTED" if avg_corr is not None else "UNKNOWN"
+    corr_note = str(
+        d.get("correlation_note")
+        or m.get("correlation_note")
+        or "Correlation: Not computed (insufficient price history)"
+    )
     hhi_from_canon = float(_canon.get("hhi") or 0)
     if hhi_from_canon > 0:
         hhi = hhi_from_canon
@@ -2118,6 +2261,8 @@ def _build_report_context(
         "weighted_beta": weighted_beta,
         "sharpe_ratio": sharpe_ratio,
         "avg_corr": avg_corr,
+        "correlation_status": corr_status,
+        "correlation_note": corr_note,
         "hhi": hhi,
         "quant_modes_selected": quant_modes_selected,
         "quant_model_contribution_summary": quant_model_contrib,
@@ -2385,7 +2530,15 @@ def _make_cover_callback(
     regime = ctx["regime_label"] or "Pending IC Analysis"
     beta = ctx["weighted_beta"]
     sr = ctx.get("sharpe_ratio")
-    sharpe_str = _fnum(sr) if sr is not None else "—"
+    if sr is not None:
+        sharpe_str = _fnum(sr)
+    else:
+        sharpe_proxy = _compute_sharpe_proxy(
+            float(beta or 1.0),
+            _market_code_from_ctx(ctx, ctx.get("positions") or []),
+            str(ctx.get("regime_label") or "Market-Neutral"),
+        )
+        sharpe_str = f"{sharpe_proxy['sharpe_proxy']:.2f} proxy"
     report_state = str(ctx.get("report_state") or REPORT_DRAFT)
     labels = ctx.get("section_labels") or {}
     cover_title = str(labels.get("cover_title") or "PORTFOLIO INTELLIGENCE REPORT")
@@ -3561,7 +3714,7 @@ def _page_portfolio_snapshot(
         ["Cash Weight", f"{cash_w:.1f}%"],
         ["Concentration HHI", hhi_disp],
         ["Weighted Beta", f"{beta:.2f}"],
-        ["Sharpe ratio", risk_labels["sharpe"][0]],
+        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0]],
         ["YTD Return", _fpct(ytd) if ytd is not None else "—"],
     ]
     if ctx.get("is_sea_region"):
@@ -4097,45 +4250,37 @@ def _page_macro_regime(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -
     defensive = get_defensive_alternatives(market_code)
 
     def _sum_weight(syms: set) -> float:
-        return sum(
-            float(p.get("weight") or p.get("weight_pct") or 0)
-            for p in positions
-            if p.get("symbol") in syms
-        )
+        return sum(_w(p) * 100 for p in positions if p.get("symbol") in syms)
 
     def_w = _sum_weight(set(defensive["defensive_symbols"]))
-    tech_w = _sum_weight({"AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "QQQ"})
-    gld_w = next(
-        (
-            float(p.get("weight") or p.get("weight_pct") or 0)
-            for p in positions
-            if p.get("symbol") == "GLD"
-        ),
-        0,
-    )
-    fi_w = next(
-        (
-            float(p.get("weight") or p.get("weight_pct") or 0)
-            for p in positions
-            if p.get("symbol") in {"TLT", "BND", "AGG", "GOVT", "IEF"}
-        ),
-        0,
-    )
 
     # SEA-NATIVE-TICKER-FIX: show benchmark-aware beta label (not always SPY)
     _bench_lbl = ctx.get("benchmark_label") or ctx.get("benchmark_symbol") or "^GSPC"
     signals = [
         ("Portfolio Beta", f"{beta:.2f}", f"vs {_bench_lbl} 1.00"),
-        ("Defensive Weight", f"{def_w:.1f}%", str(defensive["weight_label"])),
-        ("Tech Concentration", f"{tech_w:.1f}%", "Large-cap tech"),
-        ("Gold Hedge", f"{gld_w:.1f}%", "Inflation buffer"),
-        ("Fixed Income", f"{fi_w:.1f}%", "Duration exposure"),
+        (
+            "Defensive Weight",
+            f"{def_w:.1f}%",
+            str(defensive.get("weight_label") or "Defensive allocation"),
+        ),
         (
             "HHI Concentration",
             f"{float(ctx['hhi']):.4f}",
             "⚠ High" if ctx["hhi"] > 0.20 else "Normal",
         ),
     ]
+    if market_code == "VN":
+        financial_w = _sum_weight({"VCI.VN", "SSI.VN", "VPB.VN", "MBB.VN", "VCB.VN"})
+        materials_w = _sum_weight({"HPG.VN"})
+        signals.insert(2, ("VN Financials", f"{financial_w:.1f}%", "Broker/bank beta"))
+        signals.insert(3, ("VN Materials", f"{materials_w:.1f}%", "Cyclical beta"))
+    else:
+        tech_w = _sum_weight({"AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "QQQ"})
+        gld_w = _sum_weight({"GLD"})
+        fi_w = _sum_weight({"TLT", "BND", "AGG", "GOVT", "IEF"})
+        signals.insert(2, ("Tech Concentration", f"{tech_w:.1f}%", "Large-cap tech"))
+        signals.insert(3, ("Gold Hedge", f"{gld_w:.1f}%", "Inflation buffer"))
+        signals.insert(4, ("Fixed Income", f"{fi_w:.1f}%", "Duration exposure"))
     # Override with swarm macro drivers if available
     drivers = _coerce_list(mkt.get("drivers"), 6)
     if drivers:
@@ -4294,21 +4439,29 @@ def _page_risk_correlation(
             risk_labels["var"][1],
         ],
         [
+            "VaR (99%, 1-day)",
+            risk_labels["var_99"][0],
+            risk_labels["var_99"][1],
+        ],
+        [
+            "VaR (95%, 10-day)",
+            risk_labels["var_10"][0],
+            risk_labels["var_10"][1],
+        ],
+        [
             "Max Drawdown",
             risk_labels["drawdown"][0],
             risk_labels["drawdown"][1],
         ],
-        ["Sharpe Ratio", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
+        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
         ["Concentration (HHI)", f"{hhi:.4f}", "⚠ High" if hhi > 0.25 else "Normal"],
         ["Weighted Beta", f"{beta:.2f}", "⚠ High" if beta > 1.8 else "Normal"],
-        [
-            "Avg. Correlation",
-            f"{ctx.get('avg_corr', 0):.3f}",
-            "⚠ High" if float(ctx.get("avg_corr") or 0) > 0.75 else "Normal",
-        ],
+        ["Avg. Correlation", *_correlation_label(ctx)],
     ]
     items.append(Paragraph("RISK METRICS SUMMARY", st["h3"]))
     items.append(Table(risk_tbl, colWidths=[140, 210, 90], style=_tbl_std(pal)))
+    items.append(Spacer(1, 4))
+    items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
 
     # Takeaway row
     worst_metric = (
@@ -4410,15 +4563,22 @@ def _page_risk_behavioral_intelligence(
             "Reduce" if top_weight > 30 else "Monitor",
         ],
         ["Weighted beta", f"{beta:.2f}", "Elevated" if beta > 1.2 else "Contained"],
+        ["VaR (95%, 1-day)", risk_labels["var"][0], risk_labels["var"][1]],
+        ["VaR (99%, 1-day)", risk_labels["var_99"][0], risk_labels["var_99"][1]],
+        ["VaR (95%, 10-day)", risk_labels["var_10"][0], risk_labels["var_10"][1]],
         [
-            "VaR / drawdown",
-            f"{risk_labels['var'][0]} / {risk_labels['drawdown'][0]}",
+            "Drawdown",
+            risk_labels["drawdown"][0],
             risk_labels["drawdown"][1],
         ],
+        ["Avg. correlation", *_correlation_label(ctx)],
+        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
         ["Behavioral DNA", f"{dna_score}/100", f"Churn {churn}"],
     ]
     items.append(Table(risk_rows, colWidths=[115, 255, 90], style=_tbl_std(pal)))
     items.append(Spacer(1, 10))
+    items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
+    items.append(Spacer(1, 8))
 
     biases = ctx.get("structural_biases") or []
     weakness_rows = []
