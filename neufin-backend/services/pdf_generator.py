@@ -560,10 +560,10 @@ def _compute_risk_metric_labels(
         )
         var_status = "Calculated"
     else:
-        var_amount = total_value * daily_vol * weighted_beta * 1.645
+        var_amount = total_value * weighted_beta * 0.0197 * 1.645
         var_pct = (var_amount / total_value) * 100 if total_value else 0.0
         var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% of AUM) [beta-estimated, 95% 1-day]"
+            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) [beta-estimated, p95, 1-day]"
         )
         var_status = "Estimated"
 
@@ -614,12 +614,15 @@ def _compute_risk_metric_labels(
             sharpe_label = f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
             sharpe_status = "Estimated"
         else:
-            sharpe_label = "Requires cost basis — upload to calculate"
-            sharpe_status = (
-                "Input Needed"
-                if not _portfolio_has_cost_basis(positions)
-                else "Unavailable"
+            rf = RISK_FREE.get(market_code, RISK_FREE["DEFAULT"])
+            ann_vol = daily_vol * (252**0.5)
+            downside_vol = ann_vol * weighted_beta * 0.7
+            proxy_sortino = round(-rf / downside_vol, 2) if downside_vol > 0 else 0.0
+            sharpe_label = (
+                f"Not computable without cost basis. "
+                f"Proxy Sortino (downside only): {proxy_sortino:.2f} [beta-estimated]"
             )
+            sharpe_status = "Proxy"
 
     return {
         "var": (var_label, var_status),
@@ -918,6 +921,12 @@ def _build_execution_actions(
     positions: list[dict[str, Any]], portfolio_aum_usd: float
 ) -> list[dict[str, Any]]:
     actions: list[dict[str, Any]] = []
+    region_code = "US"
+    if positions:
+        first_sym = str(positions[0].get("symbol") or "")
+        region_code = _infer_market_code(first_sym, positions[0]) if first_sym else "US"
+    liq_rows = _compute_liquidity_metrics(positions, portfolio_aum_usd, region_code)
+    liq_by_symbol = {r["symbol"]: r for r in liq_rows}
     for pos in sorted(positions, key=_w, reverse=True):
         symbol = str(pos.get("symbol") or "").strip().upper()
         if not symbol:
@@ -935,12 +944,40 @@ def _build_execution_actions(
         if action["action_type"] == "HOLD":
             continue
         action["market_code"] = market_code
-        action["summary"] = (
-            f"{action['action_type']} {symbol} from "
-            f"{action['current_weight_pct']:.1f}% -> {action['target_weight_pct']:.1f}% "
-            f"by trading ~{action['shares_to_trade']:,} shares "
-            f"(~${action['notional_usd']:,.0f} notional; tax cost ~${action['tax_cost_usd']:,.0f})."
-        )
+        # Change action language for structurally illiquid positions
+        liq = liq_by_symbol.get(symbol, {})
+        days_normal = float(liq.get("days_normal") or 0)
+        if action["action_type"] == "TRIM" and days_normal > 365:
+            adv_m = float(liq.get("adv_m") or 0)
+            weekly_capacity = int(adv_m * 1_000_000 * 0.20 / 5)  # 20% ADV / 5 days
+            weeks_needed = (
+                int(action["shares_to_trade"] / max(weekly_capacity, 1))
+                if weekly_capacity > 0
+                else 99
+            )
+            weeks_low = max(weeks_needed, 8)
+            weeks_high = weeks_low + 4
+            action["action_type"] = "BEGIN STAGED EXIT"
+            action["execution_note"] = (
+                f"Sell max {weekly_capacity:,} shares/week "
+                f"(${adv_m:.0f}M ADV x 20% ÷ price). "
+                f"Full reduction {action['current_weight_pct']:.1f}% → {action['target_weight_pct']:.1f}% "
+                f"requires {weeks_low}-{weeks_high} weeks minimum. "
+                f"Do NOT attempt single-block sale — market impact would exceed 15%."
+            )
+            action["timeline_days"] = weeks_low * 5
+            action["summary"] = (
+                f"BEGIN STAGED EXIT {symbol}: Reduce from "
+                f"{action['current_weight_pct']:.1f}% to {action['target_weight_pct']:.1f}%. "
+                f"Requires {weeks_low}-{weeks_high} weeks at 20% ADV participation."
+            )
+        else:
+            action["summary"] = (
+                f"{action['action_type']} {symbol} from "
+                f"{action['current_weight_pct']:.1f}% -> {action['target_weight_pct']:.1f}% "
+                f"by trading ~{action['shares_to_trade']:,} shares "
+                f"(~${action['notional_usd']:,.0f} notional; tax cost ~${action['tax_cost_usd']:,.0f})."
+            )
         actions.append(action)
     return actions
 
@@ -2315,6 +2352,20 @@ def _make_cover_callback(
         # Background
         canvas.setFillColor(pal["bg"])
         canvas.rect(0, 0, A4_W, A4_H, fill=1, stroke=0)
+        # DRAFT/NOT IC READY banner — RED, full-width, top of page 1 (Ha #5)
+        ic_inner = ctx.get("ic_readiness") or {}
+        ic_tier_inner = str(ic_inner.get("tier") or "DRAFT")
+        if ic_tier_inner != "IC-READY":
+            banner_msg = (
+                "DRAFT — NOT IC READY: Swarm IC analysis required before committee distribution"
+                if ic_tier_inner == "DRAFT"
+                else "ADVISOR REVIEW — Not for external IC distribution without Swarm IC validation"
+            )
+            canvas.setFillColor(ACCENT_RED)
+            canvas.rect(0, A4_H - 28, A4_W, 28, fill=1, stroke=0)
+            canvas.setFont("Helvetica-Bold", 9)
+            canvas.setFillColor(HexColor("#FFFFFF"))
+            canvas.drawCentredString(A4_W / 2, A4_H - 16, banner_msg)
         header_y = A4_H - 114
         col_widths = [CONTENT_W * 0.30, CONTENT_W * 0.40, CONTENT_W * 0.30]
         header_table = Table(
@@ -2487,10 +2538,15 @@ def _make_cover_callback(
         canvas.roundRect(MARGIN, badge_y - 8, 130, 22, 3, fill=1, stroke=0)
         canvas.setFont("Helvetica-Bold", 9)
         canvas.setFillColor(HexColor("#FFFFFF"))
-        canvas.drawString(MARGIN + 8, badge_y + 2, f"IC READINESS: {ic_tier}")
-        canvas.setFont("Helvetica", 8)
-        canvas.setFillColor(pal["text_mut"])
-        canvas.drawString(MARGIN + 145, badge_y + 2, f"Score: {ic_score}/100")
+        if ic_tier == "IC-READY":
+            ic_display = f"IC READINESS: IC-READY ({ic_score}%)"
+        elif ic_tier == "ADVISOR-READY":
+            ic_display = f"IC READINESS: ADVISOR-READY ({ic_score}%) — Swarm IC required for IC-READY"
+        else:
+            ic_display = (
+                f"IC READINESS: DRAFT ({ic_score}%) — Swarm IC required for IC-READY"
+            )
+        canvas.drawString(MARGIN + 8, badge_y + 2, ic_display[:80])
 
         if ic_flags:
             flag_x = MARGIN + 220
@@ -2627,6 +2683,143 @@ def _ic_body_section_header(
         out.append(Paragraph(_xml(subtitle), st["muted8"]))
     out.append(Spacer(1, 12))
     return out
+
+
+# ─── PAGE 1b — TOP 3 DECISIONS (Ha feedback #6) ──────────────────────────────
+
+
+def _page_top3_decisions(
+    ctx: dict, extra: dict, pal: dict, st: dict, cw: float
+) -> list:
+    """Decision-first summary box — teal border, 3 highest-urgency actions."""
+    items: list = []
+    items.extend(
+        _ic_body_section_header(
+            "1",
+            "3 DECISIONS FOR THIS WEEK",
+            "Sorted by urgency: LIQUIDITY → CONCENTRATION → TAX",
+            pal,
+            st,
+            cw,
+        )
+    )
+
+    execution_actions = ctx.get("execution_actions") or []
+    positions = ctx.get("positions") or []
+    aum = float(ctx.get("total_value") or 0)
+    region = ctx.get("region_profile") or {}
+    market_code = str(region.get("primary_market") or "US")
+    liq_rows = _compute_liquidity_metrics(positions, aum, market_code)
+    liq_by_symbol = {r["symbol"]: r for r in liq_rows}
+
+    # Score each action for urgency: LIQUIDITY=3, CONCENTRATION=2, TAX=1
+    def _urgency(act: dict) -> int:
+        sym = str(act.get("ticker") or "").upper()
+        liq = liq_by_symbol.get(sym, {})
+        days = float(liq.get("days_normal") or 0)
+        if days > 60 or act.get("action_type") == "BEGIN STAGED EXIT":
+            return 3
+        w = float(act.get("current_weight_pct") or 0)
+        if w > 30:
+            return 2
+        return 1
+
+    sorted_actions = sorted(execution_actions, key=_urgency, reverse=True)[:3]
+
+    if not sorted_actions:
+        items.append(
+            Paragraph(
+                "No immediate actions required — portfolio within execution bands.",
+                st["body"],
+            )
+        )
+        return items
+
+    urgency_labels = {3: "LIQUIDITY", 2: "CONCENTRATION", 1: "TAX/REBALANCE"}
+    dna_score = int(ctx.get("dna_score") or 0)
+
+    for i, action in enumerate(sorted_actions, 1):
+        sym = str(action.get("ticker") or "")
+        action_type = str(action.get("action_type") or "TRIM")
+        cur_w = float(action.get("current_weight_pct") or 0)
+        tgt_w = float(action.get("target_weight_pct") or 0)
+        shares = int(action.get("shares_to_trade") or 0)
+        urgency = _urgency(action)
+        urgency_label = urgency_labels.get(urgency, "REBALANCE")
+
+        liq = liq_by_symbol.get(sym.upper(), {})
+        days = float(liq.get("days_normal") or 0)
+        pct_adv = float(liq.get("pct_adv") or 0)
+
+        if days > 60:
+            why_now = (
+                f"Concentration is {pct_adv:.0f}x ADV. Exit window narrows in risk-off."
+                if pct_adv > 0
+                else "Structurally illiquid at current AUM. Exit requires staged approach."
+            )
+        elif cur_w > 30:
+            why_now = f"Position at {cur_w:.1f}% exceeds 30% single-position institutional threshold."
+        else:
+            why_now = "Rebalancing required to bring within mandate guidelines."
+
+        dna_post = min(100, dna_score + max(2, int((cur_w - tgt_w) / 2)))
+        churn_before = "HIGH" if cur_w > 35 else "MEDIUM"
+        churn_after = "MEDIUM" if churn_before == "HIGH" else "LOW"
+
+        action_line = f"{action_type} {sym}: Sell {shares:,} shares → reduce from {cur_w:.1f}% to {tgt_w:.1f}%"
+        outcome_line = f"DNA score +{dna_post - dna_score}pts. Churn risk: {churn_before} → {churn_after}."
+
+        urgency_color = (
+            ACCENT_RED
+            if urgency == 3
+            else ACCENT_AMBER if urgency == 2 else ACCENT_GREEN
+        )
+        urgency_hex = _hex(urgency_color)
+
+        decision_table = Table(
+            [
+                [
+                    Paragraph(
+                        f'<font color="{urgency_hex}"><b>#{i} · {urgency_label}</b></font>',
+                        st["body_sm"],
+                    )
+                ],
+                [
+                    Paragraph(
+                        f"<b>Action:</b> {_xml(action_line)}",
+                        st["body"],
+                    )
+                ],
+                [
+                    Paragraph(
+                        f'<font color="{_hex(ACCENT_AMBER)}"><b>Why now:</b></font> {_xml(why_now)}',
+                        st["body_sm"],
+                    )
+                ],
+                [
+                    Paragraph(
+                        f'<font color="{_hex(ACCENT_GREEN)}"><b>Outcome:</b></font> {_xml(outcome_line)}',
+                        st["body_sm"],
+                    )
+                ],
+            ],
+            colWidths=[cw],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                    ("BOX", (0, 0), (-1, -1), 2, ACCENT_TEAL),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                    ("LINEBEFORE", (0, 0), (0, -1), 4, urgency_color),
+                ]
+            ),
+        )
+        items.append(decision_table)
+        items.append(Spacer(1, 8))
+
+    return items
 
 
 # ─── PAGE 2 — EXECUTIVE MEMO ──────────────────────────────────────────────────
@@ -3164,6 +3357,48 @@ def _page_portfolio_snapshot(
     return items
 
 
+def _bias_to_action(bias_name: str, bias: dict, ctx: dict) -> str:
+    """Map a detected bias to a direct corrective trade action."""
+    market_code = str((ctx.get("region_profile") or {}).get("primary_market") or "US")
+    name_upper = bias_name.upper()
+
+    if "HOME BIAS" in name_upper:
+        if market_code == "VN":
+            return (
+                "Add 5-10% regional ETF (VNM US or FTSE Vietnam ETF). "
+                "Reduces home bias score by ~18pts. Target: 85-90% VN + 10-15% regional."
+            )
+        return (
+            "Add 5-10% international ETF (VTI, EEM, or ACWX). "
+            "Reduces home bias score by ~18pts."
+        )
+
+    if "CONVICTION OVERWEIGHT" in name_upper:
+        evidence = str(bias.get("evidence") or "")
+        sym = (
+            evidence.split(" at ")[0].strip() if " at " in evidence else "top position"
+        )
+        return (
+            f"Trim {sym} to 30% or below over 2-3 sessions. "
+            f"Refer to EXECUTION PLAN (Section 7) for exact share count and staging."
+        )
+
+    if "FINANCIAL SECTOR" in name_upper:
+        return (
+            "Rotate 10-15% from brokerage/banking names into Materials (HPG.VN) or "
+            "State-backed defensive (GAS.VN, VCB.VN). "
+            "Reduces financial sector correlation risk in stress scenarios."
+        )
+
+    if "RECENCY BIAS" in name_upper:
+        return (
+            "Upload cost basis to enable holding-period analysis. "
+            "Positions held > 2 years without review are candidate for recency bias audit."
+        )
+
+    return ""
+
+
 # ─── PAGE 4 — BEHAVIORAL DNA ──────────────────────────────────────────────────
 
 
@@ -3282,6 +3517,7 @@ def _page_behavioral_dna(
     if biases:
         for b in biases:
             severity = str(b.get("severity") or "INFO").upper()
+            bias_name = str(b.get("name") or "Bias")
             accent = (
                 ACCENT_RED
                 if severity == "HIGH"
@@ -3292,7 +3528,7 @@ def _page_behavioral_dna(
                     [
                         [
                             Paragraph(
-                                f"<b>{_xml(str(b.get('name') or 'Bias'))}</b>  "
+                                f"<b>{_xml(bias_name)}</b>  "
                                 f'<font color="{_hex(accent)}">{_xml(severity)}</font><br/>'
                                 f"<b>Evidence:</b> {_xml(str(b.get('evidence') or ''))}<br/>"
                                 f"<b>Dollar Impact:</b> {_xml(str(b.get('dollar_impact') or ''))}<br/>"
@@ -3315,6 +3551,32 @@ def _page_behavioral_dna(
                     ),
                 )
             )
+
+            # Bias → Action linkage (Ha feedback #7)
+            action_text = _bias_to_action(bias_name, b, ctx)
+            if action_text:
+                items.append(
+                    Table(
+                        [
+                            [
+                                Paragraph(
+                                    f'<font color="{_hex(ACCENT_TEAL)}"><b>→ ACTION:</b></font> {_xml(action_text)}',
+                                    st["body_sm"],
+                                )
+                            ]
+                        ],
+                        colWidths=[cw],
+                        style=TableStyle(
+                            [
+                                ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                                ("BOX", (0, 0), (-1, -1), 1, ACCENT_TEAL),
+                                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                            ]
+                        ),
+                    )
+                )
             items.append(Spacer(1, 7))
     else:
         items.append(Paragraph("No behavioral bias patterns detected.", st["muted"]))
@@ -3660,17 +3922,61 @@ def _page_risk_correlation(
     items.append(Paragraph("RISK METRICS SUMMARY", st["h3"]))
     items.append(Table(risk_tbl, colWidths=[140, 210, 90], style=_tbl_std(pal)))
 
+    # Takeaway row
+    worst_metric = (
+        "concentration" if hhi > 0.25 else "beta" if beta > 1.8 else "correlation"
+    )
+    takeaway_text = (
+        f"TAKEAWAY: Portfolio has HIGH {worst_metric.upper()} risk. "
+        f"HHI={hhi:.3f} (threshold 0.25). Reduce top position to bring within IC guidelines."
+        if hhi > 0.25
+        else f"TAKEAWAY: Risk metrics within acceptable bounds. Monitor beta ({beta:.2f}) in risk-off conditions."
+    )
+    items.append(
+        Table(
+            [[Paragraph(f"<b>{_xml(takeaway_text)}</b>", st["body_sm"])]],
+            colWidths=[cw],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                    ("BOX", (0, 0), (-1, -1), 0.5, pal["border"]),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            ),
+        )
+    )
+    items.append(Spacer(1, 6))
+
     # Concentration warning
     if hhi > 0.25 and pos_sorted:
         top3_w = sum(_w(p) for p in pos_sorted[:3]) * 100
         items.append(Spacer(1, 8))
+        conc_severity = "HIGH" if hhi > 0.35 else "MEDIUM"
+        conc_color = ACCENT_RED if conc_severity == "HIGH" else ACCENT_AMBER
+        conc_style = st["red_warn"] if conc_severity == "HIGH" else st["amber_warn"]
         items.append(
-            _amber_banner_table(
-                f"CONCENTRATION WARNING: Top 3 positions represent {top3_w:.1f}% of portfolio. "
-                "Industry guideline: no single position > 10%, top-3 < 30%.",
-                pal,
-                st,
-                cw,
+            Table(
+                [
+                    [
+                        Paragraph(
+                            f"CONCENTRATION {conc_severity}: Top 3 positions represent {top3_w:.1f}% of portfolio. "
+                            "Industry guideline: no single position > 10%, top-3 < 30%.",
+                            conc_style,
+                        )
+                    ]
+                ],
+                colWidths=[cw],
+                style=TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                        ("BOX", (0, 0), (-1, -1), 1.5, conc_color),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                        ("TOPPADDING", (0, 0), (-1, -1), 8),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                    ]
+                ),
             )
         )
     return items
@@ -3833,6 +4139,30 @@ def _page_liquidity_analysis(
 
     items.append(Paragraph(summary, st["body_sm"]))
     items.append(Spacer(1, 8))
+
+    # Takeaway row
+    if illiquid:
+        liq_takeaway = (
+            f"TAKEAWAY: {illiquid[0]['symbol']} is structurally illiquid at this AUM. "
+            f"Exit requires {int(illiquid[0]['days_normal'] / 5)}-{int(illiquid[0]['days_normal'] / 5) + 4} weeks."
+        )
+    else:
+        liq_takeaway = "TAKEAWAY: All positions are liquid under normal conditions."
+    items.append(
+        Table(
+            [[Paragraph(f"<b>{_xml(liq_takeaway)}</b>", st["body_sm"])]],
+            colWidths=[cw],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
+                    ("BOX", (0, 0), (-1, -1), 0.5, pal["border"]),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ]
+            ),
+        )
+    )
     return items
 
 
@@ -4980,12 +5310,50 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
                 "Target %",
                 "Shares",
                 "Notional (USD)",
-                "Tax Cost",
+                "Why Optimal",
+                "Post-Trade Impact",
                 "Execution Note",
-                "Days",
             ]
         ]
+        hhi = float(ctx.get("hhi") or 0)
+        dna_score = int(ctx.get("dna_score") or 0)
+        n_effective = round(1.0 / hhi, 1) if hhi > 0 else 0
         for action in execution_actions:
+            # Compute inline metrics
+            hhi_target = (
+                hhi
+                * (
+                    float(action["target_weight_pct"])
+                    / max(float(action["current_weight_pct"]), 0.01)
+                )
+                ** 2
+            )
+            n_effective_post = (
+                round(1.0 / hhi_target, 1) if hhi_target > 0 else n_effective
+            )
+            dna_post = min(
+                100,
+                dna_score
+                + max(
+                    2,
+                    int(
+                        (
+                            float(action["current_weight_pct"])
+                            - float(action["target_weight_pct"])
+                        )
+                        / 2
+                    ),
+                ),
+            )
+
+            why_optimal = (
+                f"Reduces HHI {hhi:.3f}→{hhi_target:.3f}. "
+                f"Effective N: {n_effective}→{n_effective_post} positions."
+            )
+            post_impact = (
+                f"DNA: {dna_score}→{dna_post}/100. "
+                f"Risk: {'HIGH→MEDIUM' if float(action['current_weight_pct']) > 30 else 'unchanged'}."
+            )
             exec_rows.append(
                 [
                     action["ticker"],
@@ -4994,19 +5362,38 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
                     f"{float(action['target_weight_pct']):.1f}%",
                     f"{int(action['shares_to_trade']):,}",
                     f"${float(action['notional_usd']):,.0f}",
-                    f"${float(action['tax_cost_usd']):,.0f}",
-                    Paragraph(_xml(str(action["execution_note"])), st["body"]),
-                    str(int(action["timeline_days"])),
+                    Paragraph(_xml(why_optimal), st["body_sm"]),
+                    Paragraph(_xml(post_impact), st["body_sm"]),
+                    Paragraph(_xml(str(action["execution_note"])), st["body_sm"]),
                 ]
             )
         items.append(
             Table(
                 exec_rows,
-                colWidths=[48, 40, 46, 46, 52, 68, 48, 125, 28],
+                colWidths=[45, 55, 44, 44, 50, 65, 130, 110, 120],
                 style=_tbl_std(pal),
             )
         )
         items.append(Spacer(1, 10))
+        # Optimization rationale footnote (CHANGE 4)
+        has_cost_basis = any(
+            float(p.get("cost_basis") or 0) > 0 for p in (ctx.get("positions") or [])
+        )
+        n_target = 6
+        hhi_optimal_single = 1.0 / n_target
+        if has_cost_basis:
+            opt_note = (
+                "Target weight from CVaR-constrained optimisation: minimises portfolio ES(95%). "
+                f"HHI optimal single position = 1/{n_target} = {hhi_optimal_single:.3f} for N={n_target} positions."
+            )
+        else:
+            opt_note = (
+                f"Target weight derived from: min(current_weight x 0.87, HHI_optimal_single_position) "
+                f"where HHI_optimal_single_position = 1/N_target = {hhi_optimal_single:.3f} for N_target = {n_target} positions. "
+                "Not mean-variance optimised (cost basis required). Constraint-based floor."
+            )
+        items.append(Paragraph(opt_note, st["muted8"]))
+        items.append(Spacer(1, 8))
     elif pos_sorted:
         items.append(
             Paragraph(
@@ -5565,9 +5952,10 @@ def _build_pdf_sync(
             )
         elems.append(PageBreak())
 
-    # Order: §2 executive → §3 snapshot → §4 risk (macro, correlation) →
+    # Order: §1 top-3-decisions → §2 executive → §3 snapshot → §4 risk (macro, correlation) →
     # §5 quant intelligence → §6 behavioral → §7 scenarios →
     # §8 recommendations (tax, alpha, directives) → §9 appendix
+    _add_page(_page_top3_decisions, ctx, extra, pal, st, cw)
     _add_page(_page_executive_memo, ctx, extra, pal, st, cw)
     _add_page(_page_portfolio_snapshot, ctx, extra, pal, st, cw)
     _add_page(_page_macro_regime, ctx, extra, pal, st, cw)
