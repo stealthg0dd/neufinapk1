@@ -26,7 +26,6 @@ def client():
         patch(
             "main.get_price_with_fallback",
         ) as mock_price,
-        patch("services.ai_router.get_ai_analysis", new_callable=AsyncMock) as mock_ai,
         patch("services.analytics.track", new_callable=AsyncMock),
     ):
         from services.market_cache import PriceResult
@@ -35,14 +34,6 @@ def client():
             return PriceResult(symbol=sym.upper(), price=180.0, status="live")
 
         mock_price.side_effect = _price
-
-        # ai_router returns a fixed analysis dict
-        mock_ai.return_value = {
-            "investor_type": "Diversified Strategist",
-            "strengths": ["s1", "s2", "s3"],
-            "weaknesses": ["w1", "w2"],
-            "recommendation": "Hold steady.",
-        }
 
         # Supabase insert returns a minimal result
         insert_result = MagicMock()
@@ -60,13 +51,28 @@ def client():
 @pytest.mark.parametrize("field_name", FIELD_NAMES)
 def test_any_field_name_accepted(client, field_name):
     """POST with field name '{field_name}' must not return 422."""
-    response = client.post(
-        "/api/analyze-dna",
-        files={field_name: ("portfolio.csv", io.BytesIO(SAMPLE_CSV), "text/csv")},
-    )
+    mock_response = {
+        "analysis": "Simulated real-time analysis",
+        "status": "success",
+        "investor_type": "Diversified Strategist",
+        "strengths": ["Diversified across mega-cap equities"],
+        "weaknesses": ["Monitor concentration"],
+        "recommendation": "Hold steady.",
+    }
+
+    with patch("main.get_ai_analysis", new_callable=AsyncMock) as mock_ai:
+        mock_ai.return_value = mock_response
+        response = client.post(
+            "/api/analyze-dna",
+            files={field_name: ("portfolio.csv", io.BytesIO(SAMPLE_CSV), "text/csv")},
+        )
+
     assert (
         response.status_code != 422
     ), f"Field name '{field_name}' returned 422: {response.text}"
+    assert response.status_code == 200
+    assert "analysis" in response.json()
+    mock_ai.assert_called_once()
 
 
 def test_no_file_returns_422(client):
