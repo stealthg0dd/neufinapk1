@@ -165,11 +165,27 @@ def get_closes(symbol: str, days: int) -> pd.Series | None:
             if (
                 row is not None and row.data
             ):  # FIXED: guard against None response from maybe_single()
-                series = _json_to_series(row.data["payload"])
-                logger.debug("market_cache.supabase_hit", key=k)
-                # Backfill Redis so the next hit is faster
-                _redis_set(k, row.data["payload"])
-                return series
+                data = row.data
+                if not isinstance(data, dict):
+                    logger.warning(
+                        "market_cache.supabase_payload_invalid",
+                        key=k,
+                        payload_type=type(data).__name__,
+                    )
+                else:
+                    payload = data.get("payload")
+                    if not isinstance(payload, str | bytes | bytearray):
+                        logger.warning(
+                            "market_cache.supabase_payload_invalid",
+                            key=k,
+                            payload_type=type(payload).__name__,
+                        )
+                    else:
+                        series = _json_to_series(payload)
+                        logger.debug("market_cache.supabase_hit", key=k)
+                        # Backfill Redis so the next hit is faster
+                        _redis_set(k, payload)
+                        return series
         except Exception as e:
             logger.warning("market_cache.supabase_get_error", error=str(e))
 
