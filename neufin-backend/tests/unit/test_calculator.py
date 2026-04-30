@@ -277,3 +277,35 @@ class TestCalculatePortfolioMetrics:
             position["price_unavailable_message"]
             == "Price data unavailable for HPG.VN. Upload confirmed prices or retry."
         )
+
+    def test_price_resolution_quality_flags_unresolved_tickers(self):
+        from services.calculator import _validate_price_resolution
+
+        quality = _validate_price_resolution(
+            [
+                {"symbol": "AAPL", "shares": 10},
+                {"symbol": "VCI", "shares": 100},
+            ],
+            {"AAPL": 190.0, "VCI": 0},
+        )
+
+        assert quality["data_quality"] == "POOR"
+        assert quality["prices_resolved"] == 1
+        assert quality["prices_failed"] == 1
+        assert quality["failed_tickers"] == ["VCI"]
+        assert quality["warning"].startswith("PRICE DATA INCOMPLETE")
+
+    def test_price_resolution_quality_flags_suspicious_equal_weights(self):
+        from services.calculator import _validate_price_resolution
+
+        quality = _validate_price_resolution(
+            [
+                {"symbol": "AAA", "shares": 10},
+                {"symbol": "BBB", "shares": 10},
+                {"symbol": "CCC", "shares": 10},
+            ],
+            {"AAA": 100.0, "BBB": 100.0, "CCC": 100.0},
+        )
+
+        assert quality["data_quality"] == "POOR"
+        assert quality["weights_suspicious"] is True

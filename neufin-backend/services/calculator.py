@@ -70,6 +70,72 @@ def _records_nan_to_none(rows: list[dict]) -> list[dict]:
     return out
 
 
+def _position_ticker(position: dict) -> str:
+    """Return the canonical ticker key used by uploaded/API portfolio rows."""
+    return str(position.get("ticker") or position.get("symbol") or "").strip().upper()
+
+
+def _validate_price_resolution(positions: list, prices: dict) -> dict:
+    """Returns data quality assessment before any analysis runs."""
+    total = len(positions)
+
+    def _price_for(position: dict) -> float:
+        ticker = _position_ticker(position)
+        try:
+            return float(prices.get(ticker, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _shares_for(position: dict) -> float:
+        try:
+            return float(position.get("shares") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    resolved = sum(1 for p in positions if _price_for(p) > 0)
+    zero_price = [_position_ticker(p) for p in positions if _price_for(p) <= 0]
+    suspicious_equal = False
+
+    # Detect if weights look suspiciously equal (price resolution failure indicator)
+    if resolved > 0:
+        weights = [_price_for(p) * _shares_for(p) for p in positions]
+        total_val = sum(weights)
+        if total_val > 0:
+            weight_pcts = [w / total_val for w in weights]
+            # If all weights within 1% of each other for >3 positions, likely failed resolution
+            if len(positions) >= 3:
+                avg_w = sum(weight_pcts) / len(weight_pcts)
+                max_dev = max(abs(w - avg_w) for w in weight_pcts)
+                suspicious_equal = max_dev < 0.01
+        else:
+            suspicious_equal = True
+    elif total > 0:
+        suspicious_equal = True
+
+    prices_failed = total - resolved
+    data_quality = (
+        "POOR"
+        if prices_failed > 0 or suspicious_equal
+        else "PARTIAL" if resolved < total else "GOOD"
+    )
+
+    return {
+        "total_positions": total,
+        "prices_resolved": resolved,
+        "prices_failed": prices_failed,
+        "failed_tickers": zero_price,
+        "price_resolution_pct": round(resolved / total * 100) if total > 0 else 0,
+        "weights_suspicious": suspicious_equal,
+        "data_quality": data_quality,
+        "warning": (
+            f"PRICE DATA INCOMPLETE: {prices_failed}/{total} tickers unresolved. "
+            "Weights computed from share counts only — dollar weights may be inaccurate."
+            if prices_failed > 0 or suspicious_equal
+            else None
+        ),
+    }
+
+
 POLYGON_API_KEY = settings.POLYGON_API_KEY
 FINNHUB_API_KEY = settings.FINNHUB_API_KEY
 FMP_API_KEY = settings.FMP_API_KEY
@@ -1309,6 +1375,14 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         for sym, r in price_results.items()
         if r.price is not None and float(r.price) > 0
     }
+    price_quality = _validate_price_resolution(
+        df.to_dict("records"),
+        {
+            sym: float(r.price or 0)
+            for sym, r in price_results.items()
+            if r.price is None or float(r.price) >= 0
+        },
+    )
     price_status = {sym: r.status for sym, r in price_results.items()}
 
     df["native_currency"] = df["symbol"].map(lambda s: _meta_by[s].native_currency)
@@ -1569,6 +1643,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "positions": _enrich_positions_fx_hint(
             _records_nan_to_none(positions_out.to_dict("records"))
         ),
+        "data_quality": price_quality,
         # SEA-NATIVE-CURRENCY-FIX: geographic exposure
         "country_exposure": country_exposure,
         "region_exposure": region_exposure,

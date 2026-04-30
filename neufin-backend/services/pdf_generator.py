@@ -1530,6 +1530,9 @@ def _build_report_context(
     d = dna_data if isinstance(dna_data, dict) else {}
     p = portfolio_data if isinstance(portfolio_data, dict) else {}
     m = p.get("metrics") or {}
+    data_quality = m.get("data_quality") or p.get("data_quality") or {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
     report_mode = _normalize_report_mode((advisor_config or {}).get("report_mode"))
     section_labels = _report_section_labels(report_mode)
 
@@ -2074,6 +2077,7 @@ def _build_report_context(
         "quant_alpha_risk_tradeoffs": quant_alpha_risk,
         "quant_scenario_implications": quant_scenarios,
         "report_metrics_note": report_metrics_note,
+        "data_quality": data_quality,
         # Tax
         "tax_positions": tax_positions,
         "total_tax_liability": total_tax_liability,
@@ -2870,6 +2874,27 @@ def _page_executive_memo(
     if ctx.get("region_data_sources"):
         items.append(Paragraph(_xml(str(ctx["region_data_sources"])), st["muted8"]))
     items.append(Spacer(1, 8))
+
+    data_quality = ctx.get("data_quality") or {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
+    if data_quality.get("data_quality") == "POOR" or data_quality.get(
+        "weights_suspicious"
+    ):
+        items.append(
+            _amber_banner_table(
+                _xml(
+                    "⚠ PRICE DATA NOTICE: Dollar weights could not be fully verified "
+                    "for this portfolio. Analysis uses share-count weights. For accurate "
+                    "dollar weighting, ensure tickers include exchange suffix "
+                    "(e.g. VCI.VN, not VCI) and retry analysis."
+                ),
+                pal,
+                st,
+                cw,
+            )
+        )
+        items.append(Spacer(1, 8))
 
     # Quality warning banners
     for w in warnings:
@@ -5734,6 +5759,21 @@ def compute_ic_readiness(ctx: dict) -> dict:
             }
         )
 
+    data_quality = ctx.get("data_quality") or {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
+    price_quality_poor = data_quality.get("data_quality") == "POOR" or bool(
+        data_quality.get("weights_suspicious")
+    )
+    if price_quality_poor:
+        flags.append(
+            {
+                "item": "Price resolution",
+                "status": "POOR",
+                "impact": "Dollar weights could not be fully verified",
+            }
+        )
+
     if ctx.get("cost_basis_provided"):
         score += 15
     else:
@@ -5773,6 +5813,9 @@ def compute_ic_readiness(ctx: dict) -> dict:
     elif score >= 60:
         tier, tier_color = "ADVISOR-READY", "FFB300"
     else:
+        tier, tier_color = "DRAFT", "FF4444"
+
+    if price_quality_poor and tier != "DRAFT":
         tier, tier_color = "DRAFT", "FF4444"
 
     return {
@@ -5822,6 +5865,7 @@ def _build_pdf_sync(
     ic_ctx = {
         "positions": ctx.get("positions") or _positions_raw,
         "prices_fresh": True,
+        "data_quality": ctx.get("data_quality") or {},
         "cost_basis_provided": _has_cost_basis,
         "benchmark_set": bool(ctx.get("portfolio_benchmark") or ctx.get("benchmark")),
         "swarm_available": swarm_data_present,
