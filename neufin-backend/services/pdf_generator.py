@@ -2785,6 +2785,172 @@ def _hhi_after_top_trim(
     return sum(w**2 for w in weights)
 
 
+def _position_symbol(pos: dict[str, Any]) -> str:
+    return str(pos.get("ticker") or pos.get("symbol") or "").strip().upper()
+
+
+def _position_weight_pct(pos: dict[str, Any]) -> float:
+    return _w(pos) * 100.0
+
+
+def _estimate_shares_to_sell(pos: dict[str, Any], target_pct: float) -> int:
+    current_pct = max(_position_weight_pct(pos), 0.0)
+    if current_pct <= target_pct or current_pct <= 0:
+        return 0
+    try:
+        shares = float(pos.get("shares") or 0)
+    except (TypeError, ValueError):
+        shares = 0.0
+    return max(0, int(shares * ((current_pct - target_pct) / current_pct)))
+
+
+def _position_value_usd_from_ctx(pos: dict[str, Any], portfolio_value: float) -> float:
+    try:
+        explicit = float(
+            pos.get("value_usd")
+            or pos.get("market_value_usd")
+            or pos.get("current_value")
+            or pos.get("value")
+            or 0
+        )
+    except (TypeError, ValueError):
+        explicit = 0.0
+    return explicit if explicit > 0 else _w(pos) * portfolio_value
+
+
+def _hhi_after_trim(
+    positions: list[dict[str, Any]], ticker: str, target_pct: float
+) -> float:
+    target = target_pct / 100.0
+    top_pos = next(
+        (pos for pos in positions if _position_symbol(pos) == ticker.upper()),
+        None,
+    )
+    if not top_pos:
+        return sum(_w(pos) ** 2 for pos in positions)
+    return _hhi_after_top_trim(positions, top_pos, target)
+
+
+def _build_action_registry(ctx: dict) -> list[dict]:
+    """Build the canonical action list used by every PDF section."""
+    actions: list[dict] = []
+    positions = ctx.get("positions") or []
+    hhi = float(ctx.get("hhi") or 0)
+    portfolio_value = float(
+        ctx.get("portfolio_value_usd") or ctx.get("total_value") or 0
+    )
+    liq_metrics = ctx.get("liquidity_metrics") or {}
+
+    for pos in sorted(positions, key=_position_weight_pct, reverse=True):
+        ticker = _position_symbol(pos)
+        weight_pct = _position_weight_pct(pos)
+        if not ticker or weight_pct <= 30:
+            continue
+        n_positions = max(len(positions), 1)
+        target = round(min(35.0, max(weight_pct * 0.87, 100.0 / n_positions)), 1)
+        pos_val = _position_value_usd_from_ctx(pos, portfolio_value)
+        adv_usd = float(liq_metrics.get(ticker, {}).get("adv_usd") or 0)
+        reduction_value = pos_val * ((weight_pct - target) / weight_pct)
+        days_to_exit = (
+            round(reduction_value / (adv_usd * 0.20)) if adv_usd > 0 else None
+        )
+        weeks_to_exit = (
+            round(reduction_value / (adv_usd * 0.20 * 5)) if adv_usd > 0 else None
+        )
+        hhi_after = _hhi_after_trim(positions, ticker, target)
+        actions.append(
+            {
+                "id": f"reduce_{ticker}",
+                "ticker": ticker,
+                "type": "concentration_reduction",
+                "priority": "HIGH",
+                "what": f"Reduce {ticker} from {weight_pct:.1f}% to {target:.1f}%",
+                "target_pct": target,
+                "current_pct": round(weight_pct, 1),
+                "shares_to_sell": _estimate_shares_to_sell(pos, target),
+                "weeks_to_exit": weeks_to_exit,
+                "why": (
+                    f"{ticker} at {weight_pct:.1f}% exceeds the 30% "
+                    f"single-position threshold. HHI: {hhi:.3f}. "
+                    + (
+                        f"Exit at 20% ADV = {days_to_exit} days."
+                        if days_to_exit is not None
+                        else ""
+                    )
+                ),
+                "after": (
+                    f"HHI: {hhi:.3f} -> ~{hhi_after:.3f}. "
+                    "Concentration contribution to tail risk: -31%."
+                ),
+            }
+        )
+        break
+
+    if not ctx.get("cost_basis_provided"):
+        actions.append(
+            {
+                "id": "upload_cost_basis",
+                "type": "data_completeness",
+                "priority": "LOW",
+                "what": "Upload cost basis to unlock tax-loss harvesting analysis",
+                "why": (
+                    "Cost basis unavailable. Without lot-level data, optimal exit "
+                    "sequence and CGT schedule cannot be computed."
+                ),
+                "after": (
+                    "Enables exact CGT liability, harvest candidates, tax-optimal "
+                    "exit sequencing, after-tax return maximization."
+                ),
+            }
+        )
+
+    market_codes = {
+        str(pos.get("market_code") or "UNKNOWN").strip().upper() for pos in positions
+    }
+    if len(market_codes) == 1 and portfolio_value > 1_000_000:
+        market = next(iter(market_codes))
+        dna = float(ctx.get("dna_score") or 0)
+        after_score = dna + 18 if dna < 82 else dna
+        actions.append(
+            {
+                "id": "reduce_home_bias",
+                "type": "diversification",
+                "priority": "HIGH",
+                "what": "Allocate 8-12% to international diversifier",
+                "why": (
+                    f"100% {market} exposure. Zero international diversification. "
+                    "Home bias flag active: -18pts on DNA score."
+                ),
+                "after": (
+                    f"Home bias flag resolved. DNA score: {dna:.0f} -> "
+                    f"{after_score:.0f}. Geographic concentration risk -35%."
+                ),
+            }
+        )
+
+    priority_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    return sorted(
+        actions,
+        key=lambda action: priority_order.get(str(action.get("priority")), 9),
+    )
+
+
+def _action_to_decision_card(action: dict[str, Any]) -> dict[str, Any]:
+    priority = str(action.get("priority") or "MEDIUM").upper()
+    color = (
+        (0.859, 0.196, 0.196)
+        if priority == "HIGH"
+        else (0.961, 0.620, 0.039) if priority == "MEDIUM" else (0.118, 0.722, 0.800)
+    )
+    return {
+        "priority": priority,
+        "priority_color": color,
+        "what": str(action.get("what") or ""),
+        "why": str(action.get("why") or ""),
+        "impact": str(action.get("after") or ""),
+    }
+
+
 def _build_decision_brief(ctx: dict) -> list:
     """
     Goldman-style one-page decision brief.
@@ -2792,247 +2958,11 @@ def _build_decision_brief(ctx: dict) -> list:
     Format: 3 action cards, each showing:
     WHAT TO DO → WHY IT'S WRONG NOW → WHAT IMPROVES AFTER
     """
-    hhi = float(ctx.get("hhi") or 0)
-    dna = float(ctx.get("dna_score") or 0)
-    churn = ctx.get("churn_risk_level", "UNKNOWN")
-    positions = ctx.get("positions") or []
-    portfolio_value = float(
-        ctx.get("portfolio_value_usd") or ctx.get("total_value") or 0
-    )
-    beta = max(float(ctx.get("weighted_beta") or 1.0), 0.1)
-    market_code = _market_code_from_ctx(ctx, positions)
-    liq_metrics = ctx.get("liquidity_metrics") or {}
-    var_now = float(
-        ctx.get("var_1d_95_usd")
-        or _compute_var_fallback(portfolio_value, beta, market_code)["var_1d_95_usd"]
-    )
-    cards: list[dict[str, Any]] = []
-
-    # Tier 1a: concentration reduction, only when a specific position exceeds 30%.
-    if positions:
-        top_position = max(positions, key=_w)
-        top_weight = _w(top_position)
-        if top_weight > 0.30:
-            ticker = str(
-                top_position.get("ticker") or top_position.get("symbol") or "POSITION"
-            ).upper()
-            target_weight = 0.35 if top_weight > 0.35 else 0.30
-            market_for_pos = _infer_market_code(ticker, top_position)
-            price = _position_price_usd(top_position, market_for_pos)
-            reduction_value = max((top_weight - target_weight) * portfolio_value, 0)
-            shares = int(reduction_value / price) if price > 0 else 0
-            liq = liq_metrics.get(ticker, {})
-            adv = float(
-                liq.get("adv_usd") or VN_ADV_USD.get(ticker, VN_ADV_USD["DEFAULT"])
-            )
-            days = math.ceil(reduction_value / (adv * 0.20)) if adv > 0 else 0
-            weeks = max(1, math.ceil(days / 5)) if days else 4
-            hhi_after = _hhi_after_top_trim(positions, top_position, target_weight)
-            var_after = var_now * (1 - min((top_weight - target_weight) * 0.75, 0.35))
-            cards.append(
-                {
-                    "priority": "HIGH",
-                    "priority_color": (0.859, 0.196, 0.196),
-                    "what": (
-                        f"Sell {shares:,} shares of {ticker} "
-                        f"({top_weight * 100:.1f}% -> {target_weight * 100:.1f}%) "
-                        f"over {weeks} weeks"
-                    ),
-                    "why": (
-                        f"{ticker} at {top_weight * 100:.1f}% is "
-                        f"{top_weight / max(1 / max(len(positions), 1), 0.001):.1f}x "
-                        f"market-cap-neutral. ADV: {_fmt_millions(adv)}. "
-                        f"Exit at 20% ADV = {days or 'n/a'} days."
-                    ),
-                    "impact": (
-                        f"HHI {hhi:.3f} -> {hhi_after:.3f}. "
-                        f"VaR: -{_fmt_millions(max(var_now - var_after, 0))}. "
-                        f"Churn: {churn} -> {'MEDIUM' if str(churn).upper() == 'HIGH' else 'LOW'}."
-                    ),
-                }
-            )
-
-    # Tier 1b: sector concentration.
-    sector_weights = _sector_weights_for_actions(positions)
-    if sector_weights:
-        sector, sector_w = max(sector_weights.items(), key=lambda item: item[1])
-        if sector_w > 0.60:
-            benchmark_w = VN_INDEX_SECTOR_WEIGHTS.get(
-                sector, VN_INDEX_SECTOR_WEIGHTS.get("Other", 0.10)
-            )
-            alternative = (
-                "Energy/Materials" if market_code == "VN" else "index exposure"
-            )
-            rotation = min(0.15, sector_w - 0.50)
-            cards.append(
-                {
-                    "priority": "HIGH",
-                    "priority_color": (0.859, 0.196, 0.196),
-                    "what": (
-                        f"Rotate {rotation * 100:.1f}% from {sector} into "
-                        f"{alternative}"
-                    ),
-                    "why": (
-                        f"{sector_w * 100:.1f}% in {sector}. Sector correlation in "
-                        f"stress: 0.85. Diversified benchmark has "
-                        f"{benchmark_w * 100:.1f}% in this sector."
-                    ),
-                    "impact": (
-                        f"Sector concentration: {sector_w * 100:.1f}% -> "
-                        f"{(sector_w - rotation) * 100:.1f}%. "
-                        "Stress correlation risk -28%."
-                    ),
-                }
-            )
-
-    # Tier 1c: liquidity alert.
-    if positions:
-        worst = None
-        for pos in positions:
-            ticker = str(pos.get("ticker") or pos.get("symbol") or "").upper()
-            metric = liq_metrics.get(ticker, {})
-            days = float(metric.get("days_normal") or 0)
-            if days > 500 and (worst is None or days > worst[2]):
-                worst = (pos, metric, days)
-        if worst:
-            pos, metric, days = worst
-            ticker = str(pos.get("ticker") or pos.get("symbol") or "").upper()
-            price = _position_price_usd(pos, _infer_market_code(ticker, pos))
-            adv = float(
-                metric.get("adv_usd") or VN_ADV_USD.get(ticker, VN_ADV_USD["DEFAULT"])
-            )
-            weekly_shares = int((adv * 0.20 * 5) / price) if price > 0 else 0
-            value = _position_market_value_usd(pos) or (_w(pos) * portfolio_value)
-            exit_date = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
-                weeks=max(1, math.ceil(days / 5))
-            )
-            cards.append(
-                {
-                    "priority": "HIGH",
-                    "priority_color": (0.859, 0.196, 0.196),
-                    "what": (
-                        f"Begin exit programme for {ticker}: max "
-                        f"{weekly_shares:,} shares/week at 20% ADV"
-                    ),
-                    "why": (
-                        f"{ticker} = {_fmt_millions(value)} vs {_fmt_millions(adv)} "
-                        f"ADV = {days:.0f} days to exit. Single-block sale causes "
-                        "estimated 15% market impact."
-                    ),
-                    "impact": (
-                        f"Exit position by {exit_date.strftime('%Y-%m-%d')} if "
-                        "reduction starts this week."
-                    ),
-                }
-            )
-
-    # Tier 1d: home bias.
-    countries = {
-        str(pos.get("country") or market_code).strip().upper()
-        for pos in positions
-        if pos
-    }
-    if positions and len(countries) == 1:
-        instrument = "regional ETF or global equity fund"
-        if market_code == "VN":
-            instrument = "VN-available global equity ETF / feeder fund"
-        cards.append(
-            {
-                "priority": "MEDIUM",
-                "priority_color": (0.961, 0.620, 0.039),
-                "what": f"Allocate 10% to international diversifier ({instrument})",
-                "why": (
-                    f"100.0% in {market_code}. Zero international exposure. "
-                    "Home bias flag: -18pts on DNA score."
-                ),
-                "impact": (
-                    f"DNA score: {dna:.0f} -> {min(dna + 18, 100):.0f}. "
-                    "Home bias flag resolved."
-                ),
-            }
-        )
-
-    # Tier 1e: data completeness / tax sequencing.
-    if not ctx.get("cost_basis_provided"):
-        tax_drag = 0.10 if market_code == "VN" else 0.05
-        cards.append(
-            {
-                "priority": "LOW",
-                "priority_color": (0.118, 0.722, 0.800),
-                "what": "Upload cost basis CSV to unlock tax-loss harvesting",
-                "why": (
-                    f"{market_code} securities transfer tax: {tax_drag:.1f}% per sale. "
-                    "Without cost basis, optimal exit sequence cannot be determined. "
-                    f"Estimated tax drag on full portfolio exit: {tax_drag:.1f}% of AUM."
-                ),
-                "impact": (
-                    "Enables exact CGT schedule, harvest candidates, and after-tax "
-                    "optimized exit sequencing: 0.1-0.3% AUM potential drag reduced."
-                ),
-            }
-        )
-
-    # Keep existing quantified regime action, but only after position-specific items.
-    regime = ctx.get("regime_label", "Market-Neutral")
-    if regime in ["Risk-Off", "Recession", "Stagflation", "Inflationary"]:
-        cards.append(
-            {
-                "priority": "MEDIUM",
-                "priority_color": (0.961, 0.620, 0.039),
-                "what": "Add 8-12% VN defensive allocation (VGBs or VCB.VN)",
-                "why": (
-                    f"Current regime: {regime}. Portfolio has 0% defensive allocation. "
-                    "In risk-off environments, VN-Index historically draws down 18-25%. "
-                    "VCB.VN (Vietcombank, state-backed, lower beta) provides partial hedge."
-                ),
-                "impact": (
-                    "Portfolio beta: 1.00 -> ~0.87. "
-                    "Estimated drawdown reduction in risk-off scenario: -4% to -6%. "
-                    "Sharpe ratio improves from risk reduction without return sacrifice."
-                ),
-            }
-        )
-
-    # Tier 2f: Swarm IC.
-    if not ctx.get("swarm_available"):
-        confidence = (
-            65 if ctx.get("data_quality", {}).get("data_quality") == "POOR" else 78
-        )
-        cards.append(
-            {
-                "priority": "MEDIUM",
-                "priority_color": (0.961, 0.620, 0.039),
-                "what": "Run full 7-agent Swarm IC analysis on this portfolio",
-                "why": (
-                    f"Current confidence: {confidence}%. Swarm IC adds regime signals "
-                    "from FRED, factor risk decomposition, alpha discovery, and "
-                    "benchmark attribution. Unlocks IC-READY status."
-                ),
-                "impact": (
-                    f"Report confidence: {confidence}% -> 94%. Correlation computed. "
-                    "Sharpe from actual returns, not CAPM proxy."
-                ),
-            }
-        )
-
-    # Tier 2g: benchmark.
-    if not ctx.get("benchmark_set"):
-        cards.append(
-            {
-                "priority": "LOW",
-                "priority_color": (0.118, 0.722, 0.800),
-                "what": "Set portfolio benchmark for attribution analysis",
-                "why": (
-                    "Without a benchmark, active bets cannot be quantified. "
-                    "Current analysis cannot show which positions are alpha "
-                    "generators vs market replication."
-                ),
-                "impact": (
-                    "Enables: active share, tracking error, and attribution by factor."
-                ),
-            }
-        )
-
+    cards = [
+        _action_to_decision_card(action)
+        for action in (ctx.get("canonical_actions") or [])[:3]
+        if isinstance(action, dict)
+    ]
     gated: list[dict[str, Any]] = []
     seen: set[str] = set()
     for card in cards:
@@ -4077,46 +4007,38 @@ def _page_portfolio_snapshot(
     return items
 
 
-def _bias_to_action(bias_name: str, bias: dict, ctx: dict) -> str:
-    """Map a detected bias to a direct corrective trade action."""
-    market_code = str((ctx.get("region_profile") or {}).get("primary_market") or "US")
+def _canonical_action_reference_for_bias(bias_name: str, ctx: dict) -> str | None:
+    canonical = [
+        action
+        for action in (ctx.get("canonical_actions") or [])
+        if isinstance(action, dict)
+    ]
     name_upper = bias_name.upper()
+    wanted_type: str | None = None
 
     if "HOME BIAS" in name_upper:
-        if market_code == "VN":
-            return (
-                "Add 5-10% regional ETF (VNM US or FTSE Vietnam ETF). "
-                "Reduces home bias score by ~18pts. Target: 85-90% VN + 10-15% regional."
-            )
-        return (
-            "Add 5-10% international ETF (VTI, EEM, or ACWX). "
-            "Reduces home bias score by ~18pts."
-        )
+        wanted_type = "diversification"
+    elif "CONVICTION OVERWEIGHT" in name_upper or "CONCENTRATION" in name_upper:
+        wanted_type = "concentration_reduction"
+    elif "RECENCY BIAS" in name_upper or "COST BASIS" in name_upper:
+        wanted_type = "data_completeness"
 
-    if "CONVICTION OVERWEIGHT" in name_upper:
-        evidence = str(bias.get("evidence") or "")
-        sym = (
-            evidence.split(" at ")[0].strip() if " at " in evidence else "top position"
-        )
-        return (
-            f"Trim {sym} to 30% or below over 2-3 sessions. "
-            f"Refer to EXECUTION PLAN (Section 7) for exact share count and staging."
-        )
+    if not wanted_type:
+        return None
 
-    if "FINANCIAL SECTOR" in name_upper:
-        return (
-            "Rotate 10-15% from brokerage/banking names into Materials (HPG.VN) or "
-            "State-backed defensive (GAS.VN, VCB.VN). "
-            "Reduces financial sector correlation risk in stress scenarios."
-        )
+    for idx, action in enumerate(canonical, start=1):
+        if action.get("type") == wanted_type:
+            priority = str(action.get("priority") or "MEDIUM").upper()
+            return f"{bias_name} ({priority}) -> See Action #{idx} in Decision Brief"
+    return None
 
-    if "RECENCY BIAS" in name_upper:
-        return (
-            "Upload cost basis to enable holding-period analysis. "
-            "Positions held > 2 years without review are candidate for recency bias audit."
-        )
 
-    return ""
+def _bias_to_action(bias_name: str, bias: dict, ctx: dict) -> str:
+    """Reference canonical action registry instead of generating duplicate actions."""
+    return (
+        _canonical_action_reference_for_bias(bias_name, ctx)
+        or "No separate action generated; monitor under the canonical Decision Brief."
+    )
 
 
 # ─── PAGE 4 — BEHAVIORAL DNA ──────────────────────────────────────────────────
@@ -4252,7 +4174,7 @@ def _page_behavioral_dna(
                                 f'<font color="{_hex(accent)}">{_xml(severity)}</font><br/>'
                                 f"<b>Evidence:</b> {_xml(str(b.get('evidence') or ''))}<br/>"
                                 f"<b>Dollar Impact:</b> {_xml(str(b.get('dollar_impact') or ''))}<br/>"
-                                f"<b>Mitigation:</b> {_xml(str(b.get('mitigation') or ''))}",
+                                f"<b>Action Link:</b> {_xml(_bias_to_action(bias_name, b, ctx))}",
                                 st["body"],
                             )
                         ]
@@ -4271,32 +4193,6 @@ def _page_behavioral_dna(
                     ),
                 )
             )
-
-            # Bias → Action linkage (Ha feedback #7)
-            action_text = _bias_to_action(bias_name, b, ctx)
-            if action_text:
-                items.append(
-                    Table(
-                        [
-                            [
-                                Paragraph(
-                                    f'<font color="{_hex(ACCENT_TEAL)}"><b>→ ACTION:</b></font> {_xml(action_text)}',
-                                    st["body_sm"],
-                                )
-                            ]
-                        ],
-                        colWidths=[cw],
-                        style=TableStyle(
-                            [
-                                ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
-                                ("BOX", (0, 0), (-1, -1), 1, ACCENT_TEAL),
-                                ("LEFTPADDING", (0, 0), (-1, -1), 10),
-                                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                            ]
-                        ),
-                    )
-                )
             items.append(Spacer(1, 7))
     else:
         items.append(Paragraph("No behavioral bias patterns detected.", st["muted"]))
@@ -6195,29 +6091,22 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         )
     )
 
-    thesis = extra.get("thesis") or {}
     pos_sorted = extra.get("pos_sorted") or []
     advisor_config = extra.get("advisor_config") or {}
 
-    # Priority action table
-    recs = ctx.get("recommendations") or []
-    act_plan = thesis.get("action_plan") or thesis.get("recommendation_summary") or []
-    if not isinstance(act_plan, list):
-        act_plan = []
-    rec_source = act_plan if act_plan else recs
+    canonical_actions = [
+        action
+        for action in (ctx.get("canonical_actions") or [])
+        if isinstance(action, dict)
+    ]
 
     prio_rows = [["#", "Priority", "Action", "Rationale", "Timeline"]]
-    for i, a in enumerate(rec_source[:6]):
-        if isinstance(a, dict):
-            pri_str = str(a.get("priority", "MED"))
-            action = str(a.get("action") or "")
-            rational = str(a.get("rationale") or "IC synthesis")[:200]
-            timeline = str(a.get("timeline") or "90 days")[:200]
-        else:
-            pri_str = "MED"
-            action = str(a)
-            rational = "IC synthesis"
-            timeline = "90 days"
+    for i, action_obj in enumerate(canonical_actions[:6]):
+        pri_str = str(action_obj.get("priority", "MED"))
+        action = str(action_obj.get("what") or "")
+        rational = str(action_obj.get("why") or "Canonical action registry")[:240]
+        weeks = action_obj.get("weeks_to_exit")
+        timeline = f"{weeks} weeks" if weeks else "90 days"
         pri_col = (
             _hex(ACCENT_RED)
             if "HIGH" in pri_str.upper()
@@ -6234,13 +6123,27 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
                 _xml(timeline),
             ]
         )
+    if len(prio_rows) == 1:
+        prio_rows.append(
+            [
+                "—",
+                "INFO",
+                Paragraph("No canonical actions generated for this cycle.", st["body"]),
+                Paragraph("Portfolio is inside current action thresholds.", st["body"]),
+                "Next review",
+            ]
+        )
     items.append(
         Table(prio_rows, colWidths=[22, 45, 185, 160, 65], style=_tbl_std(pal))
     )
     items.append(Spacer(1, 10))
 
-    execution_actions = ctx.get("execution_actions") or []
-    if execution_actions:
+    concentration_actions = [
+        action
+        for action in canonical_actions
+        if action.get("type") == "concentration_reduction"
+    ]
+    if concentration_actions:
         items.append(Paragraph("EXECUTION PLAN", st["h3"]))
         exec_rows = [
             [
@@ -6258,16 +6161,11 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         hhi = float(ctx.get("hhi") or 0)
         dna_score = int(ctx.get("dna_score") or 0)
         n_effective = round(1.0 / hhi, 1) if hhi > 0 else 0
-        for action in execution_actions:
+        for action in concentration_actions:
             # Compute inline metrics
-            hhi_target = (
-                hhi
-                * (
-                    float(action["target_weight_pct"])
-                    / max(float(action["current_weight_pct"]), 0.01)
-                )
-                ** 2
-            )
+            current_pct = float(action.get("current_pct") or 0)
+            target_pct = float(action.get("target_pct") or current_pct)
+            hhi_target = hhi * (target_pct / max(current_pct, 0.01)) ** 2
             n_effective_post = (
                 round(1.0 / hhi_target, 1) if hhi_target > 0 else n_effective
             )
@@ -6276,13 +6174,7 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
                 dna_score
                 + max(
                     2,
-                    int(
-                        (
-                            float(action["current_weight_pct"])
-                            - float(action["target_weight_pct"])
-                        )
-                        / 2
-                    ),
+                    int((current_pct - target_pct) / 2),
                 ),
             )
 
@@ -6292,19 +6184,22 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
             )
             post_impact = (
                 f"DNA: {dna_score}→{dna_post}/100. "
-                f"Risk: {'HIGH→MEDIUM' if float(action['current_weight_pct']) > 30 else 'unchanged'}."
+                f"Risk: {'HIGH→MEDIUM' if current_pct > 30 else 'unchanged'}."
             )
             exec_rows.append(
                 [
-                    action["ticker"],
-                    action["action_type"],
-                    f"{float(action['current_weight_pct']):.1f}%",
-                    f"{float(action['target_weight_pct']):.1f}%",
-                    f"{int(action['shares_to_trade']):,}",
-                    f"${float(action['notional_usd']):,.0f}",
+                    action.get("ticker") or "—",
+                    "REDUCE",
+                    f"{current_pct:.1f}%",
+                    f"{target_pct:.1f}%",
+                    f"{int(action.get('shares_to_sell') or 0):,}",
+                    "—",
                     Paragraph(_xml(why_optimal), st["body_sm"]),
                     Paragraph(_xml(post_impact), st["body_sm"]),
-                    Paragraph(_xml(str(action["execution_note"])), st["body_sm"]),
+                    Paragraph(
+                        _xml(str(action.get("what") or action.get("after") or "")),
+                        st["body_sm"],
+                    ),
                 ]
             )
         items.append(
@@ -6316,9 +6211,9 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         )
         items.append(Spacer(1, 10))
         rationale_notes = [
-            str(action.get("optimization_rationale"))
-            for action in execution_actions
-            if action.get("optimization_rationale")
+            str(action.get("after"))
+            for action in concentration_actions
+            if action.get("after")
         ]
         if rationale_notes:
             opt_note = rationale_notes[0]
@@ -6762,6 +6657,7 @@ def _build_pdf_sync(
     advisor_cfg["report_mode"] = _normalize_report_mode(report_mode)
     ctx = _build_report_context(portfolio_data, dna_data, swarm_norm, advisor_cfg)
     ctx["swarm_available"] = swarm_data_present
+    ctx["canonical_actions"] = _build_action_registry(ctx)
     ctx["report_state"] = assess_report_state(ctx)
     ctx["section_confidence"] = build_section_confidence(ctx)
 
