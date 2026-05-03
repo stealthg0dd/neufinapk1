@@ -3,6 +3,7 @@
 import inspect
 from unittest.mock import AsyncMock, patch
 
+import pandas as pd
 import pytest
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -24,6 +25,37 @@ MOCK_PRICES = {
     "MSFT": 415.0,
     "GOOGL": 175.0,
 }
+
+
+def test_find_cost_basis_column_accepts_aliases():
+    from services.calculator import find_cost_basis_column
+
+    assert (
+        find_cost_basis_column(["symbol", "shares", "Average Cost"]) == "Average Cost"
+    )
+    assert find_cost_basis_column(["symbol", "shares", "price_paid"]) == "price_paid"
+
+
+def test_apply_cost_basis_column_parses_currency_and_vnd_fx():
+    from services.calculator import apply_cost_basis_column
+
+    df = pd.DataFrame(
+        {
+            "symbol": ["VCI.VN", "HPG.VN"],
+            "shares": [10, 20],
+            "Book Value": ["25,000", "$2.50"],
+        }
+    )
+
+    out, provided, column = apply_cost_basis_column(
+        df,
+        market_code="VN",
+        fx_rate=0.00004,
+    )
+
+    assert provided is True
+    assert column == "Book Value"
+    assert out["cost_basis"].tolist() == pytest.approx([1.0, 2.5])
 
 
 @pytest.fixture

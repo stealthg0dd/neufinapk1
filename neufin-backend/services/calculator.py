@@ -38,6 +38,93 @@ load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
 logger = structlog.get_logger("neufin.calculator")
 
+COST_BASIS_COLUMN_ALIASES = [
+    "cost_basis",
+    "cost basis",
+    "costbasis",
+    "avg_cost",
+    "avg cost",
+    "average_cost",
+    "average cost",
+    "purchase_price",
+    "buy_price",
+    "entry_price",
+    "book_value",
+    "book value",
+    "cost_per_share",
+    "price_paid",
+    "acquisition_cost",
+    "cost",
+]
+
+
+def _normalize_cost_basis_column_name(name: object) -> str:
+    return str(name or "").lower().strip().replace(" ", "").replace("_", "")
+
+
+def _most_common(values: list[str]) -> str:
+    clean = [value for value in values if value]
+    return max(set(clean), key=clean.count) if clean else ""
+
+
+def find_cost_basis_column(df_columns: list) -> str | None:
+    """Find cost basis column regardless of exact naming."""
+    cols_lower = {_normalize_cost_basis_column_name(col): col for col in df_columns}
+    for alias in COST_BASIS_COLUMN_ALIASES:
+        normalized = _normalize_cost_basis_column_name(alias)
+        if normalized in cols_lower:
+            return cols_lower[normalized]
+    return None
+
+
+def _parse_cost_basis(value: object) -> float | None:
+    """Parse cost basis value; handles currency symbols, commas, and blanks."""
+    if value is None or str(value).strip() in ("", "-", "N/A", "n/a", "null", "None"):
+        return None
+    try:
+        cleaned = (
+            str(value)
+            .replace(",", "")
+            .replace("$", "")
+            .replace("£", "")
+            .replace("€", "")
+            .strip()
+        )
+        return float(cleaned)
+    except (ValueError, TypeError):
+        return None
+
+
+def apply_cost_basis_column(
+    df: pd.DataFrame,
+    *,
+    market_code: str | None = None,
+    fx_rate: float | None = None,
+) -> tuple[pd.DataFrame, bool, str | None]:
+    """Normalize any recognized cost-basis column to df['cost_basis']."""
+    cb_col = find_cost_basis_column(df.columns.tolist())
+    if not cb_col:
+        return df, False, None
+
+    parsed_values: list[float | None] = []
+    code = str(market_code or "").upper()
+    rate = float(fx_rate or 1.0)
+    for raw in df[cb_col].tolist():
+        value = _parse_cost_basis(raw)
+        if value is not None and code == "VN" and rate > 0 and value > 1000:
+            value = value * rate
+        parsed_values.append(value)
+
+    df["cost_basis"] = parsed_values
+    resolved = sum(1 for value in parsed_values if value is not None)
+    logger.info(
+        "cost_basis.column_detected",
+        column=str(cb_col),
+        resolved=resolved,
+        total=len(parsed_values),
+    )
+    return df, resolved > 0, str(cb_col)
+
 
 def _enrich_positions_fx_hint(records: list[dict]) -> list[dict]:
     """Optional indicative SGD line per position (display-only; gated by settings)."""
@@ -1388,6 +1475,12 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     df["native_currency"] = df["symbol"].map(lambda s: _meta_by[s].native_currency)
     df["market_code"] = df["symbol"].map(lambda s: _meta_by[s].market)
     df["provider_ticker"] = df["symbol"].map(lambda s: _meta_by[s].provider_ticker)
+    dominant_market = _most_common([str(m or "") for m in df["market_code"].tolist()])
+    df, cost_basis_provided, cost_basis_column = apply_cost_basis_column(
+        df,
+        market_code=dominant_market,
+        fx_rate=1.0,
+    )
 
     for sym in resolved:
         persist_resolution_best_effort(_meta_by[sym])
@@ -1448,7 +1541,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
             correlation_note = "Correlation: Not computed (requires 2+ priced tickers)"
 
     pnl_pct = None
-    if "cost_basis" in df.columns:
+    if cost_basis_provided and "cost_basis" in df.columns:
         df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce")
         total_cost = float((df["shares"] * df["cost_basis"]).sum())
         pnl_pct = (
@@ -1457,19 +1550,20 @@ def calculate_portfolio_metrics(positions: list) -> dict:
             else None
         )
 
-    positions_out = df[
-        [
-            "symbol",
-            "shares",
-            "native_currency",
-            "market_code",
-            "provider_ticker",
-            "native_price",
-            "current_price",
-            "current_value",
-            "weight",
-        ]
-    ].copy()
+    position_columns = [
+        "symbol",
+        "shares",
+        "native_currency",
+        "market_code",
+        "provider_ticker",
+        "native_price",
+        "current_price",
+        "current_value",
+        "weight",
+    ]
+    if "cost_basis" in df.columns:
+        position_columns.append("cost_basis")
+    positions_out = df[position_columns].copy()
     positions_out["price_status"] = (
         positions_out["symbol"].map(price_status).fillna("live")
     )
@@ -1660,6 +1754,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "correlation_status": correlation_status,
         "correlation_note": correlation_note,
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
+        "cost_basis_provided": cost_basis_provided,
+        "cost_basis_column": cost_basis_column,
         "positions": _enrich_positions_fx_hint(
             _records_nan_to_none(positions_out.to_dict("records"))
         ),
