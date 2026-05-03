@@ -10,6 +10,7 @@ Admin only (is_admin):
   GET  /api/admin/access
   GET  /api/admin/dashboard
   POST /api/admin/users/{user_id}/plan
+  POST /api/admin/users/{user_id}/role
   POST /api/admin/users/{user_id}/suspend
   DELETE /api/admin/users/{user_id}
   GET  /api/admin/partners
@@ -66,6 +67,10 @@ class ExtendTrialRequest(BaseModel):
 class PlanChangeRequest(BaseModel):
     subscription_tier: str | None = None
     subscription_status: str | None = None
+
+
+class RoleChangeRequest(BaseModel):
+    role: str = Field(..., pattern="^(admin|advisor)$")
 
 
 class SuspendUserRequest(BaseModel):
@@ -575,6 +580,27 @@ async def change_user_plan(
         supabase.table("user_profiles").update(patch).eq("id", user_id).execute()
     except Exception as exc:
         raise HTTPException(500, f"Failed to update plan: {exc}") from exc
+
+    invalidate_subscription_cache(user_id)
+    return {"ok": True, "updated": patch}
+
+
+@router.post("/api/admin/users/{user_id}/role")
+async def change_user_role(
+    user_id: str,
+    body: RoleChangeRequest,
+    _admin: JWTUser = Depends(get_admin_user),
+):
+    patch = {"role": body.role, "is_admin": body.role == "admin"}
+    try:
+        result = (
+            supabase.table("user_profiles").update(patch).eq("id", user_id).execute()
+        )
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to update role: {exc}") from exc
+
+    if not result.data:
+        raise HTTPException(404, "User not found")
 
     invalidate_subscription_cache(user_id)
     return {"ok": True, "updated": patch}

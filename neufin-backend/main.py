@@ -116,6 +116,7 @@ from services.calculator import (  # noqa: E402
     _beta_score,
     _hhi_score,
     _tax_alpha_score,
+    apply_cost_basis_column,
     fetch_beta,
     get_price_with_fallback,
     get_tax_impact_analysis,
@@ -1026,7 +1027,25 @@ async def analyze_dna(
 
     # ── 4. Data preparation ────────────────────────────────────────────────────
     df["shares"] = pd.to_numeric(df["shares"], errors="coerce").fillna(0)
+    df["symbol"] = df["symbol"].str.upper()
     symbols = df["symbol"].str.upper().unique().tolist()
+    market_codes = [resolve_security(sym).market for sym in symbols]
+    dominant_market = (
+        max(set(market_codes), key=market_codes.count) if market_codes else ""
+    )
+    df, cost_basis_provided, cost_basis_column = apply_cost_basis_column(
+        df,
+        market_code=dominant_market,
+        fx_rate=1.0,
+    )
+    logger.info(
+        "analyze_dna.cost_basis",
+        column=cost_basis_column,
+        resolved=(
+            int(df["cost_basis"].notna().sum()) if "cost_basis" in df.columns else 0
+        ),
+        total=len(df),
+    )
 
     # ── 5. Price fetching — partial success like calculate_portfolio_metrics ───
     # # SEA-TICKER-FIX: never write $0 for missing quotes; exclude unpriced rows
@@ -1066,8 +1085,6 @@ async def analyze_dna(
             else:
                 price_map[sym] = float(result.price)  # type: ignore[union-attr]
                 persist_resolution_best_effort(resolve_security(sym))
-
-    df["symbol"] = df["symbol"].str.upper()
 
     def _px_for(sym: str) -> float:
         v = price_map.get(sym)
@@ -1225,6 +1242,9 @@ Return ONLY valid JSON:
             "weight": weight,
             "price_status": status_by_sym.get(str(row["symbol"]).upper(), "live"),
         }
+        if cost_basis_provided and "cost_basis" in df.columns:
+            cost_basis = df.loc[row.name, "cost_basis"]
+            pos["cost_basis"] = None if pd.isna(cost_basis) else float(cost_basis)
         if not pd.isna(vv):
             fx_hint = indicative_sgd_suffix(float(vv), _m.native_currency)
             if fx_hint:

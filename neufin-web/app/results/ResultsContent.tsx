@@ -6,7 +6,7 @@ import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import confetti from "canvas-confetti";
-import { fulfillReport, createCheckoutSession } from "@/lib/api";
+import { fulfillReport } from "@/lib/api";
 import { getSubscriptionStatus } from "@/lib/api";
 import SocialProof from "@/components/SocialProof";
 import AdvisorCTA from "@/components/AdvisorCTA";
@@ -15,7 +15,6 @@ import { useAuth } from "@/lib/auth-context";
 import { useAnalytics } from "@/lib/posthog";
 import { useNeufinAnalytics } from "@/lib/analytics";
 import type { DNAAnalysisResponse } from "@/lib/api";
-import PaywallOverlay from "@/components/PaywallOverlay";
 import { PortfolioIntelligenceProvider } from "@/components/dashboard/PortfolioIntelligenceContext";
 import { NextPrimaryAction } from "@/components/dashboard/NextPrimaryAction";
 import {
@@ -35,6 +34,19 @@ const PortfolioPie = nextDynamic(() => import("@/components/PortfolioPie"), {
   ssr: false,
 });
 const REF_STORAGE_KEY = "ref_token";
+
+type SubscriptionState = {
+  is_active?: boolean;
+  tier?: "free" | "retail" | "advisor" | "enterprise";
+  plan?: string;
+  status?: "trial" | "active" | "expired";
+  trial_active?: boolean;
+  trial_ends_at?: string | null;
+  trial_expired?: boolean;
+  days_remaining?: number;
+};
+
+type AccessState = "loading" | "anonymous" | "trial" | "expired" | "paid";
 
 const TYPE_COLORS: Record<string, string> = {
   "Diversified Strategist": "bg-primary/15 text-primary border-primary/30",
@@ -153,16 +165,15 @@ function ScoreLabel({ score }: { score: number }) {
 
 // ── Results content (client component) ────────────────────────────────────────
 export default function ResultsContent() {
-  const [subscriptionStatus, setSubscriptionStatus] = useState<
-    "trial" | "active" | "expired"
-  >("active");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, token } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const { track } = useAnalytics();
   const { capture } = useNeufinAnalytics();
 
   const [result, setResult] = useState<DNAAnalysisResponse | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [fulfillLoading, setFulfillLoading] = useState(false);
@@ -228,14 +239,23 @@ export default function ResultsContent() {
 
   // Fetch subscription status on mount
   useEffect(() => {
-    if (!token) return;
+    if (authLoading) return;
+    if (!user || !token) {
+      setSubscription(null);
+      setSubscriptionLoading(false);
+      return;
+    }
+    setSubscriptionLoading(true);
     getSubscriptionStatus(token)
       .then((res) => {
-        setSubscriptionStatus(res.status);
+        setSubscription(res);
         setDaysRemaining(res.days_remaining);
       })
-      .catch(() => setSubscriptionStatus("active"));
-  }, [token]);
+      .catch(() => {
+        setSubscription(null);
+      })
+      .finally(() => setSubscriptionLoading(false));
+  }, [authLoading, token, user]);
 
   const shareUrl = result?.share_token
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/share/${result.share_token}`
@@ -276,7 +296,41 @@ export default function ResultsContent() {
     router.push("/upload");
   };
 
+  const accessState: AccessState = authLoading
+    ? "loading"
+    : !user
+      ? "anonymous"
+      : subscriptionLoading
+        ? "loading"
+        : subscription?.trial_active === true || subscription?.status === "trial"
+          ? "trial"
+          : subscription?.trial_expired === true || subscription?.status === "expired"
+            ? "expired"
+            : subscription?.is_active === true || subscription?.status === "active"
+              ? "paid"
+              : "expired";
+
+  const downloadButtonLabel = pdfUrl
+    ? "Download PDF"
+    : accessState === "loading"
+      ? "Checking access…"
+      : accessState === "anonymous"
+        ? "Sign up to download"
+        : accessState === "expired"
+          ? "Upgrade to download"
+          : "Download PDF";
+  const trialDaysRemaining = daysRemaining ?? subscription?.days_remaining ?? 0;
+
   const startCheckout = async () => {
+    if (accessState === "loading") return;
+    if (accessState === "anonymous") {
+      router.push("/signup?next=/results");
+      return;
+    }
+    if (accessState === "expired") {
+      router.push("/pricing");
+      return;
+    }
     if (!result?.record_id) {
       document
         .getElementById("unlock-report")
@@ -285,21 +339,26 @@ export default function ResultsContent() {
     }
     setCheckoutError(null);
     setCheckoutLoading(true);
-    track("checkout_started", { record_id: result.record_id });
-    capture("advisor_report_checkout_started", {
-      plan_type: "advisor_report",
-      price: 29,
+    track("advisor_report_unlock_started", {
       record_id: result.record_id,
+      access_state: accessState,
     });
-    trackEvent(EVENTS.CHECKOUT_CLICKED, { record_id: result.record_id });
     try {
-      await createCheckoutSession(result.record_id, token);
-      // createCheckoutSession redirects — execution stops here on success
+      const report = await fulfillReport(result.record_id, token);
+      setPdfUrl(report.pdf_url);
+      trackEvent(EVENTS.PDF_DOWNLOADED, {
+        source: "results_page_unlock",
+      });
+      capture("advisor_report_unlocked", {
+        report_id: result.record_id,
+        access_state: accessState,
+      });
     } catch (e) {
       const msg =
-        e instanceof Error ? e.message : "Checkout failed. Please try again.";
-      track("checkout_error", { error: msg });
+        e instanceof Error ? e.message : "Report generation failed. Please try again.";
+      track("advisor_report_unlock_error", { error: msg });
       setCheckoutError(msg);
+    } finally {
       setCheckoutLoading(false);
     }
   };
@@ -409,6 +468,22 @@ export default function ResultsContent() {
                 You were referred — get <strong>20% off</strong> your first
                 report automatically at checkout
               </p>
+            </div>
+          </div>
+        )}
+
+        {accessState === "trial" && (
+          <div className="border-b border-primary/20 bg-primary-light/80">
+            <div className="mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-2.5">
+              <p className="text-xs font-medium text-primary-dark">
+                Trial active · {trialDaysRemaining} days remaining
+              </p>
+              <Link
+                href="/pricing"
+                className="whitespace-nowrap text-xs font-semibold text-primary-dark hover:text-primary"
+              >
+                Upgrade to keep access →
+              </Link>
             </div>
           </div>
         )}
@@ -730,24 +805,22 @@ export default function ResultsContent() {
                 🧬 Share My DNA
               </a>
 
-              {/* PDF — opens download if ready, otherwise starts checkout */}
+              {/* PDF download follows auth/trial/subscription access state */}
               <button
                 onClick={
                   pdfUrl ? () => window.open(pdfUrl, "_blank") : startCheckout
                 }
-                disabled={checkoutLoading}
+                disabled={checkoutLoading || accessState === "loading"}
                 className={`btn-primary flex items-center justify-center gap-2 py-3 text-sm
-                  ${checkoutLoading ? "opacity-70 cursor-wait" : ""}`}
+                  ${checkoutLoading || accessState === "loading" ? "opacity-70 cursor-wait" : ""}`}
               >
                 {checkoutLoading ? (
                   <>
                     <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Redirecting…
+                    Generating…
                   </>
-                ) : pdfUrl ? (
-                  "⬇ Download Report"
                 ) : (
-                  "📄 Unlock Full Report"
+                  downloadButtonLabel
                 )}
               </button>
 
@@ -850,7 +923,16 @@ export default function ResultsContent() {
             {/* ── Unlock report ───────────────────────────────────────────── */}
             <motion.div variants={fadeUp} id="unlock-report">
               {/* PDF ready — download banner */}
-              {pdfUrl ? (
+              {accessState === "loading" ? (
+                <div className="card border border-primary/20 bg-white">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-5 w-48 rounded bg-surface-3" />
+                    <div className="h-3 w-full rounded bg-surface-3" />
+                    <div className="h-3 w-5/6 rounded bg-surface-3" />
+                    <div className="h-11 w-full rounded bg-surface-3" />
+                  </div>
+                </div>
+              ) : pdfUrl ? (
                 <a
                   href={pdfUrl}
                   target="_blank"
@@ -867,15 +949,75 @@ export default function ResultsContent() {
                 >
                   ⬇ Download Your Advisor Report (PDF)
                 </a>
+              ) : accessState === "anonymous" ? (
+                <div className="card border border-primary/25 bg-white">
+                  <div className="mb-5">
+                    <h2 className="text-lg font-bold text-navy">
+                      Create your free account to unlock the full report
+                    </h2>
+                    <p className="mt-1 text-sm text-muted2">
+                      14-day full access · No credit card required · Instant
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Link
+                      href="/signup?next=/results"
+                      className="btn-primary flex-1 py-3 text-center text-sm"
+                    >
+                      Sign up free →
+                    </Link>
+                    <Link
+                      href="/login?next=/results"
+                      className="btn-outline flex-1 py-3 text-center text-sm"
+                    >
+                      Already have an account? Sign in
+                    </Link>
+                  </div>
+                </div>
+              ) : accessState === "expired" ? (
+                <div className="card border border-amber-400/30 bg-white">
+                  <div className="mb-5">
+                    <h2 className="text-lg font-bold text-navy">
+                      Your 14-day trial has ended
+                    </h2>
+                    <p className="mt-1 text-sm text-muted2">
+                      Upgrade to continue accessing full reports and PDF exports.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Link
+                      href="/pricing"
+                      className="rounded-lg border border-primary/30 p-4 transition-colors hover:border-primary hover:bg-primary-light/60"
+                    >
+                      <p className="text-sm font-bold text-navy">
+                        Advisor $299/month
+                      </p>
+                      <p className="mt-1 text-xs text-muted2">
+                        Full reports, PDF exports, advisor workflows
+                      </p>
+                    </Link>
+                    <Link
+                      href="/contact-sales"
+                      className="rounded-lg border border-primary/30 p-4 transition-colors hover:border-primary hover:bg-primary-light/60"
+                    >
+                      <p className="text-sm font-bold text-navy">
+                        Enterprise $999/month
+                      </p>
+                      <p className="mt-1 text-xs text-muted2">
+                        Team access, white-label support, priority onboarding
+                      </p>
+                    </Link>
+                  </div>
+                </div>
               ) : (
-                <div className="card border border-primary/25 bg-gradient-to-br from-primary-light/90 to-surface-2">
+                <div className="card border border-primary/25 bg-white">
                   <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
                       <h2 className="text-lg font-bold text-navy">
-                        Unlock Your Full Report
+                        Full report access included
                       </h2>
                       <p className="mt-0.5 text-xs text-muted2">
-                        AI-generated · 10-page PDF · one-time $29
+                        Generate your advisor-ready PDF with your current access.
                       </p>
                     </div>
                     <span className="text-2xl shrink-0">📄</span>
@@ -934,10 +1076,10 @@ export default function ResultsContent() {
                       {checkoutLoading ? (
                         <>
                           <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Redirecting to checkout…
+                          Generating your report…
                         </>
                       ) : (
-                        "Unlock Professional Report · $29 →"
+                        "Generate Full Report PDF"
                       )}
                     </button>
                   )}
@@ -947,10 +1089,6 @@ export default function ResultsContent() {
                       ⚠ {checkoutError}
                     </p>
                   )}
-
-                  <p className="mt-3 text-center text-xs text-muted2">
-                    Secured by Stripe · instant delivery · no subscription
-                  </p>
 
                   {/* Free unlock via referrals */}
                   <div className="mt-3 border-t border-border pt-3 text-center">

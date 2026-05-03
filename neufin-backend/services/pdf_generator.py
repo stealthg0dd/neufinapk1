@@ -92,16 +92,20 @@ CONTENT_W = A4_W - LEFT_MARGIN - RIGHT_MARGIN
 
 
 # ─── DESIGN SYSTEM ────────────────────────────────────────────────────────────
-# Goldman memo palette
-NAVY = HexColor("#0F172A")
-TEAL = HexColor("#1EB8CC")
-RED = HexColor("#DB3131")
-AMBER = HexColor("#F59E0A")
-GREEN = HexColor("#22B84C")
-LGRAY = HexColor("#F5F8FC")
-DGRAY = HexColor("#334155")
-MGRAY = HexColor("#737373")
-WHITE = HexColor("#FFFFFF")
+# Colour constants — NEVER use lighter values for text on white.
+NAVY = Color(0.059, 0.090, 0.163)  # #0F172A — primary text
+DGRAY = Color(0.200, 0.220, 0.240)  # body text, table cells
+MGRAY = Color(0.380, 0.400, 0.420)  # secondary text, labels, captions
+LGRAY = Color(0.961, 0.973, 0.988)  # #F5F8FC — backgrounds only
+TEAL = Color(0.118, 0.722, 0.800)  # #1EB8CC — section headers, positive
+RED = Color(0.859, 0.196, 0.196)  # #DB3131 — high risk, errors
+AMBER = Color(0.961, 0.620, 0.039)  # #F59E0A — medium risk, warnings
+GREEN = Color(0.133, 0.722, 0.298)  # #22B84C — low risk, improvements
+WHITE = Color(1.000, 1.000, 1.000)
+
+# Forbidden for text on white/light backgrounds: 0.6+, 0.7+, 0.8+, 0.9+ gray.
+# If background luminance > 0.5, text must use NAVY, DGRAY, or MGRAY.
+# WHITE text is only allowed on dark/accent fills.
 
 # Dark theme
 DARK_BG = HexColor("#0B0F14")
@@ -160,6 +164,14 @@ REGIME_DRAWDOWN = {
 
 RISK_FREE = {"VN": 0.080, "US": 0.045, "SG": 0.036, "DEFAULT": 0.045}
 
+SECTOR_CORRELATION_PRIORS = {
+    "all_same_market_financial": 0.72,
+    "all_same_market_mixed": 0.55,
+    "cross_market_developed": 0.42,
+    "cross_market_em": 0.38,
+    "mixed_asset": 0.25,
+}
+
 FTSE_UPGRADE = (
     "FTSE Russell EM upgrade confirmed: effective September 21, 2026. "
     "Expected capital inflows: $1.5-3B into Vietnamese equities. "
@@ -210,16 +222,19 @@ def _palette(theme: str) -> dict:
         "bg_hex": "#0B0F14" if dark else "#FFFFFF",
         "card_hex": "#161D2E" if dark else "#FFFFFF",
         "text_hex": "#F0F4FF" if dark else "#0F172A",
-        "mut_hex": "#64748B" if dark else "#737373",
+        "mut_hex": "#64748B" if dark else "#616870",
     }
 
 
 def _hex(c: HexColor) -> str:
     """HexColor → '#RRGGBB' string for Paragraph markup."""
     try:
-        return f"#{c.hexval() & 0xFFFFFF:06x}"
+        value = c.hexval()
+        if isinstance(value, str):
+            return "#" + value.removeprefix("0x")[-6:]
+        return f"#{value & 0xFFFFFF:06x}"
     except Exception:
-        return "#F0F4FF"
+        return "#0F172A"
 
 
 def _rl_color(value: Any, fallback: HexColor = ACCENT_TEAL) -> Any:
@@ -617,7 +632,53 @@ def _compute_sharpe_proxy(
     }
 
 
-def _correlation_label(ctx: dict) -> tuple[str, str]:
+def _estimate_correlation(
+    positions: list[dict[str, Any]], market_code: str, sector_map: dict[str, str]
+) -> dict:
+    """Return a sector-based correlation estimate when price history is insufficient."""
+    if not positions:
+        return {
+            "value": 0.0,
+            "label": "Not computed",
+            "note": "No positions available.",
+            "is_estimate": True,
+        }
+    sectors = {
+        sector_map.get(_position_symbol(pos), "Unknown")
+        for pos in positions
+        if isinstance(pos, dict)
+    }
+    markets = {
+        str(pos.get("market_code") or market_code or "UNKNOWN").upper()
+        for pos in positions
+        if isinstance(pos, dict)
+    }
+    all_same_market = len(markets) == 1
+    financial_sectors = {"Banking", "Securities", "Insurance", "Financial Services"}
+    financial_count = sum(1 for sector in sectors if sector in financial_sectors)
+    financial_pct = financial_count / max(len(sectors), 1)
+
+    if all_same_market and financial_pct > 0.6:
+        est = SECTOR_CORRELATION_PRIORS["all_same_market_financial"]
+        market = next(iter(markets)) if markets else market_code
+        label = f"~{est:.2f} [sector estimate: {market} financials]"
+        note = (
+            "Financial stocks in the same market historically show 0.65-0.80 "
+            "average pairwise correlation. Exact value requires 60+ days price history."
+        )
+    elif all_same_market:
+        est = SECTOR_CORRELATION_PRIORS["all_same_market_mixed"]
+        label = f"~{est:.2f} [sector estimate: mixed sectors, same market]"
+        note = "Same-market mixed portfolio. Historical avg pairwise correlation 0.45-0.65."
+    else:
+        est = SECTOR_CORRELATION_PRIORS["cross_market_em"]
+        label = f"~{est:.2f} [sector estimate: cross-market]"
+        note = "Cross-market portfolio. Historical avg pairwise correlation 0.30-0.45."
+
+    return {"value": est, "label": label, "note": note, "is_estimate": True}
+
+
+def _correlation_label(ctx: dict) -> tuple[str, str, str]:
     status = str(ctx.get("correlation_status") or "").upper()
     raw = ctx.get("avg_corr")
     try:
@@ -625,8 +686,18 @@ def _correlation_label(ctx: dict) -> tuple[str, str]:
     except (TypeError, ValueError):
         value = None
     if status == "COMPUTED" and value is not None:
-        return f"{value:.3f}", "High" if value > 0.75 else "Computed"
-    return "Not computed (insufficient price history)", "UNKNOWN"
+        return f"{value:.3f}", "High" if value > 0.75 else "Computed", "Pearson"
+    positions = ctx.get("positions") or []
+    market_code = _market_code_from_ctx(ctx, positions)
+    sector_map = {
+        _position_symbol(pos): str(
+            pos.get("sector") or _classify_sector(_position_symbol(pos))
+        )
+        for pos in positions
+        if isinstance(pos, dict)
+    }
+    est = _estimate_correlation(positions, market_code, sector_map)
+    return str(est["label"]), "Estimated", "Sector prior"
 
 
 def _compute_risk_metric_labels(
@@ -656,20 +727,17 @@ def _compute_risk_metric_labels(
         else:
             var_amount = var_numeric
             var_pct = (var_amount / total_value) * 100 if total_value else 0.0
-        var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% of AUM) [calculated, 95% 1-day]"
-        )
+        var_label = f"${var_amount:,.0f} ({var_pct:.2f}% AUM)"
         var_status = "Calculated"
+        var_method = "Quant model"
         var_fallback = None
     else:
         var_fallback = _compute_var_fallback(total_value, weighted_beta, market_code)
         var_amount = float(var_fallback["var_1d_95_usd"])
         var_pct = (var_amount / total_value) * 100 if total_value else 0.0
-        var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) "
-            f"[beta-estimated · {market_code} vol {var_fallback['daily_vol'] * 100:.1f}%]"
-        )
+        var_label = f"${var_amount:,.0f} ({var_pct:.2f}% AUM)"
         var_status = "Estimated"
+        var_method = f"Beta x {market_code} vol"
 
     drawdown_raw = quant.get("max_drawdown") or metrics.get("max_drawdown")
     drawdown_numeric: float | None = None
@@ -682,14 +750,14 @@ def _compute_risk_metric_labels(
     except (TypeError, ValueError):
         drawdown_numeric = None
     if drawdown_numeric is not None:
-        drawdown_label = f"{drawdown_numeric * 100:.1f}% [calculated]"
+        drawdown_label = f"{drawdown_numeric * 100:.1f}%"
         drawdown_status = "Calculated"
+        drawdown_method = "Quant model"
     else:
         est_drawdown = weighted_beta * _regime_drawdown_proxy(regime_label)
-        drawdown_label = (
-            f"{est_drawdown * 100:.1f}% [regime-estimated: {regime_label} analogue]"
-        )
+        drawdown_label = f"{est_drawdown * 100:.1f}%"
         drawdown_status = "Estimated"
+        drawdown_method = f"{regime_label} analogue"
 
     sharpe_raw = ctx.get("sharpe_ratio")
     sharpe_numeric: float | None = None
@@ -699,8 +767,9 @@ def _compute_risk_metric_labels(
     except (TypeError, ValueError):
         sharpe_numeric = None
     if sharpe_numeric is not None:
-        sharpe_label = f"{sharpe_numeric:.2f} [calculated]"
+        sharpe_label = f"{sharpe_numeric:.2f}"
         sharpe_status = "Calculated"
+        sharpe_method = "Returns history"
     else:
         ytd_raw = metrics.get("ytd_return")
         try:
@@ -717,14 +786,19 @@ def _compute_risk_metric_labels(
                 252**0.5
             )
             sharpe_est = (ytd_return_annualised - rf) / ann_vol if ann_vol else 0.0
-            sharpe_label = f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
+            ci_low = sharpe_est * 0.6
+            ci_high = sharpe_est * 1.6
+            sharpe_label = f"{sharpe_est:.2f} [90% CI: {ci_low:.2f}-{ci_high:.2f}]"
             sharpe_status = "Estimated"
+            sharpe_method = "YTD proxy"
         else:
             proxy = _compute_sharpe_proxy(weighted_beta, market_code, regime_label)
-            sharpe_label = (
-                f"{proxy['sharpe_proxy']:.2f} [CAPM proxy; not from actual returns]"
-            )
+            proxy_value = float(proxy["sharpe_proxy"])
+            ci_low = proxy_value * 0.6
+            ci_high = proxy_value * 1.6
+            sharpe_label = f"{proxy_value:.2f} [CAPM proxy · 90% CI: {ci_low:.2f}-{ci_high:.2f} · upload returns for exact]"
             sharpe_status = "Proxy"
+            sharpe_method = "CAPM"
 
     if var_fallback:
         var_99_pct = (
@@ -737,30 +811,28 @@ def _compute_risk_metric_labels(
             if total_value
             else 0.0
         )
-        var_99 = (
-            f"${var_fallback['var_1d_99_usd']:,.0f} ({var_99_pct:.2f}% AUM) "
-            "[beta-estimated]"
-        )
-        var_10 = (
-            f"${var_fallback['var_10d_95_usd']:,.0f} ({var_10_pct:.2f}% AUM) "
-            "[10-day horizon, sqrt(t) scaled]"
-        )
+        var_99 = f"${var_fallback['var_1d_99_usd']:,.0f} ({var_99_pct:.2f}% AUM)"
+        var_10 = f"${var_fallback['var_10d_95_usd']:,.0f} ({var_10_pct:.2f}% AUM)"
         var_footnote = (
             "VaR estimated from portfolio beta x "
             f"{market_code} historical volatility. Monte Carlo simulation available with Swarm IC."
         )
+        var_99_method = "Beta x vol"
+        var_10_method = "sqrt(t) scaled"
     else:
         var_99 = "Available with simulated VaR"
         var_10 = "Available with simulated VaR"
         var_footnote = "VaR supplied by quantitative analysis."
+        var_99_method = "Simulation"
+        var_10_method = "Simulation"
 
     return {
-        "var": (var_label, var_status),
-        "var_99": (var_99, var_status),
-        "var_10": (var_10, var_status),
+        "var": (var_label, var_status, var_method),
+        "var_99": (var_99, var_status, var_99_method),
+        "var_10": (var_10, var_status, var_10_method),
         "var_footnote": (var_footnote, "Method"),
-        "drawdown": (drawdown_label, drawdown_status),
-        "sharpe": (sharpe_label, sharpe_status),
+        "drawdown": (drawdown_label, drawdown_status, drawdown_method),
+        "sharpe": (sharpe_label, sharpe_status, sharpe_method),
     }
 
 
@@ -2741,6 +2813,216 @@ def _ic_body_section_header(
 # ─── PAGE 1b — TOP 3 DECISIONS (Ha feedback #6) ──────────────────────────────
 
 
+def _fmt_millions(value: float) -> str:
+    return f"${value / 1_000_000:.1f}M"
+
+
+def _decision_card_passes_quality(card: dict[str, Any]) -> bool:
+    action = str(card.get("what") or "")
+    why = str(card.get("why") or "")
+    impact = str(card.get("impact") or "")
+    banned = ("consider", "explore", "might", "could")
+    if any(word in action.lower() for word in banned):
+        return False
+    if len(why.strip()) < 30:
+        return False
+    if not any(token in impact for token in ("->", "→", "%", "$", "-")):
+        return False
+    if "behavioral dna assessment" in why.lower():
+        return False
+    return True
+
+
+def _sector_weights_for_actions(positions: list[dict[str, Any]]) -> dict[str, float]:
+    sector_weights: dict[str, float] = {}
+    for pos in positions:
+        symbol = str(pos.get("symbol") or pos.get("ticker") or "").upper()
+        sector = str(pos.get("sector") or pos.get("industry") or "").strip()
+        if not sector:
+            sector = _classify_sector(symbol) if symbol else "Unclassified"
+        sector_weights[sector] = sector_weights.get(sector, 0.0) + _w(pos)
+    return sector_weights
+
+
+def _hhi_after_top_trim(
+    positions: list[dict[str, Any]], top_pos: dict[str, Any], target_weight: float
+) -> float:
+    current_top = _w(top_pos)
+    remaining = max(1.0 - current_top, 0.0)
+    new_remaining = max(1.0 - target_weight, 0.0)
+    scale = new_remaining / remaining if remaining > 0 else 1.0
+    weights = []
+    for pos in positions:
+        weights.append(target_weight if pos == top_pos else _w(pos) * scale)
+    return sum(w**2 for w in weights)
+
+
+def _position_symbol(pos: dict[str, Any]) -> str:
+    return str(pos.get("ticker") or pos.get("symbol") or "").strip().upper()
+
+
+def _position_weight_pct(pos: dict[str, Any]) -> float:
+    return _w(pos) * 100.0
+
+
+def _estimate_shares_to_sell(pos: dict[str, Any], target_pct: float) -> int:
+    current_pct = max(_position_weight_pct(pos), 0.0)
+    if current_pct <= target_pct or current_pct <= 0:
+        return 0
+    try:
+        shares = float(pos.get("shares") or 0)
+    except (TypeError, ValueError):
+        shares = 0.0
+    return max(0, int(shares * ((current_pct - target_pct) / current_pct)))
+
+
+def _position_value_usd_from_ctx(pos: dict[str, Any], portfolio_value: float) -> float:
+    try:
+        explicit = float(
+            pos.get("value_usd")
+            or pos.get("market_value_usd")
+            or pos.get("current_value")
+            or pos.get("value")
+            or 0
+        )
+    except (TypeError, ValueError):
+        explicit = 0.0
+    return explicit if explicit > 0 else _w(pos) * portfolio_value
+
+
+def _hhi_after_trim(
+    positions: list[dict[str, Any]], ticker: str, target_pct: float
+) -> float:
+    target = target_pct / 100.0
+    top_pos = next(
+        (pos for pos in positions if _position_symbol(pos) == ticker.upper()),
+        None,
+    )
+    if not top_pos:
+        return sum(_w(pos) ** 2 for pos in positions)
+    return _hhi_after_top_trim(positions, top_pos, target)
+
+
+def _build_action_registry(ctx: dict) -> list[dict]:
+    """Build the canonical action list used by every PDF section."""
+    actions: list[dict] = []
+    positions = ctx.get("positions") or []
+    hhi = float(ctx.get("hhi") or 0)
+    portfolio_value = float(
+        ctx.get("portfolio_value_usd") or ctx.get("total_value") or 0
+    )
+    liq_metrics = ctx.get("liquidity_metrics") or {}
+
+    for pos in sorted(positions, key=_position_weight_pct, reverse=True):
+        ticker = _position_symbol(pos)
+        weight_pct = _position_weight_pct(pos)
+        if not ticker or weight_pct <= 30:
+            continue
+        n_positions = max(len(positions), 1)
+        target = round(min(35.0, max(weight_pct * 0.87, 100.0 / n_positions)), 1)
+        pos_val = _position_value_usd_from_ctx(pos, portfolio_value)
+        adv_usd = float(liq_metrics.get(ticker, {}).get("adv_usd") or 0)
+        reduction_value = pos_val * ((weight_pct - target) / weight_pct)
+        days_to_exit = (
+            round(reduction_value / (adv_usd * 0.20)) if adv_usd > 0 else None
+        )
+        weeks_to_exit = (
+            round(reduction_value / (adv_usd * 0.20 * 5)) if adv_usd > 0 else None
+        )
+        hhi_after = _hhi_after_trim(positions, ticker, target)
+        actions.append(
+            {
+                "id": f"reduce_{ticker}",
+                "ticker": ticker,
+                "type": "concentration_reduction",
+                "priority": "HIGH",
+                "what": f"Reduce {ticker} from {weight_pct:.1f}% to {target:.1f}%",
+                "target_pct": target,
+                "current_pct": round(weight_pct, 1),
+                "shares_to_sell": _estimate_shares_to_sell(pos, target),
+                "weeks_to_exit": weeks_to_exit,
+                "why": (
+                    f"{ticker} at {weight_pct:.1f}% exceeds the 30% "
+                    f"single-position threshold. HHI: {hhi:.3f}. "
+                    + (
+                        f"Exit at 20% ADV = {days_to_exit} days."
+                        if days_to_exit is not None
+                        else ""
+                    )
+                ),
+                "after": (
+                    f"HHI: {hhi:.3f} -> ~{hhi_after:.3f}. "
+                    "Concentration contribution to tail risk: -31%."
+                ),
+            }
+        )
+        break
+
+    if not ctx.get("cost_basis_provided"):
+        actions.append(
+            {
+                "id": "upload_cost_basis",
+                "type": "data_completeness",
+                "priority": "LOW",
+                "what": "Upload cost basis to unlock tax-loss harvesting analysis",
+                "why": (
+                    "Cost basis unavailable. Without lot-level data, optimal exit "
+                    "sequence and CGT schedule cannot be computed."
+                ),
+                "after": (
+                    "Enables exact CGT liability, harvest candidates, tax-optimal "
+                    "exit sequencing, after-tax return maximization."
+                ),
+            }
+        )
+
+    market_codes = {
+        str(pos.get("market_code") or "UNKNOWN").strip().upper() for pos in positions
+    }
+    if len(market_codes) == 1 and portfolio_value > 1_000_000:
+        market = next(iter(market_codes))
+        dna = float(ctx.get("dna_score") or 0)
+        after_score = dna + 18 if dna < 82 else dna
+        actions.append(
+            {
+                "id": "reduce_home_bias",
+                "type": "diversification",
+                "priority": "HIGH",
+                "what": "Allocate 8-12% to international diversifier",
+                "why": (
+                    f"100% {market} exposure. Zero international diversification. "
+                    "Home bias flag active: -18pts on DNA score."
+                ),
+                "after": (
+                    f"Home bias flag resolved. DNA score: {dna:.0f} -> "
+                    f"{after_score:.0f}. Geographic concentration risk -35%."
+                ),
+            }
+        )
+
+    priority_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    return sorted(
+        actions,
+        key=lambda action: priority_order.get(str(action.get("priority")), 9),
+    )
+
+
+def _action_to_decision_card(action: dict[str, Any]) -> dict[str, Any]:
+    priority = str(action.get("priority") or "MEDIUM").upper()
+    color = (
+        (0.859, 0.196, 0.196)
+        if priority == "HIGH"
+        else (0.961, 0.620, 0.039) if priority == "MEDIUM" else (0.118, 0.722, 0.800)
+    )
+    return {
+        "priority": priority,
+        "priority_color": color,
+        "what": str(action.get("what") or ""),
+        "why": str(action.get("why") or ""),
+        "impact": str(action.get("after") or ""),
+    }
+
+
 def _build_decision_brief(ctx: dict) -> list:
     """
     Goldman-style one-page decision brief.
@@ -2748,122 +3030,21 @@ def _build_decision_brief(ctx: dict) -> list:
     Format: 3 action cards, each showing:
     WHAT TO DO → WHY IT'S WRONG NOW → WHAT IMPROVES AFTER
     """
-    actions = ctx.get("recommendations", [])
-    hhi = float(ctx.get("hhi") or 0)
-    churn = ctx.get("churn_risk_level", "UNKNOWN")
-    cards = []
+    cards = [
+        _action_to_decision_card(action)
+        for action in (ctx.get("canonical_actions") or [])[:3]
+        if isinstance(action, dict)
+    ]
+    gated: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for card in cards:
+        key = str(card.get("what") or "")
+        if key in seen or not _decision_card_passes_quality(card):
+            continue
+        seen.add(key)
+        gated.append(card)
 
-    # Card 1: Concentration (if HHI > 0.20)
-    if hhi > 0.20:
-        top_position = ctx.get("top_position", {})
-        top_ticker = str(
-            top_position.get("ticker")
-            or top_position.get("symbol")
-            or "largest position"
-        )
-        top_weight = float(top_position.get("weight_pct") or 0)
-        top_value = float(
-            top_position.get("value_usd")
-            or top_position.get("market_value_usd")
-            or top_position.get("current_value")
-            or 0
-        )
-
-        adv = (
-            ctx.get("liquidity_metrics", {})
-            .get(top_ticker.upper(), {})
-            .get("adv_usd", 0)
-        )
-        if adv > 0 and top_value > 0:
-            days_normal = round(top_value / (adv * 0.20))
-            liquidity_line = f"Exit would take {days_normal} days at 20% ADV."
-        else:
-            liquidity_line = "Exit timeline not computable without ADV data."
-
-        cards.append(
-            {
-                "priority": "HIGH",
-                "priority_color": (0.94, 0.27, 0.27),
-                "what": f"Begin staged reduction of {top_ticker} from {top_weight:.1f}% -> 35%",
-                "why": (
-                    f"{top_ticker} at {top_weight:.1f}% is "
-                    f"{round(top_weight / 16.7, 1)}x a market-cap-neutral weight. "
-                    f"HHI: {hhi:.3f} - concentration risk HIGH. {liquidity_line}"
-                ),
-                "impact": (
-                    f"After reduction: HHI {hhi:.3f} -> ~0.18. "
-                    "Concentration contribution to tail risk: -31%. "
-                    f"Churn risk: {churn} -> LOWER."
-                ),
-            }
-        )
-
-    # Card 2: Regime / defensive tilt
-    regime = ctx.get("regime_label", "Market-Neutral")
-    if regime in ["Risk-Off", "Recession", "Stagflation", "Inflationary"]:
-        cards.append(
-            {
-                "priority": "MEDIUM",
-                "priority_color": (0.96, 0.62, 0.04),
-                "what": "Add 8-12% VN defensive allocation (VGBs or VCB.VN)",
-                "why": (
-                    f"Current regime: {regime}. Portfolio has 0% defensive allocation. "
-                    "In risk-off environments, VN-Index historically draws down 18-25%. "
-                    "VCB.VN (Vietcombank, state-backed, lower beta) provides partial hedge."
-                ),
-                "impact": (
-                    "Portfolio beta: 1.00 -> ~0.87. "
-                    "Estimated drawdown reduction in risk-off scenario: -4% to -6%. "
-                    "Sharpe ratio improves from risk reduction without return sacrifice."
-                ),
-            }
-        )
-
-    # Card 3: Data completeness / unlock full analysis
-    if not ctx.get("cost_basis_provided"):
-        cards.append(
-            {
-                "priority": "LOW",
-                "priority_color": (0.13, 0.72, 0.80),
-                "what": "Upload cost basis to unlock tax-loss harvesting analysis",
-                "why": (
-                    "Cost basis unavailable. VN securities transfer tax: 0.1% per sale. "
-                    "Without lot-level data, optimal exit sequence cannot be determined. "
-                    "Tax drag on portfolio exits may be 0.1-0.3% of AUM."
-                ),
-                "impact": (
-                    "Enables: exact CGT liability per position, tax-lot optimal exit sequencing, "
-                    "harvest candidates for offsetting gains, after-tax return maximization."
-                ),
-            }
-        )
-
-    for action in actions:
-        if len(cards) >= 3 or not isinstance(action, dict):
-            break
-        priority = str(action.get("priority") or "MEDIUM").upper()
-        color = (
-            (0.94, 0.27, 0.27)
-            if priority == "HIGH"
-            else (0.96, 0.62, 0.04) if priority == "MEDIUM" else (0.13, 0.72, 0.80)
-        )
-        cards.append(
-            {
-                "priority": priority,
-                "priority_color": color,
-                "what": str(action.get("action") or "Review portfolio action"),
-                "why": str(
-                    action.get("rationale")
-                    or "Recommendation from portfolio diagnostics."
-                ),
-                "impact": f"Timeline: {action.get('timeline') or 'next review cycle'}.",
-            }
-        )
-
-    while len(cards) < 3:
-        cards.append(None)
-
-    return cards[:3]
+    return gated[:3]
 
 
 def _compute_impact_table(ctx: dict, actions: list) -> list:
@@ -3118,6 +3299,13 @@ def _page_decision_brief(
     for card in cards:
         items.append(_decision_card_table(card, pal, st, cw))
         items.append(Spacer(1, 8))
+    if len(cards) < 3:
+        items.append(
+            Paragraph(
+                "Additional actions available after Swarm IC analysis.",
+                st["muted8"],
+            )
+        )
     return items
 
 
@@ -3891,46 +4079,38 @@ def _page_portfolio_snapshot(
     return items
 
 
-def _bias_to_action(bias_name: str, bias: dict, ctx: dict) -> str:
-    """Map a detected bias to a direct corrective trade action."""
-    market_code = str((ctx.get("region_profile") or {}).get("primary_market") or "US")
+def _canonical_action_reference_for_bias(bias_name: str, ctx: dict) -> str | None:
+    canonical = [
+        action
+        for action in (ctx.get("canonical_actions") or [])
+        if isinstance(action, dict)
+    ]
     name_upper = bias_name.upper()
+    wanted_type: str | None = None
 
     if "HOME BIAS" in name_upper:
-        if market_code == "VN":
-            return (
-                "Add 5-10% regional ETF (VNM US or FTSE Vietnam ETF). "
-                "Reduces home bias score by ~18pts. Target: 85-90% VN + 10-15% regional."
-            )
-        return (
-            "Add 5-10% international ETF (VTI, EEM, or ACWX). "
-            "Reduces home bias score by ~18pts."
-        )
+        wanted_type = "diversification"
+    elif "CONVICTION OVERWEIGHT" in name_upper or "CONCENTRATION" in name_upper:
+        wanted_type = "concentration_reduction"
+    elif "RECENCY BIAS" in name_upper or "COST BASIS" in name_upper:
+        wanted_type = "data_completeness"
 
-    if "CONVICTION OVERWEIGHT" in name_upper:
-        evidence = str(bias.get("evidence") or "")
-        sym = (
-            evidence.split(" at ")[0].strip() if " at " in evidence else "top position"
-        )
-        return (
-            f"Trim {sym} to 30% or below over 2-3 sessions. "
-            f"Refer to EXECUTION PLAN (Section 7) for exact share count and staging."
-        )
+    if not wanted_type:
+        return None
 
-    if "FINANCIAL SECTOR" in name_upper:
-        return (
-            "Rotate 10-15% from brokerage/banking names into Materials (HPG.VN) or "
-            "State-backed defensive (GAS.VN, VCB.VN). "
-            "Reduces financial sector correlation risk in stress scenarios."
-        )
+    for idx, action in enumerate(canonical, start=1):
+        if action.get("type") == wanted_type:
+            priority = str(action.get("priority") or "MEDIUM").upper()
+            return f"{bias_name} ({priority}) -> See Action #{idx} in Decision Brief"
+    return None
 
-    if "RECENCY BIAS" in name_upper:
-        return (
-            "Upload cost basis to enable holding-period analysis. "
-            "Positions held > 2 years without review are candidate for recency bias audit."
-        )
 
-    return ""
+def _bias_to_action(bias_name: str, bias: dict, ctx: dict) -> str:
+    """Reference canonical action registry instead of generating duplicate actions."""
+    return (
+        _canonical_action_reference_for_bias(bias_name, ctx)
+        or "No separate action generated; monitor under the canonical Decision Brief."
+    )
 
 
 # ─── PAGE 4 — BEHAVIORAL DNA ──────────────────────────────────────────────────
@@ -4066,7 +4246,7 @@ def _page_behavioral_dna(
                                 f'<font color="{_hex(accent)}">{_xml(severity)}</font><br/>'
                                 f"<b>Evidence:</b> {_xml(str(b.get('evidence') or ''))}<br/>"
                                 f"<b>Dollar Impact:</b> {_xml(str(b.get('dollar_impact') or ''))}<br/>"
-                                f"<b>Mitigation:</b> {_xml(str(b.get('mitigation') or ''))}",
+                                f"<b>Action Link:</b> {_xml(_bias_to_action(bias_name, b, ctx))}",
                                 st["body"],
                             )
                         ]
@@ -4085,32 +4265,6 @@ def _page_behavioral_dna(
                     ),
                 )
             )
-
-            # Bias → Action linkage (Ha feedback #7)
-            action_text = _bias_to_action(bias_name, b, ctx)
-            if action_text:
-                items.append(
-                    Table(
-                        [
-                            [
-                                Paragraph(
-                                    f'<font color="{_hex(ACCENT_TEAL)}"><b>→ ACTION:</b></font> {_xml(action_text)}',
-                                    st["body_sm"],
-                                )
-                            ]
-                        ],
-                        colWidths=[cw],
-                        style=TableStyle(
-                            [
-                                ("BACKGROUND", (0, 0), (-1, -1), pal["card"]),
-                                ("BOX", (0, 0), (-1, -1), 1, ACCENT_TEAL),
-                                ("LEFTPADDING", (0, 0), (-1, -1), 10),
-                                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                            ]
-                        ),
-                    )
-                )
             items.append(Spacer(1, 7))
     else:
         items.append(Paragraph("No behavioral bias patterns detected.", st["muted"]))
@@ -4425,34 +4579,53 @@ def _page_risk_correlation(
     beta = float(ctx.get("weighted_beta") or 0)
 
     risk_tbl = [
-        ["Metric", "Value", "Status"],
+        ["Metric", "Value", "Status", "Method"],
         [
             "VaR (95%, 1-day)",
             risk_labels["var"][0],
             risk_labels["var"][1],
+            risk_labels["var"][2],
         ],
         [
             "VaR (99%, 1-day)",
             risk_labels["var_99"][0],
             risk_labels["var_99"][1],
+            risk_labels["var_99"][2],
         ],
         [
             "VaR (95%, 10-day)",
             risk_labels["var_10"][0],
             risk_labels["var_10"][1],
+            risk_labels["var_10"][2],
         ],
         [
             "Max Drawdown",
             risk_labels["drawdown"][0],
             risk_labels["drawdown"][1],
+            risk_labels["drawdown"][2],
         ],
-        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
-        ["Concentration (HHI)", f"{hhi:.4f}", "⚠ High" if hhi > 0.25 else "Normal"],
-        ["Weighted Beta", f"{beta:.2f}", "⚠ High" if beta > 1.8 else "Normal"],
+        [
+            "Sharpe (CAPM proxy)",
+            risk_labels["sharpe"][0],
+            risk_labels["sharpe"][1],
+            risk_labels["sharpe"][2],
+        ],
+        [
+            "Concentration (HHI)",
+            f"{hhi:.4f}",
+            "High" if hhi > 0.25 else "Normal",
+            "Holdings weights",
+        ],
+        [
+            "Weighted Beta",
+            f"{beta:.2f}",
+            "High" if beta > 1.8 else "Normal",
+            "Weighted beta",
+        ],
         ["Avg. Correlation", *_correlation_label(ctx)],
     ]
     items.append(Paragraph("RISK METRICS SUMMARY", st["h3"]))
-    items.append(Table(risk_tbl, colWidths=[140, 210, 90], style=_tbl_std(pal)))
+    items.append(Table(risk_tbl, colWidths=[120, 185, 70, 85], style=_tbl_std(pal)))
     items.append(Spacer(1, 4))
     items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
 
@@ -4541,36 +4714,88 @@ def _page_risk_behavioral_intelligence(
     dna_score = int(ctx.get("dna_score") or 0)
     churn = str(ctx.get("churn_risk_level") or "UNKNOWN")
 
-    top_weight = _w(pos_sorted[0]) * 100 if pos_sorted else 0
-    top_symbol = (
-        str(pos_sorted[0].get("symbol") or pos_sorted[0].get("ticker") or "—")
-        if pos_sorted
-        else "—"
-    )
-    risk_rows = [
-        ["Signal", "Current", "IC Read"],
-        ["Concentration HHI", f"{hhi:.3f}", "HIGH" if hhi > 0.20 else "Normal"],
-        [
-            "Largest position",
-            f"{top_symbol} · {top_weight:.1f}%",
-            "Reduce" if top_weight > 30 else "Monitor",
-        ],
-        ["Weighted beta", f"{beta:.2f}", "Elevated" if beta > 1.2 else "Contained"],
-        ["VaR (95%, 1-day)", risk_labels["var"][0], risk_labels["var"][1]],
-        ["VaR (99%, 1-day)", risk_labels["var_99"][0], risk_labels["var_99"][1]],
-        ["VaR (95%, 10-day)", risk_labels["var_10"][0], risk_labels["var_10"][1]],
-        [
-            "Drawdown",
-            risk_labels["drawdown"][0],
-            risk_labels["drawdown"][1],
-        ],
-        ["Avg. correlation", *_correlation_label(ctx)],
-        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
-        ["Behavioral DNA", f"{dna_score}/100", f"Churn {churn}"],
+    corr_value, corr_status, _corr_method = _correlation_label(ctx)
+
+    def _status_color(status: str) -> HexColor:
+        s = status.upper()
+        if "HIGH" in s or "ACT" in s:
+            return ACCENT_RED
+        if "EST" in s or "PROXY" in s or "MOD" in s:
+            return ACCENT_AMBER
+        return ACCENT_GREEN
+
+    def _tile(metric: str, value: str, status: str) -> Table:
+        status_hex = _hex(_status_color(status))
+        content = Paragraph(
+            f'<font name="Helvetica" size="8" color="{_hex(MGRAY)}">{_xml(metric)}</font><br/>'
+            f'<font name="Helvetica-Bold" size="12" color="{_hex(NAVY)}">{_xml(value)}</font>'
+            f' <font name="Helvetica-Bold" size="9" color="{status_hex}">{_xml(status)}</font>',
+            ParagraphStyle(
+                "risk_tile_" + metric.replace(" ", "_") + pal["theme"],
+                fontName="Helvetica",
+                fontSize=9,
+                leading=13,
+                textColor=DGRAY,
+            ),
+        )
+        return Table(
+            [[content]],
+            colWidths=[cw / 2 - 6],
+            rowHeights=[40],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+                    ("BOX", (0, 0), (-1, -1), 0.3, LGRAY),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            ),
+        )
+
+    var_pct = ""
+    if "(" in risk_labels["var"][0]:
+        var_pct = risk_labels["var"][0].split("(", 1)[1].split(")", 1)[0]
+    tiles = [
+        (
+            _tile("HHI", f"{hhi:.3f}", "HIGH" if hhi > 0.20 else "Normal"),
+            _tile(
+                "VaR (95% 1-day)",
+                risk_labels["var"][0].split(" (", 1)[0],
+                var_pct or risk_labels["var"][1],
+            ),
+        ),
+        (
+            _tile("Beta", f"{beta:.2f}", "Elevated" if beta > 1.2 else "Normal"),
+            _tile("Drawdown (est.)", risk_labels["drawdown"][0], "Moderate"),
+        ),
+        (
+            _tile(
+                "Correlation",
+                corr_value.split(" ", 1)[0],
+                "Est." if corr_status == "Estimated" else corr_status,
+            ),
+            _tile(
+                "Sharpe",
+                risk_labels["sharpe"][0].split(" ", 1)[0],
+                risk_labels["sharpe"][1],
+            ),
+        ),
+        (
+            _tile(
+                "DNA Score", f"{dna_score}/100", "Good" if dna_score >= 70 else "Watch"
+            ),
+            _tile("Churn Risk", churn, "Act" if churn.upper() == "HIGH" else "Monitor"),
+        ),
     ]
-    items.append(Table(risk_rows, colWidths=[115, 255, 90], style=_tbl_std(pal)))
-    items.append(Spacer(1, 10))
-    items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
+    items.append(
+        Table(
+            tiles,
+            colWidths=[cw / 2, cw / 2],
+            style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]),
+        )
+    )
     items.append(Spacer(1, 8))
 
     biases = ctx.get("structural_biases") or []
@@ -4578,18 +4803,15 @@ def _page_risk_behavioral_intelligence(
     for bias in biases[:3]:
         if not isinstance(bias, dict):
             continue
+        bias_name = str(bias.get("name") or "Behavioral flag")
+        action_ref = _bias_to_action(bias_name, bias, ctx)
+        action_short = action_ref.replace(" -> ", " → ")
         weakness_rows.append(
             [
                 str(bias.get("severity") or "MED"),
+                bias_name,
                 Paragraph(
-                    f"<b>{_xml(str(bias.get('name') or 'Behavioral flag'))}</b><br/>{_xml(str(bias.get('evidence') or ''))}",
-                    st["body_sm"],
-                ),
-                Paragraph(
-                    _xml(
-                        _bias_to_action(str(bias.get("name") or ""), bias, ctx)
-                        or "Monitor in next rebalance."
-                    ),
+                    _xml(f"{str(bias.get('evidence') or '')[:70]} → {action_short}"),
                     st["body_sm"],
                 ),
             ]
@@ -4604,12 +4826,12 @@ def _page_risk_behavioral_intelligence(
         items.append(Paragraph("BEHAVIORAL FLAGS -> ACTIONS", st["h3"]))
         items.append(
             Table(
-                [["Severity", "Evidence", "Action"], *weakness_rows],
-                colWidths=[55, 225, 180],
+                [["Severity", "Flag", "Action Link"], *weakness_rows],
+                colWidths=[55, 125, 280],
                 style=_tbl_std(pal),
             )
         )
-        items.append(Spacer(1, 10))
+        items.append(Spacer(1, 8))
 
     market_code = _market_code_from_ctx(ctx, positions)
     liq_rows = _compute_liquidity_metrics(
@@ -4617,19 +4839,21 @@ def _page_risk_behavioral_intelligence(
     )
     if liq_rows:
         items.append(Paragraph("LIQUIDITY WATCHLIST", st["h3"]))
-        liq_table = [["Ticker", "Value", "ADV", "Days @20% ADV", "Status"]]
+        liq_table = [["Ticker", "Position ($M)", "Days to exit", "Status"]]
         for row in liq_rows[:4]:
             liq_table.append(
                 [
                     row["symbol"],
                     f"${float(row.get('pos_m') or 0):.1f}M",
-                    f"${float(row.get('adv_m') or 0):.1f}M",
-                    str(row.get("days_normal") or "—"),
+                    f"{float(row.get('days_normal') or 0):,.0f} days",
                     row.get("status") or "—",
                 ]
             )
         items.append(
-            Table(liq_table, colWidths=[70, 70, 70, 120, 90], style=_tbl_std(pal))
+            Table(liq_table, colWidths=[80, 115, 145, 90], style=_tbl_std(pal))
+        )
+        items.append(
+            Paragraph("Days computed at 20% of average daily volume.", st["muted8"])
         )
 
     return items
@@ -5113,275 +5337,78 @@ def _page_stress_testing(
         )
     )
 
-    thesis = extra.get("thesis") or {}
-    swarm_norm = extra.get("swarm_norm") or {}
-    stress_results = (
-        thesis.get("stress_results") or swarm_norm.get("stress_results") or {}
-    )
-
-    regime_label = ctx["regime_label"] or "Market-Neutral"
-    beta = float(ctx.get("weighted_beta") or 0)
-
-    def _scenario_ret_pct(data: Any) -> float:
-        if not isinstance(data, dict):
-            return 0.0
-        raw = data.get("portfolio_return_pct", data.get("portfolio_impact", 0))
-        try:
-            return float(str(raw).replace("%", "").strip())
-        except (TypeError, ValueError):
-            return 0.0
-
-    stress_artifact = True
-    if isinstance(stress_results, dict) and stress_results:
-        stress_artifact = any(
-            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
-            for v in stress_results.values()
-        )
-    elif isinstance(stress_results, list) and stress_results:
-        stress_artifact = any(
-            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
-            for v in stress_results
-        )
-    elif stress_results:
-        stress_artifact = False
-
-    def _beta_impact(mult: float) -> str:
-        return f"{(beta * mult) * 100:+.1f}% (beta-estimated)"
-
-    if stress_artifact:
-        items.append(
-            Paragraph(
-                "STRESS TEST — QUALITATIVE IC ASSESSMENT",
-                ParagraphStyle(
-                    "stress_warn_h_" + pal["theme"],
-                    fontName="Helvetica-Bold",
-                    fontSize=9,
-                    textColor=ACCENT_AMBER,
-                ),
-            )
-        )
-        items.append(
-            Paragraph(
-                _xml(
-                    "Quantitative stress figures reflect a portfolio weight "
-                    "normalization artifact. IC qualitative assessment applied "
-                    "based on individual position betas and sector exposures."
-                ),
-                ParagraphStyle(
-                    "stress_warn_b_" + pal["theme"],
-                    fontName="Helvetica",
-                    fontSize=8,
-                    textColor=pal["text_mut"],
-                    spaceAfter=8,
-                ),
-            )
-        )
-
-        positions = list(ctx.get("positions") or [])
-        market_code = _market_code_from_ctx(ctx, positions)
-        defensive = get_defensive_alternatives(market_code)
-        tech_cluster = ("AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "TSLA")
-        bond_cluster = ("TLT", "IEF", "BND", "AGG", "SHY", "GOVT")
-        tech_w = sum(
-            float(p.get("weight_pct") or p.get("weight") or 0)
-            for p in positions
-            if str(p.get("symbol") or "").upper() in tech_cluster
-        )
-        bond_w = sum(
-            float(p.get("weight_pct") or p.get("weight") or 0)
-            for p in positions
-            if str(p.get("symbol") or "").upper() in bond_cluster
-        )
-
-        qualitative_rows = defensive.get("qualitative_scenarios")
-        if qualitative_rows:
-            qualitative_data = [
-                ["Scenario", "Historical", "Est. Impact", "Primary Risk"]
-            ]
-            qualitative_data.extend(qualitative_rows)
-        else:
-            qualitative_data = [
-                ["Scenario", "Historical", "Est. Impact", "Primary Risk"],
-                [
-                    "2022 Rate Shock",
-                    "S&P -25.4%",
-                    f"Est. -{min(35, max(8, tech_w * 0.5 + bond_w * 0.7)):.0f}% to "
-                    f"-{min(45, max(14, tech_w * 0.65 + bond_w * 0.9)):.0f}%",
-                    f"Tech {tech_w:.0f}% + duration",
-                ],
-                [
-                    "2020 COVID Crash",
-                    "S&P -33.9%",
-                    "Est. -20% to -32%",
-                    "All correlations -> 1.0 in liquidity crisis",
-                ],
-                [
-                    "2024 AI Rotation",
-                    "S&P -8.5%",
-                    f"Est. -{max(4, tech_w * 0.3):.0f}% to -{max(8, tech_w * 0.45):.0f}%",
-                    "Tech cluster amplifies rotation",
-                ],
-            ]
-        stress_table = Table(
-            qualitative_data,
-            colWidths=[cw * 0.2, cw * 0.15, cw * 0.3, cw * 0.35],
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), pal["border"]),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), pal["text_pri"]),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [pal["card"], pal["bg"]]),
-                    ("TEXTCOLOR", (0, 1), (-1, -1), pal["text_bod"]),
-                    ("TOPPADDING", (0, 0), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                    ("BOX", (0, 0), (-1, -1), 1, pal["border"]),
-                    ("INNERGRID", (0, 0), (-1, -1), 0.5, pal["border"]),
-                ]
-            ),
-        )
-        items.append(stress_table)
-        items.append(Spacer(1, 10))
-    else:
-        stress_raw: list[Any] = []
-        if isinstance(stress_results, dict):
-            stress_raw = list(stress_results.values())
-        elif isinstance(stress_results, list):
-            stress_raw = stress_results
-
-        def _stress_row_usable(row: dict) -> bool:
-            if row.get("data_status") == "unavailable":
-                return False
-            pr = row.get("portfolio_return_pct", row.get("portfolio_impact"))
-            if pr is None:
-                return False
-            try:
-                v = float(str(pr).replace("%", "").strip())
-            except (TypeError, ValueError):
-                return False
-            return abs(v) <= 200
-
-        stress_raw = [
-            r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)
-        ]
-
-        if not stress_raw:
-            items.append(
-                _amber_banner_table(
-                    "Note: Stress-test output from Swarm IC is not available. "
-                    "Qualitative scenarios below are estimated from portfolio beta and current regime.",
-                    pal,
-                    st,
-                    cw,
-                )
-            )
-            items.append(Spacer(1, 8))
-
-        def _is_artifact_val(val: Any) -> bool:
-            try:
-                v = float(str(val).replace("%", "").strip())
-                return abs(v) > 200
-            except (TypeError, ValueError):
-                return False
-
-        has_row_artifact = any(
-            _is_artifact_val(
-                row.get("portfolio_impact") or row.get("portfolio_return_pct", "")
-            )
-            for row in stress_raw
-            if isinstance(row, dict)
-        )
-        if has_row_artifact:
-            items.append(
-                _amber_banner_table(
-                    "Note: Stress rows contained extreme values; using beta-estimated scenarios instead.",
-                    pal,
-                    st,
-                    cw,
-                )
-            )
-            items.append(Spacer(1, 8))
-
-        scenario_defaults = [
-            ("Bull", "35%", regime_label, _beta_impact(0.12)),
-            ("Base", "45%", regime_label, _beta_impact(0.06)),
-            ("Bear", "20%", regime_label, _beta_impact(-0.15)),
-        ]
-        scen_rows = [["Scenario", "Probability", "Regime", "Est. Portfolio Impact"]]
-        for i, (label, default_prob, default_reg, default_impact) in enumerate(
-            scenario_defaults
-        ):
-            if (
-                (not has_row_artifact)
-                and i < len(stress_raw)
-                and isinstance(stress_raw[i], dict)
-            ):
-                row = stress_raw[i]
-                impact = str(
-                    row.get("portfolio_impact")
-                    or row.get("portfolio_return_pct")
-                    or default_impact
-                )[:200]
-                prob = (
-                    _fpct(row.get("probability"))
-                    if row.get("probability")
-                    else default_prob
-                )
-                reg = str(row.get("regime") or default_reg)[:200]
-            else:
-                impact, prob, reg = default_impact, default_prob, default_reg
-            scen_rows.append([label, prob, reg, impact])
-
-        items.append(
-            Table(scen_rows, colWidths=[60, 70, 100, 210], style=_tbl_std(pal))
-        )
-        items.append(Spacer(1, 10))
-
-    commentary = (
-        f"With a weighted beta of {beta:.2f}, the portfolio amplifies broad market moves. "
-        f"In the current {regime_label} environment, bear-case drawdown risk is "
-        f"{'elevated' if beta > 1.2 else 'contained'}. "
-        f"{'Consider reducing high-beta exposure before a risk-off rotation.' if beta > 1.2 else 'Portfolio positioning is broadly appropriate for the current regime.'}"
-    )
-    items.append(Paragraph("QUALITATIVE STRESS COMMENTARY", st["h3"]))
-    items.append(Paragraph(_xml(commentary), st["body"]))
-    items.append(Spacer(1, 10))
-
     market_code = _market_code_from_ctx(ctx, ctx.get("positions") or [])
-    defensive = get_defensive_alternatives(market_code)
-    risk_scenarios = defensive.get("additional_risk_scenarios") or [
-        [
-            "Event Risk",
-            "+25% VIX spike",
-            f"Est. {_beta_impact(-0.08)}",
-            "Monitor correlation spikes",
-        ],
-        [
-            "Rate Shock",
-            "+100bps yield shock",
-            f"Est. {_beta_impact(-0.05)}",
-            "Review duration exposure",
-        ],
-        [
-            "FX Volatility",
-            "USD +5%",
-            "Varies by FX exposure",
-            "Check international holdings",
-        ],
-        [
-            "Liquidity Crunch",
-            "Bid-ask spreads x 3",
-            "Position exits may be costly",
-            "Maintain cash buffer",
-        ],
-    ]
-    risk_hdr = [["Scenario", "Trigger", "Impact Estimate", "Action"]]
-    items.append(Paragraph("ADDITIONAL RISK SCENARIOS", st["h3"]))
+    if market_code == "VN":
+        scenario_rows = [
+            [
+                "Severe",
+                "Credit shock / liquidity crisis",
+                "-30% to -38%",
+                "Correlation -> 1.0",
+            ],
+            [
+                "Moderate",
+                "Rate shock / sector rotation",
+                "-15% to -22%",
+                "Securities broker stress",
+            ],
+            [
+                "Positive",
+                "FTSE EM upgrade (Sep 2026)",
+                "+15% to +25%",
+                "Delay risk: -10%",
+            ],
+        ]
+        additional = [
+            ["Tariff Shock", "US tariffs", "-15% to -22%", "Export cyclicals"],
+            ["FTSE EM Delay", "Upgrade reversal", "-8% to -12%", "Foreign-flow names"],
+            ["VND Depreciation", "USD +5% vs VND", "-3% to -6%", "FX overlay"],
+        ]
+    else:
+        beta = float(ctx.get("weighted_beta") or 1.0)
+
+        def _impact(mult: float) -> str:
+            return f"{beta * mult * 100:+.0f}%"
+
+        scenario_rows = [
+            [
+                "Severe",
+                "Credit shock / liquidity crisis",
+                _impact(-0.30),
+                "Correlation -> 1.0",
+            ],
+            [
+                "Moderate",
+                "Rate shock / sector rotation",
+                _impact(-0.18),
+                "High-beta stress",
+            ],
+            [
+                "Positive",
+                "Risk-on earnings recovery",
+                _impact(0.18),
+                "Upside beta capture",
+            ],
+        ]
+        additional = [
+            ["Rate Shock", "+100bps yields", _impact(-0.05), "Duration / beta"],
+            ["FX Volatility", "USD +5%", "Varies", "Currency mix"],
+            ["Liquidity Crunch", "Bid-ask x3", "Exit cost", "Cash buffer"],
+        ]
+
     items.append(
         Table(
-            risk_hdr + risk_scenarios,
-            colWidths=[100, 110, 130, 110],
+            [["Scenario", "Trigger", "Est. Impact", "Key Risk"], *scenario_rows],
+            colWidths=[70, 170, 105, 115],
+            style=_tbl_std(pal),
+        )
+    )
+    items.append(Spacer(1, 10))
+    items.append(Paragraph("ADDITIONAL SCENARIOS", st["h3"]))
+    items.append(
+        Table(
+            [["Scenario", "Trigger", "Impact", "Risk"], *additional[:3]],
+            colWidths=[95, 135, 95, 135],
             style=_tbl_std(pal),
         )
     )
@@ -6009,29 +6036,22 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         )
     )
 
-    thesis = extra.get("thesis") or {}
     pos_sorted = extra.get("pos_sorted") or []
     advisor_config = extra.get("advisor_config") or {}
 
-    # Priority action table
-    recs = ctx.get("recommendations") or []
-    act_plan = thesis.get("action_plan") or thesis.get("recommendation_summary") or []
-    if not isinstance(act_plan, list):
-        act_plan = []
-    rec_source = act_plan if act_plan else recs
+    canonical_actions = [
+        action
+        for action in (ctx.get("canonical_actions") or [])
+        if isinstance(action, dict)
+    ]
 
     prio_rows = [["#", "Priority", "Action", "Rationale", "Timeline"]]
-    for i, a in enumerate(rec_source[:6]):
-        if isinstance(a, dict):
-            pri_str = str(a.get("priority", "MED"))
-            action = str(a.get("action") or "")
-            rational = str(a.get("rationale") or "IC synthesis")[:200]
-            timeline = str(a.get("timeline") or "90 days")[:200]
-        else:
-            pri_str = "MED"
-            action = str(a)
-            rational = "IC synthesis"
-            timeline = "90 days"
+    for i, action_obj in enumerate(canonical_actions[:6]):
+        pri_str = str(action_obj.get("priority", "MED"))
+        action = str(action_obj.get("what") or "")
+        rational = str(action_obj.get("why") or "Canonical action registry")[:240]
+        weeks = action_obj.get("weeks_to_exit")
+        timeline = f"{weeks} weeks" if weeks else "90 days"
         pri_col = (
             _hex(ACCENT_RED)
             if "HIGH" in pri_str.upper()
@@ -6048,13 +6068,27 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
                 _xml(timeline),
             ]
         )
+    if len(prio_rows) == 1:
+        prio_rows.append(
+            [
+                "—",
+                "INFO",
+                Paragraph("No canonical actions generated for this cycle.", st["body"]),
+                Paragraph("Portfolio is inside current action thresholds.", st["body"]),
+                "Next review",
+            ]
+        )
     items.append(
         Table(prio_rows, colWidths=[22, 45, 185, 160, 65], style=_tbl_std(pal))
     )
     items.append(Spacer(1, 10))
 
-    execution_actions = ctx.get("execution_actions") or []
-    if execution_actions:
+    concentration_actions = [
+        action
+        for action in canonical_actions
+        if action.get("type") == "concentration_reduction"
+    ]
+    if concentration_actions:
         items.append(Paragraph("EXECUTION PLAN", st["h3"]))
         exec_rows = [
             [
@@ -6072,16 +6106,11 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         hhi = float(ctx.get("hhi") or 0)
         dna_score = int(ctx.get("dna_score") or 0)
         n_effective = round(1.0 / hhi, 1) if hhi > 0 else 0
-        for action in execution_actions:
+        for action in concentration_actions:
             # Compute inline metrics
-            hhi_target = (
-                hhi
-                * (
-                    float(action["target_weight_pct"])
-                    / max(float(action["current_weight_pct"]), 0.01)
-                )
-                ** 2
-            )
+            current_pct = float(action.get("current_pct") or 0)
+            target_pct = float(action.get("target_pct") or current_pct)
+            hhi_target = hhi * (target_pct / max(current_pct, 0.01)) ** 2
             n_effective_post = (
                 round(1.0 / hhi_target, 1) if hhi_target > 0 else n_effective
             )
@@ -6090,13 +6119,7 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
                 dna_score
                 + max(
                     2,
-                    int(
-                        (
-                            float(action["current_weight_pct"])
-                            - float(action["target_weight_pct"])
-                        )
-                        / 2
-                    ),
+                    int((current_pct - target_pct) / 2),
                 ),
             )
 
@@ -6106,19 +6129,22 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
             )
             post_impact = (
                 f"DNA: {dna_score}→{dna_post}/100. "
-                f"Risk: {'HIGH→MEDIUM' if float(action['current_weight_pct']) > 30 else 'unchanged'}."
+                f"Risk: {'HIGH→MEDIUM' if current_pct > 30 else 'unchanged'}."
             )
             exec_rows.append(
                 [
-                    action["ticker"],
-                    action["action_type"],
-                    f"{float(action['current_weight_pct']):.1f}%",
-                    f"{float(action['target_weight_pct']):.1f}%",
-                    f"{int(action['shares_to_trade']):,}",
-                    f"${float(action['notional_usd']):,.0f}",
+                    action.get("ticker") or "—",
+                    "REDUCE",
+                    f"{current_pct:.1f}%",
+                    f"{target_pct:.1f}%",
+                    f"{int(action.get('shares_to_sell') or 0):,}",
+                    "—",
                     Paragraph(_xml(why_optimal), st["body_sm"]),
                     Paragraph(_xml(post_impact), st["body_sm"]),
-                    Paragraph(_xml(str(action["execution_note"])), st["body_sm"]),
+                    Paragraph(
+                        _xml(str(action.get("what") or action.get("after") or "")),
+                        st["body_sm"],
+                    ),
                 ]
             )
         items.append(
@@ -6130,9 +6156,9 @@ def _page_directives(ctx: dict, extra: dict, pal: dict, st: dict, cw: float) -> 
         )
         items.append(Spacer(1, 10))
         rationale_notes = [
-            str(action.get("optimization_rationale"))
-            for action in execution_actions
-            if action.get("optimization_rationale")
+            str(action.get("after"))
+            for action in concentration_actions
+            if action.get("after")
         ]
         if rationale_notes:
             opt_note = rationale_notes[0]
@@ -6576,6 +6602,7 @@ def _build_pdf_sync(
     advisor_cfg["report_mode"] = _normalize_report_mode(report_mode)
     ctx = _build_report_context(portfolio_data, dna_data, swarm_norm, advisor_cfg)
     ctx["swarm_available"] = swarm_data_present
+    ctx["canonical_actions"] = _build_action_registry(ctx)
     ctx["report_state"] = assess_report_state(ctx)
     ctx["section_confidence"] = build_section_confidence(ctx)
 

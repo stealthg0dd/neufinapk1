@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, apiPost } from "@/lib/api-client";
+import { getSubscriptionStatus } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 type UserDetail = {
   id: string;
@@ -24,11 +26,13 @@ type UserDetail = {
 export default function AdminUserDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { token } = useAuth();
   const id = String(params.id || "");
   const [u, setU] = useState<UserDetail | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -47,6 +51,20 @@ export default function AdminUserDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token) {
+      setCurrentUserIsAdmin(false);
+      return;
+    }
+    getSubscriptionStatus(token)
+      .then((status) => {
+        setCurrentUserIsAdmin(
+          status.is_admin === true || (status.role ?? "").toLowerCase() === "admin",
+        );
+      })
+      .catch(() => setCurrentUserIsAdmin(false));
+  }, [token]);
 
   async function doAction(label: string, fn: () => Promise<void>) {
     setBusy(label);
@@ -204,55 +222,35 @@ export default function AdminUserDetailPage() {
         >
           Set plan → free / expired
         </button>
-        {/* ── Admin Access Management ─────────────────────────────────── */}
-        <div className="mt-2 border-t border-zinc-800 pt-3">
-          <p className="text-xs text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
-            Admin Management
-          </p>
-          {u.role === "admin" ? (
-            <button
-              type="button"
-              disabled={!!busy}
-              className="rounded-lg border border-amber-700/60 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50 text-amber-200 w-full"
-              onClick={() => {
-                if (
-                  !confirm(
-                    `Revoke admin access from ${u.email}? They will be downgraded to advisor tier.`,
-                  )
-                )
-                  return;
-                void doAction("Revoke admin", async () => {
-                  await apiPost(`/api/admin/users/${id}/plan`, {
-                    role: "advisor",
-                  });
-                });
-              }}
-            >
-              Revoke Admin Access
-            </button>
-          ) : (
+        {currentUserIsAdmin && (
+          <div className="mt-2 border-t border-zinc-800 pt-3">
+            <p className="text-xs text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
+              Admin Management
+            </p>
             <button
               type="button"
               disabled={!!busy}
               className="rounded-lg border border-sky-700/60 px-3 py-2 text-sm text-left hover:bg-zinc-900 disabled:opacity-50 text-sky-200 w-full"
               onClick={() => {
+                const nextRole = u.role === "admin" ? "advisor" : "admin";
                 if (
                   !confirm(
-                    `Grant admin access to ${u.email}? This gives full system access.`,
+                    `Set ${u.email} role to ${nextRole}? This changes admin panel access.`,
                   )
                 )
                   return;
-                void doAction("Grant admin", async () => {
-                  await apiPost(`/api/admin/users/${id}/plan`, {
-                    role: "admin",
+                void doAction("Toggle admin access", async () => {
+                  await apiPost(`/api/admin/users/${id}/role`, {
+                    role: nextRole,
                   });
                 });
               }}
             >
-              Grant Admin Access
+              Toggle Admin Access (
+              {u.role === "admin" ? "admin → advisor" : "advisor → admin"})
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         <button
           type="button"
