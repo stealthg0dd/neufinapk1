@@ -69,9 +69,15 @@ export async function getSubscriptionStatus(
 ): Promise<{
   plan?: string;
   status: "trial" | "active" | "expired";
+  is_active?: boolean;
+  tier?: "free" | "retail" | "advisor" | "enterprise";
+  trial_active?: boolean;
+  trial_ends_at?: string | null;
+  trial_expired?: boolean;
   days_remaining?: number;
   onboarding_completed?: boolean;
   is_admin?: boolean;
+  role?: string;
   usage?: Record<string, unknown>;
 }> {
   const res = await fetch(`${API}/api/subscription/status`, {
