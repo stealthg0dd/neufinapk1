@@ -41,20 +41,29 @@ def test_risk_metric_fallbacks_compute_var_and_sharpe_proxy():
         [],
     )
 
-    assert "beta-estimated" in labels["var"][0]
-    assert "VN vol 1.8%" in labels["var"][0]
-    assert "beta-estimated" in labels["var_99"][0]
-    assert "10-day horizon" in labels["var_10"][0]
+    assert labels["var"][1] == "Estimated"
+    assert labels["var"][2] == "Beta x VN vol"
+    assert labels["var_99"][2] == "Beta x vol"
+    assert labels["var_10"][2] == "sqrt(t) scaled"
     assert "CAPM proxy" in labels["sharpe"][0]
 
 
-def test_missing_correlation_is_unknown_not_zero():
-    label, status = _correlation_label(
-        {"avg_corr": None, "correlation_status": "UNKNOWN"}
+def test_missing_correlation_uses_sector_estimate_not_zero():
+    label, status, method = _correlation_label(
+        {
+            "avg_corr": None,
+            "correlation_status": "UNKNOWN",
+            "positions": [
+                {"symbol": "VCI.VN", "market_code": "VN"},
+                {"symbol": "SSI.VN", "market_code": "VN"},
+                {"symbol": "MBB.VN", "market_code": "VN"},
+            ],
+        }
     )
 
-    assert label == "Not computed (insufficient price history)"
-    assert status == "UNKNOWN"
+    assert label.startswith("~")
+    assert status == "Estimated"
+    assert method == "Sector prior"
 
 
 def test_equal_weight_portfolio_does_not_trigger_overweight_bias():

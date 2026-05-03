@@ -92,16 +92,20 @@ CONTENT_W = A4_W - LEFT_MARGIN - RIGHT_MARGIN
 
 
 # ─── DESIGN SYSTEM ────────────────────────────────────────────────────────────
-# Goldman memo palette
-NAVY = HexColor("#0F172A")
-TEAL = HexColor("#1EB8CC")
-RED = HexColor("#DB3131")
-AMBER = HexColor("#F59E0A")
-GREEN = HexColor("#22B84C")
-LGRAY = HexColor("#F5F8FC")
-DGRAY = HexColor("#334155")
-MGRAY = HexColor("#737373")
-WHITE = HexColor("#FFFFFF")
+# Colour constants — NEVER use lighter values for text on white.
+NAVY = Color(0.059, 0.090, 0.163)  # #0F172A — primary text
+DGRAY = Color(0.200, 0.220, 0.240)  # body text, table cells
+MGRAY = Color(0.380, 0.400, 0.420)  # secondary text, labels, captions
+LGRAY = Color(0.961, 0.973, 0.988)  # #F5F8FC — backgrounds only
+TEAL = Color(0.118, 0.722, 0.800)  # #1EB8CC — section headers, positive
+RED = Color(0.859, 0.196, 0.196)  # #DB3131 — high risk, errors
+AMBER = Color(0.961, 0.620, 0.039)  # #F59E0A — medium risk, warnings
+GREEN = Color(0.133, 0.722, 0.298)  # #22B84C — low risk, improvements
+WHITE = Color(1.000, 1.000, 1.000)
+
+# Forbidden for text on white/light backgrounds: 0.6+, 0.7+, 0.8+, 0.9+ gray.
+# If background luminance > 0.5, text must use NAVY, DGRAY, or MGRAY.
+# WHITE text is only allowed on dark/accent fills.
 
 # Dark theme
 DARK_BG = HexColor("#0B0F14")
@@ -160,6 +164,14 @@ REGIME_DRAWDOWN = {
 
 RISK_FREE = {"VN": 0.080, "US": 0.045, "SG": 0.036, "DEFAULT": 0.045}
 
+SECTOR_CORRELATION_PRIORS = {
+    "all_same_market_financial": 0.72,
+    "all_same_market_mixed": 0.55,
+    "cross_market_developed": 0.42,
+    "cross_market_em": 0.38,
+    "mixed_asset": 0.25,
+}
+
 FTSE_UPGRADE = (
     "FTSE Russell EM upgrade confirmed: effective September 21, 2026. "
     "Expected capital inflows: $1.5-3B into Vietnamese equities. "
@@ -210,16 +222,19 @@ def _palette(theme: str) -> dict:
         "bg_hex": "#0B0F14" if dark else "#FFFFFF",
         "card_hex": "#161D2E" if dark else "#FFFFFF",
         "text_hex": "#F0F4FF" if dark else "#0F172A",
-        "mut_hex": "#64748B" if dark else "#737373",
+        "mut_hex": "#64748B" if dark else "#616870",
     }
 
 
 def _hex(c: HexColor) -> str:
     """HexColor → '#RRGGBB' string for Paragraph markup."""
     try:
-        return f"#{c.hexval() & 0xFFFFFF:06x}"
+        value = c.hexval()
+        if isinstance(value, str):
+            return "#" + value.removeprefix("0x")[-6:]
+        return f"#{value & 0xFFFFFF:06x}"
     except Exception:
-        return "#F0F4FF"
+        return "#0F172A"
 
 
 def _rl_color(value: Any, fallback: HexColor = ACCENT_TEAL) -> Any:
@@ -617,7 +632,53 @@ def _compute_sharpe_proxy(
     }
 
 
-def _correlation_label(ctx: dict) -> tuple[str, str]:
+def _estimate_correlation(
+    positions: list[dict[str, Any]], market_code: str, sector_map: dict[str, str]
+) -> dict:
+    """Return a sector-based correlation estimate when price history is insufficient."""
+    if not positions:
+        return {
+            "value": 0.0,
+            "label": "Not computed",
+            "note": "No positions available.",
+            "is_estimate": True,
+        }
+    sectors = {
+        sector_map.get(_position_symbol(pos), "Unknown")
+        for pos in positions
+        if isinstance(pos, dict)
+    }
+    markets = {
+        str(pos.get("market_code") or market_code or "UNKNOWN").upper()
+        for pos in positions
+        if isinstance(pos, dict)
+    }
+    all_same_market = len(markets) == 1
+    financial_sectors = {"Banking", "Securities", "Insurance", "Financial Services"}
+    financial_count = sum(1 for sector in sectors if sector in financial_sectors)
+    financial_pct = financial_count / max(len(sectors), 1)
+
+    if all_same_market and financial_pct > 0.6:
+        est = SECTOR_CORRELATION_PRIORS["all_same_market_financial"]
+        market = next(iter(markets)) if markets else market_code
+        label = f"~{est:.2f} [sector estimate: {market} financials]"
+        note = (
+            "Financial stocks in the same market historically show 0.65-0.80 "
+            "average pairwise correlation. Exact value requires 60+ days price history."
+        )
+    elif all_same_market:
+        est = SECTOR_CORRELATION_PRIORS["all_same_market_mixed"]
+        label = f"~{est:.2f} [sector estimate: mixed sectors, same market]"
+        note = "Same-market mixed portfolio. Historical avg pairwise correlation 0.45-0.65."
+    else:
+        est = SECTOR_CORRELATION_PRIORS["cross_market_em"]
+        label = f"~{est:.2f} [sector estimate: cross-market]"
+        note = "Cross-market portfolio. Historical avg pairwise correlation 0.30-0.45."
+
+    return {"value": est, "label": label, "note": note, "is_estimate": True}
+
+
+def _correlation_label(ctx: dict) -> tuple[str, str, str]:
     status = str(ctx.get("correlation_status") or "").upper()
     raw = ctx.get("avg_corr")
     try:
@@ -625,8 +686,18 @@ def _correlation_label(ctx: dict) -> tuple[str, str]:
     except (TypeError, ValueError):
         value = None
     if status == "COMPUTED" and value is not None:
-        return f"{value:.3f}", "High" if value > 0.75 else "Computed"
-    return "Not computed (insufficient price history)", "UNKNOWN"
+        return f"{value:.3f}", "High" if value > 0.75 else "Computed", "Pearson"
+    positions = ctx.get("positions") or []
+    market_code = _market_code_from_ctx(ctx, positions)
+    sector_map = {
+        _position_symbol(pos): str(
+            pos.get("sector") or _classify_sector(_position_symbol(pos))
+        )
+        for pos in positions
+        if isinstance(pos, dict)
+    }
+    est = _estimate_correlation(positions, market_code, sector_map)
+    return str(est["label"]), "Estimated", "Sector prior"
 
 
 def _compute_risk_metric_labels(
@@ -656,20 +727,17 @@ def _compute_risk_metric_labels(
         else:
             var_amount = var_numeric
             var_pct = (var_amount / total_value) * 100 if total_value else 0.0
-        var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% of AUM) [calculated, 95% 1-day]"
-        )
+        var_label = f"${var_amount:,.0f} ({var_pct:.2f}% AUM)"
         var_status = "Calculated"
+        var_method = "Quant model"
         var_fallback = None
     else:
         var_fallback = _compute_var_fallback(total_value, weighted_beta, market_code)
         var_amount = float(var_fallback["var_1d_95_usd"])
         var_pct = (var_amount / total_value) * 100 if total_value else 0.0
-        var_label = (
-            f"${var_amount:,.0f} ({var_pct:.2f}% AUM) "
-            f"[beta-estimated · {market_code} vol {var_fallback['daily_vol'] * 100:.1f}%]"
-        )
+        var_label = f"${var_amount:,.0f} ({var_pct:.2f}% AUM)"
         var_status = "Estimated"
+        var_method = f"Beta x {market_code} vol"
 
     drawdown_raw = quant.get("max_drawdown") or metrics.get("max_drawdown")
     drawdown_numeric: float | None = None
@@ -682,14 +750,14 @@ def _compute_risk_metric_labels(
     except (TypeError, ValueError):
         drawdown_numeric = None
     if drawdown_numeric is not None:
-        drawdown_label = f"{drawdown_numeric * 100:.1f}% [calculated]"
+        drawdown_label = f"{drawdown_numeric * 100:.1f}%"
         drawdown_status = "Calculated"
+        drawdown_method = "Quant model"
     else:
         est_drawdown = weighted_beta * _regime_drawdown_proxy(regime_label)
-        drawdown_label = (
-            f"{est_drawdown * 100:.1f}% [regime-estimated: {regime_label} analogue]"
-        )
+        drawdown_label = f"{est_drawdown * 100:.1f}%"
         drawdown_status = "Estimated"
+        drawdown_method = f"{regime_label} analogue"
 
     sharpe_raw = ctx.get("sharpe_ratio")
     sharpe_numeric: float | None = None
@@ -699,8 +767,9 @@ def _compute_risk_metric_labels(
     except (TypeError, ValueError):
         sharpe_numeric = None
     if sharpe_numeric is not None:
-        sharpe_label = f"{sharpe_numeric:.2f} [calculated]"
+        sharpe_label = f"{sharpe_numeric:.2f}"
         sharpe_status = "Calculated"
+        sharpe_method = "Returns history"
     else:
         ytd_raw = metrics.get("ytd_return")
         try:
@@ -717,14 +786,19 @@ def _compute_risk_metric_labels(
                 252**0.5
             )
             sharpe_est = (ytd_return_annualised - rf) / ann_vol if ann_vol else 0.0
-            sharpe_label = f"{sharpe_est:.2f} [estimated from YTD return vs {rf * 100:.1f}% risk-free]"
+            ci_low = sharpe_est * 0.6
+            ci_high = sharpe_est * 1.6
+            sharpe_label = f"{sharpe_est:.2f} [90% CI: {ci_low:.2f}-{ci_high:.2f}]"
             sharpe_status = "Estimated"
+            sharpe_method = "YTD proxy"
         else:
             proxy = _compute_sharpe_proxy(weighted_beta, market_code, regime_label)
-            sharpe_label = (
-                f"{proxy['sharpe_proxy']:.2f} [CAPM proxy; not from actual returns]"
-            )
+            proxy_value = float(proxy["sharpe_proxy"])
+            ci_low = proxy_value * 0.6
+            ci_high = proxy_value * 1.6
+            sharpe_label = f"{proxy_value:.2f} [CAPM proxy · 90% CI: {ci_low:.2f}-{ci_high:.2f} · upload returns for exact]"
             sharpe_status = "Proxy"
+            sharpe_method = "CAPM"
 
     if var_fallback:
         var_99_pct = (
@@ -737,30 +811,28 @@ def _compute_risk_metric_labels(
             if total_value
             else 0.0
         )
-        var_99 = (
-            f"${var_fallback['var_1d_99_usd']:,.0f} ({var_99_pct:.2f}% AUM) "
-            "[beta-estimated]"
-        )
-        var_10 = (
-            f"${var_fallback['var_10d_95_usd']:,.0f} ({var_10_pct:.2f}% AUM) "
-            "[10-day horizon, sqrt(t) scaled]"
-        )
+        var_99 = f"${var_fallback['var_1d_99_usd']:,.0f} ({var_99_pct:.2f}% AUM)"
+        var_10 = f"${var_fallback['var_10d_95_usd']:,.0f} ({var_10_pct:.2f}% AUM)"
         var_footnote = (
             "VaR estimated from portfolio beta x "
             f"{market_code} historical volatility. Monte Carlo simulation available with Swarm IC."
         )
+        var_99_method = "Beta x vol"
+        var_10_method = "sqrt(t) scaled"
     else:
         var_99 = "Available with simulated VaR"
         var_10 = "Available with simulated VaR"
         var_footnote = "VaR supplied by quantitative analysis."
+        var_99_method = "Simulation"
+        var_10_method = "Simulation"
 
     return {
-        "var": (var_label, var_status),
-        "var_99": (var_99, var_status),
-        "var_10": (var_10, var_status),
+        "var": (var_label, var_status, var_method),
+        "var_99": (var_99, var_status, var_99_method),
+        "var_10": (var_10, var_status, var_10_method),
         "var_footnote": (var_footnote, "Method"),
-        "drawdown": (drawdown_label, drawdown_status),
-        "sharpe": (sharpe_label, sharpe_status),
+        "drawdown": (drawdown_label, drawdown_status, drawdown_method),
+        "sharpe": (sharpe_label, sharpe_status, sharpe_method),
     }
 
 
@@ -4507,34 +4579,53 @@ def _page_risk_correlation(
     beta = float(ctx.get("weighted_beta") or 0)
 
     risk_tbl = [
-        ["Metric", "Value", "Status"],
+        ["Metric", "Value", "Status", "Method"],
         [
             "VaR (95%, 1-day)",
             risk_labels["var"][0],
             risk_labels["var"][1],
+            risk_labels["var"][2],
         ],
         [
             "VaR (99%, 1-day)",
             risk_labels["var_99"][0],
             risk_labels["var_99"][1],
+            risk_labels["var_99"][2],
         ],
         [
             "VaR (95%, 10-day)",
             risk_labels["var_10"][0],
             risk_labels["var_10"][1],
+            risk_labels["var_10"][2],
         ],
         [
             "Max Drawdown",
             risk_labels["drawdown"][0],
             risk_labels["drawdown"][1],
+            risk_labels["drawdown"][2],
         ],
-        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
-        ["Concentration (HHI)", f"{hhi:.4f}", "⚠ High" if hhi > 0.25 else "Normal"],
-        ["Weighted Beta", f"{beta:.2f}", "⚠ High" if beta > 1.8 else "Normal"],
+        [
+            "Sharpe (CAPM proxy)",
+            risk_labels["sharpe"][0],
+            risk_labels["sharpe"][1],
+            risk_labels["sharpe"][2],
+        ],
+        [
+            "Concentration (HHI)",
+            f"{hhi:.4f}",
+            "High" if hhi > 0.25 else "Normal",
+            "Holdings weights",
+        ],
+        [
+            "Weighted Beta",
+            f"{beta:.2f}",
+            "High" if beta > 1.8 else "Normal",
+            "Weighted beta",
+        ],
         ["Avg. Correlation", *_correlation_label(ctx)],
     ]
     items.append(Paragraph("RISK METRICS SUMMARY", st["h3"]))
-    items.append(Table(risk_tbl, colWidths=[140, 210, 90], style=_tbl_std(pal)))
+    items.append(Table(risk_tbl, colWidths=[120, 185, 70, 85], style=_tbl_std(pal)))
     items.append(Spacer(1, 4))
     items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
 
@@ -4623,36 +4714,88 @@ def _page_risk_behavioral_intelligence(
     dna_score = int(ctx.get("dna_score") or 0)
     churn = str(ctx.get("churn_risk_level") or "UNKNOWN")
 
-    top_weight = _w(pos_sorted[0]) * 100 if pos_sorted else 0
-    top_symbol = (
-        str(pos_sorted[0].get("symbol") or pos_sorted[0].get("ticker") or "—")
-        if pos_sorted
-        else "—"
-    )
-    risk_rows = [
-        ["Signal", "Current", "IC Read"],
-        ["Concentration HHI", f"{hhi:.3f}", "HIGH" if hhi > 0.20 else "Normal"],
-        [
-            "Largest position",
-            f"{top_symbol} · {top_weight:.1f}%",
-            "Reduce" if top_weight > 30 else "Monitor",
-        ],
-        ["Weighted beta", f"{beta:.2f}", "Elevated" if beta > 1.2 else "Contained"],
-        ["VaR (95%, 1-day)", risk_labels["var"][0], risk_labels["var"][1]],
-        ["VaR (99%, 1-day)", risk_labels["var_99"][0], risk_labels["var_99"][1]],
-        ["VaR (95%, 10-day)", risk_labels["var_10"][0], risk_labels["var_10"][1]],
-        [
-            "Drawdown",
-            risk_labels["drawdown"][0],
-            risk_labels["drawdown"][1],
-        ],
-        ["Avg. correlation", *_correlation_label(ctx)],
-        ["Sharpe (CAPM proxy)", risk_labels["sharpe"][0], risk_labels["sharpe"][1]],
-        ["Behavioral DNA", f"{dna_score}/100", f"Churn {churn}"],
+    corr_value, corr_status, _corr_method = _correlation_label(ctx)
+
+    def _status_color(status: str) -> HexColor:
+        s = status.upper()
+        if "HIGH" in s or "ACT" in s:
+            return ACCENT_RED
+        if "EST" in s or "PROXY" in s or "MOD" in s:
+            return ACCENT_AMBER
+        return ACCENT_GREEN
+
+    def _tile(metric: str, value: str, status: str) -> Table:
+        status_hex = _hex(_status_color(status))
+        content = Paragraph(
+            f'<font name="Helvetica" size="8" color="{_hex(MGRAY)}">{_xml(metric)}</font><br/>'
+            f'<font name="Helvetica-Bold" size="12" color="{_hex(NAVY)}">{_xml(value)}</font>'
+            f' <font name="Helvetica-Bold" size="9" color="{status_hex}">{_xml(status)}</font>',
+            ParagraphStyle(
+                "risk_tile_" + metric.replace(" ", "_") + pal["theme"],
+                fontName="Helvetica",
+                fontSize=9,
+                leading=13,
+                textColor=DGRAY,
+            ),
+        )
+        return Table(
+            [[content]],
+            colWidths=[cw / 2 - 6],
+            rowHeights=[40],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+                    ("BOX", (0, 0), (-1, -1), 0.3, LGRAY),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            ),
+        )
+
+    var_pct = ""
+    if "(" in risk_labels["var"][0]:
+        var_pct = risk_labels["var"][0].split("(", 1)[1].split(")", 1)[0]
+    tiles = [
+        (
+            _tile("HHI", f"{hhi:.3f}", "HIGH" if hhi > 0.20 else "Normal"),
+            _tile(
+                "VaR (95% 1-day)",
+                risk_labels["var"][0].split(" (", 1)[0],
+                var_pct or risk_labels["var"][1],
+            ),
+        ),
+        (
+            _tile("Beta", f"{beta:.2f}", "Elevated" if beta > 1.2 else "Normal"),
+            _tile("Drawdown (est.)", risk_labels["drawdown"][0], "Moderate"),
+        ),
+        (
+            _tile(
+                "Correlation",
+                corr_value.split(" ", 1)[0],
+                "Est." if corr_status == "Estimated" else corr_status,
+            ),
+            _tile(
+                "Sharpe",
+                risk_labels["sharpe"][0].split(" ", 1)[0],
+                risk_labels["sharpe"][1],
+            ),
+        ),
+        (
+            _tile(
+                "DNA Score", f"{dna_score}/100", "Good" if dna_score >= 70 else "Watch"
+            ),
+            _tile("Churn Risk", churn, "Act" if churn.upper() == "HIGH" else "Monitor"),
+        ),
     ]
-    items.append(Table(risk_rows, colWidths=[115, 255, 90], style=_tbl_std(pal)))
-    items.append(Spacer(1, 10))
-    items.append(Paragraph(_xml(risk_labels["var_footnote"][0]), st["muted8"]))
+    items.append(
+        Table(
+            tiles,
+            colWidths=[cw / 2, cw / 2],
+            style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]),
+        )
+    )
     items.append(Spacer(1, 8))
 
     biases = ctx.get("structural_biases") or []
@@ -4660,18 +4803,15 @@ def _page_risk_behavioral_intelligence(
     for bias in biases[:3]:
         if not isinstance(bias, dict):
             continue
+        bias_name = str(bias.get("name") or "Behavioral flag")
+        action_ref = _bias_to_action(bias_name, bias, ctx)
+        action_short = action_ref.replace(" -> ", " → ")
         weakness_rows.append(
             [
                 str(bias.get("severity") or "MED"),
+                bias_name,
                 Paragraph(
-                    f"<b>{_xml(str(bias.get('name') or 'Behavioral flag'))}</b><br/>{_xml(str(bias.get('evidence') or ''))}",
-                    st["body_sm"],
-                ),
-                Paragraph(
-                    _xml(
-                        _bias_to_action(str(bias.get("name") or ""), bias, ctx)
-                        or "Monitor in next rebalance."
-                    ),
+                    _xml(f"{str(bias.get('evidence') or '')[:70]} → {action_short}"),
                     st["body_sm"],
                 ),
             ]
@@ -4686,12 +4826,12 @@ def _page_risk_behavioral_intelligence(
         items.append(Paragraph("BEHAVIORAL FLAGS -> ACTIONS", st["h3"]))
         items.append(
             Table(
-                [["Severity", "Evidence", "Action"], *weakness_rows],
-                colWidths=[55, 225, 180],
+                [["Severity", "Flag", "Action Link"], *weakness_rows],
+                colWidths=[55, 125, 280],
                 style=_tbl_std(pal),
             )
         )
-        items.append(Spacer(1, 10))
+        items.append(Spacer(1, 8))
 
     market_code = _market_code_from_ctx(ctx, positions)
     liq_rows = _compute_liquidity_metrics(
@@ -4699,19 +4839,21 @@ def _page_risk_behavioral_intelligence(
     )
     if liq_rows:
         items.append(Paragraph("LIQUIDITY WATCHLIST", st["h3"]))
-        liq_table = [["Ticker", "Value", "ADV", "Days @20% ADV", "Status"]]
+        liq_table = [["Ticker", "Position ($M)", "Days to exit", "Status"]]
         for row in liq_rows[:4]:
             liq_table.append(
                 [
                     row["symbol"],
                     f"${float(row.get('pos_m') or 0):.1f}M",
-                    f"${float(row.get('adv_m') or 0):.1f}M",
-                    str(row.get("days_normal") or "—"),
+                    f"{float(row.get('days_normal') or 0):,.0f} days",
                     row.get("status") or "—",
                 ]
             )
         items.append(
-            Table(liq_table, colWidths=[70, 70, 70, 120, 90], style=_tbl_std(pal))
+            Table(liq_table, colWidths=[80, 115, 145, 90], style=_tbl_std(pal))
+        )
+        items.append(
+            Paragraph("Days computed at 20% of average daily volume.", st["muted8"])
         )
 
     return items
@@ -5195,275 +5337,78 @@ def _page_stress_testing(
         )
     )
 
-    thesis = extra.get("thesis") or {}
-    swarm_norm = extra.get("swarm_norm") or {}
-    stress_results = (
-        thesis.get("stress_results") or swarm_norm.get("stress_results") or {}
-    )
-
-    regime_label = ctx["regime_label"] or "Market-Neutral"
-    beta = float(ctx.get("weighted_beta") or 0)
-
-    def _scenario_ret_pct(data: Any) -> float:
-        if not isinstance(data, dict):
-            return 0.0
-        raw = data.get("portfolio_return_pct", data.get("portfolio_impact", 0))
-        try:
-            return float(str(raw).replace("%", "").strip())
-        except (TypeError, ValueError):
-            return 0.0
-
-    stress_artifact = True
-    if isinstance(stress_results, dict) and stress_results:
-        stress_artifact = any(
-            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
-            for v in stress_results.values()
-        )
-    elif isinstance(stress_results, list) and stress_results:
-        stress_artifact = any(
-            isinstance(v, dict) and abs(_scenario_ret_pct(v)) > 200
-            for v in stress_results
-        )
-    elif stress_results:
-        stress_artifact = False
-
-    def _beta_impact(mult: float) -> str:
-        return f"{(beta * mult) * 100:+.1f}% (beta-estimated)"
-
-    if stress_artifact:
-        items.append(
-            Paragraph(
-                "STRESS TEST — QUALITATIVE IC ASSESSMENT",
-                ParagraphStyle(
-                    "stress_warn_h_" + pal["theme"],
-                    fontName="Helvetica-Bold",
-                    fontSize=9,
-                    textColor=ACCENT_AMBER,
-                ),
-            )
-        )
-        items.append(
-            Paragraph(
-                _xml(
-                    "Quantitative stress figures reflect a portfolio weight "
-                    "normalization artifact. IC qualitative assessment applied "
-                    "based on individual position betas and sector exposures."
-                ),
-                ParagraphStyle(
-                    "stress_warn_b_" + pal["theme"],
-                    fontName="Helvetica",
-                    fontSize=8,
-                    textColor=pal["text_mut"],
-                    spaceAfter=8,
-                ),
-            )
-        )
-
-        positions = list(ctx.get("positions") or [])
-        market_code = _market_code_from_ctx(ctx, positions)
-        defensive = get_defensive_alternatives(market_code)
-        tech_cluster = ("AAPL", "MSFT", "AMZN", "NVDA", "META", "GOOGL", "TSLA")
-        bond_cluster = ("TLT", "IEF", "BND", "AGG", "SHY", "GOVT")
-        tech_w = sum(
-            float(p.get("weight_pct") or p.get("weight") or 0)
-            for p in positions
-            if str(p.get("symbol") or "").upper() in tech_cluster
-        )
-        bond_w = sum(
-            float(p.get("weight_pct") or p.get("weight") or 0)
-            for p in positions
-            if str(p.get("symbol") or "").upper() in bond_cluster
-        )
-
-        qualitative_rows = defensive.get("qualitative_scenarios")
-        if qualitative_rows:
-            qualitative_data = [
-                ["Scenario", "Historical", "Est. Impact", "Primary Risk"]
-            ]
-            qualitative_data.extend(qualitative_rows)
-        else:
-            qualitative_data = [
-                ["Scenario", "Historical", "Est. Impact", "Primary Risk"],
-                [
-                    "2022 Rate Shock",
-                    "S&P -25.4%",
-                    f"Est. -{min(35, max(8, tech_w * 0.5 + bond_w * 0.7)):.0f}% to "
-                    f"-{min(45, max(14, tech_w * 0.65 + bond_w * 0.9)):.0f}%",
-                    f"Tech {tech_w:.0f}% + duration",
-                ],
-                [
-                    "2020 COVID Crash",
-                    "S&P -33.9%",
-                    "Est. -20% to -32%",
-                    "All correlations -> 1.0 in liquidity crisis",
-                ],
-                [
-                    "2024 AI Rotation",
-                    "S&P -8.5%",
-                    f"Est. -{max(4, tech_w * 0.3):.0f}% to -{max(8, tech_w * 0.45):.0f}%",
-                    "Tech cluster amplifies rotation",
-                ],
-            ]
-        stress_table = Table(
-            qualitative_data,
-            colWidths=[cw * 0.2, cw * 0.15, cw * 0.3, cw * 0.35],
-            style=TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), pal["border"]),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), pal["text_pri"]),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [pal["card"], pal["bg"]]),
-                    ("TEXTCOLOR", (0, 1), (-1, -1), pal["text_bod"]),
-                    ("TOPPADDING", (0, 0), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                    ("BOX", (0, 0), (-1, -1), 1, pal["border"]),
-                    ("INNERGRID", (0, 0), (-1, -1), 0.5, pal["border"]),
-                ]
-            ),
-        )
-        items.append(stress_table)
-        items.append(Spacer(1, 10))
-    else:
-        stress_raw: list[Any] = []
-        if isinstance(stress_results, dict):
-            stress_raw = list(stress_results.values())
-        elif isinstance(stress_results, list):
-            stress_raw = stress_results
-
-        def _stress_row_usable(row: dict) -> bool:
-            if row.get("data_status") == "unavailable":
-                return False
-            pr = row.get("portfolio_return_pct", row.get("portfolio_impact"))
-            if pr is None:
-                return False
-            try:
-                v = float(str(pr).replace("%", "").strip())
-            except (TypeError, ValueError):
-                return False
-            return abs(v) <= 200
-
-        stress_raw = [
-            r for r in stress_raw if isinstance(r, dict) and _stress_row_usable(r)
-        ]
-
-        if not stress_raw:
-            items.append(
-                _amber_banner_table(
-                    "Note: Stress-test output from Swarm IC is not available. "
-                    "Qualitative scenarios below are estimated from portfolio beta and current regime.",
-                    pal,
-                    st,
-                    cw,
-                )
-            )
-            items.append(Spacer(1, 8))
-
-        def _is_artifact_val(val: Any) -> bool:
-            try:
-                v = float(str(val).replace("%", "").strip())
-                return abs(v) > 200
-            except (TypeError, ValueError):
-                return False
-
-        has_row_artifact = any(
-            _is_artifact_val(
-                row.get("portfolio_impact") or row.get("portfolio_return_pct", "")
-            )
-            for row in stress_raw
-            if isinstance(row, dict)
-        )
-        if has_row_artifact:
-            items.append(
-                _amber_banner_table(
-                    "Note: Stress rows contained extreme values; using beta-estimated scenarios instead.",
-                    pal,
-                    st,
-                    cw,
-                )
-            )
-            items.append(Spacer(1, 8))
-
-        scenario_defaults = [
-            ("Bull", "35%", regime_label, _beta_impact(0.12)),
-            ("Base", "45%", regime_label, _beta_impact(0.06)),
-            ("Bear", "20%", regime_label, _beta_impact(-0.15)),
-        ]
-        scen_rows = [["Scenario", "Probability", "Regime", "Est. Portfolio Impact"]]
-        for i, (label, default_prob, default_reg, default_impact) in enumerate(
-            scenario_defaults
-        ):
-            if (
-                (not has_row_artifact)
-                and i < len(stress_raw)
-                and isinstance(stress_raw[i], dict)
-            ):
-                row = stress_raw[i]
-                impact = str(
-                    row.get("portfolio_impact")
-                    or row.get("portfolio_return_pct")
-                    or default_impact
-                )[:200]
-                prob = (
-                    _fpct(row.get("probability"))
-                    if row.get("probability")
-                    else default_prob
-                )
-                reg = str(row.get("regime") or default_reg)[:200]
-            else:
-                impact, prob, reg = default_impact, default_prob, default_reg
-            scen_rows.append([label, prob, reg, impact])
-
-        items.append(
-            Table(scen_rows, colWidths=[60, 70, 100, 210], style=_tbl_std(pal))
-        )
-        items.append(Spacer(1, 10))
-
-    commentary = (
-        f"With a weighted beta of {beta:.2f}, the portfolio amplifies broad market moves. "
-        f"In the current {regime_label} environment, bear-case drawdown risk is "
-        f"{'elevated' if beta > 1.2 else 'contained'}. "
-        f"{'Consider reducing high-beta exposure before a risk-off rotation.' if beta > 1.2 else 'Portfolio positioning is broadly appropriate for the current regime.'}"
-    )
-    items.append(Paragraph("QUALITATIVE STRESS COMMENTARY", st["h3"]))
-    items.append(Paragraph(_xml(commentary), st["body"]))
-    items.append(Spacer(1, 10))
-
     market_code = _market_code_from_ctx(ctx, ctx.get("positions") or [])
-    defensive = get_defensive_alternatives(market_code)
-    risk_scenarios = defensive.get("additional_risk_scenarios") or [
-        [
-            "Event Risk",
-            "+25% VIX spike",
-            f"Est. {_beta_impact(-0.08)}",
-            "Monitor correlation spikes",
-        ],
-        [
-            "Rate Shock",
-            "+100bps yield shock",
-            f"Est. {_beta_impact(-0.05)}",
-            "Review duration exposure",
-        ],
-        [
-            "FX Volatility",
-            "USD +5%",
-            "Varies by FX exposure",
-            "Check international holdings",
-        ],
-        [
-            "Liquidity Crunch",
-            "Bid-ask spreads x 3",
-            "Position exits may be costly",
-            "Maintain cash buffer",
-        ],
-    ]
-    risk_hdr = [["Scenario", "Trigger", "Impact Estimate", "Action"]]
-    items.append(Paragraph("ADDITIONAL RISK SCENARIOS", st["h3"]))
+    if market_code == "VN":
+        scenario_rows = [
+            [
+                "Severe",
+                "Credit shock / liquidity crisis",
+                "-30% to -38%",
+                "Correlation -> 1.0",
+            ],
+            [
+                "Moderate",
+                "Rate shock / sector rotation",
+                "-15% to -22%",
+                "Securities broker stress",
+            ],
+            [
+                "Positive",
+                "FTSE EM upgrade (Sep 2026)",
+                "+15% to +25%",
+                "Delay risk: -10%",
+            ],
+        ]
+        additional = [
+            ["Tariff Shock", "US tariffs", "-15% to -22%", "Export cyclicals"],
+            ["FTSE EM Delay", "Upgrade reversal", "-8% to -12%", "Foreign-flow names"],
+            ["VND Depreciation", "USD +5% vs VND", "-3% to -6%", "FX overlay"],
+        ]
+    else:
+        beta = float(ctx.get("weighted_beta") or 1.0)
+
+        def _impact(mult: float) -> str:
+            return f"{beta * mult * 100:+.0f}%"
+
+        scenario_rows = [
+            [
+                "Severe",
+                "Credit shock / liquidity crisis",
+                _impact(-0.30),
+                "Correlation -> 1.0",
+            ],
+            [
+                "Moderate",
+                "Rate shock / sector rotation",
+                _impact(-0.18),
+                "High-beta stress",
+            ],
+            [
+                "Positive",
+                "Risk-on earnings recovery",
+                _impact(0.18),
+                "Upside beta capture",
+            ],
+        ]
+        additional = [
+            ["Rate Shock", "+100bps yields", _impact(-0.05), "Duration / beta"],
+            ["FX Volatility", "USD +5%", "Varies", "Currency mix"],
+            ["Liquidity Crunch", "Bid-ask x3", "Exit cost", "Cash buffer"],
+        ]
+
     items.append(
         Table(
-            risk_hdr + risk_scenarios,
-            colWidths=[100, 110, 130, 110],
+            [["Scenario", "Trigger", "Est. Impact", "Key Risk"], *scenario_rows],
+            colWidths=[70, 170, 105, 115],
+            style=_tbl_std(pal),
+        )
+    )
+    items.append(Spacer(1, 10))
+    items.append(Paragraph("ADDITIONAL SCENARIOS", st["h3"]))
+    items.append(
+        Table(
+            [["Scenario", "Trigger", "Impact", "Risk"], *additional[:3]],
+            colWidths=[95, 135, 95, 135],
             style=_tbl_std(pal),
         )
     )
