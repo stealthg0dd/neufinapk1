@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useRef, DragEvent, ChangeEvent } from "r
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
-import { analyzeDNA } from "@/lib/api";
+import { analyzeDNA, SubscriptionRequiredError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import RefCapture from "@/components/RefCapture";
 import { trackEvent, EVENTS } from "@/components/Analytics";
@@ -102,6 +102,14 @@ export default function UploadPage() {
       capture("csv_upload_failed", {
         error_reason: e instanceof Error ? e.message : "unknown",
       });
+      if (e instanceof SubscriptionRequiredError) {
+        if (e.checkoutUrl) {
+          window.location.href = e.checkoutUrl;
+          return;
+        }
+        router.push(e.upgradeUrl);
+        return;
+      }
       setError(
         e instanceof Error ? e.message : "Analysis failed. Please try again.",
       );
