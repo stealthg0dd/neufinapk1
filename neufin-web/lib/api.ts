@@ -105,9 +105,12 @@ export async function claimAnonymousPortfolio(
   }
   return res.json();
 }
-// Empty string = relative URL → routes through Next.js /api/* rewrite proxy to Railway.
-// In Vercel production, set NEXT_PUBLIC_API_URL=https://neufin-web.vercel.app so
-// client-side fetch calls hit the same-origin proxy. Do NOT point directly at Railway.
+// Leave NEXT_PUBLIC_API_URL empty (or unset) in Vercel production.
+// An empty string means all fetch calls use relative /api/* paths, which the
+// Next.js rewrite proxy (next.config.js fallback rules) forwards to Railway.
+// Never set this to the Railway URL in production — doing so bakes the Railway
+// hostname into the browser bundle, causing ERR_NAME_NOT_RESOLVED on networks
+// that block *.up.railway.app.  Set RAILWAY_API_URL (server-only) instead.
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /** Absolute origin for server-side fetch to this deployment (RSC / ISR). Relative `/api` can throw without a base. */
@@ -323,20 +326,56 @@ export async function getSEAPulse(): Promise<SEAPulseResponse> {
 
 // ── DNA ───────────────────────────────────────────────────────────────────────
 
+export class SubscriptionRequiredError extends Error {
+  readonly checkoutUrl: string | null;
+  readonly upgradeUrl: string;
+  constructor(message: string, checkoutUrl: string | null, upgradeUrl = "/pricing") {
+    super(message);
+    this.name = "SubscriptionRequiredError";
+    this.checkoutUrl = checkoutUrl;
+    this.upgradeUrl = upgradeUrl;
+  }
+}
+
 export async function analyzeDNA(
   file: File,
   token?: string | null,
 ): Promise<DNAAnalysisResponse> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API}/api/analyze-dna`, {
+  // Always use a relative URL so the call goes through the Vercel/Next.js proxy
+  // instead of hitting Railway directly from the browser.  Direct browser→Railway
+  // calls fail with ERR_NAME_NOT_RESOLVED on networks that block *.up.railway.app.
+  const res = await fetch("/api/analyze-dna", {
     method: "POST",
     body: form,
     headers: authHeaders(token),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || "Analysis failed");
+    const err = await res.json().catch(() => ({} as Record<string, unknown>));
+    if (res.status === 402) {
+      const msg =
+        (err.message as string) ??
+        (typeof err.detail === "string" ? err.detail : null) ??
+        "Subscription required to run this analysis.";
+      const checkoutUrl =
+        (err.checkout_url as string | null) ??
+        (typeof err.detail === "object" && err.detail !== null
+          ? ((err.detail as Record<string, unknown>).checkout_url as string | null) ?? null
+          : null);
+      const upgradeUrl =
+        (err.upgrade_url as string) ??
+        (typeof err.detail === "object" && err.detail !== null
+          ? ((err.detail as Record<string, unknown>).upgrade_url as string) ?? "/pricing"
+          : "/pricing");
+      throw new SubscriptionRequiredError(msg, checkoutUrl ?? null, upgradeUrl);
+    }
+    const message =
+      typeof err.detail === "string"
+        ? err.detail
+        : (err.message as string | undefined) ??
+          "Analysis failed. Please try again.";
+    throw new Error(message);
   }
   return res.json();
 }

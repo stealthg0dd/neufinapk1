@@ -102,10 +102,15 @@ Set in Vercel dashboard → neufin-web → Settings → Environment Variables:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
-NEXT_PUBLIC_API_BASE_URL=https://neufin101-production.up.railway.app
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_SECRET_KEY=sk_live_...
 NEXT_PUBLIC_SENTRY_DSN=https://...
+
+# Server-only — proxies /api/* to Railway.  No NEXT_PUBLIC_ prefix.
+# DO NOT set NEXT_PUBLIC_API_URL to the Railway URL; leave it unset or empty.
+# Setting it to the Railway URL bakes that domain into the JS bundle and causes
+# ERR_NAME_NOT_RESOLVED for users on networks that block *.up.railway.app.
+RAILWAY_API_URL=https://neufin101-production.up.railway.app
 ```
 
 ### Deploy to Production
