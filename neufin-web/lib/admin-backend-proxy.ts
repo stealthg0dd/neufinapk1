@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 function backendBase(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "";
+  return (
+    process.env.RAILWAY_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    ""
+  );
 }
 
 function extractBearerToken(req: NextRequest): string | null {
@@ -29,7 +33,7 @@ export async function proxyBackendJson(
     return NextResponse.json(
       {
         error: "server_misconfigured",
-        message: "NEXT_PUBLIC_API_URL is not set",
+        message: "RAILWAY_API_URL is not set",
       },
       { status: 503 },
     );

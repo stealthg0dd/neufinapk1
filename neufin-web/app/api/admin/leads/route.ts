@@ -4,7 +4,10 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL ?? "";
+const BACKEND =
+  process.env.RAILWAY_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "";
 
 export const dynamic = "force-dynamic";
 

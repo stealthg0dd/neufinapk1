@@ -105,9 +105,12 @@ export async function claimAnonymousPortfolio(
   }
   return res.json();
 }
-// Empty string = relative URL → routes through Next.js /api/* rewrite proxy to Railway.
-// In Vercel production, set NEXT_PUBLIC_API_URL=https://neufin-web.vercel.app so
-// client-side fetch calls hit the same-origin proxy. Do NOT point directly at Railway.
+// Leave NEXT_PUBLIC_API_URL empty (or unset) in Vercel production.
+// An empty string means all fetch calls use relative /api/* paths, which the
+// Next.js rewrite proxy (next.config.js fallback rules) forwards to Railway.
+// Never set this to the Railway URL in production — doing so bakes the Railway
+// hostname into the browser bundle, causing ERR_NAME_NOT_RESOLVED on networks
+// that block *.up.railway.app.  Set RAILWAY_API_URL (server-only) instead.
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 /** Absolute origin for server-side fetch to this deployment (RSC / ISR). Relative `/api` can throw without a base. */

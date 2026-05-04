@@ -9,7 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const BACKEND = () => process.env.NEXT_PUBLIC_API_URL ?? "";
+const BACKEND = () =>
+  process.env.RAILWAY_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "";
 
 function extractBearerToken(req: NextRequest): string {
   const auth = req.headers.get("authorization")?.trim();

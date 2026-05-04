@@ -7,7 +7,10 @@
 type EnvCheck = { key: string; value: string | undefined };
 
 const REQUIRED_PUBLIC: readonly EnvCheck[] = [
-  { key: "NEXT_PUBLIC_API_URL", value: process.env.NEXT_PUBLIC_API_URL },
+  // NEXT_PUBLIC_API_URL is intentionally optional — leave empty in production
+  // so all /api/* browser calls use relative paths (proxied by Vercel to Railway).
+  // Setting it to the Railway URL bakes that domain into the browser bundle and
+  // causes ERR_NAME_NOT_RESOLVED on networks that block *.up.railway.app.
   {
     key: "NEXT_PUBLIC_SUPABASE_URL",
     value: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -24,7 +27,9 @@ const REQUIRED_PUBLIC: readonly EnvCheck[] = [
 ];
 
 const REQUIRED_SERVER: readonly EnvCheck[] = [
-  // Only checked server-side; never included in client bundle
+  // Server-only Railway target — proxies /api/* from Vercel to Railway.
+  // Must be set in Vercel dashboard without NEXT_PUBLIC_ prefix.
+  { key: "RAILWAY_API_URL", value: process.env.RAILWAY_API_URL },
   { key: "NEXT_PUBLIC_APP_URL", value: process.env.NEXT_PUBLIC_APP_URL },
 ];
 
