@@ -1207,6 +1207,47 @@ export default function SwarmPage() {
     }
   }, []);
 
+  // Optional deep-link from advisor book: /swarm?portfolio_id=…
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pid = new URLSearchParams(window.location.search).get("portfolio_id");
+    if (!pid) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const m = await apiGet<{
+          total_value?: number;
+          positions?: Array<{
+            symbol: string;
+            shares?: number;
+            current_price?: number;
+            current_value?: number;
+            weight?: number;
+          }>;
+        }>(`/api/portfolio/${encodeURIComponent(pid)}/metrics`, {
+          cache: "no-store",
+        });
+        if (cancelled) return;
+        const mapped: SwarmPosition[] = (m.positions ?? []).map((p) => ({
+          symbol: p.symbol,
+          shares: Number(p.shares ?? 0),
+          price: Number(p.current_price ?? 0),
+          value: Number(p.current_value ?? 0),
+          weight: Number(p.weight ?? 0),
+        }));
+        if (mapped.length > 0) {
+          setPositions(mapped);
+          setTotalValue(Number(m.total_value ?? 0));
+        }
+      } catch {
+        /* keep localStorage snapshot */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useBackendHealth();
 
   const API_BASE = "";

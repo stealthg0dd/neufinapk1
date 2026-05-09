@@ -802,13 +802,22 @@ export async function getLeadStats(token: string): Promise<LeadStats> {
 
 export interface AdvisorClient {
   id: string;
-  client_name: string;
+  display_name?: string;
+  client_name?: string;
   client_email?: string;
   notes?: string;
+  /** Linked NeuFin portfolio row (new client book) */
+  primary_portfolio_id?: string | null;
   portfolio_id?: string;
-  dna_score?: number;
+  dna_score?: number | null;
+  score_delta?: number | null;
+  churn_risk?: string;
+  top_bias?: string;
+  last_review_at?: string | null;
+  next_action?: string;
   last_analysis?: string;
-  created_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export async function getAdvisorClients(

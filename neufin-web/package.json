@@ -37,7 +37,8 @@
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
     "resend": "^6.10.0",
-    "stripe": "^21.0.1"
+    "stripe": "^21.0.1",
+    "swr": "^2.4.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",

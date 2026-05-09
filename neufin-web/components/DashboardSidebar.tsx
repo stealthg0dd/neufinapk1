@@ -4,7 +4,15 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { LogOut, Code2, Shield, Link2, ClipboardList } from "lucide-react";
+import {
+  LogOut,
+  Code2,
+  Shield,
+  Link2,
+  ClipboardList,
+  Sunrise,
+  Users,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiGet } from "@/lib/api-client";
 import type { User } from "@supabase/supabase-js";
@@ -21,6 +29,7 @@ function isActivePath(pathname: string, href: string): boolean {
 }
 
 const ADVISOR_PORTFOLIO_NAV: ProductNavItem[] = [
+  { href: "/advisor/clients", label: "Client Book", icon: Users },
   { href: "/dashboard/connect", label: "Connect Portfolio", icon: Link2 },
   { href: "/dashboard/raw-input", label: "Raw Portfolio", icon: ClipboardList },
 ];
@@ -93,6 +102,18 @@ export default function DashboardSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { isAdmin: isAdminFromHook } = useUser();
+
+  const overviewNavItems = useMemo(() => {
+    const base = [...SIDEBAR_NAV.overview];
+    if (isAdvisorModeEnabled()) {
+      base.splice(1, 0, {
+        href: "/dashboard/morning-brief",
+        label: "Morning Brief",
+        icon: Sunrise,
+      });
+    }
+    return base;
+  }, []);
   const [subscription, setSubscription] = useState<SubscriptionStatus>({});
   const [sidebarDnaScore, setSidebarDnaScore] = useState<number | null>(null);
 
@@ -243,7 +264,7 @@ export default function DashboardSidebar({
       )}
 
       <nav className="flex flex-1 flex-col overflow-y-auto pb-3 pt-1">
-        <NavSection label="Overview" items={[...SIDEBAR_NAV.overview]} pathname={pathname} />
+        <NavSection label="Overview" items={overviewNavItems} pathname={pathname} />
         <NavSection label="Insights" items={[...SIDEBAR_NAV.insights]} pathname={pathname} />
         <NavSection label="Account" items={[...SIDEBAR_NAV.account]} pathname={pathname} />
 
