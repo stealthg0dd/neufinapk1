@@ -13,6 +13,7 @@ import {
   perfTimer,
   captureSentrySlowOp,
 } from "@/lib/analytics";
+import { isAdvisorModeEnabled } from "@/lib/featureFlags";
 
 const SAMPLE_CSV = `symbol,shares,cost_basis
 AAPL,10,145.50
@@ -371,6 +372,24 @@ export default function UploadPage() {
             >
               Download sample CSV
             </button>
+
+            {isAdvisorModeEnabled() && (
+              <p className="text-center text-xs text-muted-foreground">
+                <Link
+                  href="/dashboard/connect"
+                  className="text-primary hover:underline"
+                >
+                  More ways to add holdings
+                </Link>
+                {" · "}
+                <Link
+                  href="/dashboard/raw-input"
+                  className="text-primary hover:underline"
+                >
+                  Paste raw portfolio text
+                </Link>
+              </p>
+            )}
           </div>
 
           {/* Format hint */}

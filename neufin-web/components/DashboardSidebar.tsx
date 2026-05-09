@@ -4,7 +4,7 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { LogOut, Code2, Shield } from "lucide-react";
+import { LogOut, Code2, Shield, Link2, ClipboardList } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiGet } from "@/lib/api-client";
 import type { User } from "@supabase/supabase-js";
@@ -14,10 +14,16 @@ import {
   isNavActive,
   type ProductNavItem,
 } from "@/lib/product-navigation";
+import { isAdvisorModeEnabled } from "@/lib/featureFlags";
 
 function isActivePath(pathname: string, href: string): boolean {
   return isNavActive(pathname, href);
 }
+
+const ADVISOR_PORTFOLIO_NAV: ProductNavItem[] = [
+  { href: "/dashboard/connect", label: "Connect Portfolio", icon: Link2 },
+  { href: "/dashboard/raw-input", label: "Raw Portfolio", icon: ClipboardList },
+];
 
 type PortfolioListRow = { dna_score?: number | null };
 
@@ -240,6 +246,14 @@ export default function DashboardSidebar({
         <NavSection label="Overview" items={[...SIDEBAR_NAV.overview]} pathname={pathname} />
         <NavSection label="Insights" items={[...SIDEBAR_NAV.insights]} pathname={pathname} />
         <NavSection label="Account" items={[...SIDEBAR_NAV.account]} pathname={pathname} />
+
+        {isAdvisorModeEnabled() && (
+          <NavSection
+            label="Portfolio"
+            items={ADVISOR_PORTFOLIO_NAV}
+            pathname={pathname}
+          />
+        )}
 
         {isAdminNav && (
           <div className="mt-2">
