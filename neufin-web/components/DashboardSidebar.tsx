@@ -4,7 +4,16 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/BrandLogo";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { LogOut, Code2, Shield } from "lucide-react";
+import {
+  LogOut,
+  Code2,
+  Shield,
+  Link2,
+  ClipboardList,
+  MessageSquare,
+  Sunrise,
+  Users,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { apiGet } from "@/lib/api-client";
 import type { User } from "@supabase/supabase-js";
@@ -14,10 +23,17 @@ import {
   isNavActive,
   type ProductNavItem,
 } from "@/lib/product-navigation";
+import { isAdvisorModeEnabled } from "@/lib/featureFlags";
 
 function isActivePath(pathname: string, href: string): boolean {
   return isNavActive(pathname, href);
 }
+
+const ADVISOR_PORTFOLIO_NAV: ProductNavItem[] = [
+  { href: "/advisor/clients", label: "Client Book", icon: Users },
+  { href: "/dashboard/connect", label: "Connect Portfolio", icon: Link2 },
+  { href: "/dashboard/raw-input", label: "Raw Portfolio", icon: ClipboardList },
+];
 
 type PortfolioListRow = { dna_score?: number | null };
 
@@ -87,6 +103,23 @@ export default function DashboardSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { isAdmin: isAdminFromHook } = useUser();
+
+  const overviewNavItems = useMemo(() => {
+    const base = [...SIDEBAR_NAV.overview];
+    if (isAdvisorModeEnabled()) {
+      base.splice(1, 0, {
+        href: "/dashboard/morning-brief",
+        label: "Morning Brief",
+        icon: Sunrise,
+      });
+      base.splice(2, 0, {
+        href: "/dashboard/communications",
+        label: "Communications",
+        icon: MessageSquare,
+      });
+    }
+    return base;
+  }, []);
   const [subscription, setSubscription] = useState<SubscriptionStatus>({});
   const [sidebarDnaScore, setSidebarDnaScore] = useState<number | null>(null);
 
@@ -237,9 +270,17 @@ export default function DashboardSidebar({
       )}
 
       <nav className="flex flex-1 flex-col overflow-y-auto pb-3 pt-1">
-        <NavSection label="Overview" items={[...SIDEBAR_NAV.overview]} pathname={pathname} />
+        <NavSection label="Overview" items={overviewNavItems} pathname={pathname} />
         <NavSection label="Insights" items={[...SIDEBAR_NAV.insights]} pathname={pathname} />
         <NavSection label="Account" items={[...SIDEBAR_NAV.account]} pathname={pathname} />
+
+        {isAdvisorModeEnabled() && (
+          <NavSection
+            label="Portfolio"
+            items={ADVISOR_PORTFOLIO_NAV}
+            pathname={pathname}
+          />
+        )}
 
         {isAdminNav && (
           <div className="mt-2">

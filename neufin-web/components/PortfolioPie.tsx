@@ -22,6 +22,11 @@ interface Props {
   positions: Position[];
 }
 
+type PieTooltipProps = {
+  active?: boolean;
+  payload?: ReadonlyArray<{ payload?: Position & { color: string } }>;
+};
+
 const usd = (n: number) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -36,8 +41,7 @@ const pct = (n: number) =>
     maximumFractionDigits: 1,
   }).format(n / 100);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload }: any) {
+function CustomTooltip({ active, payload }: PieTooltipProps) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as Position & { color: string };
   const v =

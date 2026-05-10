@@ -13,6 +13,7 @@ import numpy as np
 import structlog
 
 from database import supabase
+from services.zip_compat import zip_equal
 
 logger = structlog.get_logger("neufin.quant_model_engine")
 
@@ -514,9 +515,7 @@ async def _run_macro_mode() -> tuple[dict[str, Any], list[str]]:
     ]
     results = await asyncio.gather(*macro_tasks)
     signal_snapshot: dict[str, float] = {}
-    for key, (payload, warning) in zip(
-        ("vix", "cpi", "unemployment"), results, strict=False
-    ):
+    for key, (payload, warning) in zip_equal(("vix", "cpi", "unemployment"), results):
         if warning:
             warnings.append(warning)
             continue

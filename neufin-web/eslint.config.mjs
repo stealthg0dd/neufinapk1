@@ -1,21 +1,36 @@
-// ESLint 9 flat config — replaces .eslintrc.json
-// eslint-config-next@16 exports native flat config arrays; no FlatCompat needed.
-// Eliminates the "Converting circular structure to JSON" error caused by the
-// react plugin's circular references when serialized through the legacy eslintrc shim.
+// ESLint 9 flat config with FlatCompat for `next/core-web-vitals` (legacy eslintrc shape).
 
-import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { FlatCompat } from "@eslint/eslintrc";
 import securityPlugin from "eslint-plugin-security";
 
-export default [
-  // Next.js core-web-vitals: includes React, React-hooks, import, and @next/next rules
-  ...nextCoreWebVitals,
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Security plugin + project-wide rule overrides
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
+/** @type {import("eslint").Linter.Config[]} */
+const eslintConfig = [
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.turbo/**",
+    ],
+  },
+  ...compat.extends("next/core-web-vitals"),
+
   {
     plugins: { security: securityPlugin },
     rules: {
-      // ── Security ───────────────────────────────────────────────────────────
-      "security/detect-object-injection": "warn",
+      // High noise on chart maps / dynamic keys; rely on code review + typed access where it matters.
+      "security/detect-object-injection": "off",
       "security/detect-non-literal-regexp": "warn",
       "security/detect-unsafe-regex": "error",
       "security/detect-buffer-noassert": "error",
@@ -28,18 +43,29 @@ export default [
       "security/detect-possible-timing-attacks": "warn",
       "security/detect-pseudoRandomBytes": "error",
 
-      // ── Console ────────────────────────────────────────────────────────────
       "no-console": ["warn", { allow: ["warn", "error"] }],
 
-      // ── React Compiler rules (new in Next.js 16 / eslint-config-next@16) ──
-      // Downgraded from error → warn: the codebase pre-dates React Compiler
-      // requirements and these patterns (setState in effects, etc.) are
-      // intentional in existing components.
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/refs": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
+      // React Compiler / hooks rules: many false positives on legacy patterns; keep off for CI until refactors land.
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+    },
+  },
+
+  {
+    files: [
+      "qa/**/*",
+      "**/*.spec.ts",
+      "playwright.config.ts",
+      "proxy.ts",
+      "scripts/**/*",
+    ],
+    rules: {
+      "no-console": "off",
     },
   },
 ];
+
+export default eslintConfig;

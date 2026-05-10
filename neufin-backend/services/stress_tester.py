@@ -33,6 +33,7 @@ import requests
 import structlog
 
 from core.config import settings
+from services.zip_compat import zip_equal
 
 logger = structlog.get_logger("neufin.stress_tester")
 
@@ -539,7 +540,7 @@ def _fetch_history_finnhub(sym: str, start: str, end: str) -> pd.Series:
             return pd.Series(dtype=float, name=sym)
         closes = {
             datetime.date.fromtimestamp(ts).isoformat(): c
-            for ts, c in zip(data["t"], data["c"], strict=False)
+            for ts, c in zip_equal(data["t"], data["c"])
         }
         series = pd.Series(closes, dtype=float)
         series.name = sym
@@ -747,7 +748,7 @@ class StressTester:
                 benchmark_task,
             )
 
-            for ticker, prices in zip(tickers, all_prices, strict=False):
+            for ticker, prices in zip_equal(tickers, all_prices):
                 if prices is not None and not prices.empty:
                     start_p = float(prices.iloc[0])
                     end_p = float(prices.iloc[-1])

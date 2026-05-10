@@ -22,6 +22,7 @@ from services.calculator import (
 from services.jwt_auth import JWTUser
 from services.market_resolver import resolve_security
 from services.risk_engine import build_risk_report
+from services.zip_compat import zip_equal
 
 logger = structlog.get_logger(__name__)
 
@@ -599,14 +600,13 @@ async def get_stock_chart(symbol: str, period: str = "3mo"):
             "close": round(c, 2),
             "volume": v,
         }
-        for t, o, h, lam, c, v in zip(
+        for t, o, h, lam, c, v in zip_equal(
             candle["t"],
             candle["o"],
             candle["h"],
             candle["l"],
             candle["c"],
             candle.get("v", [0] * len(candle["c"])),
-            strict=True,
         )
     ]
     return {"symbol": symbol.upper(), "period": normalized_period, "data": data}
@@ -681,7 +681,7 @@ async def get_portfolio_value_history(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Price fetch failed: {e}") from e
 
-    weight_map = dict(zip(sym_list, shares_list, strict=False))
+    weight_map = dict(zip_equal(sym_list, shares_list))
     history = []
     for date_idx, row in prices.iterrows():
         day_value = sum(

@@ -98,6 +98,7 @@ from routers import (  # noqa: E402
     dna,
     leads as leads_router,
     market,
+    normalize as normalize_router,
     payments,
     portfolio,
     profile as profile_router,
@@ -784,6 +785,7 @@ async def auth_middleware(request: Request, call_next):
 
 app.include_router(dna.router)
 app.include_router(portfolio.router)
+app.include_router(normalize_router.router)
 app.include_router(quant_router.router)
 app.include_router(reports.router)
 app.include_router(payments.router)

@@ -131,3 +131,35 @@ export async function proxyBinaryPost(
     );
   }
 }
+
+/** GET from Railway and return binary (e.g. PDF); forwards auth only. */
+export async function proxyBinaryGet(
+  req: NextRequest,
+  backendPath: string,
+): Promise<NextResponse> {
+  const url = `${RAILWAY_BASE}${backendPath}`;
+  const bearerToken = bearerTokenFromRequest(req);
+  const headers: Record<string, string> = {};
+  if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
+
+  try {
+    const upstream = await fetch(url, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(120000),
+    });
+    const buf = await upstream.arrayBuffer();
+    const out = new Headers();
+    const ct = upstream.headers.get("content-type");
+    if (ct) out.set("content-type", ct);
+    const cd = upstream.headers.get("content-disposition");
+    if (cd) out.set("content-disposition", cd);
+    return new NextResponse(buf, { status: upstream.status, headers: out });
+  } catch (err) {
+    console.error(`[proxy] GET ${url} failed:`, err);
+    return NextResponse.json(
+      { error: "Upstream service unavailable", detail: String(err) },
+      { status: 502 },
+    );
+  }
+}

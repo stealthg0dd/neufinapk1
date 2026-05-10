@@ -5,8 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-
-const API = process.env.NEXT_PUBLIC_API_URL;
+import { apiFetch } from "@/lib/api-client";
 
 export default function NewClientPage() {
   const { token } = useAuth();
@@ -36,19 +35,26 @@ export default function NewClientPage() {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/api/advisor/clients`, {
+      const res = await apiFetch("/api/advisor/clients", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(form),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
-        throw new Error(err.detail || "Could not add client");
+        const d = err.detail;
+        const msg =
+          typeof d === "string"
+            ? d
+            : d && typeof d === "object" && "message" in d
+              ? String((d as { message?: string }).message)
+              : "Could not add client";
+        throw new Error(msg);
       }
-      router.push("/advisor/dashboard");
+      const created = (await res.json().catch(() => null)) as {
+        id?: string;
+      } | null;
+      const cid = created?.id;
+      router.push(cid ? `/advisor/clients/${cid}` : "/advisor/clients");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add client");
     } finally {
@@ -61,7 +67,7 @@ export default function NewClientPage() {
       <div className="mx-auto w-full max-w-3xl space-y-6 px-4 md:px-0">
         <div className="flex items-center gap-4">
           <Link
-            href="/advisor/dashboard"
+            href="/advisor/clients"
             className="text-sm text-muted2 transition-colors hover:text-primary-dark"
           >
             ← Back

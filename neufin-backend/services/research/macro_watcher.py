@@ -23,6 +23,7 @@ import structlog
 
 from core.config import settings
 from database import supabase
+from services.zip_compat import zip_equal
 
 logger = structlog.get_logger("neufin.macro_watcher")
 
@@ -192,7 +193,7 @@ async def ingest_fred() -> int:
     new_count = 0
     tasks = {s[0]: fetch_fred_series(s[0]) for s in FRED_SERIES}
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
-    series_results = dict(zip(tasks.keys(), results, strict=False))
+    series_results = dict(zip_equal(tasks.keys(), results))
 
     for series_id, signal_type, region, title in FRED_SERIES:
         obs = series_results.get(series_id)
