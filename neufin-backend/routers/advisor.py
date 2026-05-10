@@ -1,6 +1,7 @@
 """
 Advisor Multi-Client Dashboard & CRM
 -----------------------------------
+GET  /api/advisor/brief                      → daily brief JSON (30m cache)
 GET  /api/advisor/morning-brief              → aggregated advisor morning brief
 GET  /api/advisor/clients                    → advisor client book (CRM)
 POST /api/advisor/clients                    → create advisor_client + primary portfolio link
@@ -23,6 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from database import supabase
+from services.advisor_brief import build_morning_brief_dashboard, get_daily_brief_cached
 from services.auth_dependency import get_current_user
 from services.jwt_auth import JWTUser
 
@@ -178,308 +180,20 @@ class BatchReportRequest(BaseModel):
 # ── Morning brief ─────────────────────────────────────────────────────────────
 
 
+@router.get("/brief")
+async def advisor_daily_brief(user: JWTUser = Depends(get_current_user)):
+    """
+    Cached daily brief (30m) — regime, ranked clients, unread alerts, meetings.
+    """
+    _require_advisor_access(user)
+    return get_daily_brief_cached(user.id)
+
+
 @router.get("/morning-brief")
 async def morning_brief(user: JWTUser = Depends(get_current_user)):
     """Aggregated behavioral / CRM brief for the advisor dashboard."""
     _require_advisor_access(user)
-
-    uid = user.id
-    now = datetime.now(UTC)
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    first_name: str | None = None
-    if user.email:
-        first_name = (user.email.split("@", 1)[0] or "there").strip() or None
-
-    try:
-        ac_res = (
-            supabase.table("advisor_clients")
-            .select("id")
-            .eq("advisor_id", uid)
-            .execute()
-        )
-        advisor_client_ids = [str(r["id"]) for r in (ac_res.data or [])]
-    except Exception as e:
-        raise HTTPException(500, f"Could not load clients: {e}") from e
-
-    try:
-        cp_res = (
-            supabase.table("client_portfolios")
-            .select("id")
-            .eq("advisor_id", uid)
-            .execute()
-        )
-        portfolios_monitored = len(cp_res.data or [])
-    except Exception:
-        portfolios_monitored = 0
-
-    alerts_morning = 0
-    try:
-        ar = (
-            supabase.table("behavioral_alerts")
-            .select("id", count="exact")
-            .eq("advisor_id", uid)
-            .gte("created_at", day_start.isoformat())
-            .execute()
-        )
-        alerts_morning = int(ar.count or 0)
-    except Exception:
-        try:
-            fallback = (
-                supabase.table("behavioral_alerts")
-                .select("id")
-                .eq("advisor_id", uid)
-                .gte("created_at", day_start.isoformat())
-                .execute()
-            )
-            alerts_morning = len(fallback.data or [])
-        except Exception:
-            alerts_morning = 0
-
-    clients_due_review = 0
-    cutoff = (now - timedelta(days=90)).isoformat()
-    try:
-        all_clients = (
-            supabase.table("advisor_clients")
-            .select("id, metadata")
-            .eq("advisor_id", uid)
-            .execute()
-        )
-        for row in all_clients.data or []:
-            meta = row.get("metadata") or {}
-            if not isinstance(meta, dict):
-                meta = {}
-            lr = meta.get("last_review_at")
-            if not lr:
-                clients_due_review += 1
-            else:
-                try:
-                    lr_dt = datetime.fromisoformat(str(lr).replace("Z", "+00:00"))
-                    if lr_dt.isoformat() < cutoff:
-                        clients_due_review += 1
-                except Exception:
-                    clients_due_review += 1
-    except Exception:
-        clients_due_review = 0
-
-    # Load alerts (recent first) to prioritize cards + regime heuristics
-    alerts_rows: list[dict[str, Any]] = []
-    try:
-        alerts_rows = (
-            supabase.table("behavioral_alerts")
-            .select("*")
-            .eq("advisor_id", uid)
-            .order("created_at", desc=True)
-            .limit(200)
-            .execute()
-        ).data or []
-    except Exception:
-        alerts_rows = []
-
-    # Build per-client snapshot stats
-    cp_all = (
-        supabase.table("client_portfolios")
-        .select("id, client_id")
-        .eq("advisor_id", uid)
-        .execute()
-    ).data or []
-    cp_to_client: dict[str, str] = {
-        str(x["id"]): str(x["client_id"]) for x in cp_all if x.get("client_id")
-    }
-    cp_ids = list(cp_to_client.keys())
-    snaps_by_cp: dict[str, list[dict[str, Any]]] = {cid: [] for cid in cp_ids}
-    if cp_ids:
-        try:
-            snap_res = (
-                supabase.table("dna_score_snapshots")
-                .select("client_portfolio_id, dna_score, detail, created_at")
-                .in_("client_portfolio_id", cp_ids)
-                .order("created_at", desc=True)
-                .limit(800)
-                .execute()
-            )
-            for s in snap_res.data or []:
-                cid = str(s.get("client_portfolio_id") or "")
-                if cid in snaps_by_cp:
-                    snaps_by_cp[cid].append(s)
-        except Exception as exc:
-            logger.warning("advisor.morning_brief.snapshots_failed", error=str(exc))
-
-    def score_delta_for_client(client_uuid: str) -> tuple[int | None, int | None]:
-        series: list[tuple[datetime, int]] = []
-        for cp_id, client_id in cp_to_client.items():
-            if client_id != client_uuid:
-                continue
-            for s in snaps_by_cp.get(cp_id, [])[:3]:
-                ds = s.get("dna_score")
-                if ds is None:
-                    continue
-                try:
-                    ca = s.get("created_at")
-                    dt = datetime.fromisoformat(str(ca).replace("Z", "+00:00"))
-                    series.append((dt, int(ds)))
-                except Exception as exc:
-                    logger.debug(
-                        "advisor.morning_brief.skip_snapshot_ts", error=str(exc)
-                    )
-                    continue
-        series.sort(key=lambda x: x[0], reverse=True)
-        if not series:
-            return None, None
-        cur = series[0][1]
-        if len(series) < 2:
-            return cur, None
-        prev = series[1][1]
-        return cur, cur - prev
-
-    clients_by_id: dict[str, dict[str, Any]] = {}
-    if advisor_client_ids:
-        try:
-            cr = (
-                supabase.table("advisor_clients")
-                .select("*")
-                .in_("id", advisor_client_ids)
-                .execute()
-            )
-            for c in cr.data or []:
-                clients_by_id[str(c["id"])] = c
-        except Exception as exc:
-            logger.warning("advisor.morning_brief.clients_fetch_failed", error=str(exc))
-
-    priority: list[str] = []
-    seen_c: set[str] = set()
-    for a in alerts_rows:
-        cid = str(a.get("client_id") or "")
-        if cid and cid not in seen_c:
-            seen_c.add(cid)
-            priority.append(cid)
-
-    scored: list[tuple[int, str]] = []
-    for cid in advisor_client_ids:
-        if cid in seen_c:
-            continue
-        cur, dlt = score_delta_for_client(cid)
-        drop = abs(min(0, dlt or 0))
-        scored.append((int(drop * 10), cid))
-    scored.sort(key=lambda x: (-x[0], x[1]))
-    for _, cid in scored:
-        if cid not in seen_c:
-            priority.append(cid)
-            if len(priority) >= 25:
-                break
-
-    top_clients: list[dict[str, Any]] = []
-    for cid in priority[:5]:
-        c = clients_by_id.get(cid, {})
-        display = str(c.get("display_name") or f"Client {str(cid)[:8]}")
-        latest_alert = next(
-            (x for x in alerts_rows if str(x.get("client_id")) == cid), None
-        )
-        churn = (
-            _severity_to_churn(str(latest_alert.get("severity")))
-            if latest_alert
-            else "LOW"
-        )
-        cur_s, delta = score_delta_for_client(cid)
-        payload = (latest_alert or {}).get("payload") or {}
-        detail = {}
-        if latest_alert:
-            # reuse last snapshot detail for bias if alert has none
-            any_snap: dict[str, Any] | None = None
-            for cp_id, clid in cp_to_client.items():
-                if clid == cid and snaps_by_cp.get(cp_id):
-                    any_snap = snaps_by_cp[cp_id][0]
-                    break
-            detail = (any_snap or {}).get("detail") or {}
-            if isinstance(detail, str):
-                detail = {}
-        top_bias = (
-            _payload_str(payload, "top_bias", "bias_flag", "top_flag")
-            or _detail_bias(detail)
-            or "—"
-        )
-        risk_from = _payload_str(payload, "risk_from", "from_risk") or "—"
-        risk_to = _payload_str(payload, "risk_to", "to_risk") or "—"
-        reason = (
-            (latest_alert or {}).get("body")
-            or (latest_alert or {}).get("title")
-            or "Review behavioral signals for this client."
-        )
-        next_action = (
-            _payload_str(payload, "recommended_action", "next_action", "action")
-            or "Review alerts and schedule touchpoint if material."
-        )
-        row: dict[str, Any] = {
-            "client_id": cid,
-            "display_name": display,
-            "dna_score_current": cur_s,
-            "dna_score_delta": delta,
-            "churn_risk": churn,
-            "top_bias": top_bias,
-            "risk_from": risk_from,
-            "risk_to": risk_to,
-            "reason": reason,
-            "recommended_action": next_action,
-            "severity": (latest_alert or {}).get("severity"),
-            "primary_portfolio_id": _resolve_primary_portfolio_id(cid, uid),
-        }
-        top_clients.append(row)
-
-    misaligned = 0
-    primary_risk = (
-        "Monitor concentration and factor exposures versus the current regime."
-    )
-    for a in alerts_rows[:40]:
-        pl = a.get("payload") or {}
-        if isinstance(pl, dict) and pl.get("regime_misaligned") is True:
-            misaligned += 1
-    if misaligned == 0:
-        misaligned = sum(
-            1
-            for a in alerts_rows[:40]
-            if (a.get("severity") or "").lower() in {"high", "critical"}
-        )
-
-    upcoming_meetings: list[dict[str, Any]] = []
-    try:
-        mt = (
-            supabase.table("client_meetings")
-            .select("id, client_id, title, scheduled_at, duration_minutes, notes")
-            .eq("advisor_id", uid)
-            .gte("scheduled_at", now.isoformat())
-            .order("scheduled_at", desc=False)
-            .limit(3)
-            .execute()
-        )
-        for m in mt.data or []:
-            cid = str(m.get("client_id") or "")
-            display = (clients_by_id.get(cid) or {}).get(
-                "display_name"
-            ) or f"Client {cid[:8]}"
-            upcoming_meetings.append(
-                {
-                    **m,
-                    "client_display_name": display,
-                    "prep_ready": bool((m.get("notes") or "").strip()),
-                }
-            )
-    except Exception:
-        upcoming_meetings = []
-
-    return {
-        "greeting_name": first_name or "there",
-        "generated_at": now.isoformat(),
-        "portfolios_monitored": portfolios_monitored,
-        "alerts_this_morning": alerts_morning,
-        "clients_due_review_this_week": clients_due_review,
-        "top_clients": top_clients,
-        "upcoming_meetings": upcoming_meetings,
-        "regime_impact": {
-            "misaligned_portfolios": misaligned,
-            "primary_risk": primary_risk,
-            "suggested_tilt": "Consider trimming momentum / high-beta sleeves when regime data shows risk-off.",
-        },
-    }
+    return build_morning_brief_dashboard(user)
 
 
 # ── Client book ───────────────────────────────────────────────────────────────
