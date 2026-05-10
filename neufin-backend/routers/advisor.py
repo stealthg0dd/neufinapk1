@@ -12,6 +12,8 @@ GET  /api/advisor/clients/{id}/timeline      → DNA + portfolio snapshots
 GET  /api/advisor/clients/{id}/analysis       → latest DNA (legacy portfolio OR book client)
 GET  /api/advisor/clients/{id}/reports       → advisor PDF reports for linked portfolio
 POST /api/advisor/reports/batch              → queue reports (portfolio UUIDs)
+POST /api/advisor/meeting-prep               → generate 1-page meeting prep brief
+PATCH /api/advisor/meeting-prep/{meeting_id}  → update prep status / saved JSON
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from database import supabase
 from services.advisor_brief import build_morning_brief_dashboard, get_daily_brief_cached
 from services.auth_dependency import get_current_user
 from services.jwt_auth import JWTUser
+from services.meeting_prep import generate_meeting_prep_brief, patch_meeting_prep
 
 logger = structlog.get_logger(__name__)
 
@@ -177,6 +180,17 @@ class BatchReportRequest(BaseModel):
     client_ids: list[str]
 
 
+class MeetingPrepRequest(BaseModel):
+    client_id: str
+    meeting_date: str
+    notes: str | None = None
+
+
+class MeetingPrepPatchBody(BaseModel):
+    prep_status: str | None = None
+    prep_brief_json: dict[str, Any] | None = None
+
+
 # ── Morning brief ─────────────────────────────────────────────────────────────
 
 
@@ -194,6 +208,50 @@ async def morning_brief(user: JWTUser = Depends(get_current_user)):
     """Aggregated behavioral / CRM brief for the advisor dashboard."""
     _require_advisor_access(user)
     return build_morning_brief_dashboard(user)
+
+
+@router.post("/meeting-prep")
+async def meeting_prep_create(
+    body: MeetingPrepRequest,
+    user: JWTUser = Depends(get_current_user),
+):
+    """Generate meeting prep brief (metrics-only → Claude), persist meeting + draft comms."""
+    _require_advisor_access(user)
+    try:
+        return await generate_meeting_prep_brief(
+            user.id,
+            body.client_id,
+            body.meeting_date,
+            body.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("advisor.meeting_prep_failed", error=str(exc))
+        raise HTTPException(500, "Meeting prep generation failed.") from exc
+
+
+@router.patch("/meeting-prep/{meeting_id}")
+async def meeting_prep_patch(
+    meeting_id: str,
+    body: MeetingPrepPatchBody,
+    user: JWTUser = Depends(get_current_user),
+):
+    _require_advisor_access(user)
+    if body.prep_status is None and body.prep_brief_json is None:
+        raise HTTPException(400, "Provide prep_status and/or prep_brief_json.")
+    try:
+        return patch_meeting_prep(
+            user.id,
+            meeting_id,
+            prep_status=body.prep_status,
+            prep_brief_json=body.prep_brief_json,
+        )
+    except ValueError as exc:
+        msg = str(exc).lower()
+        if "not found" in msg:
+            raise HTTPException(404, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
 
 
 # ── Client book ───────────────────────────────────────────────────────────────
