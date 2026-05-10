@@ -14,19 +14,29 @@ GET  /api/advisor/clients/{id}/reports       → advisor PDF reports for linked 
 POST /api/advisor/reports/batch              → queue reports (portfolio UUIDs)
 POST /api/advisor/meeting-prep               → generate 1-page meeting prep brief
 PATCH /api/advisor/meeting-prep/{meeting_id}  → update prep status / saved JSON
+POST /api/advisor/communications/generate    → AI draft (email / WhatsApp / PDF / talking points)
+GET  /api/advisor/communications?client_id= → list communications for client
+PATCH /api/advisor/communications/{id}       → save draft / approve / mark sent (no auto-send)
+GET  /api/advisor/communications/{id}/pdf  → download client-summary PDF (pdf type only)
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from database import supabase
 from services.advisor_brief import build_morning_brief_dashboard, get_daily_brief_cached
+from services.advisor_communications import (
+    build_pdf_for_communication,
+    generate_communication_draft,
+    list_communications,
+    patch_communication,
+)
 from services.auth_dependency import get_current_user
 from services.jwt_auth import JWTUser
 from services.meeting_prep import generate_meeting_prep_brief, patch_meeting_prep
@@ -191,6 +201,18 @@ class MeetingPrepPatchBody(BaseModel):
     prep_brief_json: dict[str, Any] | None = None
 
 
+class CommunicationGenerateBody(BaseModel):
+    client_id: str
+    type: Literal["email", "whatsapp", "pdf", "talking_points"]
+    context_notes: str | None = None
+
+
+class CommunicationPatchBody(BaseModel):
+    subject: str | None = None
+    body: str | None = None
+    status: Literal["draft", "approved", "sent"] | None = None
+
+
 # ── Morning brief ─────────────────────────────────────────────────────────────
 
 
@@ -252,6 +274,92 @@ async def meeting_prep_patch(
         if "not found" in msg:
             raise HTTPException(404, str(exc)) from exc
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.post("/communications/generate")
+async def communications_generate(
+    body: CommunicationGenerateBody,
+    user: JWTUser = Depends(get_current_user),
+):
+    """
+    Generate advisor-reviewable client communication; persists as draft.
+    NeuFin never sends email or WhatsApp from this API.
+    """
+    _require_advisor_access(user)
+    try:
+        return await generate_communication_draft(
+            user.id,
+            body.client_id,
+            body.type,
+            body.context_notes,
+        )
+    except ValueError as exc:
+        msg = str(exc).lower()
+        if "not found" in msg:
+            raise HTTPException(404, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("advisor.communications_generate_failed", error=str(exc))
+        raise HTTPException(500, "Communication generation failed.") from exc
+
+
+@router.get("/communications")
+async def communications_list(
+    client_id: str = Query(..., description="advisor_clients.id"),
+    user: JWTUser = Depends(get_current_user),
+):
+    _require_advisor_access(user)
+    try:
+        rows = list_communications(user.id, client_id)
+        return {"communications": rows}
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.patch("/communications/{comm_id}")
+async def communications_patch(
+    comm_id: str,
+    body: CommunicationPatchBody,
+    user: JWTUser = Depends(get_current_user),
+):
+    _require_advisor_access(user)
+    if body.subject is None and body.body is None and body.status is None:
+        raise HTTPException(400, "Provide subject, body, and/or status.")
+    try:
+        return patch_communication(
+            user.id,
+            comm_id,
+            subject=body.subject,
+            body=body.body,
+            status=body.status,
+        )
+    except ValueError as exc:
+        msg = str(exc).lower()
+        if "not found" in msg:
+            raise HTTPException(404, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/communications/{comm_id}/pdf")
+async def communications_pdf_download(
+    comm_id: str,
+    user: JWTUser = Depends(get_current_user),
+):
+    _require_advisor_access(user)
+    try:
+        pdf_bytes, title = build_pdf_for_communication(user.id, comm_id)
+    except ValueError as exc:
+        msg = str(exc).lower()
+        if "not found" in msg:
+            raise HTTPException(404, str(exc)) from exc
+        raise HTTPException(400, str(exc)) from exc
+    safe = "".join(c if c.isalnum() or c in "._-" else "_" for c in title)[:80]
+    fname = f"{safe or 'client-summary'}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 # ── Client book ───────────────────────────────────────────────────────────────

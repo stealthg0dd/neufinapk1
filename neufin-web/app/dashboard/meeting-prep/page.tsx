@@ -427,8 +427,21 @@ export default function MeetingPrepPage() {
                 <ChevronDown className="h-4 w-4 shrink-0" />
               )}
             </button>
+            {brief.client_id ? (
+              <div className="mt-3">
+                <Link
+                  href={`/dashboard/communications?client=${encodeURIComponent(brief.client_id)}&type=email`}
+                  className="inline-flex rounded-lg border border-primary/40 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-primary-light/80"
+                >
+                  Draft follow-up email
+                </Link>
+                <p className="mt-1 text-xs text-muted2">
+                  Opens the communication studio (review and send from your own email).
+                </p>
+              </div>
+            ) : null}
             {emailOpen && (
-              <div className="mt-3 space-y-2 text-sm">
+              <div className="mt-3 space-y-3 text-sm">
                 <p className="font-medium text-navy">{brief.section_f?.subject}</p>
                 <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 font-sans text-readable">
                   {brief.section_f?.body}

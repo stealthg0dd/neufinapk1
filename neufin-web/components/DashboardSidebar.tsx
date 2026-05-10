@@ -10,6 +10,7 @@ import {
   Shield,
   Link2,
   ClipboardList,
+  MessageSquare,
   Sunrise,
   Users,
 } from "lucide-react";
@@ -110,6 +111,11 @@ export default function DashboardSidebar({
         href: "/dashboard/morning-brief",
         label: "Morning Brief",
         icon: Sunrise,
+      });
+      base.splice(2, 0, {
+        href: "/dashboard/communications",
+        label: "Communications",
+        icon: MessageSquare,
       });
     }
     return base;

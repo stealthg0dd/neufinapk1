@@ -242,6 +242,12 @@ export default function AdvisorClientDetailPage() {
                   >
                     Generate meeting prep
                   </Link>
+                  <Link
+                    href={`/dashboard/communications?client=${encodeURIComponent(id)}&type=pdf`}
+                    className="rounded-lg border border-primary/30 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-primary-light/80"
+                  >
+                    Generate Client Summary
+                  </Link>
                 </div>
               </div>
             </div>

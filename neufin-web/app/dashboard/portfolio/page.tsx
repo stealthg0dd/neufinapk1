@@ -37,6 +37,7 @@ import {
   formatPortfolioTotalLine,
 } from "@/lib/finance-content";
 import { PageJourneyHint } from "@/components/dashboard/PageJourneyHint";
+import { isAdvisorModeEnabled } from "@/lib/featureFlags";
 
 const STAGES = [
   {
@@ -788,6 +789,14 @@ export default function PortfolioPage() {
             <p className="mt-2 text-center text-sm font-mono tracking-widest text-muted-foreground">
               Portfolio DNA score
             </p>
+            {isAdvisorModeEnabled() ? (
+              <Link
+                href="/dashboard/communications?type=pdf"
+                className="mt-3 inline-block text-center text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Generate Client Summary (pick client in studio)
+              </Link>
+            ) : null}
           </div>
 
           {piePositions.length ? (

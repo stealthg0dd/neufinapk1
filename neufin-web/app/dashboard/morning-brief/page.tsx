@@ -315,7 +315,7 @@ export default function MorningBriefPage() {
                         Run Analysis
                       </Link>
                       <Link
-                        href={`/dashboard/reports?client_id=${encodeURIComponent(c.client_id)}`}
+                        href={`/dashboard/communications?client=${encodeURIComponent(c.client_id)}&type=email`}
                         className="rounded-lg border border-primary/30 bg-primary-light px-3 py-2 text-xs font-semibold text-primary-dark hover:bg-primary-light/80"
                       >
                         Generate Memo

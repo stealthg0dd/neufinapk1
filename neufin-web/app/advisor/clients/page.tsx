@@ -288,6 +288,12 @@ export default function AdvisorClientBookPage() {
                         Meeting prep
                       </Link>
                       <Link
+                        href={`/dashboard/communications?client=${encodeURIComponent(r.id)}&type=email`}
+                        className="rounded-md border border-primary/30 bg-primary-light px-2 py-1 text-xs font-semibold text-primary-dark hover:bg-primary-light/80"
+                      >
+                        Generate memo
+                      </Link>
+                      <Link
                         href={
                           r.primary_portfolio_id
                             ? `/swarm?portfolio_id=${encodeURIComponent(r.primary_portfolio_id)}`
