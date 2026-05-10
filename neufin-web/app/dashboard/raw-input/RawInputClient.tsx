@@ -144,13 +144,10 @@ export function RawInputClient() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-navy">
-          Raw portfolio input
-        </h1>
         <p className="mt-1 text-sm text-slate2">
           Paste exports or handwritten lines. We parse locally on the server
           (deterministic), then you review before the same DNA analysis as{" "}
-          <Link href="/upload" className="text-primary hover:underline">
+          <Link href="/upload?method=upload" className="text-primary hover:underline">
             CSV upload
           </Link>
           .
@@ -361,10 +358,10 @@ export function RawInputClient() {
               {analyzeLoading ? "Analyzing…" : "Proceed to analysis"}
             </button>
             <Link
-              href="/dashboard/connect"
+              href="/upload?method=upload"
               className="btn-secondary inline-flex items-center px-6 py-3 text-sm"
             >
-              Connection hub
+              Upload hub
             </Link>
           </div>
         </div>

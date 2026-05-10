@@ -1,33 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { RawInputClient } from "./RawInputClient";
 
 export const dynamic = "force-dynamic";
 
-/** Phase 4 — rich paste / raw portfolio capture (placeholder). */
 export default function RawInputPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-4 px-4 py-10">
+    <div className="mx-auto max-w-4xl space-y-6 px-4 py-8 md:px-6">
       <p className="text-label">Portfolio</p>
-      <h1 className="text-2xl font-bold text-navy">Paste raw portfolio</h1>
-      <p className="text-sm text-muted2">
-        Structured paste, CSV repair, and advisor batch ingest will land in Phase
-        4. For now, use Upload or Connect Portfolio from the dashboard.
-      </p>
-      <div className="flex flex-wrap gap-2 pt-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-navy">Paste raw portfolio</h1>
         <Link
-          href="/upload"
-          className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-dark"
+          href="/upload?method=upload"
+          className="text-sm font-medium text-primary hover:underline"
         >
-          Go to upload
-        </Link>
-        <Link
-          href="/dashboard/connect"
-          className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-2"
-        >
-          Connect portfolio
+          ← Back to upload hub
         </Link>
       </div>
+      <RawInputClient />
     </div>
   );
 }
