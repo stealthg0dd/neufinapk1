@@ -119,8 +119,8 @@ export async function POST(req: Request) {
     const rawForLog =
       process.env.STRIPE_WEBHOOK_SECRET_CLI ??
       process.env.STRIPE_WEBHOOK_SECRET;
-    console.log("[webhook] stripe-signature present:", Boolean(sig));
-    console.log(
+    console.warn("[webhook] stripe-signature present:", Boolean(sig));
+    console.warn(
       "[webhook] using secret from:",
       process.env.STRIPE_WEBHOOK_SECRET_CLI
         ? "STRIPE_WEBHOOK_SECRET_CLI"
@@ -161,7 +161,7 @@ export async function POST(req: Request) {
     });
   }
 
-  console.log(`[webhook] Received: ${event.type}`);
+  console.warn(`[webhook] Received: ${event.type}`);
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
@@ -358,7 +358,7 @@ async function dispatchStripeWebhookEvent(
         return;
       }
 
-      console.log(
+      console.warn(
         `[webhook] Upgraded to advisor: ${email_domain_only_log(email)}`,
       );
       await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
@@ -415,7 +415,7 @@ async function dispatchStripeWebhookEvent(
         return;
       }
 
-      console.log(`[webhook] Invoice paid for customer: ${customerId}`);
+      console.warn(`[webhook] Invoice paid for customer: ${customerId}`);
       await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
@@ -470,7 +470,7 @@ async function dispatchStripeWebhookEvent(
         return;
       }
 
-      console.log(`[webhook] Sub updated: ${customerId} → ${sub.status}`);
+      console.warn(`[webhook] Sub updated: ${customerId} → ${sub.status}`);
       await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
@@ -526,13 +526,13 @@ async function dispatchStripeWebhookEvent(
         return;
       }
 
-      console.log(`[webhook] Sub cancelled: ${customerId}`);
+      console.warn(`[webhook] Sub cancelled: ${customerId}`);
       await invalidateBackendSubscriptionCache(rows.map((row) => row.id));
       return;
     }
 
     default:
-      console.log(`[webhook] Unhandled event type: ${event.type}`);
+      console.warn(`[webhook] Unhandled event type: ${event.type}`);
   }
 }
 

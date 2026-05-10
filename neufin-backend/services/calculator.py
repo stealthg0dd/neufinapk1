@@ -33,6 +33,7 @@ from services.market_resolver import (
     should_use_twelve_data_first,
     twelve_data_symbol,
 )
+from services.zip_compat import zip_equal
 
 load_dotenv()  # No-op when Railway injects env vars; loads .env in local dev
 
@@ -1576,7 +1577,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     # null/blank with no explicit reason. SEA-VN-FIX after: compute USD market
     # value with local price + FX, or annotate an actionable data outage.
     market_value_payload: dict[str, dict] = {}
-    shares_by_symbol = dict(zip(df["symbol"], df["shares"], strict=False))
+    shares_by_symbol = dict(zip_equal(df["symbol"], df["shares"]))
     for sym in symbols:
         status = price_status.get(sym, "unresolvable")
         if _is_sea_market_symbol(sym):

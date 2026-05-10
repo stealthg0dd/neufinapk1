@@ -161,9 +161,8 @@ export default function RootLayout({
 }) {
   const showAuthDebug = process.env.NODE_ENV !== "production";
   if (showAuthDebug) {
-    // Keep env validation out of production runtime path.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require("@/lib/env-check");
+    // Keep env validation out of production runtime path (dynamic import avoids require).
+    void import("@/lib/env-check");
   }
 
   return (

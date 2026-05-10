@@ -27,6 +27,8 @@ function typeStyle(t: string): string {
 
 function highlightText(text: string, q: string) {
   if (!q.trim()) return text;
+  // q is escaped for regex metacharacters before interpolation.
+  // eslint-disable-next-line security/detect-non-literal-regexp
   const parts = text.split(new RegExp(`(${escapeReg(q)})`, "gi"));
   return parts.map((part, i) =>
     part.toLowerCase() === q.toLowerCase() ? (

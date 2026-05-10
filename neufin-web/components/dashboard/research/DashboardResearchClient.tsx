@@ -134,7 +134,7 @@ export default function DashboardResearchClient() {
   const savedIds = useMemo(() => {
     void savedTick;
     return new Set(getSavedResearchIds());
-  }, [savedTick, notes]);
+  }, [savedTick]);
 
   const relevanceCtx = useMemo(
     () =>

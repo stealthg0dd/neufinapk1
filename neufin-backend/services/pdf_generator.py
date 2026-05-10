@@ -68,6 +68,7 @@ from services.report_state import (
     assess_report_state,
     build_section_confidence,
 )
+from services.zip_compat import zip_equal
 
 # Optional: matplotlib for donut chart (degrades to ReportLab bar if absent)
 try:
@@ -1422,12 +1423,11 @@ def _donut_chart_image(
     if not HAS_MPL:
         return None
     try:
-        filtered = [
-            (lbl, v) for lbl, v in zip(labels, values, strict=True) if float(v) > 0.01
-        ]
+        filtered = [(lbl, v) for lbl, v in zip_equal(labels, values) if float(v) > 0.01]
         if not filtered:
             return None
-        _fl, fv = zip(*filtered, strict=True)
+        _fl = tuple(t[0] for t in filtered)
+        fv = tuple(t[1] for t in filtered)
         n = len(fv)
 
         fig, ax = plt.subplots(figsize=(width / 72, height / 72))
@@ -3839,7 +3839,7 @@ def _page_portfolio_snapshot(
         if chart_img is None:
             # Fallback: horizontal bar chart as a Table
             bar_rows = []
-            for i, (lbl, val) in enumerate(zip(labels_p[:8], vals_p[:8], strict=True)):
+            for i, (lbl, val) in enumerate(zip_equal(labels_p[:8], vals_p[:8])):
                 bar_w = max(10, min(110, float(val) * 1.1))
                 bar_rows.append(
                     [
@@ -3953,7 +3953,7 @@ def _page_portfolio_snapshot(
     if labels_p:
         legend_rows = []
         row_chunk = []
-        for i, (lbl, val) in enumerate(zip(labels_p, vals_p, strict=True)):
+        for i, (lbl, val) in enumerate(zip_equal(labels_p, vals_p)):
             dot = Table(
                 [[""]],
                 colWidths=[8],

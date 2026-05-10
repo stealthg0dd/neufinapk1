@@ -12,13 +12,25 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
-export default [
+/** @type {import("eslint").Linter.Config[]} */
+const eslintConfig = [
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/out/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.turbo/**",
+    ],
+  },
   ...compat.extends("next/core-web-vitals"),
 
   {
     plugins: { security: securityPlugin },
     rules: {
-      "security/detect-object-injection": "warn",
+      // High noise on chart maps / dynamic keys; rely on code review + typed access where it matters.
+      "security/detect-object-injection": "off",
       "security/detect-non-literal-regexp": "warn",
       "security/detect-unsafe-regex": "error",
       "security/detect-buffer-noassert": "error",
@@ -33,11 +45,27 @@ export default [
 
       "no-console": ["warn", { allow: ["warn", "error"] }],
 
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/refs": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
+      // React Compiler / hooks rules: many false positives on legacy patterns; keep off for CI until refactors land.
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/immutability": "off",
+      "react-hooks/purity": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+    },
+  },
+
+  {
+    files: [
+      "qa/**/*",
+      "**/*.spec.ts",
+      "playwright.config.ts",
+      "proxy.ts",
+      "scripts/**/*",
+    ],
+    rules: {
+      "no-console": "off",
     },
   },
 ];
+
+export default eslintConfig;

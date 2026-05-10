@@ -90,6 +90,8 @@ const markets = [
 
 function hasFounderImage(webPath: string): boolean {
   const local = path.join(process.cwd(), "public", webPath.replace(/^\//, ""));
+  // webPath is from static founder list, not user input.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   return fs.existsSync(local);
 }
 

@@ -79,6 +79,7 @@ from services.risk_engine import (  # noqa: E402
     format_clusters_for_ai,
 )
 from services.stress_tester import StressTester, compute_factor_metrics  # noqa: E402
+from services.zip_compat import zip_equal  # noqa: E402
 
 
 # alerts router is in routers/ — import lazily to avoid circular dependency at
@@ -383,7 +384,7 @@ async def strategist_node(state: SwarmState) -> dict:
         asyncio.gather(*news_tasks),
         cpi_task,
     )
-    news_map = dict(zip(top3, news_lists, strict=False))
+    news_map = dict(zip_equal(top3, news_lists))
 
     regime = cpi_data["regime"]
     yoy_str = (
@@ -537,7 +538,7 @@ async def quant_node(state: SwarmState) -> dict:
     trace.append(f"[Quant] Fetching beta for {len(symbols)} symbols...")
     betas = await asyncio.gather(*[asyncio.to_thread(fetch_beta, s) for s in symbols])
     beta_map = dict(
-        zip(symbols, [b if isinstance(b, float) else 1.0 for b in betas], strict=False)
+        zip_equal(symbols, [b if isinstance(b, float) else 1.0 for b in betas]),
     )
     weighted_beta = sum(weights.get(s, 0.0) * beta_map.get(s, 1.0) for s in symbols)
     beta_pts = _beta_score(weighted_beta)

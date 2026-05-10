@@ -25,6 +25,7 @@ import requests
 import structlog
 
 from core.config import settings
+from services.zip_compat import zip_equal
 
 logger = structlog.get_logger("neufin.risk_engine")
 
@@ -111,7 +112,7 @@ def _fetch_daily_closes_finnhub(sym: str, days: int = 60) -> pd.Series:
             return pd.Series(dtype=float, name=sym_upper)
         closes = {
             _dt.date.fromtimestamp(ts).isoformat(): c
-            for ts, c in zip(data["t"], data["c"], strict=False)
+            for ts, c in zip_equal(data["t"], data["c"])
         }
         series = pd.Series(closes, dtype=float).sort_index().tail(days)
         series.name = sym_upper
@@ -528,7 +529,7 @@ async def fetch_all_closes(
     results: list[pd.Series] = await asyncio.gather(
         *[asyncio.to_thread(_fetch_daily_closes_av, sym, days) for sym in syms_upper]
     )
-    return dict(zip(syms_upper, results, strict=False))
+    return dict(zip_equal(syms_upper, results))
 
 
 def find_correlation_clusters(

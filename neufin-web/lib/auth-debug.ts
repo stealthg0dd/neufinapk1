@@ -15,15 +15,27 @@ export function debugAuth(location: string): void {
 
   // Supabase JS v2 stores the session at '<storageKey>-auth-token'
   const sessionRaw = localStorage.getItem("neufin-auth-auth-token");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let session: any = null;
+  let session: unknown = null;
   try {
     session = sessionRaw ? JSON.parse(sessionRaw) : null;
-  } catch {}
+  } catch {
+    session = null;
+  }
 
-  const accessToken = session?.access_token ?? null;
-  const user = session?.user ?? null;
-  const expiresAt = session?.expires_at ?? null;
+  const sessObj =
+    typeof session === "object" && session !== null
+      ? (session as Record<string, unknown>)
+      : null;
+  const accessToken =
+    typeof sessObj?.access_token === "string" ? sessObj.access_token : null;
+  const userRaw = sessObj?.user;
+  const userRec =
+    typeof userRaw === "object" && userRaw !== null
+      ? (userRaw as Record<string, unknown>)
+      : null;
+  const userId = typeof userRec?.id === "string" ? userRec.id : null;
+  const userEmail = typeof userRec?.email === "string" ? userRec.email : null;
+  const expiresAt = sessObj?.expires_at ?? null;
 
   const cookieNames = document.cookie
     .split(";")
@@ -35,9 +47,9 @@ export function debugAuth(location: string): void {
       location,
       hasToken: !!accessToken,
       hasCookie,
-      hasUser: !!user,
-      userId: user?.id ?? null,
-      userEmail: user?.email ?? null,
+      hasUser: !!userRec,
+      userId,
+      userEmail,
       tokenPrefix: accessToken
         ? (accessToken as string).slice(0, 20) + "..."
         : null,

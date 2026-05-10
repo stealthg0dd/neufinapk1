@@ -72,7 +72,10 @@ export function ObservabilitySummary({
   const top = data?.incidents?.top_recurring ?? incidents.slice(0, 10);
   const vLatest = data?.deployments?.vercel?.latest;
   const rLatest = data?.deployments?.railway?.latest;
-  const sources = data?.service_health?.sources ?? [];
+  const sources = useMemo(
+    () => data?.service_health?.sources ?? [],
+    [data?.service_health?.sources],
+  );
   const http = data?.service_health?.http_24h ?? {};
 
   const staleSources = useMemo(

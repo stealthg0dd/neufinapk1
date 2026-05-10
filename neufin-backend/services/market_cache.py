@@ -28,6 +28,7 @@ import structlog
 from dotenv import load_dotenv
 
 from core.config import settings
+from services.zip_compat import zip_equal
 
 load_dotenv()
 
@@ -363,7 +364,7 @@ class MarketCache:
                 if data.get("s") == "ok" and data.get("c"):
                     closes = {
                         _dt.date.fromtimestamp(ts).isoformat(): float(c)
-                        for ts, c in zip(data["t"], data["c"], strict=False)
+                        for ts, c in zip_equal(data["t"], data["c"])
                         if _coerce_price(c) is not None
                     }
                     if closes:

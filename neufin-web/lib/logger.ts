@@ -63,12 +63,10 @@ function makeConsoleLogger(bindings: LogEntry = {}): Logger {
 // chunk (Next.js tree-shakes server-only code automatically).
 function makeServerLogger(): Logger {
   // Lazy require so this path is only executed in Node.js environments.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pino = require("pino") as typeof import("pino");
+  const pino = require("pino") as typeof import("pino") & { default?: typeof import("pino") };
   const isProd = process.env.NODE_ENV === "production";
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pinoFn = ((pino as any).default ?? pino) as (
+  const pinoFn = (pino.default ?? pino) as unknown as (
     opts: unknown,
   ) => import("pino").Logger;
   const instance = pinoFn({

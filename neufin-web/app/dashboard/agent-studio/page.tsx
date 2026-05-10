@@ -11,7 +11,7 @@
  *    private agents can later become copyable templates without changing the UI.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import {
   Area,
@@ -127,13 +127,34 @@ export default function AgentStudioPage() {
   );
   const totalWeight = parentAgents.reduce((sum, agent) => sum + agent.weight, 0);
 
+  const refreshAgents = useCallback(async () => {
+    try {
+      const res = await apiGet<{ agents: SavedAgent[] }>("/api/agent-studio/agents");
+      setSavedAgents(res.agents);
+      setActiveAgentId((current) =>
+        !current && res.agents[0] ? res.agents[0].id : current,
+      );
+    } catch {
+      setSavedAgents([]);
+    }
+  }, []);
+
+  const refreshCompare = useCallback(async () => {
+    try {
+      const res = await apiGet<{ agents: CompareAgent[] }>("/api/agent-studio/compare");
+      setCompare(res.agents);
+    } catch {
+      setCompare([]);
+    }
+  }, []);
+
   useEffect(() => {
     apiGet<{ agents: CoreAgent[] }>("/api/agent-studio/core-agents")
       .then((res) => setCoreAgents(res.agents))
       .catch(() => setCoreAgents(fallbackCoreAgents));
-    refreshAgents();
-    refreshCompare();
-  }, []);
+    void refreshAgents();
+    void refreshCompare();
+  }, [refreshAgents, refreshCompare]);
 
   useEffect(() => {
     if (!activeAgentId) return;
@@ -141,25 +162,6 @@ export default function AgentStudioPage() {
       .then(setLearning)
       .catch(() => setLearning(null));
   }, [activeAgentId]);
-
-  async function refreshAgents() {
-    try {
-      const res = await apiGet<{ agents: SavedAgent[] }>("/api/agent-studio/agents");
-      setSavedAgents(res.agents);
-      if (!activeAgentId && res.agents[0]) setActiveAgentId(res.agents[0].id);
-    } catch {
-      setSavedAgents([]);
-    }
-  }
-
-  async function refreshCompare() {
-    try {
-      const res = await apiGet<{ agents: CompareAgent[] }>("/api/agent-studio/compare");
-      setCompare(res.agents);
-    } catch {
-      setCompare([]);
-    }
-  }
 
   async function saveAgent() {
     setSaving(true);

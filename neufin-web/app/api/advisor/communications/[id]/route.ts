@@ -3,9 +3,11 @@ import { proxyToRailway } from "@/lib/proxy";
 
 export async function PATCH(
   req: NextRequest,
-  ctx: { params: Promise<{ id: string }> },
+  ctx: { params: Promise<unknown> },
 ) {
-  const { id } = await ctx.params;
+  const p = (await ctx.params) as Record<string, string | string[] | undefined>;
+  const raw = p.id;
+  const id = Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
   return proxyToRailway(
     req,
     `/api/advisor/communications/${encodeURIComponent(id)}`,
