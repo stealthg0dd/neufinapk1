@@ -1259,7 +1259,13 @@ Return ONLY valid JSON:
 
     analysis_mode = "ai"
     try:
-        analysis = await asyncio.wait_for(get_ai_analysis(prompt), timeout=20.0)
+        # Total AI budget: 40 s.  Each provider inside get_ai_analysis already
+        # has its own per-provider deadline (via asyncio.to_thread + wait_for),
+        # so this outer limit is a safety net ensuring we never exceed Railway's
+        # ~185 s gateway timeout even if a thread stalls.
+        # Worst-case chain: Claude ~2 s fail + OpenAI ~2 s fail +
+        # Gemini 20 s timeout + Groq 15 s timeout = ~39 s → under 40 s.
+        analysis = await asyncio.wait_for(get_ai_analysis(prompt), timeout=40.0)
     except Exception as e:
         logger.warning("analyze_dna.ai_degraded_fallback", error=str(e))
         analysis = _fallback_behavioral_analysis(

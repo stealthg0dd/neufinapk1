@@ -131,7 +131,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
 
     analysis_mode = "ai"
     try:
-        analysis = await asyncio.wait_for(get_ai_analysis(prompt), timeout=20.0)
+        analysis = await asyncio.wait_for(get_ai_analysis(prompt), timeout=40.0)
     except Exception as e:
         logger.warning("dna.generate.ai_degraded_fallback", error=str(e))
         analysis = _fallback_analysis_from_metrics(metrics)

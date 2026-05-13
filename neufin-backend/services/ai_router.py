@@ -5,6 +5,7 @@ Claude Sonnet 4.6 → OpenAI GPT-4o → Gemini 3.1 Pro (→ 1.5 Flash) → Groq 
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -94,6 +95,7 @@ def call_gemini(prompt: str) -> dict:
     Call Gemini with automatic model fallback.
     Tries GEMINI_PRIMARY_MODEL first; on model-not-found errors retries with GEMINI_FALLBACK_MODEL.
     Raises on all other errors or if both models fail.
+    Synchronous — intended to be called via asyncio.to_thread in get_ai_analysis.
     """
     for model in (GEMINI_PRIMARY_MODEL, GEMINI_FALLBACK_MODEL):
         try:
@@ -118,76 +120,102 @@ def call_gemini(prompt: str) -> dict:
     )
 
 
+# ── Per-provider hard timeout (seconds) ───────────────────────────────────────
+# These run the blocking SDK call in a thread pool.  asyncio.wait_for enforces
+# the deadline; the underlying thread may run a bit longer but the coroutine
+# moves on immediately, so the total request budget stays predictable.
+_PROVIDER_TIMEOUT: dict[str, int] = {
+    "anthropic": 25,
+    "openai": 20,
+    "gemini": 20,
+    "groq": 15,
+}
+
+
+def _call_anthropic_sync(prompt: str) -> dict:
+    if not settings.ANTHROPIC_API_KEY:
+        raise ValueError("ANTHROPIC_API_KEY not set")
+    client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=2000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return _parse(response.content[0].text)
+
+
+def _call_openai_sync(prompt: str) -> dict:
+    client = OpenAI(api_key=settings.OPENAI_KEY)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return _parse(response.choices[0].message.content)
+
+
+def _call_groq_sync(prompt: str) -> dict:
+    client = Groq(api_key=settings.GROQ_KEY)
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a financial analyst. Return ONLY valid JSON, no markdown.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.1,
+    )
+    return _parse(response.choices[0].message.content)
+
+
 async def get_ai_analysis(prompt: str, response_format: str = "json") -> dict:
     """
     Unified AI Analysis with 4-tier provider fallback.
+
+    Each provider's blocking SDK call runs inside asyncio.to_thread() so the
+    event loop remains responsive and asyncio.wait_for() can enforce the hard
+    per-provider deadline.  If a provider times out the thread continues in the
+    background but the coroutine immediately tries the next provider — ensuring
+    the total wall-clock time stays well under the Railway gateway timeout.
+
+    Provider order: Claude → OpenAI → Gemini → Groq
     """
+    _providers = [
+        ("anthropic", _call_anthropic_sync),
+        ("openai", _call_openai_sync),
+        ("gemini", call_gemini),
+        ("groq", _call_groq_sync),
+    ]
 
-    # ── 1. Claude Sonnet 4.6 (Primary) ───────────────────────────────────────
-    t0 = time.monotonic()
-    try:
-        if (
-            not settings.ANTHROPIC_API_KEY
-        ):  # FIXED: skip init entirely when key is absent
-            raise ValueError("ANTHROPIC_API_KEY not set")
-        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-        response = client.messages.create(
-            model="claude-sonnet-4-6",  # Latest March 2026 Stable
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        result = _parse(response.content[0].text)
-        logger.info("ai.claude_ok", elapsed=f"{time.monotonic() - t0:.1f}s")
-        return result
-    except Exception as e:
-        logger.warning("ai.claude_failed", error=str(e))
-
-    # ── 2. OpenAI GPT-4o (Tier 2 Fallback) ───────────────────────────────────
-    t1 = time.monotonic()
-    try:
-        client = OpenAI(api_key=settings.OPENAI_KEY)
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-        )
-        result = _parse(response.choices[0].message.content)
-        logger.info("ai.gpt4o_ok", elapsed=f"{time.monotonic() - t1:.1f}s")
-        return result
-    except Exception as e:
-        logger.warning("ai.gpt4o_failed", error=str(e))
-
-    # ── 3. Gemini (Tier 3 Fallback) — auto-fallback: primary → GEMINI_FALLBACK_MODEL ─
-    t2 = time.monotonic()
-    try:
-        result = call_gemini(prompt)
-        logger.info("ai.gemini_ok", elapsed=f"{time.monotonic() - t2:.1f}s")
-        return result
-    except Exception as e:
-        logger.warning("ai.gemini_failed", error=str(e))
-
-    # ── 4. Groq Llama 3.3 70B (Final Fallback) ───────────────────────────────
-    t3 = time.monotonic()
-    try:
-        client = Groq(api_key=settings.GROQ_KEY)
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a financial analyst. Return ONLY valid JSON, no markdown.",
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.1,
-        )
-        result = _parse(response.choices[0].message.content)
-        logger.info("ai.llama_ok", elapsed=f"{time.monotonic() - t3:.1f}s")
-        return result
-    except Exception as e:
-        logger.warning("ai.llama_failed", error=str(e))
+    for name, fn in _providers:
+        t0 = time.monotonic()
+        timeout = float(_PROVIDER_TIMEOUT.get(name, 20))
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(fn, prompt),
+                timeout=timeout,
+            )
+            logger.info(
+                f"ai.{name}_ok",
+                elapsed=f"{time.monotonic() - t0:.1f}s",
+            )
+            return result
+        except TimeoutError:
+            logger.warning(
+                f"ai.{name}_timeout",
+                timeout=timeout,
+                elapsed=f"{time.monotonic() - t0:.1f}s",
+            )
+            # Do NOT re-raise — try the next provider immediately.
+            continue
+        except Exception as e:
+            logger.warning(f"ai.{name}_failed", error=str(e))
+            continue
 
     raise Exception(
-        "All AI providers failed: claude-sonnet-4-6, gpt-4o, gemini-3.1-pro-preview, llama-3.3-70b-versatile. Check API keys and provider status."
+        "All AI providers failed or timed out: anthropic, openai, gemini, groq. "
+        "Check API keys and provider status."
     )
 
 

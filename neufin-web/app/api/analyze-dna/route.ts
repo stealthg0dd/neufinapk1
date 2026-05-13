@@ -40,7 +40,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       body: req.body,
       // @ts-expect-error — duplex required for streaming request bodies in Node 18+
       duplex: "half",
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(90_000),
     });
 
     const text = await upstream.text();
