@@ -1065,7 +1065,14 @@ def fetch_beta(sym: str) -> float:
             },
             timeout=8.0,
         )
-        beta = float(r.json().get("Beta") or 1.0)
+        beta_raw = float(r.json().get("Beta") or 1.0)
+        beta = beta_raw
+        # Some providers occasionally return beta in percent-like scale (e.g., 91.33).
+        # Beta is a ratio, so normalize anomalous 100x values back to ratio space.
+        if math.isfinite(beta) and abs(beta) > 10.0:
+            beta = beta / 100.0
+        if not math.isfinite(beta) or abs(beta) > 10.0:
+            beta = 1.0
         _BETA_CACHE[sym] = (beta, time.time())
         return beta
     except Exception:
