@@ -29,6 +29,38 @@ _lb_cache: dict[int, tuple[float, object]] = {}
 _LB_TTL = 300
 
 
+def _fallback_analysis_from_metrics(metrics: dict) -> dict[str, Any]:
+    weighted_beta = float(metrics.get("weighted_beta") or 1.0)
+    max_pos = float(metrics.get("max_position_pct") or 0.0)
+    dna_score = int(metrics.get("dna_score") or 60)
+
+    if max_pos >= 45 or weighted_beta >= 1.6:
+        investor_type = "Speculative Investor"
+    elif weighted_beta >= 1.2:
+        investor_type = "Conviction Growth"
+    elif weighted_beta <= 0.8:
+        investor_type = "Defensive Allocator"
+    else:
+        investor_type = "Diversified Strategist"
+
+    return {
+        "dna_score": dna_score,
+        "investor_type": investor_type,
+        "strengths": [
+            "Portfolio scoring completed with live pricing and risk inputs",
+            "Risk factors quantified with explicit score breakdown",
+            "Actionable recommendations available despite AI provider degradation",
+        ],
+        "weaknesses": [
+            "Concentration and beta may still amplify drawdowns",
+            "Further diversification and tax optimization may improve resilience",
+        ],
+        "recommendation": "Reduce top concentration and add one lower-correlation allocation.",
+        "leaderboard_category": "Long-Term Strategist",
+        "analysis_mode": "fallback",
+    }
+
+
 @router.post("/generate")
 async def generate_dna_score(
     file: UploadFile = File(...),
@@ -97,10 +129,13 @@ Return ONLY valid JSON (no markdown, no code fences):
 
 Be engaging, data-driven, and make the insights feel personal and shareable."""
 
+    analysis_mode = "ai"
     try:
-        analysis = await get_ai_analysis(prompt)
+        analysis = await asyncio.wait_for(get_ai_analysis(prompt), timeout=20.0)
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"AI analysis failed: {e}") from e
+        logger.warning("dna.generate.ai_degraded_fallback", error=str(e))
+        analysis = _fallback_analysis_from_metrics(metrics)
+        analysis_mode = "fallback"
 
     applied_modifier = 0.0
     if quant_result:
@@ -164,6 +199,7 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
 
     return {
         **analysis,
+        "analysis_mode": analysis_mode,
         "id": record_id,
         "share_token": share_token,
         "share_url": f"{APP_BASE_URL}/share/{share_token}",

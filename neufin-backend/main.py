@@ -146,6 +146,51 @@ def _zip_equal_lengths(left: list, right: list) -> list[tuple]:
     return [(left[i], right[i]) for i in range(len(left))]
 
 
+def _fallback_behavioral_analysis(
+    *,
+    weighted_beta: float,
+    max_pos: float,
+    dna_score: int,
+) -> dict[str, object]:
+    """Deterministic fallback when external AI providers are unavailable."""
+    if max_pos >= 45 or weighted_beta >= 1.6:
+        investor_type = "Speculative Investor"
+    elif weighted_beta >= 1.2:
+        investor_type = "Conviction Growth"
+    elif weighted_beta <= 0.8:
+        investor_type = "Defensive Allocator"
+    else:
+        investor_type = "Diversified Strategist"
+
+    strengths = [
+        "Portfolio uploaded and priced successfully for risk scoring",
+        "Transparent score breakdown across concentration, beta, tax, and correlation",
+        "Actionable liquidity and risk metrics generated from live market inputs",
+    ]
+    weaknesses: list[str] = []
+    if max_pos >= 35:
+        weaknesses.append("High single-name concentration increases drawdown risk")
+    if weighted_beta > 1.4:
+        weaknesses.append(
+            "Portfolio beta suggests amplified downside in market selloffs"
+        )
+    if not weaknesses:
+        weaknesses.append("Further diversification can improve downside resilience")
+        weaknesses.append("Tax optimization opportunities may still be unharvested")
+
+    recommendation = "Reduce the largest position and add one lower-correlation allocation to improve stability."
+    if dna_score >= 80:
+        recommendation = "Maintain current construction and rebalance monthly to preserve the current risk profile."
+
+    return {
+        "investor_type": investor_type,
+        "strengths": strengths[:3],
+        "weaknesses": weaknesses[:2],
+        "recommendation": recommendation,
+        "analysis_mode": "fallback",
+    }
+
+
 # ── Startup time (for uptime_seconds in /health) ──────────────────────────────
 _startup_time: float = time.monotonic()
 
@@ -1212,13 +1257,17 @@ Return ONLY valid JSON:
   "recommendation": "one specific actionable suggestion"
 }}"""
 
+    analysis_mode = "ai"
     try:
-        analysis = await get_ai_analysis(prompt)
+        analysis = await asyncio.wait_for(get_ai_analysis(prompt), timeout=20.0)
     except Exception as e:
-        logger.error("analyze_dna.ai_failed", error=str(e))
-        raise HTTPException(
-            status_code=503, detail="AI analysis providers are unavailable."
-        ) from e
+        logger.warning("analyze_dna.ai_degraded_fallback", error=str(e))
+        analysis = _fallback_behavioral_analysis(
+            weighted_beta=weighted_beta,
+            max_pos=max_pos,
+            dna_score=dna_score,
+        )
+        analysis_mode = "fallback"
     analysis["investor_type"] = dna_archetype_overlay(
         _prompt_records,
         str(analysis.get("investor_type") or "Balanced Growth Investor"),
@@ -1436,6 +1485,7 @@ Return ONLY valid JSON:
     )
     out: dict = {
         **analysis,
+        "analysis_mode": analysis_mode,
         "dna_score": dna_score,
         "ic_readiness": ic_readiness,
         "ic_readiness_tier": ic_readiness.get("tier"),
