@@ -245,10 +245,20 @@ for _k, _v in _KEY_MAP.items():
 # ── In-process caches (1-hour TTL) ────────────────────────────────────────────
 _PRICE_CACHE: dict[str, tuple[float, float]] = {}  # sym → (price, ts)
 _BETA_CACHE: dict[str, tuple[float, float]] = {}  # sym → (beta, ts)
+_BETA_SOURCE_CACHE: dict[str, tuple[str, float]] = {}  # sym → (source, ts)
 _HISTORY_CACHE: dict = {}  # key → {"data": df, "ts": float}
 _CACHE_TTL = 3600  # seconds
 
 _PERIOD_DAYS = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
+
+CRYPTO_BETA_PRIORS: dict[str, float] = {
+    "BTC-USD": 1.45,
+    "ETH-USD": 1.75,
+    "SOL-USD": 2.10,
+    "COIN": 1.85,
+    "MSTR": 2.40,
+    "DOGE-USD": 2.50,
+}
 
 # ── Circuit breaker ────────────────────────────────────────────────────────────
 _BLACKLIST: dict[str, float] = {}  # provider_name → expiry epoch
@@ -313,19 +323,72 @@ def _is_rate_limit(response_json: dict) -> bool:
 
 
 # ── Ticker normalisation ───────────────────────────────────────────────────────
+def normalize_ticker_for_provider(ticker: str, provider: str) -> str:
+    """Return provider-specific symbol for known crypto tickers."""
+    crypto_map = {
+        "BTC-USD": {
+            "polygon": "X:BTCUSD",
+            "yahoo": "BTC-USD",
+            "finnhub": "BINANCE:BTCUSDT",
+            "twelvedata": "BTC/USD",
+        },
+        "ETH-USD": {
+            "polygon": "X:ETHUSD",
+            "yahoo": "ETH-USD",
+            "finnhub": "BINANCE:ETHUSDT",
+            "twelvedata": "ETH/USD",
+        },
+        "SOL-USD": {
+            "polygon": "X:SOLUSD",
+            "yahoo": "SOL-USD",
+            "finnhub": "BINANCE:SOLUSDT",
+            "twelvedata": "SOL/USD",
+        },
+        "DOGE-USD": {
+            "polygon": "X:DOGEUSD",
+            "yahoo": "DOGE-USD",
+            "twelvedata": "DOGE/USD",
+        },
+    }
+    ticker_up = str(ticker or "").strip().upper()
+    provider_key = str(provider or "").strip().lower()
+    if ticker_up in crypto_map and provider_key in crypto_map[ticker_up]:
+        return crypto_map[ticker_up][provider_key]
+    return ticker_up
+
+
 def _fh_ticker(sym: str) -> str:
     """Finnhub-compatible symbol (regional suffixes keep dots)."""
+    provider_symbol = normalize_ticker_for_provider(sym, "finnhub")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
     # # SEA-TICKER-FIX: index aliases + regional metadata applied before Finnhub.
     return resolve_security(sym).provider_finnhub
 
 
 def _polygon_sym(sym: str) -> str:
-    """Polygon / FMP: BRK-B → BRK.B."""
-    return sym.replace("-", ".").upper()
+    """Polygon symbol mapper."""
+    provider_symbol = normalize_ticker_for_provider(sym, "polygon")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
+    return str(sym or "").replace("-", ".").upper()
+
+
+def _fmp_sym(sym: str) -> str:
+    """FMP symbol mapper."""
+    return str(sym or "").replace("-", ".").upper()
+
+
+def _marketstack_sym(sym: str) -> str:
+    """Marketstack symbol mapper."""
+    return str(sym or "").replace("-", ".").upper()
 
 
 def _td_sym(sym: str) -> str:
     """TwelveData: BRK-B → BRK/B."""
+    provider_symbol = normalize_ticker_for_provider(sym, "twelvedata")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
     if should_use_twelve_data_first(sym):
         # SEA-VN-FIX before: SEA symbols were converted to provider-looking strings only.
         # SEA-VN-FIX after: the request layer adds required exchange/country params.
@@ -361,6 +424,9 @@ def _is_sea_market_symbol(sym: str) -> bool:
 
 def _av_ticker(sym: str) -> str:
     """Alpha Vantage: BRK-B → BRK.B."""
+    provider_symbol = normalize_ticker_for_provider(sym, "alphavantage")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
     return sym.replace("-", ".").upper()
 
 
@@ -434,7 +500,7 @@ def _fmp_batch(symbols: list[str]) -> dict[str, float]:
     """FMP /api/v3/quote — comma-separated batch."""
     if not FMP_API_KEY or not _available("fmp"):
         return {}
-    syms_str = ",".join(_polygon_sym(s) for s in symbols)
+    syms_str = ",".join(_fmp_sym(s) for s in symbols)
     try:
         r = requests.get(
             f"https://financialmodelingprep.com/api/v3/quote/{syms_str}",
@@ -454,7 +520,7 @@ def _fmp_batch(symbols: list[str]) -> dict[str, float]:
             price = float(entry.get("price") or 0)
             if price > 0:
                 # reverse-normalise: BRK.B → BRK-B to match caller's sym
-                orig = next((s for s in symbols if _polygon_sym(s) == raw), raw)
+                orig = next((s for s in symbols if _fmp_sym(s) == raw), raw)
                 results[orig] = price
         return results
     except Exception as e:
@@ -561,7 +627,7 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
             "https://api.marketstack.com/v1/eod/latest",
             params={
                 "access_key": MARKETSTACK_API_KEY,
-                "symbols": ",".join(_polygon_sym(s) for s in symbols),
+                "symbols": ",".join(_marketstack_sym(s) for s in symbols),
             },
             timeout=10.0,
         )
@@ -577,7 +643,7 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
             raw = entry.get("symbol", "")
             price = float(entry.get("close") or 0)
             if price > 0:
-                orig = next((s for s in symbols if _polygon_sym(s) == raw), raw)
+                orig = next((s for s in symbols if _marketstack_sym(s) == raw), raw)
                 results[orig] = price
         return results
     except Exception as e:
@@ -603,7 +669,9 @@ def _yfinance_batch(symbols: list[str]) -> dict[str, float]:
     def _one(sym: str) -> tuple[str, float | None]:
         try:
             # # SEA-TICKER-FIX: Yahoo symbol may differ after index alias normalization.
-            ysym = resolve_security(sym).provider_ticker
+            ysym = normalize_ticker_for_provider(sym, "yahoo")
+            if ysym == str(sym or "").strip().upper():
+                ysym = resolve_security(sym).provider_ticker
             t = yf.Ticker(ysym)
             hist = t.history(period="5d", auto_adjust=True)
             if hist is not None and not hist.empty and "Close" in hist.columns:
@@ -1042,18 +1110,30 @@ def verify_price_integrity(positions: list) -> list[dict]:
 
 
 # ── Beta fetcher ───────────────────────────────────────────────────────────────
-def fetch_beta(sym: str) -> float:
-    """
-    Fetch beta from Alpha Vantage OVERVIEW (1-hour cache).
-    Returns 1.0 (market-neutral) when unavailable.
-    """
-    sym = sym.upper()
-    cached = _BETA_CACHE.get(sym)
-    if cached and (time.time() - cached[1]) < _CACHE_TTL:
-        return cached[0]
+def fetch_beta_with_source(sym: str) -> tuple[float, str]:
+    """Fetch beta and annotate source (alphavantage/prior/fallback)."""
+    sym = str(sym or "").upper()
+    cached_beta = _BETA_CACHE.get(sym)
+    cached_source = _BETA_SOURCE_CACHE.get(sym)
+    if (
+        cached_beta
+        and cached_source
+        and (time.time() - cached_beta[1]) < _CACHE_TTL
+        and (time.time() - cached_source[1]) < _CACHE_TTL
+    ):
+        return cached_beta[0], cached_source[0]
+
+    prior = CRYPTO_BETA_PRIORS.get(sym)
+
+    def _finalize(beta_val: float, source_val: str) -> tuple[float, str]:
+        _BETA_CACHE[sym] = (beta_val, time.time())
+        _BETA_SOURCE_CACHE[sym] = (source_val, time.time())
+        return beta_val, source_val
 
     if not ALPHA_VANTAGE_API_KEY:
-        return 1.0
+        if prior is not None:
+            return _finalize(float(prior), "prior")
+        return _finalize(1.0, "fallback")
 
     try:
         r = requests.get(
@@ -1065,18 +1145,41 @@ def fetch_beta(sym: str) -> float:
             },
             timeout=8.0,
         )
-        beta_raw = float(r.json().get("Beta") or 1.0)
-        beta = beta_raw
+        body = r.json()
+        beta_raw = (body.get("Beta") if isinstance(body, dict) else None) or 0
+        try:
+            beta = float(beta_raw)
+        except (TypeError, ValueError):
+            beta = 0.0
+        source = "alphavantage"
+
         # Some providers occasionally return beta in percent-like scale (e.g., 91.33).
         # Beta is a ratio, so normalize anomalous 100x values back to ratio space.
         if math.isfinite(beta) and abs(beta) > 10.0:
             beta = beta / 100.0
-        if not math.isfinite(beta) or abs(beta) > 10.0:
-            beta = 1.0
-        _BETA_CACHE[sym] = (beta, time.time())
-        return beta
+
+        if not math.isfinite(beta) or beta <= 0 or abs(beta) > 10.0:
+            if prior is not None:
+                beta = float(prior)
+                source = "prior"
+            else:
+                beta = 1.0
+                source = "fallback"
+
+        return _finalize(beta, source)
     except Exception:
-        return 1.0
+        if prior is not None:
+            return _finalize(float(prior), "prior")
+        return _finalize(1.0, "fallback")
+
+
+def fetch_beta(sym: str) -> float:
+    """
+    Fetch beta from Alpha Vantage OVERVIEW (1-hour cache).
+    Returns 1.0 (market-neutral) when unavailable.
+    """
+    beta, _ = fetch_beta_with_source(sym)
+    return beta
 
 
 # ── Scoring components ─────────────────────────────────────────────────────────
@@ -1516,7 +1619,9 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     # Scoring components
     hhi_pts = _hhi_score(df["weight"])
 
-    df["beta"] = [float(_fetch_beta(sym)) for sym in df["symbol"].tolist()]
+    beta_rows = [fetch_beta_with_source(sym) for sym in df["symbol"].tolist()]
+    df["beta"] = [float(beta) for beta, _source in beta_rows]
+    df["beta_source"] = [source for _beta, source in beta_rows]
     weighted_beta = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
     beta_pts = _beta_score(weighted_beta)
 
@@ -1548,6 +1653,19 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         elif len(returns.columns) < 2:
             correlation_note = "Correlation: Not computed (requires 2+ priced tickers)"
 
+    if avg_correlation is None and len(resolved) >= 2:
+        market_corr_priors = {
+            "US": 0.48,
+            "VN": 0.58,
+            "SG": 0.52,
+            "HKEX": 0.53,
+            "TSE": 0.49,
+            "LSE": 0.51,
+        }
+        avg_correlation = float(market_corr_priors.get(dominant_market, 0.5))
+        correlation_status = "ESTIMATED_SECTOR_PRIOR"
+        correlation_note = "Correlation estimated from market prior due to insufficient synchronized history."
+
     pnl_pct = None
     if cost_basis_provided and "cost_basis" in df.columns:
         df["cost_basis"] = pd.to_numeric(df["cost_basis"], errors="coerce")
@@ -1565,6 +1683,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "market_code",
         "provider_ticker",
         "native_price",
+        "beta",
+        "beta_source",
         "current_price",
         "current_value",
         "weight",
@@ -1754,6 +1874,10 @@ def calculate_portfolio_metrics(positions: list) -> dict:
             "correlation": corr_pts,
         },
         "weighted_beta": round(weighted_beta, 3),
+        "beta_sources": {
+            row["symbol"]: row["beta_source"]
+            for row in _records_nan_to_none(positions_out.to_dict("records"))
+        },
         "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
         "avg_correlation": (
