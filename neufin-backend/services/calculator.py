@@ -1222,6 +1222,57 @@ def _beta_score(weighted_beta: float) -> float:
     return round(score, 2)
 
 
+def _compute_correlation_score(
+    returns_by_ticker: dict,
+    weights: dict,
+    min_samples: int = 30,
+) -> tuple[float, float | None, str]:
+    """
+    Returns (corr_pts, avg_correlation, status).
+
+    corr_pts is on a 0-30 scale.
+    """
+    tickers = [
+        t
+        for t in weights
+        if t in returns_by_ticker and len(returns_by_ticker.get(t) or []) >= min_samples
+    ]
+    if len(tickers) < 2:
+        has_defensive = any(t in ("GLD", "TLT", "IEF", "BND", "AGG") for t in weights)
+        prior_corr = 0.30 if has_defensive else 0.55
+        penalty = min(30, round(prior_corr * 30))
+        corr_pts = max(0, 30 - penalty)
+        return float(corr_pts), float(prior_corr), "sector_prior"
+
+    pairs: list[float] = []
+    for i in range(len(tickers)):
+        for j in range(i + 1, len(tickers)):
+            t1, t2 = tickers[i], tickers[j]
+            s1 = returns_by_ticker[t1]
+            s2 = returns_by_ticker[t2]
+
+            if hasattr(s1, "index") and hasattr(s2, "index"):
+                common_idx = s1.index.intersection(s2.index)
+                v1 = s1.loc[common_idx].values
+                v2 = s2.loc[common_idx].values
+            else:
+                n = min(len(s1), len(s2))
+                v1, v2 = s1[:n], s2[:n]
+
+            if len(v1) >= min_samples and np.std(v1) > 0 and np.std(v2) > 0:
+                rho = float(np.corrcoef(v1, v2)[0, 1])
+                if not np.isnan(rho):
+                    pairs.append(rho)
+
+    if not pairs:
+        return 15.0, None, "UNKNOWN"
+
+    avg_corr = sum(pairs) / len(pairs)
+    penalty = min(30, round(avg_corr * 30))
+    corr_pts = max(0, 30 - penalty)
+    return float(corr_pts), round(avg_corr, 3), "computed"
+
+
 def _tax_alpha_score(df: pd.DataFrame) -> float:
     """
     Tax alpha component (0-20 pts).
@@ -1626,45 +1677,40 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     beta_pts = _beta_score(weighted_beta)
 
     tax_pts = _tax_alpha_score(df)
-    corr_pts = 15.0  # neutral placeholder — risk_engine fills this in the DNA flow
+
+    returns_dict: dict[str, pd.Series] = {}
+    if returns is not None and not returns.empty:
+        returns_dict = {
+            str(col).upper(): returns[col].dropna() for col in returns.columns if col
+        }
+    weight_dict = {
+        str(sym).upper(): float(w)
+        for sym, w in zip_equal(df["symbol"].tolist(), df["weight"].tolist())
+    }
+    corr_pts, avg_correlation, corr_status = _compute_correlation_score(
+        returns_by_ticker=returns_dict,
+        weights=weight_dict,
+    )
 
     dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
 
     # Annualised volatility (requires historical price DataFrame)
     volatility = 0.0
-    avg_correlation: float | None = None
-    correlation_status = "UNKNOWN"
-    correlation_note = "Correlation: Not computed (insufficient price history)"
+    correlation_status = corr_status
+    correlation_note = "Correlation estimated from sector prior."
     if returns is not None and not returns.empty:
         weights_series = df.set_index("symbol")["weight"]
         aligned_weights = weights_series.reindex(returns.columns).fillna(0)
         portfolio_returns = (returns * aligned_weights).sum(axis=1)
         volatility = float(portfolio_returns.std() * np.sqrt(252) * 100)
-        if len(returns) >= 30 and len(returns.columns) >= 2:
-            corr_matrix = returns.corr()
-            corr_values = corr_matrix.where(
-                np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
-            ).stack()
-            corr_values = corr_values.dropna()
-            if not corr_values.empty:
-                avg_correlation = float(corr_values.mean())
-                correlation_status = "COMPUTED"
-                correlation_note = "Pearson correlation computed from price history."
-        elif len(returns.columns) < 2:
-            correlation_note = "Correlation: Not computed (requires 2+ priced tickers)"
-
-    if avg_correlation is None and len(resolved) >= 2:
-        market_corr_priors = {
-            "US": 0.48,
-            "VN": 0.58,
-            "SG": 0.52,
-            "HKEX": 0.53,
-            "TSE": 0.49,
-            "LSE": 0.51,
-        }
-        avg_correlation = float(market_corr_priors.get(dominant_market, 0.5))
-        correlation_status = "ESTIMATED_SECTOR_PRIOR"
-        correlation_note = "Correlation estimated from market prior due to insufficient synchronized history."
+    if correlation_status == "computed":
+        correlation_note = "Pearson correlation computed from price history."
+    elif correlation_status == "sector_prior":
+        correlation_note = "Correlation estimated from sector prior."
+    else:
+        correlation_note = (
+            "Correlation: Not computed (insufficient overlap in returns history)."
+        )
 
     pnl_pct = None
     if cost_basis_provided and "cost_basis" in df.columns:
@@ -1884,6 +1930,7 @@ def calculate_portfolio_metrics(positions: list) -> dict:
             round(avg_correlation, 3) if avg_correlation is not None else None
         ),
         "correlation_status": correlation_status,
+        "corr_status": correlation_status,
         "correlation_note": correlation_note,
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
         "cost_basis_provided": cost_basis_provided,
