@@ -38,7 +38,6 @@ type SubLite = SubscriptionAccessInput;
 function formatPlanLine(s: SubLite | null): string | null {
   if (!s) return null;
   const tier = (s.plan ?? s.subscription_tier ?? "free").toString();
-  const tierLc = tier.toLowerCase();
   const statusRaw = (s.status ?? s.subscription_status ?? "").toString();
   const statusLc = statusRaw.toLowerCase();
   const days = s.trial_days_remaining ?? s.days_remaining ?? null;
@@ -54,7 +53,8 @@ function formatPlanLine(s: SubLite | null): string | null {
     return `Trial · ${days} day${days === 1 ? "" : "s"} left`;
   }
   if (days !== null && days <= 0) return "Trial ended · upgrade to continue";
-  return `${tierLc} plan`;
+  const label = (s.plan ?? s.subscription_tier ?? "free").toString();
+  return `${label} plan`;
 }
 
 export function DashboardContextRibbon() {

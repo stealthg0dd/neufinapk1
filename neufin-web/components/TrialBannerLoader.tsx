@@ -17,7 +17,7 @@ export default function TrialBannerLoader() {
     getSubscriptionStatus(token)
       .then((res) => {
         setStatus(res.status);
-        setDays(res.days_remaining);
+        setDays(res.days_remaining ?? undefined);
       })
       .catch(() => setStatus("active"));
   }, [token]);

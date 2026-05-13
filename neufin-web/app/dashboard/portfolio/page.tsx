@@ -38,7 +38,7 @@ import {
 } from "@/lib/finance-content";
 import { PageJourneyHint } from "@/components/dashboard/PageJourneyHint";
 import { isAdvisorModeEnabled } from "@/lib/featureFlags";
-import { hasFullAccess, type SubscriptionAccessInput } from "@/lib/subscription-access";
+import { hasFullAccess as subscriptionHasFullAccess, type SubscriptionAccessInput } from "@/lib/subscription-access";
 
 const STAGES = [
   {
@@ -213,7 +213,7 @@ export default function PortfolioPage() {
     if (score >= 40) return "Moderate";
     return "High";
   }, [result?.dna_score]);
-  const paidAccess = hasFullAccess(subscriptionStatus);
+  const userHasFullAccess = subscriptionHasFullAccess(subscriptionStatus);
 
   const activeStageIndex = useMemo(() => {
     const idx = STAGES.findIndex((s) => s.label === stage);
@@ -404,7 +404,7 @@ export default function PortfolioPage() {
         setSubscriptionStatus(statusRes);
       }
 
-      if (hasFullAccess(statusRes)) {
+      if (subscriptionHasFullAccess(statusRes)) {
         const reportBody: Record<string, unknown> = {
           portfolio_id: portfolioId,
           inline_pdf: false,
@@ -979,7 +979,7 @@ export default function PortfolioPage() {
               onClick={() => void handleDownloadReport()}
               disabled={downloadLoading || !portfolioId}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${
-                paidAccess
+                userHasFullAccess
                   ? "bg-primary text-primary-foreground"
                   : "bg-warning text-[var(--text-primary)]"
               }`}
@@ -989,13 +989,13 @@ export default function PortfolioPage() {
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Preparing report...
                 </>
-              ) : paidAccess ? (
+              ) : userHasFullAccess ? (
                 "Download PDF"
               ) : (
                 "Get Full Report — $49"
               )}
             </button>
-            {!paidAccess && (
+            {!userHasFullAccess && (
               <Link
                 href="/pricing"
                 className="rounded-lg border border-border px-4 py-2 text-sm text-primary"

@@ -1161,19 +1161,28 @@ export default function SwarmPage() {
       .then((data) => {
         if (data && typeof data === "object") {
           setSubscriptionGate(data);
+          const d = data as SubscriptionAccessInput & { has_full_access?: boolean };
+          if (d.is_admin === true || d.status === "active") {
+            try {
+              localStorage.removeItem("neufin:subscription-status:cache");
+            } catch {
+              /* ignore */
+            }
+          }
           localStorage.setItem(
             "neufin:subscription-status:cache",
             JSON.stringify({
               ts: Date.now(),
               data: {
-                plan: data.plan,
-                subscription_tier: data.subscription_tier,
-                status: data.status,
-                subscription_status: data.subscription_status,
-                days_remaining: data.days_remaining,
-                trial_days_remaining: data.trial_days_remaining,
-                is_admin: data.is_admin,
-                is_pro: data.is_pro,
+                plan: d.plan,
+                subscription_tier: d.subscription_tier,
+                status: d.status,
+                subscription_status: d.subscription_status,
+                days_remaining: d.days_remaining,
+                trial_days_remaining: d.trial_days_remaining,
+                is_admin: d.is_admin,
+                is_pro: d.is_pro,
+                has_full_access: d.has_full_access,
               },
             }),
           );

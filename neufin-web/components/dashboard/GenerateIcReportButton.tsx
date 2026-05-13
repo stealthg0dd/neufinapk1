@@ -10,7 +10,10 @@ import {
   getStoredReportMode,
   type ReportTheme,
 } from "@/components/dashboard/ReportThemeModal";
-import { hasFullAccess } from "@/lib/subscription-access";
+import {
+  hasFullAccess,
+  type SubscriptionAccessInput,
+} from "@/lib/subscription-access";
 
 type Props = {
   portfolioId: string | null | undefined;
@@ -38,7 +41,9 @@ export function GenerateIcReportButton({
 
     try {
       setLoading(true);
-      const statusRes = await apiGet("/api/subscription/status");
+      const statusRes = await apiGet<SubscriptionAccessInput>(
+        "/api/subscription/status",
+      );
       if (hasFullAccess(statusRes)) {
         const res = await apiFetch("/api/reports/generate", {
           method: "POST",

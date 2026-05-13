@@ -43,7 +43,7 @@ type SubscriptionState = {
   trial_active?: boolean;
   trial_ends_at?: string | null;
   trial_expired?: boolean;
-  days_remaining?: number;
+  days_remaining?: number | null;
 };
 
 type AccessState = "loading" | "anonymous" | "trial" | "expired" | "paid";
@@ -249,7 +249,7 @@ export default function ResultsContent() {
     getSubscriptionStatus(token)
       .then((res) => {
         setSubscription(res);
-        setDaysRemaining(res.days_remaining);
+        setDaysRemaining(res.days_remaining ?? undefined);
       })
       .catch(() => {
         setSubscription(null);

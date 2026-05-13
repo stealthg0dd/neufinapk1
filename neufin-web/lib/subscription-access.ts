@@ -13,12 +13,16 @@ export type SubscriptionAccessInput = {
   is_admin?: boolean;
   /** Set by /api/vault/subscription for trial window + paid (server-computed). */
   is_pro?: boolean;
+  /** Server-computed from GET /api/subscription/status or /api/vault/subscription. */
+  has_full_access?: boolean;
 };
 
 export function hasFullAccess(
   subscription: SubscriptionAccessInput | null | undefined,
 ): boolean {
   if (!subscription) return false;
+
+  if (subscription.has_full_access === true) return true;
 
   if (subscription.is_admin) return true;
 
