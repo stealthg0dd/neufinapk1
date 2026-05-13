@@ -30,7 +30,7 @@ def fetch_user_profile(user_id: str) -> dict:
         result = (
             supabase.table("user_profiles")
             .select(
-                "id, email, trial_started_at, subscription_status, subscription_tier"
+                "id, email, trial_started_at, subscription_status, subscription_tier, is_admin"
             )
             .eq("id", user_id)
             .single()
@@ -102,6 +102,17 @@ def _ensure_trial_started_at(user: JWTUser) -> None:
         return
 
 
+def _profile_is_admin(val) -> bool:
+    """Match _truthy_is_admin semantics without reordering the whole module."""
+    if val is True:
+        return True
+    if isinstance(val, int | float) and val:
+        return True
+    if isinstance(val, str) and val.strip().lower() in ("true", "1", "yes", "t"):
+        return True
+    return False
+
+
 def get_subscription_status(user_id: str) -> dict:
     # Check cache first
     cached = _sub_cache.get(user_id)
@@ -126,7 +137,7 @@ def get_subscription_status(user_id: str) -> dict:
 
     if status_val == "active":
         tier = (profile.get("subscription_tier") or "").lower() or "free"
-        result = {"status": "active", "tier": tier}
+        result = {"status": "active", "tier": tier, "days_remaining": None}
         _sub_cache[user_id] = (result, time.monotonic() + _SUB_CACHE_TTL)
         return result
     result = {"status": "expired", "days_remaining": 0}
@@ -137,6 +148,9 @@ def get_subscription_status(user_id: str) -> dict:
 def require_active_subscription(user: JWTUser | None = None) -> JWTUser:
     if user is None:
         raise HTTPException(status_code=401, detail="Missing user")
+    profile = fetch_user_profile(user.id)
+    if _profile_is_admin(profile.get("is_admin")):
+        return user
     sub = get_subscription_status(user.id)
     if sub.get("status") == "expired":
         raise HTTPException(

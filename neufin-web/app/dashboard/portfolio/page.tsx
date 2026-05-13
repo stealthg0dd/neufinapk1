@@ -38,6 +38,7 @@ import {
 } from "@/lib/finance-content";
 import { PageJourneyHint } from "@/components/dashboard/PageJourneyHint";
 import { isAdvisorModeEnabled } from "@/lib/featureFlags";
+import { hasFullAccess as subscriptionHasFullAccess, type SubscriptionAccessInput } from "@/lib/subscription-access";
 
 const STAGES = [
   {
@@ -178,9 +179,8 @@ export default function PortfolioPage() {
   const [stage, setStage] = useState("");
   const [result, setResult] = useState<DNAAnalysisResponse | null>(null);
   const [displayScore, setDisplayScore] = useState(0);
-  const [plan, setPlan] = useState<
-    "free" | "retail" | "advisor" | "enterprise"
-  >("free");
+  const [subscriptionStatus, setSubscriptionStatus] =
+    useState<SubscriptionAccessInput | null>(null);
   const [reportAt, setReportAt] = useState<string | null>(null);
   const [step, setStep] = useState<AnalysisStep>("idle");
 
@@ -213,7 +213,7 @@ export default function PortfolioPage() {
     if (score >= 40) return "Moderate";
     return "High";
   }, [result?.dna_score]);
-  const isAdvisorPlan = plan === "advisor" || plan === "enterprise";
+  const userHasFullAccess = subscriptionHasFullAccess(subscriptionStatus);
 
   const activeStageIndex = useMemo(() => {
     const idx = STAGES.findIndex((s) => s.label === stage);
@@ -326,13 +326,20 @@ export default function PortfolioPage() {
   }, [result?.dna_score]);
 
   useEffect(() => {
-    if (!result) return;
-    apiGet<{ plan: "free" | "retail" | "advisor" | "enterprise" }>(
-      "/api/subscription/status",
-    )
-      .then((res) => setPlan(res.plan))
-      .catch(() => setPlan("free"));
-  }, [result]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res =
+          await apiGet<SubscriptionAccessInput>("/api/subscription/status");
+        if (!cancelled) setSubscriptionStatus(res ?? null);
+      } catch {
+        if (!cancelled) setSubscriptionStatus(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Load white-label config once on mount
   useEffect(() => {
@@ -391,19 +398,13 @@ export default function PortfolioPage() {
     const resolvedTheme = theme ?? getStoredReportTheme();
     try {
       setDownloadLoading(true);
-      const statusRes = await apiGet<{
-        plan: "free" | "retail" | "advisor" | "enterprise";
-        status?: string;
-      }>("/api/subscription/status");
-      const currentPlan = statusRes.plan;
-      setPlan(currentPlan);
+      const statusRes =
+        await apiGet<SubscriptionAccessInput>("/api/subscription/status");
+      if (statusRes && typeof statusRes === "object") {
+        setSubscriptionStatus(statusRes);
+      }
 
-      const canGeneratePdf =
-        currentPlan === "advisor" ||
-        currentPlan === "enterprise" ||
-        statusRes.status === "trial";
-
-      if (canGeneratePdf) {
+      if (subscriptionHasFullAccess(statusRes)) {
         const reportBody: Record<string, unknown> = {
           portfolio_id: portfolioId,
           inline_pdf: false,
@@ -555,11 +556,8 @@ export default function PortfolioPage() {
 
   const piePositions = useMemo(() => {
     if (!result?.positions?.length) return [];
-    // PortfolioPie expects weight as a 0–100 percent value for its pct formatter.
-    return result.positions.map((p) => ({
-      ...p,
-      weight: p.weight * 100,
-    })) as Position[];
+    // DNA weights are already 0–100 (portfolio percent).
+    return result.positions as Position[];
   }, [result?.positions]);
 
   return (
@@ -891,7 +889,7 @@ export default function PortfolioPage() {
                         {formatNativeValue(p.value, p.native_currency)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {(p.weight * 100).toFixed(1)}%
+                        {p.weight.toFixed(1)}%
                       </td>
                     </tr>
                   ))}
@@ -981,7 +979,7 @@ export default function PortfolioPage() {
               onClick={() => void handleDownloadReport()}
               disabled={downloadLoading || !portfolioId}
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50 ${
-                isAdvisorPlan
+                userHasFullAccess
                   ? "bg-primary text-primary-foreground"
                   : "bg-warning text-[var(--text-primary)]"
               }`}
@@ -991,13 +989,13 @@ export default function PortfolioPage() {
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Preparing report...
                 </>
-              ) : isAdvisorPlan ? (
+              ) : userHasFullAccess ? (
                 "Download PDF"
               ) : (
                 "Get Full Report — $49"
               )}
             </button>
-            {!isAdvisorPlan && (
+            {!userHasFullAccess && (
               <Link
                 href="/pricing"
                 className="rounded-lg border border-border px-4 py-2 text-sm text-primary"

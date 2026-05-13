@@ -88,7 +88,7 @@ export default function BillingPage() {
     ])
       .then(([sub, hist]) => {
         setStatus(sub.status);
-        setDaysRemaining(sub.days_remaining);
+        setDaysRemaining(sub.days_remaining ?? undefined);
         setHistory(hist);
       })
       .finally(() => setLoading(false));

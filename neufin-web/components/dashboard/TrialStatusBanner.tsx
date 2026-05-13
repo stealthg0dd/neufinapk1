@@ -4,14 +4,19 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { apiGet } from "@/lib/api-client";
+import { hasFullAccess } from "@/lib/subscription-access";
 
 type SubscriptionStatus = {
   plan?: "free" | "retail" | "advisor" | "enterprise";
   subscription_tier?: string;
   status?: "trial" | "active" | "expired";
+  subscription_status?: string;
   trial_days_remaining?: number;
-  days_remaining?: number;
+  days_remaining?: number | null;
   trial_ends_at?: string;
+  is_admin?: boolean;
+  is_pro?: boolean;
+  has_full_access?: boolean;
 };
 
 type BannerState =
@@ -66,6 +71,13 @@ export function TrialStatusBanner() {
         );
         if (cancelled) return;
         setSubscription(fresh ?? null);
+        if (fresh?.is_admin === true || fresh?.status === "active") {
+          try {
+            window.localStorage.removeItem(CACHE_KEY);
+          } catch {
+            /* ignore */
+          }
+        }
         if (fresh) writeCached(fresh);
       } catch {
         // keep cached value if available
@@ -82,7 +94,15 @@ export function TrialStatusBanner() {
       .toString()
       .toLowerCase();
     if (plan === "advisor" || plan === "enterprise") return null;
-    if (subscription.status === "active") return null;
+    if (subscription.is_admin === true) return null;
+    if (
+      subscription.status === "active" ||
+      subscription.subscription_status === "active"
+    ) {
+      return null;
+    }
+    if (subscription.has_full_access === true) return null;
+    if (hasFullAccess(subscription)) return null;
 
     const daysRemaining =
       subscription.trial_days_remaining ?? subscription.days_remaining ?? null;

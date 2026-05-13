@@ -96,6 +96,24 @@ PLAN_DNA_LIMITS: dict[str, int] = {
     "enterprise": -1,
 }
 
+
+def _subscription_has_full_access(
+    is_admin: bool,
+    status: str,
+    tier_lc: str,
+    days_remaining: int | None,
+) -> bool:
+    if is_admin:
+        return True
+    st = (status or "").lower()
+    t = (tier_lc or "").lower()
+    if st == "active" and t in ("enterprise", "advisor", "retail"):
+        return True
+    if st == "trial" and isinstance(days_remaining, int) and days_remaining > 0:
+        return True
+    return False
+
+
 stripe.api_key = STRIPE_SECRET_KEY
 
 # ── Plans router (public, no /vault prefix) ────────────────────────────────────
@@ -140,20 +158,33 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
     days_remaining = sub.get("days_remaining", None)
     trial_started_at = data.get("trial_started_at")
 
-    tier = data.get("subscription_tier", "free") or "free"
+    tier_raw = data.get("subscription_tier", "free") or "free"
+    tier = tier_raw
     if status == "trial":
         tier = "advisor"
+    tier_lc = str(tier).lower()
 
-    plan = PLANS.get(tier, PLANS["free"])
-    dna_limit = PLAN_DNA_LIMITS.get(tier, 3)
+    plan_details = PLANS.get(tier_lc, PLANS["free"])
+    dna_limit = PLAN_DNA_LIMITS.get(tier_lc, 3)
     usage = get_monthly_usage(uid)
 
+    is_admin_flag = bool(data.get("is_admin") or False)
+    is_enterprise_flag = tier_lc in ("enterprise", "advisor")
+    has_full_flag = _subscription_has_full_access(
+        is_admin_flag, status, tier_lc, days_remaining
+    )
+
     return {
-        "plan": tier,
+        "plan": tier_lc,
         "status": status,
         "days_remaining": days_remaining,
+        "subscription_tier": tier_lc,
+        "subscription_status": status,
+        "is_admin": is_admin_flag,
+        "is_enterprise": is_enterprise_flag,
+        "has_full_access": has_full_flag,
         "trial_started_at": trial_started_at,
-        "plan_details": plan,
+        "plan_details": plan_details,
         "usage": {
             **usage,
             "dna_limit": dna_limit,
@@ -164,7 +195,6 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
         "advisor_name": data.get("advisor_name"),
         "firm_name": data.get("firm_name"),
         "onboarding_completed": data.get("onboarding_completed", True),
-        "is_admin": bool(data.get("is_admin") or False),
         "role": data.get("role") or "user",
     }
 
@@ -360,12 +390,14 @@ def _compute_is_pro(tier: str, status: str, trial_started_at: object) -> bool:
       - Paid advisor/enterprise subscription that is currently active, OR
       - An active 14-day trial (trial_started_at is within the last 14 days).
     """
-    # Paid tiers
-    if tier in ("advisor", "enterprise") and status == "active":
+    t = str(tier or "").lower()
+    s = str(status or "").lower()
+
+    if s == "active" and t in ("advisor", "enterprise", "retail"):
         return True
 
     # Trial period
-    if status == "trial" and trial_started_at:
+    if s == "trial" and trial_started_at:
         try:
             ts = trial_started_at
             if isinstance(ts, str):
@@ -400,14 +432,29 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
         tier = data.get("subscription_tier", "free") or "free"
         status = data.get("subscription_status", "free") or "free"
         trial_started_at = data.get("trial_started_at")
+        sub_norm = get_sub_status(uid)
+        status_norm = sub_norm.get("status") or "expired"
+        days_rem = sub_norm.get("days_remaining", None)
+        tier_lc = str(tier).lower()
+        if status_norm == "trial":
+            tier_effective = "advisor"
+        else:
+            tier_effective = tier_lc
+        is_admin_flag = bool(data.get("is_admin") or False)
+        is_pro = _compute_is_pro(tier, status, trial_started_at)
+        has_full_flag = _subscription_has_full_access(
+            is_admin_flag, status_norm, tier_effective, days_rem
+        )
         return {
             "subscription_tier": tier,
             "subscription_status": status,
             "trial_started_at": str(trial_started_at or ""),
-            "is_pro": _compute_is_pro(tier, status, trial_started_at),
+            "is_pro": is_pro or has_full_flag,
+            "has_full_access": has_full_flag,
+            "is_enterprise": tier_effective in ("enterprise", "advisor"),
             "advisor_name": data.get("advisor_name"),
             "firm_name": data.get("firm_name"),
-            "is_admin": bool(data.get("is_admin") or False),
+            "is_admin": is_admin_flag,
             "role": data.get("role") or "user",
         }
     except Exception:
@@ -416,6 +463,8 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
             "subscription_status": "free",
             "trial_started_at": "",
             "is_pro": False,
+            "has_full_access": False,
+            "is_enterprise": False,
             "is_admin": False,
             "role": "user",
         }

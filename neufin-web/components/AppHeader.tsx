@@ -65,7 +65,7 @@ export default function AppHeader() {
     getSubscriptionStatus(token)
       .then((data) => {
         setSubscriptionStatus(data.status);
-        setDaysRemaining(data.days_remaining);
+        setDaysRemaining(data.days_remaining ?? undefined);
       })
       .catch(() => {
         /* non-critical */

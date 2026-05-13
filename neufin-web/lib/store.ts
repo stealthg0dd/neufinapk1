@@ -4,7 +4,7 @@
  * Abstracts both guests (localStorage) and authenticated users (Supabase session)
  * into a single interface so components never need to branch on auth state.
  *
- * const { score, isPro, isGuest, isAdmin, user, token } = useUser()
+ * const { score, isPro, hasFullAccess, isGuest, isAdmin, user, token } = useUser()
  */
 
 "use client";
@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./auth-context";
 import { getSubscription, type SubscriptionInfo } from "./api";
+import { hasFullAccess as computeHasFullAccess } from "./subscription-access";
 
 export interface UserState {
   /** Latest DNA score — from session DB or localStorage, whichever is available */
@@ -30,6 +31,8 @@ export interface UserState {
   advisorName: string | null;
   /** Internal ops / dashboard admin access */
   isAdmin: boolean;
+  /** Full product access (paid, active trial, admin, or server has_full_access). */
+  hasFullAccess: boolean;
   /** Raw auth state passthrough */
   user: ReturnType<typeof useAuth>["user"];
   token: ReturnType<typeof useAuth>["token"];
@@ -75,14 +78,17 @@ export function useUser(): UserState {
       .finally(() => setSubLoading(false));
   }, [token]);
 
-  // is_pro is true for any full-access state:
-  // - Backend now sets is_pro=true for trial + advisor + enterprise
-  // - Guard here for any stale cached response that still uses the old logic
-  const isPro =
-    subscription?.is_pro === true ||
-    subscription?.subscription_status === "trial" ||
-    subscription?.subscription_tier === "advisor" ||
-    subscription?.subscription_tier === "enterprise";
+  const accessInput = subscription
+    ? {
+        plan: subscription.subscription_tier,
+        subscription_tier: subscription.subscription_tier,
+        subscription_status: subscription.subscription_status,
+        is_admin: subscription.is_admin,
+        is_pro: subscription.is_pro,
+        has_full_access: subscription.has_full_access,
+      }
+    : null;
+  const hasFullAccessUser = computeHasFullAccess(accessInput);
   const isGuest = !user;
 
   const isAdmin =
@@ -93,7 +99,8 @@ export function useUser(): UserState {
     score,
     investorType,
     shareToken,
-    isPro,
+    isPro: hasFullAccessUser,
+    hasFullAccess: hasFullAccessUser,
     isGuest,
     subscriptionTier: subscription?.subscription_tier ?? "free",
     advisorName: subscription?.advisor_name ?? null,

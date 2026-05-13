@@ -74,11 +74,15 @@ export async function getSubscriptionStatus(
   trial_active?: boolean;
   trial_ends_at?: string | null;
   trial_expired?: boolean;
-  days_remaining?: number;
+  days_remaining?: number | null;
   onboarding_completed?: boolean;
   is_admin?: boolean;
   role?: string;
   usage?: Record<string, unknown>;
+  subscription_tier?: string;
+  subscription_status?: string;
+  has_full_access?: boolean;
+  is_enterprise?: boolean;
 }> {
   const res = await fetch(`${API}/api/subscription/status`, {
     headers: authHeaders(token),
@@ -653,6 +657,8 @@ export interface SubscriptionInfo {
   is_pro: boolean;
   advisor_name: string | null;
   firm_name: string | null;
+  has_full_access?: boolean;
+  is_enterprise?: boolean;
   /** NeuFin internal admin (user_profiles.is_admin) */
   is_admin?: boolean;
   role?: string;
@@ -688,23 +694,28 @@ export async function getVaultHistory(
   return res.json();
 }
 
+function vaultSubscriptionFallback(): SubscriptionInfo {
+  return {
+    subscription_tier: "free",
+    subscription_status: "free",
+    trial_started_at: "",
+    is_pro: false,
+    has_full_access: false,
+    is_enterprise: false,
+    advisor_name: null,
+    firm_name: null,
+    is_admin: false,
+    role: "user",
+  };
+}
+
 export async function getSubscription(
   token: string,
 ): Promise<SubscriptionInfo> {
   const res = await fetch(`${API}/api/vault/subscription`, {
     headers: authHeaders(token),
   });
-  if (!res.ok)
-    return {
-      subscription_tier: "free",
-      subscription_status: "free",
-      trial_started_at: "",
-      is_pro: false,
-      advisor_name: null,
-      firm_name: null,
-      is_admin: false,
-      role: "user",
-    };
+  if (!res.ok) return vaultSubscriptionFallback();
   return res.json();
 }
 

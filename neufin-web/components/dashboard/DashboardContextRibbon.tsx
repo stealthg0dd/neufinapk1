@@ -5,6 +5,10 @@ import { Loader2 } from "lucide-react";
 import { formatRegimeLabel } from "@/lib/regime-display";
 import { usePortfolioIntelligence } from "@/components/dashboard/PortfolioIntelligenceContext";
 import { apiGet } from "@/lib/api-client";
+import {
+  hasFullAccess,
+  type SubscriptionAccessInput,
+} from "@/lib/subscription-access";
 
 function ribbonRegimeChipClass(regime: Parameters<typeof formatRegimeLabel>[0]): string {
   const u = (regime?.regime ?? regime?.label ?? "").toLowerCase();
@@ -29,22 +33,28 @@ function ribbonRegimeChipClass(regime: Parameters<typeof formatRegimeLabel>[0]):
   return "border-slate-200 bg-slate-50 text-slate-800";
 }
 
-type SubLite = {
-  plan?: string;
-  subscription_tier?: string;
-  trial_days_remaining?: number;
-  days_remaining?: number;
-};
+type SubLite = SubscriptionAccessInput;
 
 function formatPlanLine(s: SubLite | null): string | null {
   if (!s) return null;
-  const plan = (s.plan ?? s.subscription_tier ?? "free").toString().toLowerCase();
-  const isPaid = plan === "advisor" || plan === "enterprise";
+  const tier = (s.plan ?? s.subscription_tier ?? "free").toString();
+  const statusRaw = (s.status ?? s.subscription_status ?? "").toString();
+  const statusLc = statusRaw.toLowerCase();
   const days = s.trial_days_remaining ?? s.days_remaining ?? null;
-  if (isPaid) return "Advisor · active";
-  if (days !== null && days > 0) return `Trial · ${days} day${days === 1 ? "" : "s"} left`;
+
+  if (hasFullAccess(s)) {
+    if (statusLc === "trial" && typeof days === "number" && days > 0) {
+      return `${tier} · trial · ${days} day${days === 1 ? "" : "s"} left`;
+    }
+    return `${tier} · ${statusRaw || "active"}`;
+  }
+
+  if (days !== null && days > 0) {
+    return `Trial · ${days} day${days === 1 ? "" : "s"} left`;
+  }
   if (days !== null && days <= 0) return "Trial ended · upgrade to continue";
-  return `${plan} plan`;
+  const label = (s.plan ?? s.subscription_tier ?? "free").toString();
+  return `${label} plan`;
 }
 
 export function DashboardContextRibbon() {
@@ -56,7 +66,9 @@ export function DashboardContextRibbon() {
     let c = false;
     void (async () => {
       try {
-        const res = await apiGet<SubLite>("/api/subscription/status");
+        const res = await apiGet<SubscriptionAccessInput>(
+          "/api/subscription/status",
+        );
         if (!c) setPlanLine(formatPlanLine(res ?? null));
       } catch {
         if (!c) setPlanLine(null);
