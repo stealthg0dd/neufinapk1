@@ -1,4 +1,8 @@
 import type { SwarmReport } from "@/hooks/usePortfolioData";
+import {
+  hasFullAccess,
+  type SubscriptionAccessInput,
+} from "@/lib/subscription-access";
 
 export type NextActionKey =
   | "upload_portfolio"
@@ -7,23 +11,17 @@ export type NextActionKey =
   | "run_swarm"
   | "open_reports";
 
-type SubLite = {
-  plan?: string;
-  subscription_tier?: string;
-  trial_days_remaining?: number;
-  days_remaining?: number;
-};
+type SubLite = SubscriptionAccessInput;
 
 function planMeta(s: SubLite | null): {
   isPaid: boolean;
   trialDays: number | null;
   isExpired: boolean;
 } {
-  const plan = (s?.plan ?? s?.subscription_tier ?? "free").toString().toLowerCase();
-  const isPaid = plan === "advisor" || plan === "enterprise";
+  const hasAccess = hasFullAccess(s);
   const trialDays = s?.trial_days_remaining ?? s?.days_remaining ?? null;
-  const isExpired = !isPaid && trialDays !== null && trialDays <= 0;
-  return { isPaid, trialDays, isExpired };
+  const isExpired = !hasAccess && trialDays !== null && trialDays <= 0;
+  return { isPaid: hasAccess, trialDays, isExpired };
 }
 
 export type NextPrimaryActionPayload = {

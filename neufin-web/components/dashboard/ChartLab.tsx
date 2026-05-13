@@ -162,7 +162,7 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
       current: last.close,
       dayChangePct,
       beta: betaMap[selectedTicker] ?? null,
-      weight: selectedPosition ? selectedPosition.weight * 100 : null,
+      weight: selectedPosition ? selectedPosition.weight : null,
     };
   }, [data, swarmResult, selectedTicker, selectedPosition]);
 
@@ -218,7 +218,7 @@ export default function ChartLab({ positions, swarmResult }: ChartLabProps) {
                 : "border-border bg-surface-2 text-muted-foreground"
             }`}
           >
-            {p.symbol} {(p.weight * 100).toFixed(1)}%
+            {p.symbol} {p.weight.toFixed(1)}%
           </button>
         ))}
       </div>

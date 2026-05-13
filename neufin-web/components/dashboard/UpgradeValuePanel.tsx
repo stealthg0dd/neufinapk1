@@ -4,17 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
-
-type SubStatus = {
-  plan?: string;
-  subscription_tier?: string;
-};
-
-function isPaidPlan(s: SubStatus | null): boolean {
-  if (!s) return false;
-  const p = (s.plan ?? s.subscription_tier ?? "free").toString().toLowerCase();
-  return p === "advisor" || p === "enterprise";
-}
+import {
+  hasFullAccess,
+  type SubscriptionAccessInput,
+} from "@/lib/subscription-access";
 
 const ADVISOR_UNLOCKS = [
   "Unlimited Swarm IC & regime-aware briefings",
@@ -35,8 +28,10 @@ export function UpgradeValuePanel() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await apiGet<SubStatus>("/api/subscription/status");
-        if (!cancelled) setPaid(isPaidPlan(res ?? null));
+        const res = await apiGet<SubscriptionAccessInput>(
+          "/api/subscription/status",
+        );
+        if (!cancelled) setPaid(hasFullAccess(res ?? null));
       } catch {
         if (!cancelled) setPaid(false);
       }

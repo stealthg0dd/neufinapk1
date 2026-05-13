@@ -721,7 +721,7 @@ export default function DashboardClient() {
                             {p.symbol}
                           </td>
                           <td className="p-3 font-mono text-[var(--text-secondary)]">
-                            {(p.weight * 100).toFixed(1)}%
+                            {p.weight.toFixed(1)}%
                           </td>
                           <td className="p-3 font-mono text-[var(--text-primary)]">
                             {formatNativePrice(

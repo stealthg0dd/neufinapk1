@@ -10,6 +10,10 @@ import {
   getStoredReportTheme,
   type ReportTheme,
 } from "@/components/dashboard/ReportThemeModal";
+import {
+  hasFullAccess,
+  type SubscriptionAccessInput,
+} from "@/lib/subscription-access";
 
 interface ReportRecord {
   id: string;
@@ -74,15 +78,10 @@ export default function DashboardReportsPage() {
     setGenerating(report.id);
     try {
       // Check subscription gate first
-      const statusRes = await apiGet<{ plan: string; status?: string }>(
+      const statusRes = await apiGet<SubscriptionAccessInput>(
         "/api/subscription/status",
       );
-      const canGenerate =
-        statusRes.plan === "advisor" ||
-        statusRes.plan === "enterprise" ||
-        statusRes.status === "trial";
-
-      if (!canGenerate) {
+      if (!hasFullAccess(statusRes)) {
         const origin = window.location.origin;
         const { checkout_url } = await apiPost<{ checkout_url: string }>(
           "/api/reports/checkout",

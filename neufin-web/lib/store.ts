@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./auth-context";
 import { getSubscription, type SubscriptionInfo } from "./api";
+import { hasFullAccess } from "./subscription-access";
 
 export interface UserState {
   /** Latest DNA score — from session DB or localStorage, whichever is available */
@@ -75,14 +76,17 @@ export function useUser(): UserState {
       .finally(() => setSubLoading(false));
   }, [token]);
 
-  // is_pro is true for any full-access state:
-  // - Backend now sets is_pro=true for trial + advisor + enterprise
-  // - Guard here for any stale cached response that still uses the old logic
-  const isPro =
-    subscription?.is_pro === true ||
-    subscription?.subscription_status === "trial" ||
-    subscription?.subscription_tier === "advisor" ||
-    subscription?.subscription_tier === "enterprise";
+  const isPro = hasFullAccess(
+    subscription
+      ? {
+          plan: subscription.subscription_tier,
+          subscription_tier: subscription.subscription_tier,
+          subscription_status: subscription.subscription_status,
+          is_admin: subscription.is_admin,
+          is_pro: subscription.is_pro,
+        }
+      : null,
+  );
   const isGuest = !user;
 
   const isAdmin =

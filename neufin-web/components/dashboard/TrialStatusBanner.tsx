@@ -4,14 +4,18 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { apiGet } from "@/lib/api-client";
+import { hasFullAccess } from "@/lib/subscription-access";
 
 type SubscriptionStatus = {
   plan?: "free" | "retail" | "advisor" | "enterprise";
   subscription_tier?: string;
   status?: "trial" | "active" | "expired";
+  subscription_status?: string;
   trial_days_remaining?: number;
   days_remaining?: number;
   trial_ends_at?: string;
+  is_admin?: boolean;
+  is_pro?: boolean;
 };
 
 type BannerState =
@@ -78,11 +82,7 @@ export function TrialStatusBanner() {
 
   const banner: BannerState = useMemo(() => {
     if (!subscription) return null;
-    const plan = (subscription.plan ?? subscription.subscription_tier ?? "free")
-      .toString()
-      .toLowerCase();
-    if (plan === "advisor" || plan === "enterprise") return null;
-    if (subscription.status === "active") return null;
+    if (hasFullAccess(subscription)) return null;
 
     const daysRemaining =
       subscription.trial_days_remaining ?? subscription.days_remaining ?? null;

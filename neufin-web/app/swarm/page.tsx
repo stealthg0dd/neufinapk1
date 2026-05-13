@@ -7,7 +7,6 @@ import React, {
   useState,
   useCallback,
   useEffect,
-  useMemo,
 } from "react";
 import AppHeader from "@/components/AppHeader";
 import SwarmTerminal from "@/components/SwarmTerminal";
@@ -29,6 +28,10 @@ import {
   captureSentrySlowOp,
 } from "@/lib/analytics";
 import { apiFetch, apiGet, apiPost } from "@/lib/api-client";
+import {
+  hasFullAccess,
+  type SubscriptionAccessInput,
+} from "@/lib/subscription-access";
 import { PriceWarningBanner } from "@/components/PriceWarningBanner";
 import { useUser } from "@/lib/store";
 import { debugAuth } from "@/lib/auth-debug";
@@ -166,7 +169,17 @@ function loadPortfolioFromStorage(): {
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+function readSubscriptionCache(): SubscriptionAccessInput | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = localStorage.getItem("neufin:subscription-status:cache");
+    if (!cached) return null;
+    const parsed = JSON.parse(cached) as { data?: SubscriptionAccessInput };
+    return parsed?.data ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Generate 12-month CPI disinflation sparkline — deterministic, no Math.random */
 function cpiSparkline(
@@ -1132,62 +1145,35 @@ export default function SwarmPage() {
 
   const { isPro, loading: authLoading, user } = useUser();
   const { capture } = useNeufinAnalytics();
-  const isTrialBypass = useMemo(() => {
-    // 1. Check subscription cache first (populated by mount effect below)
-    try {
-      const cached = localStorage.getItem("neufin:subscription-status:cache");
-      if (cached) {
-        const parsed = JSON.parse(cached) as {
-          ts?: number;
-          data?: { status?: string; plan?: string };
-        };
-        const d = parsed?.data;
-        if (
-          d?.status === "trial" ||
-          d?.plan === "advisor" ||
-          d?.plan === "enterprise"
-        ) {
-          return true;
-        }
-      }
-    } catch {}
-
-    // 2. Fallback: user object not available yet
-    if (!user) return false;
-
-    // 3. created_at heuristic — broad fallback for accounts < 14 days old
-    const createdAt = user?.created_at;
-    if (createdAt) {
-      const created = new Date(createdAt);
-      const daysSince = (Date.now() - created.getTime()) / 86_400_000;
-      if (Number.isFinite(daysSince) && daysSince < 14) return true;
-    }
-
-    return false;
-  }, [user]);
-  const isUnlocked = isPro || unlockedLocally || isTrialBypass;
+  const [subscriptionGate, setSubscriptionGate] = useState<
+    SubscriptionAccessInput | null
+  >(() => readSubscriptionCache());
+  const isUnlocked =
+    hasFullAccess(subscriptionGate) || unlockedLocally || isPro;
 
   useEffect(() => {
     debugAuth("swarm:mount");
   }, []);
 
-  // Refresh subscription cache on mount so isTrialBypass has fresh data
+  // Refresh subscription cache on mount for PaywallOverlay / hasFullAccess
   useEffect(() => {
-    apiGet<{
-      plan?: string;
-      status?: string;
-      days_remaining?: number;
-    }>("/api/subscription/status")
+    apiGet<SubscriptionAccessInput>("/api/subscription/status")
       .then((data) => {
         if (data && typeof data === "object") {
+          setSubscriptionGate(data);
           localStorage.setItem(
             "neufin:subscription-status:cache",
             JSON.stringify({
               ts: Date.now(),
               data: {
                 plan: data.plan,
+                subscription_tier: data.subscription_tier,
                 status: data.status,
+                subscription_status: data.subscription_status,
                 days_remaining: data.days_remaining,
+                trial_days_remaining: data.trial_days_remaining,
+                is_admin: data.is_admin,
+                is_pro: data.is_pro,
               },
             }),
           );
@@ -1777,13 +1763,13 @@ export default function SwarmPage() {
                     <div className="flex justify-between text-xs">
                       <span className="font-bold text-navy">{p.symbol}</span>
                       <span className="text-muted2">
-                        {Math.round(p.weight * 100)}%
+                        {Math.round(p.weight)}%
                       </span>
                     </div>
                     <div className="h-[2px] overflow-hidden rounded-full bg-surface-3">
                       <div
                         className="h-full rounded-full bg-primary/70"
-                        style={{ width: `${Math.round(p.weight * 100)}%` }}
+                        style={{ width: `${Math.min(100, Math.round(p.weight))}%` }}
                       />
                     </div>
                   </div>

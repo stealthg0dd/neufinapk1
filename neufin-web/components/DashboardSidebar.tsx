@@ -24,6 +24,7 @@ import {
   type ProductNavItem,
 } from "@/lib/product-navigation";
 import { isAdvisorModeEnabled } from "@/lib/featureFlags";
+import { hasFullAccess } from "@/lib/subscription-access";
 
 function isActivePath(pathname: string, href: string): boolean {
   return isNavActive(pathname, href);
@@ -173,17 +174,14 @@ export default function DashboardSidebar({
     router.push("/");
   };
 
-  const plan = (subscription.plan ?? subscription.subscription_tier ?? "free")
-    .toString()
-    .toLowerCase();
   const daysRemaining =
     subscription.trial_days_remaining ?? subscription.days_remaining ?? null;
   const trialEndsAt = subscription.trial_ends_at
     ? new Date(subscription.trial_ends_at)
     : null;
-  const isActivePaid = plan === "advisor" || plan === "enterprise";
+  const fullAccess = hasFullAccess(subscription);
   const isExpired =
-    !isActivePaid && daysRemaining !== null && daysRemaining <= 0;
+    !fullAccess && daysRemaining !== null && daysRemaining <= 0;
 
   const isAdminNav =
     isAdminFromHook ||
@@ -206,10 +204,20 @@ export default function DashboardSidebar({
     if (isAdminNav) {
       return `${tierLabel} · ${statusLabel}`;
     }
-    if (isActivePaid) {
-      const dayText =
-        daysRemaining !== null ? `${daysRemaining} days remaining` : "active";
-      return `Advisor · ${dayText}`;
+    if (fullAccess) {
+      const statusWord = (
+        subscription.status ??
+        subscription.subscription_status ??
+        "active"
+      ).toString();
+      if (
+        statusWord.toLowerCase() === "trial" &&
+        daysRemaining !== null &&
+        daysRemaining > 0
+      ) {
+        return `${tierLabel} · ${daysRemaining} days left`;
+      }
+      return `${tierLabel} · ${statusWord}`;
     }
     if (isExpired) return "Free · Trial expired";
     if (trialEndsAt && !Number.isNaN(trialEndsAt.getTime())) {
@@ -225,7 +233,7 @@ export default function DashboardSidebar({
 
   const planBadgeClass = (() => {
     if (isExpired) return "border border-red-200 bg-red-50 text-red-800";
-    if (isActivePaid)
+    if (fullAccess)
       return "border border-emerald-200 bg-emerald-50 text-emerald-900";
     if (daysRemaining !== null && daysRemaining < 3)
       return "border border-amber-200 bg-amber-50 text-amber-900";
@@ -298,7 +306,7 @@ export default function DashboardSidebar({
           </div>
         )}
 
-        {isActivePaid && (
+        {fullAccess && (
           <>
             <div className="mx-4 my-4 border-t border-border" />
             <div className="mt-0">
