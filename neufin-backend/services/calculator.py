@@ -308,6 +308,106 @@ TICKER_SECTOR_MAP: dict[str, str] = {
     "MA": "financials",
 }
 
+MARKET_ADV_USD: dict[str, float] = {
+    # Vietnam (VN suffix)
+    "VCI.VN": 12.0,
+    "HPG.VN": 45.0,
+    "VPB.VN": 18.0,
+    "MBB.VN": 15.0,
+    "SSI.VN": 8.0,
+    "LCG.VN": 2.0,
+    "VNM.VN": 5.0,
+    "VHM.VN": 12.0,
+    "TCB.VN": 20.0,
+    # Crypto (USD, 24h volume / 252 for daily equivalent)
+    "BTC-USD": 25000.0,
+    "ETH-USD": 12000.0,
+    "SOL-USD": 3000.0,
+    "COIN": 800.0,
+    "MSTR": 1200.0,
+    # US Large Cap (approximate, in $M)
+    "AAPL": 8500.0,
+    "MSFT": 5200.0,
+    "GOOGL": 3200.0,
+    "AMZN": 4800.0,
+    "NVDA": 6200.0,
+    "META": 3900.0,
+    "TSLA": 7500.0,
+    "JPM": 2800.0,
+    "V": 1200.0,
+    "GLD": 2100.0,
+    "TLT": 1500.0,
+}
+
+INSTITUTIONAL_DAILY_LIMIT = 0.20  # 20% of ADV
+STRESS_DAILY_LIMIT = 0.05  # 5% of ADV
+
+
+def compute_liquidity_metrics(
+    positions: list,
+    prices_usd: dict,
+    portfolio_value_usd: float,
+) -> list[dict]:
+    """
+    Returns per-position liquidity analysis.
+
+    positions format: [{'ticker': str, 'shares': float, 'weight_pct': float}]
+    """
+    results: list[dict] = []
+    for pos in positions:
+        ticker = str(pos.get("ticker") or "").upper()
+        weight = float(pos.get("weight_pct", 0) or 0) / 100.0
+        pos_value = float(portfolio_value_usd or 0) * weight
+
+        adv = MARKET_ADV_USD.get(ticker)
+        if adv is None:
+            # Future enhancement: load live ADV from provider.
+            price = float(prices_usd.get(ticker, 0) or 0)
+            if price > 0:
+                adv = None
+
+        if adv is not None and adv > 0:
+            pct_of_adv = pos_value / (adv * 1_000_000) * 100
+            days_normal = pos_value / (adv * 1_000_000 * INSTITUTIONAL_DAILY_LIMIT)
+            days_stress = pos_value / (adv * 1_000_000 * STRESS_DAILY_LIMIT)
+
+            if days_normal > 365:
+                status = "ILLIQUID"
+            elif days_normal > 90:
+                status = "RESTRICTED"
+            elif days_normal > 30:
+                status = "WATCH"
+            else:
+                status = "LIQUID"
+        else:
+            pct_of_adv = None
+            days_normal = None
+            days_stress = None
+            status = "ADV_UNKNOWN"
+
+        results.append(
+            {
+                "ticker": ticker,
+                "position_value_usd": round(pos_value),
+                "adv_usd_millions": adv,
+                "pct_of_adv": round(pct_of_adv, 1) if pct_of_adv is not None else None,
+                "days_to_exit_normal": (
+                    round(days_normal, 0) if days_normal is not None else None
+                ),
+                "days_to_exit_stress": (
+                    round(days_stress, 0) if days_stress is not None else None
+                ),
+                "liquidity_status": status,
+            }
+        )
+
+    return sorted(
+        results,
+        key=lambda x: (x.get("days_to_exit_normal") or 0),
+        reverse=True,
+    )
+
+
 # ── Circuit breaker ────────────────────────────────────────────────────────────
 _BLACKLIST: dict[str, float] = {}  # provider_name → expiry epoch
 
@@ -1884,6 +1984,25 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         lambda s: market_value_payload.get(s, {}).get("price_unavailable_message")
     )
 
+    liquidity_positions = [
+        {
+            "ticker": str(row.get("symbol") or "").upper(),
+            "shares": float(row.get("shares") or 0),
+            "weight_pct": float(row.get("weight") or 0) * 100,
+        }
+        for row in _records_nan_to_none(positions_out.to_dict("records"))
+    ]
+    liquidity_metrics = compute_liquidity_metrics(
+        positions=liquidity_positions,
+        prices_usd=spot_prices,
+        portfolio_value_usd=float(total_value),
+    )
+    liquidity_watchlist = [
+        row
+        for row in liquidity_metrics
+        if row.get("liquidity_status") in {"ILLIQUID", "RESTRICTED"}
+    ]
+
     # # SEA-NATIVE-TICKER-FIX: derive canonical benchmark from resolved symbols
     _mf = portfolio_market_framing(resolved)
     portfolio_benchmark = _mf["benchmark"]
@@ -1995,6 +2114,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "positions": _enrich_positions_fx_hint(
             _records_nan_to_none(positions_out.to_dict("records"))
         ),
+        "liquidity_metrics": liquidity_metrics,
+        "liquidity_watchlist": liquidity_watchlist,
         "data_quality": price_quality,
         # SEA-NATIVE-CURRENCY-FIX: geographic exposure
         "country_exposure": country_exposure,

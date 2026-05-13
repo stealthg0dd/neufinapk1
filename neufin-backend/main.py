@@ -118,6 +118,7 @@ from services.calculator import (  # noqa: E402
     _hhi_score,
     _tax_alpha_score,
     apply_cost_basis_column,
+    compute_liquidity_metrics,
     fetch_beta,
     get_price_with_fallback,
     get_tax_impact_analysis,
@@ -1253,6 +1254,28 @@ Return ONLY valid JSON:
                 pos["fx_indicative_sgd"] = fx_hint
         positions_out.append(pos)
 
+    liquidity_metrics = compute_liquidity_metrics(
+        positions=[
+            {
+                "ticker": str(p.get("symbol") or "").upper(),
+                "shares": float(p.get("shares") or 0),
+                "weight_pct": float(p.get("weight") or 0),
+            }
+            for p in positions_out
+        ],
+        prices_usd={
+            str(k).upper(): float(v)
+            for k, v in price_map.items()
+            if v is not None and float(v) > 0
+        },
+        portfolio_value_usd=float(total_value),
+    )
+    liquidity_watchlist = [
+        row
+        for row in liquidity_metrics
+        if row.get("liquidity_status") in {"ILLIQUID", "RESTRICTED"}
+    ]
+
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
     logger.info(
         "analyze_dna.score",
@@ -1406,6 +1429,8 @@ Return ONLY valid JSON:
         "hidden_correlation_clusters": clusters,
         "tax_analysis": tax_analysis,
         "positions": positions_out,
+        "liquidity_metrics": liquidity_metrics,
+        "liquidity_watchlist": liquidity_watchlist,
         "share_token": share_token,
         "share_url": f"{settings.APP_BASE_URL}/share/{share_token}",
         "record_id": record_id,
