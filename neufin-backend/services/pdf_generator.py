@@ -6837,9 +6837,22 @@ async def generate_advisor_report(
             ic_grade_only=ic_grade_only,
             report_mode=report_mode,
         )
-    except ValueError:
-        # Intentional gate (e.g. ic_grade_only + draft state) — never mask as emergency PDF
-        raise
+    except ValueError as e:
+        # Only preserve the intentional IC-grade gate as a user-facing 422.
+        # Any other ValueError is an internal rendering issue and should
+        # degrade to emergency PDF instead of breaking report generation.
+        if "IC-grade PDF export requires complete portfolio data" in str(e):
+            raise
+        logger.error("pdf.orchestrator_value_error", error=str(e), exc_info=True)
+        try:
+            return _generate_emergency_pdf(
+                f"Report assembly value error: {e}",
+                advisor_config,
+                _palette(theme),
+            )
+        except Exception as e2:
+            logger.error("pdf.emergency_pdf_failed", error=str(e2), exc_info=True)
+            raise
     except Exception as e:
         logger.error("pdf.orchestrator_failed", error=str(e), exc_info=True)
         try:
