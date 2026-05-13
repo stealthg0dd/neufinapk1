@@ -21,6 +21,8 @@ type BannerState =
 
 const CACHE_KEY = "neufin:subscription-status:cache";
 const CACHE_TTL_MS = 5 * 60 * 1000;
+// Note: cached status expires after 5 min (CACHE_TTL_MS).
+// Force-clear: localStorage.removeItem("neufin:subscription-status:cache")
 
 function readCached(): SubscriptionStatus | null {
   if (typeof window === "undefined") return null;
@@ -80,6 +82,7 @@ export function TrialStatusBanner() {
       .toString()
       .toLowerCase();
     if (plan === "advisor" || plan === "enterprise") return null;
+    if (subscription.status === "active") return null;
 
     const daysRemaining =
       subscription.trial_days_remaining ?? subscription.days_remaining ?? null;

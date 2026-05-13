@@ -137,7 +137,7 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
     # Trial users get full Advisor-tier access for 14 days, even if subscription_tier is still 'free'.
     sub = get_sub_status(uid)
     status = sub.get("status") or "expired"
-    days_remaining = sub.get("days_remaining", 0)
+    days_remaining = sub.get("days_remaining", None)
     trial_started_at = data.get("trial_started_at")
 
     tier = data.get("subscription_tier", "free") or "free"
