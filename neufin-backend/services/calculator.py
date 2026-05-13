@@ -1176,7 +1176,7 @@ def fetch_beta_with_source(sym: str) -> tuple[float, str]:
 def fetch_beta(sym: str) -> float:
     """
     Fetch beta from Alpha Vantage OVERVIEW (1-hour cache).
-    Returns 1.0 (market-neutral) when unavailable.
+    Returns crypto prior for unsupported crypto symbols; otherwise 1.0 fallback.
     """
     beta, _ = fetch_beta_with_source(sym)
     return beta
