@@ -278,6 +278,91 @@ def _get_fred_cpi_analysis() -> dict:
     }
 
 
+def _cpi_only_regime_fallback() -> tuple[str, float, dict, list[str]]:
+    """Fallback when canonical regime detector is unavailable."""
+    cpi_data = _get_fred_cpi_analysis()
+    yoy = cpi_data.get("yoy_pct")
+    trend = cpi_data.get("trend_3m_ann")
+
+    if yoy is None:
+        return (
+            "risk-off",
+            0.55,
+            cpi_data,
+            ["FRED data unavailable — defaulting to defensive risk-off posture"],
+        )
+    if yoy < 0:
+        return (
+            "recession",
+            min(0.92, 0.70 + abs(yoy) * 0.05),
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% — deflationary pressure",
+                "Real growth likely contracting",
+                "Flight to quality assets expected",
+            ],
+        )
+    if yoy < 1.5:
+        return (
+            "recession",
+            0.65,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% — well below Fed target signals demand weakness",
+                "Growth slowdown signals present",
+                "Bond proxies and defensives outperform",
+            ],
+        )
+    if yoy <= 2.0:
+        return (
+            "growth",
+            0.82,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% at/near Fed 2% target",
+                "Accommodative rate environment supports risk assets",
+                "Equity multiples and growth stocks favoured",
+            ],
+        )
+    if yoy <= 3.0:
+        return (
+            "growth",
+            0.72,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% slightly above target but controlled",
+                "Controlled inflation historically coincides with expansion",
+                "Monitor for rate-hike signals from Fed",
+            ],
+        )
+    if trend is not None and yoy > 0 and trend < yoy - 1.5:
+        return (
+            "stagflation",
+            0.68,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% elevated but 3m-ann {trend:.1f}% decelerating",
+                "Growth momentum fading while inflation persists",
+                "Stagflationary compression on corporate margins",
+            ],
+        )
+
+    return (
+        "inflation",
+        min(0.95, 0.72 + (float(yoy) - 3.0) * 0.05),
+        cpi_data,
+        [
+            f"CPI YoY {yoy:.1f}% above 3% threshold",
+            (
+                f"3m annualised trend {trend:.1f}%"
+                if trend is not None
+                else "Trend data unavailable"
+            ),
+            "Rate-sensitive sectors under pressure; real assets defensive",
+        ],
+    )
+
+
 def _compute_portfolio_sharpe(
     symbols: list[str],
     weights: dict[str, float],
@@ -849,87 +934,55 @@ async def market_regime_node(state: SwarmState) -> dict:
     """
     trace: list[str] = []
     region_context = state.get("region_context") or {}
-    trace.append(
-        "[Market Regime] Fetching FRED CPI data for macro regime classification..."
-    )
+    trace.append("[Market Regime] Fetching canonical regime detector output...")
     if region_context.get("primary_market") == "VN":
         trace.append(
             "[Market Regime] VN region context active: adding SBV policy rate, VND NEER, and HOSE liquidity placeholders alongside FRED."
         )
 
-    cpi_data = await asyncio.to_thread(_get_fred_cpi_analysis)
+    use_fallback = False
+    try:
+        from services.regime_detector import get_current_regime
+
+        canonical = await asyncio.to_thread(get_current_regime)
+        regime = str(canonical.get("regime") or "market-neutral")
+        confidence = round(float(canonical.get("confidence") or 0.60), 2)
+        cpi_data = canonical.get("cpi_data") if isinstance(canonical, dict) else {}
+        cpi_data = cpi_data if isinstance(cpi_data, dict) else {}
+        _signals = (
+            canonical.get("supporting_signals") if isinstance(canonical, dict) else []
+        )
+        drivers = []
+        if isinstance(_signals, list):
+            for s in _signals[:3]:
+                if isinstance(s, dict):
+                    nm = s.get("signal") or s.get("name") or "signal"
+                    val = s.get("value")
+                    drivers.append(f"{nm}: {val}" if val is not None else str(nm))
+                elif isinstance(s, str):
+                    drivers.append(s)
+        if not drivers:
+            drivers = ["Canonical regime detector output"]
+        trace.append(
+            f"[Market Regime] Canonical: {regime} (conf={confidence:.0%}) from regime detector."
+        )
+    except Exception as e:
+        use_fallback = True
+        regime, confidence, cpi_data, drivers = await asyncio.to_thread(
+            _cpi_only_regime_fallback
+        )
+        trace.append(
+            f"[Market Regime] Canonical detector unavailable ({e}) — using CPI fallback ({regime}, conf={confidence:.0%})."
+        )
 
     yoy = cpi_data.get("yoy_pct")
     trend = cpi_data.get("trend_3m_ann")
 
-    # ── Rule-based regime + confidence ────────────────────────────────────────
-    if yoy is None:
-        regime = "risk-off"
-        confidence = 0.40
-        drivers = ["FRED data unavailable — defaulting to defensive risk-off posture"]
-    elif yoy < 0:
-        regime = "recession"
-        confidence = min(0.92, 0.70 + abs(yoy) * 0.05)
-        drivers = [
-            f"CPI YoY {yoy:.1f}% — deflationary pressure",
-            "Real growth likely contracting",
-            "Flight to quality assets expected",
-        ]
-    elif yoy < 1.5:
-        regime = "recession"
-        confidence = 0.65
-        drivers = [
-            f"CPI YoY {yoy:.1f}% — well below Fed target signals demand weakness",
-            "Growth slowdown signals present",
-            "Bond proxies and defensives outperform",
-        ]
-    elif yoy <= 2.0:
-        regime = "growth"
-        confidence = 0.82
-        drivers = [
-            f"CPI YoY {yoy:.1f}% at/near Fed 2% target",
-            "Accommodative rate environment supports risk assets",
-            "Equity multiples and growth stocks favoured",
-        ]
-    elif yoy <= 3.0:
-        regime = "growth"
-        confidence = 0.72
-        drivers = [
-            f"CPI YoY {yoy:.1f}% slightly above target but controlled",
-            "Controlled inflation historically coincides with expansion",
-            "Monitor for rate-hike signals from Fed",
-        ]
-    elif yoy > 3.0:
-        # Differentiate inflation vs. stagflation by 3m trend direction
-        if trend is not None and yoy > 0 and trend < yoy - 1.5:
-            regime = "stagflation"
-            confidence = 0.68
-            drivers = [
-                f"CPI YoY {yoy:.1f}% elevated but 3m-ann {trend:.1f}% decelerating",
-                "Growth momentum fading while inflation persists",
-                "Stagflationary compression on corporate margins",
-            ]
-        else:
-            regime = "inflation"
-            confidence = min(0.95, 0.72 + (yoy - 3.0) * 0.05)
-            drivers = [
-                f"CPI YoY {yoy:.1f}% above 3% threshold",
-                (
-                    f"3m annualised trend {trend:.1f}%"
-                    if trend is not None
-                    else "Trend data unavailable"
-                ),
-                "Rate-sensitive sectors under pressure; real assets defensive",
-            ]
-    else:
-        regime = "inflation"
-        confidence = 0.75
-        drivers = [f"CPI YoY {yoy:.1f}%", "Above-target inflation regime"]
-
     yoy_str = f"{yoy:.1f}%" if yoy is not None else "N/A"
-    trace.append(
-        f"[Market Regime] Rule-based: {regime} (conf={confidence:.0%}) | CPI YoY={yoy_str}"
-    )
+    if use_fallback:
+        trace.append(
+            f"[Market Regime] Fallback rule-based: {regime} (conf={confidence:.0%}) | CPI YoY={yoy_str}"
+        )
 
     # ── AI enrichment (optional — falls back to rule-based on failure) ─────────
     symbols = [t["symbol"] for t in state["ticker_data"][:5]]
@@ -945,11 +998,23 @@ Return ONLY valid JSON — no markdown:
   "drivers": ["specific driver 1", "specific driver 2", "specific driver 3"],
   "portfolio_implication": "one sentence on how {regime} regime specifically affects {", ".join(symbols[:3])}"
 }}
-regime MUST be one of: growth, inflation, recession, stagflation, risk-off"""
+regime MUST be one of: growth, inflation, recession, stagflation, risk-off, risk_on, risk_off, recovery, recession_risk, neutral, market-neutral"""
 
     try:
         result = await get_ai_analysis(prompt)
-        valid_regimes = {"growth", "inflation", "recession", "stagflation", "risk-off"}
+        valid_regimes = {
+            "growth",
+            "inflation",
+            "recession",
+            "stagflation",
+            "risk-off",
+            "risk_on",
+            "risk_off",
+            "recovery",
+            "recession_risk",
+            "neutral",
+            "market-neutral",
+        }
         if result.get("regime") not in valid_regimes:
             result["regime"] = regime
         try:
