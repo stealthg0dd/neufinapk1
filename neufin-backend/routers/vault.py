@@ -33,6 +33,7 @@ from config import (
 )
 from database import claim_guest_data, supabase
 from services.auth_dependency import (
+    fetch_user_profile,
     get_current_user,
     get_subscription_status as get_sub_status,
     invalidate_subscription_cache,
@@ -149,20 +150,67 @@ async def get_subscription_status(user: JWTUser = Depends(get_current_user)):
             .execute()
         )
         data = result.data or {}
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "subscription_status_profile_select_failed", uid=uid, error=str(exc)
+        )
         data = {}
 
-    # Trial users get full Advisor-tier access for 14 days, even if subscription_tier is still 'free'.
+    # When the rich select fails or omits tier, overlay from the same profile read
+    # used by get_sub_status (avoids plan: "free" while DB has enterprise).
+    profile_lite = fetch_user_profile(uid)
+    if profile_lite:
+        for key in (
+            "subscription_tier",
+            "subscription_status",
+            "trial_started_at",
+            "is_admin",
+        ):
+            cur = data.get(key)
+            if cur is None or (isinstance(cur, str) and not cur.strip()):
+                if profile_lite.get(key) is not None:
+                    data[key] = profile_lite[key]
+
+    # Force fresh auth-layer cache if we still have no tier (stale tier in _sub_cache).
+    if not (data.get("subscription_tier") or "").strip():
+        invalidate_subscription_cache(uid)
+
     sub = get_sub_status(uid)
     status = sub.get("status") or "expired"
     days_remaining = sub.get("days_remaining", None)
     trial_started_at = data.get("trial_started_at")
 
-    tier_raw = data.get("subscription_tier", "free") or "free"
+    sub_tier = (sub.get("tier") or "").strip().lower()
+    profile_tier = (data.get("subscription_tier") or "").strip().lower()
+    # Active + mismatched cached tier vs profile (e.g. upgraded in DB, cache still "free").
+    if (
+        status == "active"
+        and profile_tier in ("enterprise", "advisor", "retail")
+        and sub_tier
+        and sub_tier != profile_tier
+    ):
+        invalidate_subscription_cache(uid)
+        sub = get_sub_status(uid)
+        status = sub.get("status") or "expired"
+        days_remaining = sub.get("days_remaining", None)
+        sub_tier = (sub.get("tier") or "").strip().lower()
+
+    tier_raw = profile_tier or sub_tier or "free"
     tier = tier_raw
     if status == "trial":
         tier = "advisor"
     tier_lc = str(tier).lower()
+
+    logger.info(
+        "subscription_status_debug",
+        uid=uid,
+        data_keys=sorted(data.keys()) if isinstance(data, dict) else [],
+        data_subscription_tier=data.get("subscription_tier"),
+        sub_status=status,
+        sub_tier=sub.get("tier"),
+        tier_raw=tier_raw,
+        tier_lc=tier_lc,
+    )
 
     plan_details = PLANS.get(tier_lc, PLANS["free"])
     dna_limit = PLAN_DNA_LIMITS.get(tier_lc, 3)
@@ -418,24 +466,63 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
     """Return the user's current subscription tier and access level."""
     uid = user.id
     try:
-        result = (
-            supabase.table("user_profiles")
-            .select(
-                "subscription_tier, subscription_status, trial_started_at, "
-                "advisor_name, firm_name, is_admin, role"
+        try:
+            result = (
+                supabase.table("user_profiles")
+                .select(
+                    "subscription_tier, subscription_status, trial_started_at, "
+                    "advisor_name, firm_name, is_admin, role"
+                )
+                .eq("id", uid)
+                .single()
+                .execute()
             )
-            .eq("id", uid)
-            .single()
-            .execute()
-        )
-        data = result.data or {}
-        tier = data.get("subscription_tier", "free") or "free"
-        status = data.get("subscription_status", "free") or "free"
-        trial_started_at = data.get("trial_started_at")
+            data = result.data or {}
+        except Exception as exc:
+            logger.warning("vault_subscription_select_failed", uid=uid, error=str(exc))
+            data = {}
+
+        profile_lite = fetch_user_profile(uid)
+        if profile_lite:
+            for key in (
+                "subscription_tier",
+                "subscription_status",
+                "trial_started_at",
+                "is_admin",
+            ):
+                cur = data.get(key)
+                if cur is None or (isinstance(cur, str) and not cur.strip()):
+                    if profile_lite.get(key) is not None:
+                        data[key] = profile_lite[key]
+
+        if not (data.get("subscription_tier") or "").strip():
+            invalidate_subscription_cache(uid)
+
         sub_norm = get_sub_status(uid)
         status_norm = sub_norm.get("status") or "expired"
         days_rem = sub_norm.get("days_remaining", None)
+        sub_tier = (sub_norm.get("tier") or "").strip().lower()
+
+        tier = (data.get("subscription_tier") or "").strip() or sub_tier or "free"
+        status = data.get("subscription_status", "free") or "free"
+        trial_started_at = data.get("trial_started_at")
+
         tier_lc = str(tier).lower()
+        profile_paid = tier_lc in ("enterprise", "advisor", "retail")
+        if (
+            status_norm == "active"
+            and profile_paid
+            and sub_tier
+            and sub_tier != tier_lc
+        ):
+            invalidate_subscription_cache(uid)
+            sub_norm = get_sub_status(uid)
+            status_norm = sub_norm.get("status") or "expired"
+            days_rem = sub_norm.get("days_remaining", None)
+            sub_tier = (sub_norm.get("tier") or "").strip().lower()
+            tier = (data.get("subscription_tier") or "").strip() or sub_tier or "free"
+            tier_lc = str(tier).lower()
+
         if status_norm == "trial":
             tier_effective = "advisor"
         else:
@@ -457,7 +544,8 @@ async def get_subscription(user: JWTUser = Depends(get_current_user)):
             "is_admin": is_admin_flag,
             "role": data.get("role") or "user",
         }
-    except Exception:
+    except Exception as exc:
+        logger.warning("vault_subscription_failed", uid=uid, error=str(exc))
         return {
             "subscription_tier": "free",
             "subscription_status": "free",
