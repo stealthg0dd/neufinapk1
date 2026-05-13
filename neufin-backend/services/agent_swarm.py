@@ -2008,6 +2008,7 @@ async def run_swarm(
     normalized_ticker_data = (
         list(ticker_data.values()) if isinstance(ticker_data, dict) else ticker_data
     )
+    # Always derive context from the current payload to avoid cross-run carryover.
     resolved_region_context = detect_region(
         [str(t.get("symbol") or "") for t in normalized_ticker_data]
     )
