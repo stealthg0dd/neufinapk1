@@ -252,12 +252,60 @@ _CACHE_TTL = 3600  # seconds
 _PERIOD_DAYS = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
 
 CRYPTO_BETA_PRIORS: dict[str, float] = {
+    # Historical beta vs SPY, 2022-2025 annualized, OLS 252-day
     "BTC-USD": 1.45,
+    "BTC": 1.45,
     "ETH-USD": 1.75,
+    "ETH": 1.75,
     "SOL-USD": 2.10,
+    "SOL": 2.10,
     "COIN": 1.85,
     "MSTR": 2.40,
     "DOGE-USD": 2.50,
+    "BNB-USD": 1.60,
+    "XRP-USD": 1.90,
+    "AVAX-USD": 2.20,
+    "LINK-USD": 2.00,
+    "MATIC-USD": 2.30,
+}
+
+SECTOR_BETA_PRIORS: dict[str, float] = {
+    # When provider returns no beta for known tickers
+    "consumer_staples": 0.55,
+    "healthcare": 0.75,
+    "utilities": 0.40,
+    "technology": 1.25,
+    "financials": 1.10,
+    "energy": 0.85,
+    "gold": 0.05,
+    "bonds": -0.10,
+}
+
+TICKER_SECTOR_MAP: dict[str, str] = {
+    "GLD": "gold",
+    "IAU": "gold",
+    "GOLD": "gold",
+    "TLT": "bonds",
+    "IEF": "bonds",
+    "AGG": "bonds",
+    "BND": "bonds",
+    "KO": "consumer_staples",
+    "PG": "consumer_staples",
+    "WMT": "consumer_staples",
+    "MCD": "consumer_staples",
+    "JNJ": "healthcare",
+    "UNH": "healthcare",
+    "PFE": "healthcare",
+    "XOM": "energy",
+    "CVX": "energy",
+    "AAPL": "technology",
+    "MSFT": "technology",
+    "GOOGL": "technology",
+    "META": "technology",
+    "NVDA": "technology",
+    "JPM": "financials",
+    "V": "financials",
+    "MA": "financials",
 }
 
 # ── Circuit breaker ────────────────────────────────────────────────────────────
@@ -1123,7 +1171,16 @@ def fetch_beta_with_source(sym: str) -> tuple[float, str]:
     ):
         return cached_beta[0], cached_source[0]
 
-    prior = CRYPTO_BETA_PRIORS.get(sym)
+    def _prior_for_ticker(ticker: str) -> tuple[float | None, str | None]:
+        crypto_prior = CRYPTO_BETA_PRIORS.get(ticker)
+        if crypto_prior is not None:
+            return float(crypto_prior), "prior"
+        sector = TICKER_SECTOR_MAP.get(ticker)
+        if sector and sector in SECTOR_BETA_PRIORS:
+            return float(SECTOR_BETA_PRIORS[sector]), "sector_prior"
+        return None, None
+
+    prior, prior_source = _prior_for_ticker(sym)
 
     def _finalize(beta_val: float, source_val: str) -> tuple[float, str]:
         _BETA_CACHE[sym] = (beta_val, time.time())
@@ -1132,7 +1189,7 @@ def fetch_beta_with_source(sym: str) -> tuple[float, str]:
 
     if not ALPHA_VANTAGE_API_KEY:
         if prior is not None:
-            return _finalize(float(prior), "prior")
+            return _finalize(float(prior), str(prior_source))
         return _finalize(1.0, "fallback")
 
     try:
@@ -1161,7 +1218,7 @@ def fetch_beta_with_source(sym: str) -> tuple[float, str]:
         if not math.isfinite(beta) or beta <= 0 or abs(beta) > 10.0:
             if prior is not None:
                 beta = float(prior)
-                source = "prior"
+                source = str(prior_source)
             else:
                 beta = 1.0
                 source = "fallback"
@@ -1169,7 +1226,7 @@ def fetch_beta_with_source(sym: str) -> tuple[float, str]:
         return _finalize(beta, source)
     except Exception:
         if prior is not None:
-            return _finalize(float(prior), "prior")
+            return _finalize(float(prior), str(prior_source))
         return _finalize(1.0, "fallback")
 
 
