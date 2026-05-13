@@ -114,10 +114,12 @@ from routers import (  # noqa: E402
 from services.ai_router import get_ai_analysis  # noqa: E402
 from services.auth_dependency import get_current_user  # noqa: E402
 from services.calculator import (  # noqa: E402
+    _compute_ic_readiness,
     _beta_score,
     _hhi_score,
     _tax_alpha_score,
     apply_cost_basis_column,
+    compute_liquidity_metrics,
     fetch_beta,
     get_price_with_fallback,
     get_tax_impact_analysis,
@@ -1253,6 +1255,28 @@ Return ONLY valid JSON:
                 pos["fx_indicative_sgd"] = fx_hint
         positions_out.append(pos)
 
+    liquidity_metrics = compute_liquidity_metrics(
+        positions=[
+            {
+                "ticker": str(p.get("symbol") or "").upper(),
+                "shares": float(p.get("shares") or 0),
+                "weight_pct": float(p.get("weight") or 0),
+            }
+            for p in positions_out
+        ],
+        prices_usd={
+            str(k).upper(): float(v)
+            for k, v in price_map.items()
+            if v is not None and float(v) > 0
+        },
+        portfolio_value_usd=float(total_value),
+    )
+    liquidity_watchlist = [
+        row
+        for row in liquidity_metrics
+        if row.get("liquidity_status") in {"ILLIQUID", "RESTRICTED"}
+    ]
+
     # ── 9. Persist to DB ───────────────────────────────────────────────────────
     logger.info(
         "analyze_dna.score",
@@ -1391,9 +1415,30 @@ Return ONLY valid JSON:
         investor_type=analysis.get("investor_type"),
     )
     num_priced = len([s for s in symbols if s not in set(failed_tickers)])
+    has_return_history = (
+        not corr_matrix.empty if hasattr(corr_matrix, "empty") else False
+    )
+    resolution_pct = num_priced / len(df) if len(df) > 0 else 0.0
+    dna_confidence = min(
+        1.0,
+        max(
+            0.4,
+            (0.5 + 0.3 * resolution_pct) + (0.2 if corr_pts >= 15 else 0.0),
+        ),
+    )
+    ic_readiness = _compute_ic_readiness(
+        prices_resolved=num_priced,
+        total_positions=len(df),
+        cost_basis_provided=cost_basis_provided,
+        swarm_complete=False,
+        dna_confidence=dna_confidence,
+        has_return_history=has_return_history,
+    )
     out: dict = {
         **analysis,
         "dna_score": dna_score,
+        "ic_readiness": ic_readiness,
+        "ic_readiness_tier": ic_readiness.get("tier"),
         "score_breakdown": score_breakdown,
         "total_value": round(total_value, 2),
         "multi_currency_portfolio": multi_ccy,
@@ -1406,6 +1451,8 @@ Return ONLY valid JSON:
         "hidden_correlation_clusters": clusters,
         "tax_analysis": tax_analysis,
         "positions": positions_out,
+        "liquidity_metrics": liquidity_metrics,
+        "liquidity_watchlist": liquidity_watchlist,
         "share_token": share_token,
         "share_url": f"{settings.APP_BASE_URL}/share/{share_token}",
         "record_id": record_id,

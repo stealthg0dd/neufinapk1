@@ -726,10 +726,25 @@ class StressTester:
         return out
 
     async def run_stress_test(self, portfolio_df: pd.DataFrame) -> dict:
+        from services.calculator import fetch_beta
         from services.market_cache import market_cache as _mc
 
         tickers = portfolio_df["ticker"].tolist()
         weights = portfolio_df.set_index("ticker")["weight"]
+
+        # Canonical weighted beta (ratio, not percent) for scenario fallback estimates.
+        beta_vals = await asyncio.gather(
+            *[asyncio.to_thread(fetch_beta, t) for t in tickers],
+            return_exceptions=True,
+        )
+        beta_map: dict[str, float] = {}
+        for t, b in zip_equal(tickers, beta_vals):
+            beta_map[t] = float(b) if isinstance(b, float | int) else 1.0
+        weighted_beta = float(
+            sum(float(weights.get(t, 0.0)) * beta_map.get(t, 1.0) for t in tickers)
+        )
+        if not weighted_beta:
+            weighted_beta = 1.0
 
         results: dict = {}
 
@@ -749,7 +764,7 @@ class StressTester:
             )
 
             for ticker, prices in zip_equal(tickers, all_prices):
-                if prices is not None and not prices.empty:
+                if prices is not None and not prices.empty and len(prices) >= 2:
                     start_p = float(prices.iloc[0])
                     end_p = float(prices.iloc[-1])
                     if start_p > 0:
@@ -765,6 +780,50 @@ class StressTester:
                         scenario_returns.append(period_ret * w)
 
             portfolio_impact = sum(scenario_returns)
+            covered_weight = float(
+                sum(
+                    float(weights.get(t, 0.0))
+                    for t, p in zip_equal(tickers, all_prices)
+                    if p is not None and not p.empty and len(p) >= 2
+                )
+            )
+
+            # If we cannot compute from historical returns, emit beta-estimated ranges
+            # instead of misleading +0.0% placeholders.
+            if not scenario_returns or covered_weight <= 0.0:
+                spy_ret = float(benchmark["SPY"])
+                est_mid = round(weighted_beta * spy_ret, 2)
+                band = max(1.0, round(abs(est_mid) * 0.15, 2))
+                est_low = min(round(est_mid - band, 2), round(est_mid + band, 2))
+                est_high = max(round(est_mid - band, 2), round(est_mid + band, 2))
+                outperf = round(est_mid - spy_ret, 2)
+                results[key] = {
+                    "scenario_name": meta["scenario_name"],
+                    "impact_pct": est_mid,
+                    "weak_link": weak_link,
+                    "description": meta["description"],
+                    "key": key,
+                    "label": meta["label"],
+                    "start": start,
+                    "end": end,
+                    "spy_return_pct": benchmark["SPY"],
+                    "qqq_return_pct": benchmark["QQQ"],
+                    "benchmark_impact": benchmark,
+                    "outperformance_vs_spy_pct": outperf,
+                    "data_status": "estimated_beta_fallback",
+                    "data_coverage_pct": round(covered_weight * 100, 1),
+                    "estimated_return_range_pct": {
+                        "low": est_low,
+                        "high": est_high,
+                    },
+                    "md_narrative": (
+                        f"Est. {est_low:+.1f}% to {est_high:+.1f}% "
+                        "[beta-estimated, not from returns history]. "
+                        f"Computed from weighted beta {weighted_beta:.3f} and "
+                        f"historical index drawdown {spy_ret:+.1f}%."
+                    ),
+                }
+                continue
 
             results[key] = {
                 "scenario_name": meta["scenario_name"],
@@ -780,6 +839,12 @@ class StressTester:
                 "benchmark_impact": benchmark,
                 "outperformance_vs_spy_pct": round(
                     portfolio_impact * 100 - benchmark["SPY"], 2
+                ),
+                "data_status": "observed_history",
+                "data_coverage_pct": 100.0,
+                "md_narrative": (
+                    f"Observed historical return: {round(portfolio_impact * 100, 2):+.1f}% "
+                    f"(vs. S&P {benchmark['SPY']:+.1f}%, QQQ {benchmark['QQQ']:+.1f}%)."
                 ),
             }
 
@@ -831,13 +896,16 @@ class StressTester:
                     "benchmark_impact": r.get(
                         "benchmark_impact", {"SPY": r["spy_return_pct"], "QQQ": 0.0}
                     ),
-                    "data_coverage_pct": 100.0,
+                    "data_coverage_pct": r.get("data_coverage_pct", 100.0),
+                    "data_status": r.get("data_status", "observed_history"),
+                    "estimated_return_range_pct": r.get("estimated_return_range_pct"),
                     "alpha_gap_spy": r.get(
                         "alpha_gap_spy", r["outperformance_vs_spy_pct"]
                     ),
                     "alpha_gap_qqq": r.get("alpha_gap_qqq", 0.0),
                     "alpha_gap_narrative": r.get("alpha_gap_narrative", ""),
-                    "md_narrative": (
+                    "md_narrative": r.get("md_narrative")
+                    or (
                         f"In a {r.get('label', key)}-style scenario, this portfolio would "
                         f"have returned {r['impact_pct']:+.1f}% "
                         f"(vs. S&P {r['spy_return_pct']:+.1f}%, QQQ {r.get('qqq_return_pct', 0.0):+.1f}%), "

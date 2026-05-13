@@ -89,6 +89,7 @@ class Position(BaseModel):
 class SwarmAnalyzeRequest(BaseModel):
     positions: list[Position]
     total_value: float
+    precomputed_dna_score: float | None = None
     user_id: str | None = None
     session_id: str | None = None
     quant_modes: list[str] | None = None
@@ -343,6 +344,7 @@ async def _start_swarm_job(
         job_id=job_id,
         positions=[p.model_dump() for p in payload.positions],
         total_value=payload.total_value,
+        precomputed_dna_score=payload.precomputed_dna_score,
         user_id=user_id,
         session_id=session_id,
         quant_modes=payload.quant_modes,
@@ -360,6 +362,7 @@ async def _run_swarm_background(
     job_id: str,
     positions: list[dict],
     total_value: float,
+    precomputed_dna_score: float | None,
     user_id: str | None,
     session_id: str,
     quant_modes: list[str] | None,
@@ -386,6 +389,7 @@ async def _run_swarm_background(
             job_id=job_id,
             region_context=region_context,
             external_quant_intelligence=_build_swarm_quant_context(quant_result, modes),
+            precomputed_dna_score=precomputed_dna_score,
         )
         if modes:
             result = _merge_quant_model_outputs(result, quant_result, modes)
@@ -526,6 +530,7 @@ async def analyze_with_swarm_sync(
         total_value=body.total_value,
         region_context=region_context,
         external_quant_intelligence=_build_swarm_quant_context(quant_result, modes),
+        precomputed_dna_score=body.precomputed_dna_score,
     )
     if modes:
         result = _merge_quant_model_outputs(result, quant_result, modes)

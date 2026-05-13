@@ -125,6 +125,7 @@ class SwarmState(TypedDict):
     total_value: float
     region_context: dict
     external_quant_intelligence: dict
+    precomputed_dna_score: float | None
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
     macro_context: str  # Strategist: regime + news summary
@@ -275,6 +276,91 @@ def _get_fred_cpi_analysis() -> dict:
         "regime": regime,
         "regime_description": description,
     }
+
+
+def _cpi_only_regime_fallback() -> tuple[str, float, dict, list[str]]:
+    """Fallback when canonical regime detector is unavailable."""
+    cpi_data = _get_fred_cpi_analysis()
+    yoy = cpi_data.get("yoy_pct")
+    trend = cpi_data.get("trend_3m_ann")
+
+    if yoy is None:
+        return (
+            "risk-off",
+            0.55,
+            cpi_data,
+            ["FRED data unavailable — defaulting to defensive risk-off posture"],
+        )
+    if yoy < 0:
+        return (
+            "recession",
+            min(0.92, 0.70 + abs(yoy) * 0.05),
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% — deflationary pressure",
+                "Real growth likely contracting",
+                "Flight to quality assets expected",
+            ],
+        )
+    if yoy < 1.5:
+        return (
+            "recession",
+            0.65,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% — well below Fed target signals demand weakness",
+                "Growth slowdown signals present",
+                "Bond proxies and defensives outperform",
+            ],
+        )
+    if yoy <= 2.0:
+        return (
+            "growth",
+            0.82,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% at/near Fed 2% target",
+                "Accommodative rate environment supports risk assets",
+                "Equity multiples and growth stocks favoured",
+            ],
+        )
+    if yoy <= 3.0:
+        return (
+            "growth",
+            0.72,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% slightly above target but controlled",
+                "Controlled inflation historically coincides with expansion",
+                "Monitor for rate-hike signals from Fed",
+            ],
+        )
+    if trend is not None and yoy > 0 and trend < yoy - 1.5:
+        return (
+            "stagflation",
+            0.68,
+            cpi_data,
+            [
+                f"CPI YoY {yoy:.1f}% elevated but 3m-ann {trend:.1f}% decelerating",
+                "Growth momentum fading while inflation persists",
+                "Stagflationary compression on corporate margins",
+            ],
+        )
+
+    return (
+        "inflation",
+        min(0.95, 0.72 + (float(yoy) - 3.0) * 0.05),
+        cpi_data,
+        [
+            f"CPI YoY {yoy:.1f}% above 3% threshold",
+            (
+                f"3m annualised trend {trend:.1f}%"
+                if trend is not None
+                else "Trend data unavailable"
+            ),
+            "Rate-sensitive sectors under pressure; real assets defensive",
+        ],
+    )
 
 
 def _compute_portfolio_sharpe(
@@ -575,6 +661,21 @@ async def quant_node(state: SwarmState) -> dict:
     corr_matrix = build_correlation_matrix_from_series(price_series)
     clusters = find_correlation_clusters(corr_matrix, weights, threshold=corr_threshold)
     corr_pts, avg_corr = correlation_penalty_score(clusters, corr_matrix)
+    if len(symbols) >= 2 and (avg_corr is None or float(avg_corr) <= 0.0):
+        market_corr_priors = {
+            "US": 0.48,
+            "VN": 0.58,
+            "SG": 0.52,
+            "HKEX": 0.53,
+            "TSE": 0.49,
+            "LSE": 0.51,
+        }
+        markets = [str(resolve_security(sym).market or "") for sym in symbols]
+        dominant_market = max(set(markets), key=markets.count) if markets else ""
+        avg_corr = float(market_corr_priors.get(dominant_market, 0.5))
+        trace.append(
+            f"[Quant] Correlation history incomplete — using market prior avg_corr={avg_corr:.3f}."
+        )
     cluster_summary = format_clusters_for_ai(clusters)
 
     # Serialise top-5 correlation sub-matrix for frontend heatmap
@@ -650,6 +751,10 @@ async def quant_node(state: SwarmState) -> dict:
         "risk_factors": factor_metrics,
         "corr_matrix_data": corr_matrix_data,
     }
+    if state.get("precomputed_dna_score") is not None:
+        risk_metrics["precomputed_dna_score"] = float(
+            state.get("precomputed_dna_score") or 0
+        )
     trace.append(
         f"[Quant] Risk model complete. Sub-total (excl. tax): {risk_metrics['total_score']}/80"
     )
@@ -829,87 +934,55 @@ async def market_regime_node(state: SwarmState) -> dict:
     """
     trace: list[str] = []
     region_context = state.get("region_context") or {}
-    trace.append(
-        "[Market Regime] Fetching FRED CPI data for macro regime classification..."
-    )
+    trace.append("[Market Regime] Fetching canonical regime detector output...")
     if region_context.get("primary_market") == "VN":
         trace.append(
             "[Market Regime] VN region context active: adding SBV policy rate, VND NEER, and HOSE liquidity placeholders alongside FRED."
         )
 
-    cpi_data = await asyncio.to_thread(_get_fred_cpi_analysis)
+    use_fallback = False
+    try:
+        from services.regime_detector import get_current_regime
+
+        canonical = await asyncio.to_thread(get_current_regime)
+        regime = str(canonical.get("regime") or "market-neutral")
+        confidence = round(float(canonical.get("confidence") or 0.60), 2)
+        cpi_data = canonical.get("cpi_data") if isinstance(canonical, dict) else {}
+        cpi_data = cpi_data if isinstance(cpi_data, dict) else {}
+        _signals = (
+            canonical.get("supporting_signals") if isinstance(canonical, dict) else []
+        )
+        drivers = []
+        if isinstance(_signals, list):
+            for s in _signals[:3]:
+                if isinstance(s, dict):
+                    nm = s.get("signal") or s.get("name") or "signal"
+                    val = s.get("value")
+                    drivers.append(f"{nm}: {val}" if val is not None else str(nm))
+                elif isinstance(s, str):
+                    drivers.append(s)
+        if not drivers:
+            drivers = ["Canonical regime detector output"]
+        trace.append(
+            f"[Market Regime] Canonical: {regime} (conf={confidence:.0%}) from regime detector."
+        )
+    except Exception as e:
+        use_fallback = True
+        regime, confidence, cpi_data, drivers = await asyncio.to_thread(
+            _cpi_only_regime_fallback
+        )
+        trace.append(
+            f"[Market Regime] Canonical detector unavailable ({e}) — using CPI fallback ({regime}, conf={confidence:.0%})."
+        )
 
     yoy = cpi_data.get("yoy_pct")
     trend = cpi_data.get("trend_3m_ann")
 
-    # ── Rule-based regime + confidence ────────────────────────────────────────
-    if yoy is None:
-        regime = "risk-off"
-        confidence = 0.40
-        drivers = ["FRED data unavailable — defaulting to defensive risk-off posture"]
-    elif yoy < 0:
-        regime = "recession"
-        confidence = min(0.92, 0.70 + abs(yoy) * 0.05)
-        drivers = [
-            f"CPI YoY {yoy:.1f}% — deflationary pressure",
-            "Real growth likely contracting",
-            "Flight to quality assets expected",
-        ]
-    elif yoy < 1.5:
-        regime = "recession"
-        confidence = 0.65
-        drivers = [
-            f"CPI YoY {yoy:.1f}% — well below Fed target signals demand weakness",
-            "Growth slowdown signals present",
-            "Bond proxies and defensives outperform",
-        ]
-    elif yoy <= 2.0:
-        regime = "growth"
-        confidence = 0.82
-        drivers = [
-            f"CPI YoY {yoy:.1f}% at/near Fed 2% target",
-            "Accommodative rate environment supports risk assets",
-            "Equity multiples and growth stocks favoured",
-        ]
-    elif yoy <= 3.0:
-        regime = "growth"
-        confidence = 0.72
-        drivers = [
-            f"CPI YoY {yoy:.1f}% slightly above target but controlled",
-            "Controlled inflation historically coincides with expansion",
-            "Monitor for rate-hike signals from Fed",
-        ]
-    elif yoy > 3.0:
-        # Differentiate inflation vs. stagflation by 3m trend direction
-        if trend is not None and yoy > 0 and trend < yoy - 1.5:
-            regime = "stagflation"
-            confidence = 0.68
-            drivers = [
-                f"CPI YoY {yoy:.1f}% elevated but 3m-ann {trend:.1f}% decelerating",
-                "Growth momentum fading while inflation persists",
-                "Stagflationary compression on corporate margins",
-            ]
-        else:
-            regime = "inflation"
-            confidence = min(0.95, 0.72 + (yoy - 3.0) * 0.05)
-            drivers = [
-                f"CPI YoY {yoy:.1f}% above 3% threshold",
-                (
-                    f"3m annualised trend {trend:.1f}%"
-                    if trend is not None
-                    else "Trend data unavailable"
-                ),
-                "Rate-sensitive sectors under pressure; real assets defensive",
-            ]
-    else:
-        regime = "inflation"
-        confidence = 0.75
-        drivers = [f"CPI YoY {yoy:.1f}%", "Above-target inflation regime"]
-
     yoy_str = f"{yoy:.1f}%" if yoy is not None else "N/A"
-    trace.append(
-        f"[Market Regime] Rule-based: {regime} (conf={confidence:.0%}) | CPI YoY={yoy_str}"
-    )
+    if use_fallback:
+        trace.append(
+            f"[Market Regime] Fallback rule-based: {regime} (conf={confidence:.0%}) | CPI YoY={yoy_str}"
+        )
 
     # ── AI enrichment (optional — falls back to rule-based on failure) ─────────
     symbols = [t["symbol"] for t in state["ticker_data"][:5]]
@@ -925,11 +998,23 @@ Return ONLY valid JSON — no markdown:
   "drivers": ["specific driver 1", "specific driver 2", "specific driver 3"],
   "portfolio_implication": "one sentence on how {regime} regime specifically affects {", ".join(symbols[:3])}"
 }}
-regime MUST be one of: growth, inflation, recession, stagflation, risk-off"""
+regime MUST be one of: growth, inflation, recession, stagflation, risk-off, risk_on, risk_off, recovery, recession_risk, neutral, market-neutral"""
 
     try:
         result = await get_ai_analysis(prompt)
-        valid_regimes = {"growth", "inflation", "recession", "stagflation", "risk-off"}
+        valid_regimes = {
+            "growth",
+            "inflation",
+            "recession",
+            "stagflation",
+            "risk-off",
+            "risk_on",
+            "risk_off",
+            "recovery",
+            "recession_risk",
+            "neutral",
+            "market-neutral",
+        }
         if result.get("regime") not in valid_regimes:
             result["regime"] = regime
         try:
@@ -1488,7 +1573,13 @@ async def synthesizer_node(state: SwarmState) -> dict:
     hhi_pts = risk.get("hhi_pts", 0.0)
     beta_pts = risk.get("beta_pts", 0.0)
     corr_pts = risk.get("corr_pts", 0.0)
-    dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
+    precomputed_dna = state.get("precomputed_dna_score")
+    if precomputed_dna is not None:
+        dna_score = max(5, min(100, int(round(float(precomputed_dna)))))
+        dna_score_source = "precomputed"
+    else:
+        dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
+        dna_score_source = "computed"
 
     score_breakdown = {
         "hhi_concentration": hhi_pts,
@@ -1511,8 +1602,13 @@ async def synthesizer_node(state: SwarmState) -> dict:
         _port_benchmark_label = (
             region_context.get("benchmark_name") or _port_benchmark_label
         )
-        _port_native_ccy = region_context.get("local_currency") or _port_native_ccy
         _is_sea = True
+
+    aum_usd = float(
+        sum(float(t.get("value") or 0) for t in state["ticker_data"])
+        or state["total_value"]
+        or 0
+    )
 
     # ── Build structured input payload for the MD (all 7 agents) ──────────────
     portfolio_positions = []
@@ -1542,13 +1638,16 @@ async def synthesizer_node(state: SwarmState) -> dict:
         "portfolio": {
             # SEA-NATIVE-TICKER-FIX: native value + explicit currency (not always USD)
             "total_value": round(state["total_value"], 2),
+            "aum_usd": round(aum_usd, 2),
             "total_value_native_currency": _port_native_ccy,
+            "currency": _port_native_ccy,
             "benchmark": _port_benchmark,
             "benchmark_label": _port_benchmark_label,
             "market_context": _port_market_ctx,
             "region_context": region_context,
             "positions": portfolio_positions,
             "dna_score": dna_score,
+            "dna_score_source": dna_score_source,
             "score_breakdown": score_breakdown,
         },
         "external_quant_intelligence": external_quant,
@@ -1703,6 +1802,7 @@ Return ONLY valid JSON matching this exact schema:
         "briefing": briefing_md,
         "dna_score": dna_score,
         "score_breakdown": score_breakdown,
+        "dna_score_source": dna_score_source,
         "weighted_beta": risk.get("weighted_beta"),
         "sharpe_ratio": risk.get("sharpe_ratio"),
         "avg_correlation": risk.get("avg_corr"),
@@ -1963,6 +2063,7 @@ async def run_swarm(
     job_id: str | None = None,
     region_context: dict | None = None,
     external_quant_intelligence: dict | None = None,
+    precomputed_dna_score: float | None = None,
 ) -> dict:
     """
     Primary entry point: run the full 7-agent swarm and return the final state.
@@ -1972,7 +2073,8 @@ async def run_swarm(
     normalized_ticker_data = (
         list(ticker_data.values()) if isinstance(ticker_data, dict) else ticker_data
     )
-    resolved_region_context = region_context or detect_region(
+    # Always derive context from the current payload to avoid cross-run carryover.
+    resolved_region_context = detect_region(
         [str(t.get("symbol") or "") for t in normalized_ticker_data]
     )
 
@@ -2030,6 +2132,7 @@ async def run_swarm(
         "total_value": total_value,
         "region_context": resolved_region_context,
         "external_quant_intelligence": external_quant_intelligence or {},
+        "precomputed_dna_score": precomputed_dna_score,
         "macro_context": "",
         "market_regime": {},
         "risk_metrics": {},
@@ -2201,6 +2304,7 @@ async def chat_with_swarm(
     initial: dict = {
         "ticker_data": ticker_data,
         "total_value": total_value,
+        "precomputed_dna_score": None,
         "macro_context": "",
         "market_regime": {},
         "risk_metrics": {},

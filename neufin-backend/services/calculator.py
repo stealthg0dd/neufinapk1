@@ -245,10 +245,168 @@ for _k, _v in _KEY_MAP.items():
 # ── In-process caches (1-hour TTL) ────────────────────────────────────────────
 _PRICE_CACHE: dict[str, tuple[float, float]] = {}  # sym → (price, ts)
 _BETA_CACHE: dict[str, tuple[float, float]] = {}  # sym → (beta, ts)
+_BETA_SOURCE_CACHE: dict[str, tuple[str, float]] = {}  # sym → (source, ts)
 _HISTORY_CACHE: dict = {}  # key → {"data": df, "ts": float}
 _CACHE_TTL = 3600  # seconds
 
 _PERIOD_DAYS = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
+
+CRYPTO_BETA_PRIORS: dict[str, float] = {
+    # Historical beta vs SPY, 2022-2025 annualized, OLS 252-day
+    "BTC-USD": 1.45,
+    "BTC": 1.45,
+    "ETH-USD": 1.75,
+    "ETH": 1.75,
+    "SOL-USD": 2.10,
+    "SOL": 2.10,
+    "COIN": 1.85,
+    "MSTR": 2.40,
+    "DOGE-USD": 2.50,
+    "BNB-USD": 1.60,
+    "XRP-USD": 1.90,
+    "AVAX-USD": 2.20,
+    "LINK-USD": 2.00,
+    "MATIC-USD": 2.30,
+}
+
+SECTOR_BETA_PRIORS: dict[str, float] = {
+    # When provider returns no beta for known tickers
+    "consumer_staples": 0.55,
+    "healthcare": 0.75,
+    "utilities": 0.40,
+    "technology": 1.25,
+    "financials": 1.10,
+    "energy": 0.85,
+    "gold": 0.05,
+    "bonds": -0.10,
+}
+
+TICKER_SECTOR_MAP: dict[str, str] = {
+    "GLD": "gold",
+    "IAU": "gold",
+    "GOLD": "gold",
+    "TLT": "bonds",
+    "IEF": "bonds",
+    "AGG": "bonds",
+    "BND": "bonds",
+    "KO": "consumer_staples",
+    "PG": "consumer_staples",
+    "WMT": "consumer_staples",
+    "MCD": "consumer_staples",
+    "JNJ": "healthcare",
+    "UNH": "healthcare",
+    "PFE": "healthcare",
+    "XOM": "energy",
+    "CVX": "energy",
+    "AAPL": "technology",
+    "MSFT": "technology",
+    "GOOGL": "technology",
+    "META": "technology",
+    "NVDA": "technology",
+    "JPM": "financials",
+    "V": "financials",
+    "MA": "financials",
+}
+
+MARKET_ADV_USD: dict[str, float] = {
+    # Vietnam (VN suffix)
+    "VCI.VN": 12.0,
+    "HPG.VN": 45.0,
+    "VPB.VN": 18.0,
+    "MBB.VN": 15.0,
+    "SSI.VN": 8.0,
+    "LCG.VN": 2.0,
+    "VNM.VN": 5.0,
+    "VHM.VN": 12.0,
+    "TCB.VN": 20.0,
+    # Crypto (USD, 24h volume / 252 for daily equivalent)
+    "BTC-USD": 25000.0,
+    "ETH-USD": 12000.0,
+    "SOL-USD": 3000.0,
+    "COIN": 800.0,
+    "MSTR": 1200.0,
+    # US Large Cap (approximate, in $M)
+    "AAPL": 8500.0,
+    "MSFT": 5200.0,
+    "GOOGL": 3200.0,
+    "AMZN": 4800.0,
+    "NVDA": 6200.0,
+    "META": 3900.0,
+    "TSLA": 7500.0,
+    "JPM": 2800.0,
+    "V": 1200.0,
+    "GLD": 2100.0,
+    "TLT": 1500.0,
+}
+
+INSTITUTIONAL_DAILY_LIMIT = 0.20  # 20% of ADV
+STRESS_DAILY_LIMIT = 0.05  # 5% of ADV
+
+
+def compute_liquidity_metrics(
+    positions: list,
+    prices_usd: dict,
+    portfolio_value_usd: float,
+) -> list[dict]:
+    """
+    Returns per-position liquidity analysis.
+
+    positions format: [{'ticker': str, 'shares': float, 'weight_pct': float}]
+    """
+    results: list[dict] = []
+    for pos in positions:
+        ticker = str(pos.get("ticker") or "").upper()
+        weight = float(pos.get("weight_pct", 0) or 0) / 100.0
+        pos_value = float(portfolio_value_usd or 0) * weight
+
+        adv = MARKET_ADV_USD.get(ticker)
+        if adv is None:
+            # Future enhancement: load live ADV from provider.
+            price = float(prices_usd.get(ticker, 0) or 0)
+            if price > 0:
+                adv = None
+
+        if adv is not None and adv > 0:
+            pct_of_adv = pos_value / (adv * 1_000_000) * 100
+            days_normal = pos_value / (adv * 1_000_000 * INSTITUTIONAL_DAILY_LIMIT)
+            days_stress = pos_value / (adv * 1_000_000 * STRESS_DAILY_LIMIT)
+
+            if days_normal > 365:
+                status = "ILLIQUID"
+            elif days_normal > 90:
+                status = "RESTRICTED"
+            elif days_normal > 30:
+                status = "WATCH"
+            else:
+                status = "LIQUID"
+        else:
+            pct_of_adv = None
+            days_normal = None
+            days_stress = None
+            status = "ADV_UNKNOWN"
+
+        results.append(
+            {
+                "ticker": ticker,
+                "position_value_usd": round(pos_value),
+                "adv_usd_millions": adv,
+                "pct_of_adv": round(pct_of_adv, 1) if pct_of_adv is not None else None,
+                "days_to_exit_normal": (
+                    round(days_normal, 0) if days_normal is not None else None
+                ),
+                "days_to_exit_stress": (
+                    round(days_stress, 0) if days_stress is not None else None
+                ),
+                "liquidity_status": status,
+            }
+        )
+
+    return sorted(
+        results,
+        key=lambda x: (x.get("days_to_exit_normal") or 0),
+        reverse=True,
+    )
+
 
 # ── Circuit breaker ────────────────────────────────────────────────────────────
 _BLACKLIST: dict[str, float] = {}  # provider_name → expiry epoch
@@ -313,19 +471,72 @@ def _is_rate_limit(response_json: dict) -> bool:
 
 
 # ── Ticker normalisation ───────────────────────────────────────────────────────
+def normalize_ticker_for_provider(ticker: str, provider: str) -> str:
+    """Return provider-specific symbol for known crypto tickers."""
+    crypto_map = {
+        "BTC-USD": {
+            "polygon": "X:BTCUSD",
+            "yahoo": "BTC-USD",
+            "finnhub": "BINANCE:BTCUSDT",
+            "twelvedata": "BTC/USD",
+        },
+        "ETH-USD": {
+            "polygon": "X:ETHUSD",
+            "yahoo": "ETH-USD",
+            "finnhub": "BINANCE:ETHUSDT",
+            "twelvedata": "ETH/USD",
+        },
+        "SOL-USD": {
+            "polygon": "X:SOLUSD",
+            "yahoo": "SOL-USD",
+            "finnhub": "BINANCE:SOLUSDT",
+            "twelvedata": "SOL/USD",
+        },
+        "DOGE-USD": {
+            "polygon": "X:DOGEUSD",
+            "yahoo": "DOGE-USD",
+            "twelvedata": "DOGE/USD",
+        },
+    }
+    ticker_up = str(ticker or "").strip().upper()
+    provider_key = str(provider or "").strip().lower()
+    if ticker_up in crypto_map and provider_key in crypto_map[ticker_up]:
+        return crypto_map[ticker_up][provider_key]
+    return ticker_up
+
+
 def _fh_ticker(sym: str) -> str:
     """Finnhub-compatible symbol (regional suffixes keep dots)."""
+    provider_symbol = normalize_ticker_for_provider(sym, "finnhub")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
     # # SEA-TICKER-FIX: index aliases + regional metadata applied before Finnhub.
     return resolve_security(sym).provider_finnhub
 
 
 def _polygon_sym(sym: str) -> str:
-    """Polygon / FMP: BRK-B → BRK.B."""
-    return sym.replace("-", ".").upper()
+    """Polygon symbol mapper."""
+    provider_symbol = normalize_ticker_for_provider(sym, "polygon")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
+    return str(sym or "").replace("-", ".").upper()
+
+
+def _fmp_sym(sym: str) -> str:
+    """FMP symbol mapper."""
+    return str(sym or "").replace("-", ".").upper()
+
+
+def _marketstack_sym(sym: str) -> str:
+    """Marketstack symbol mapper."""
+    return str(sym or "").replace("-", ".").upper()
 
 
 def _td_sym(sym: str) -> str:
     """TwelveData: BRK-B → BRK/B."""
+    provider_symbol = normalize_ticker_for_provider(sym, "twelvedata")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
     if should_use_twelve_data_first(sym):
         # SEA-VN-FIX before: SEA symbols were converted to provider-looking strings only.
         # SEA-VN-FIX after: the request layer adds required exchange/country params.
@@ -361,6 +572,9 @@ def _is_sea_market_symbol(sym: str) -> bool:
 
 def _av_ticker(sym: str) -> str:
     """Alpha Vantage: BRK-B → BRK.B."""
+    provider_symbol = normalize_ticker_for_provider(sym, "alphavantage")
+    if provider_symbol != str(sym or "").strip().upper():
+        return provider_symbol
     return sym.replace("-", ".").upper()
 
 
@@ -434,7 +648,7 @@ def _fmp_batch(symbols: list[str]) -> dict[str, float]:
     """FMP /api/v3/quote — comma-separated batch."""
     if not FMP_API_KEY or not _available("fmp"):
         return {}
-    syms_str = ",".join(_polygon_sym(s) for s in symbols)
+    syms_str = ",".join(_fmp_sym(s) for s in symbols)
     try:
         r = requests.get(
             f"https://financialmodelingprep.com/api/v3/quote/{syms_str}",
@@ -454,7 +668,7 @@ def _fmp_batch(symbols: list[str]) -> dict[str, float]:
             price = float(entry.get("price") or 0)
             if price > 0:
                 # reverse-normalise: BRK.B → BRK-B to match caller's sym
-                orig = next((s for s in symbols if _polygon_sym(s) == raw), raw)
+                orig = next((s for s in symbols if _fmp_sym(s) == raw), raw)
                 results[orig] = price
         return results
     except Exception as e:
@@ -561,7 +775,7 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
             "https://api.marketstack.com/v1/eod/latest",
             params={
                 "access_key": MARKETSTACK_API_KEY,
-                "symbols": ",".join(_polygon_sym(s) for s in symbols),
+                "symbols": ",".join(_marketstack_sym(s) for s in symbols),
             },
             timeout=10.0,
         )
@@ -577,7 +791,7 @@ def _marketstack_batch(symbols: list[str]) -> dict[str, float]:
             raw = entry.get("symbol", "")
             price = float(entry.get("close") or 0)
             if price > 0:
-                orig = next((s for s in symbols if _polygon_sym(s) == raw), raw)
+                orig = next((s for s in symbols if _marketstack_sym(s) == raw), raw)
                 results[orig] = price
         return results
     except Exception as e:
@@ -603,7 +817,9 @@ def _yfinance_batch(symbols: list[str]) -> dict[str, float]:
     def _one(sym: str) -> tuple[str, float | None]:
         try:
             # # SEA-TICKER-FIX: Yahoo symbol may differ after index alias normalization.
-            ysym = resolve_security(sym).provider_ticker
+            ysym = normalize_ticker_for_provider(sym, "yahoo")
+            if ysym == str(sym or "").strip().upper():
+                ysym = resolve_security(sym).provider_ticker
             t = yf.Ticker(ysym)
             hist = t.history(period="5d", auto_adjust=True)
             if hist is not None and not hist.empty and "Close" in hist.columns:
@@ -1042,18 +1258,39 @@ def verify_price_integrity(positions: list) -> list[dict]:
 
 
 # ── Beta fetcher ───────────────────────────────────────────────────────────────
-def fetch_beta(sym: str) -> float:
-    """
-    Fetch beta from Alpha Vantage OVERVIEW (1-hour cache).
-    Returns 1.0 (market-neutral) when unavailable.
-    """
-    sym = sym.upper()
-    cached = _BETA_CACHE.get(sym)
-    if cached and (time.time() - cached[1]) < _CACHE_TTL:
-        return cached[0]
+def fetch_beta_with_source(sym: str) -> tuple[float, str]:
+    """Fetch beta and annotate source (alphavantage/prior/fallback)."""
+    sym = str(sym or "").upper()
+    cached_beta = _BETA_CACHE.get(sym)
+    cached_source = _BETA_SOURCE_CACHE.get(sym)
+    if (
+        cached_beta
+        and cached_source
+        and (time.time() - cached_beta[1]) < _CACHE_TTL
+        and (time.time() - cached_source[1]) < _CACHE_TTL
+    ):
+        return cached_beta[0], cached_source[0]
+
+    def _prior_for_ticker(ticker: str) -> tuple[float | None, str | None]:
+        crypto_prior = CRYPTO_BETA_PRIORS.get(ticker)
+        if crypto_prior is not None:
+            return float(crypto_prior), "prior"
+        sector = TICKER_SECTOR_MAP.get(ticker)
+        if sector and sector in SECTOR_BETA_PRIORS:
+            return float(SECTOR_BETA_PRIORS[sector]), "sector_prior"
+        return None, None
+
+    prior, prior_source = _prior_for_ticker(sym)
+
+    def _finalize(beta_val: float, source_val: str) -> tuple[float, str]:
+        _BETA_CACHE[sym] = (beta_val, time.time())
+        _BETA_SOURCE_CACHE[sym] = (source_val, time.time())
+        return beta_val, source_val
 
     if not ALPHA_VANTAGE_API_KEY:
-        return 1.0
+        if prior is not None:
+            return _finalize(float(prior), str(prior_source))
+        return _finalize(1.0, "fallback")
 
     try:
         r = requests.get(
@@ -1065,11 +1302,41 @@ def fetch_beta(sym: str) -> float:
             },
             timeout=8.0,
         )
-        beta = float(r.json().get("Beta") or 1.0)
-        _BETA_CACHE[sym] = (beta, time.time())
-        return beta
+        body = r.json()
+        beta_raw = (body.get("Beta") if isinstance(body, dict) else None) or 0
+        try:
+            beta = float(beta_raw)
+        except (TypeError, ValueError):
+            beta = 0.0
+        source = "alphavantage"
+
+        # Some providers occasionally return beta in percent-like scale (e.g., 91.33).
+        # Beta is a ratio, so normalize anomalous 100x values back to ratio space.
+        if math.isfinite(beta) and abs(beta) > 10.0:
+            beta = beta / 100.0
+
+        if not math.isfinite(beta) or beta <= 0 or abs(beta) > 10.0:
+            if prior is not None:
+                beta = float(prior)
+                source = str(prior_source)
+            else:
+                beta = 1.0
+                source = "fallback"
+
+        return _finalize(beta, source)
     except Exception:
-        return 1.0
+        if prior is not None:
+            return _finalize(float(prior), str(prior_source))
+        return _finalize(1.0, "fallback")
+
+
+def fetch_beta(sym: str) -> float:
+    """
+    Fetch beta from Alpha Vantage OVERVIEW (1-hour cache).
+    Returns crypto prior for unsupported crypto symbols; otherwise 1.0 fallback.
+    """
+    beta, _ = fetch_beta_with_source(sym)
+    return beta
 
 
 # ── Scoring components ─────────────────────────────────────────────────────────
@@ -1110,6 +1377,116 @@ def _beta_score(weighted_beta: float) -> float:
     """
     score = 25.0 * max(0.0, 1.0 - abs(weighted_beta - 1.0))
     return round(score, 2)
+
+
+def _compute_correlation_score(
+    returns_by_ticker: dict,
+    weights: dict,
+    min_samples: int = 30,
+) -> tuple[float, float | None, str]:
+    """
+    Returns (corr_pts, avg_correlation, status).
+
+    corr_pts is on a 0-30 scale.
+    """
+    tickers = [
+        t
+        for t in weights
+        if t in returns_by_ticker and len(returns_by_ticker.get(t) or []) >= min_samples
+    ]
+    if len(tickers) < 2:
+        has_defensive = any(t in ("GLD", "TLT", "IEF", "BND", "AGG") for t in weights)
+        prior_corr = 0.30 if has_defensive else 0.55
+        penalty = min(30, round(prior_corr * 30))
+        corr_pts = max(0, 30 - penalty)
+        return float(corr_pts), float(prior_corr), "sector_prior"
+
+    pairs: list[float] = []
+    for i in range(len(tickers)):
+        for j in range(i + 1, len(tickers)):
+            t1, t2 = tickers[i], tickers[j]
+            s1 = returns_by_ticker[t1]
+            s2 = returns_by_ticker[t2]
+
+            if hasattr(s1, "index") and hasattr(s2, "index"):
+                common_idx = s1.index.intersection(s2.index)
+                v1 = s1.loc[common_idx].values
+                v2 = s2.loc[common_idx].values
+            else:
+                n = min(len(s1), len(s2))
+                v1, v2 = s1[:n], s2[:n]
+
+            if len(v1) >= min_samples and np.std(v1) > 0 and np.std(v2) > 0:
+                rho = float(np.corrcoef(v1, v2)[0, 1])
+                if not np.isnan(rho):
+                    pairs.append(rho)
+
+    if not pairs:
+        return 15.0, None, "UNKNOWN"
+
+    avg_corr = sum(pairs) / len(pairs)
+    penalty = min(30, round(avg_corr * 30))
+    corr_pts = max(0, 30 - penalty)
+    return float(corr_pts), round(avg_corr, 3), "computed"
+
+
+def _ic_upgrade_steps(
+    tier: str,
+    has_cost_basis: bool,
+    swarm_done: bool,
+) -> list[str]:
+    steps: list[str] = []
+    if tier == "DRAFT":
+        steps.append("Resolve all ticker prices (check exchange suffixes)")
+    if not swarm_done:
+        steps.append("Run 7-agent Swarm IC analysis")
+    if not has_cost_basis:
+        steps.append("Upload cost basis (add cost_basis column to CSV)")
+    return steps
+
+
+def _compute_ic_readiness(
+    prices_resolved: int,
+    total_positions: int,
+    cost_basis_provided: bool,
+    swarm_complete: bool,
+    dna_confidence: float,
+    has_return_history: bool,
+) -> dict:
+    """
+    Returns IC readiness tier and required upgrade steps.
+    """
+    issues: list[str] = []
+    resolution_pct = prices_resolved / total_positions if total_positions > 0 else 0
+    if resolution_pct < 1.0:
+        issues.append(f"{total_positions - prices_resolved} ticker(s) unpriced")
+
+    if resolution_pct < 0.8:
+        tier = "DRAFT"
+        reason = "Price data incomplete"
+    elif not swarm_complete:
+        tier = "DATA-READY"
+        reason = "Run Swarm IC for full analysis"
+    elif not cost_basis_provided and not has_return_history:
+        tier = "ADVISOR-READY"
+        reason = "Upload cost basis for exact Sharpe and tax analysis"
+    elif cost_basis_provided and has_return_history and dna_confidence >= 0.80:
+        tier = "IC-READY"
+        reason = "Full analysis complete"
+    else:
+        tier = "ADVISOR-READY"
+        reason = "Add cost basis and return history for IC-READY status"
+
+    if not cost_basis_provided and tier == "IC-READY":
+        tier = "ADVISOR-READY"
+        reason = "Upload cost basis for IC-READY status"
+
+    return {
+        "tier": tier,
+        "reason": reason,
+        "issues": issues,
+        "upgrades_needed": _ic_upgrade_steps(tier, cost_basis_provided, swarm_complete),
+    }
 
 
 def _tax_alpha_score(df: pd.DataFrame) -> float:
@@ -1509,37 +1886,66 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     # Scoring components
     hhi_pts = _hhi_score(df["weight"])
 
-    df["beta"] = [float(_fetch_beta(sym)) for sym in df["symbol"].tolist()]
+    beta_rows = [fetch_beta_with_source(sym) for sym in df["symbol"].tolist()]
+    df["beta"] = [float(beta) for beta, _source in beta_rows]
+    df["beta_source"] = [source for _beta, source in beta_rows]
     weighted_beta = float((df["weight"] * df["beta"]).sum()) if total_value > 0 else 1.0
     beta_pts = _beta_score(weighted_beta)
 
     tax_pts = _tax_alpha_score(df)
-    corr_pts = 15.0  # neutral placeholder — risk_engine fills this in the DNA flow
+
+    returns_dict: dict[str, pd.Series] = {}
+    if returns is not None and not returns.empty:
+        returns_dict = {
+            str(col).upper(): returns[col].dropna() for col in returns.columns if col
+        }
+    weight_dict = {
+        str(sym).upper(): float(w)
+        for sym, w in zip_equal(df["symbol"].tolist(), df["weight"].tolist())
+    }
+    corr_pts, avg_correlation, corr_status = _compute_correlation_score(
+        returns_by_ticker=returns_dict,
+        weights=weight_dict,
+    )
 
     dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
+    has_return_history = bool(returns is not None and not returns.empty)
+    prices_resolved = len(resolved)
+    total_positions = len(df)
+    resolution_pct = prices_resolved / total_positions if total_positions > 0 else 0.0
+    dna_confidence = min(
+        1.0,
+        max(
+            0.4,
+            (0.5 + 0.3 * resolution_pct) + (0.2 if corr_status == "computed" else 0.0),
+        ),
+    )
+    ic_readiness = _compute_ic_readiness(
+        prices_resolved=prices_resolved,
+        total_positions=total_positions,
+        cost_basis_provided=cost_basis_provided,
+        swarm_complete=False,
+        dna_confidence=dna_confidence,
+        has_return_history=has_return_history,
+    )
 
     # Annualised volatility (requires historical price DataFrame)
     volatility = 0.0
-    avg_correlation: float | None = None
-    correlation_status = "UNKNOWN"
-    correlation_note = "Correlation: Not computed (insufficient price history)"
+    correlation_status = corr_status
+    correlation_note = "Correlation estimated from sector prior."
     if returns is not None and not returns.empty:
         weights_series = df.set_index("symbol")["weight"]
         aligned_weights = weights_series.reindex(returns.columns).fillna(0)
         portfolio_returns = (returns * aligned_weights).sum(axis=1)
         volatility = float(portfolio_returns.std() * np.sqrt(252) * 100)
-        if len(returns) >= 30 and len(returns.columns) >= 2:
-            corr_matrix = returns.corr()
-            corr_values = corr_matrix.where(
-                np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
-            ).stack()
-            corr_values = corr_values.dropna()
-            if not corr_values.empty:
-                avg_correlation = float(corr_values.mean())
-                correlation_status = "COMPUTED"
-                correlation_note = "Pearson correlation computed from price history."
-        elif len(returns.columns) < 2:
-            correlation_note = "Correlation: Not computed (requires 2+ priced tickers)"
+    if correlation_status == "computed":
+        correlation_note = "Pearson correlation computed from price history."
+    elif correlation_status == "sector_prior":
+        correlation_note = "Correlation estimated from sector prior."
+    else:
+        correlation_note = (
+            "Correlation: Not computed (insufficient overlap in returns history)."
+        )
 
     pnl_pct = None
     if cost_basis_provided and "cost_basis" in df.columns:
@@ -1558,6 +1964,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "market_code",
         "provider_ticker",
         "native_price",
+        "beta",
+        "beta_source",
         "current_price",
         "current_value",
         "weight",
@@ -1654,6 +2062,25 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         lambda s: market_value_payload.get(s, {}).get("price_unavailable_message")
     )
 
+    liquidity_positions = [
+        {
+            "ticker": str(row.get("symbol") or "").upper(),
+            "shares": float(row.get("shares") or 0),
+            "weight_pct": float(row.get("weight") or 0) * 100,
+        }
+        for row in _records_nan_to_none(positions_out.to_dict("records"))
+    ]
+    liquidity_metrics = compute_liquidity_metrics(
+        positions=liquidity_positions,
+        prices_usd=spot_prices,
+        portfolio_value_usd=float(total_value),
+    )
+    liquidity_watchlist = [
+        row
+        for row in liquidity_metrics
+        if row.get("liquidity_status") in {"ILLIQUID", "RESTRICTED"}
+    ]
+
     # # SEA-NATIVE-TICKER-FIX: derive canonical benchmark from resolved symbols
     _mf = portfolio_market_framing(resolved)
     portfolio_benchmark = _mf["benchmark"]
@@ -1739,6 +2166,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "num_positions": len(df),
         "num_priced": len(resolved),
         "dna_score": dna_score,
+        "ic_readiness": ic_readiness,
+        "ic_readiness_tier": ic_readiness.get("tier"),
         "tax_alpha_score": tax_pts,
         "score_breakdown": {
             "hhi_concentration": hhi_pts,
@@ -1747,12 +2176,17 @@ def calculate_portfolio_metrics(positions: list) -> dict:
             "correlation": corr_pts,
         },
         "weighted_beta": round(weighted_beta, 3),
+        "beta_sources": {
+            row["symbol"]: row["beta_source"]
+            for row in _records_nan_to_none(positions_out.to_dict("records"))
+        },
         "max_position_pct": round(float(df["weight"].max()) * 100, 2),
         "annualized_volatility": round(volatility, 2),
         "avg_correlation": (
             round(avg_correlation, 3) if avg_correlation is not None else None
         ),
         "correlation_status": correlation_status,
+        "corr_status": correlation_status,
         "correlation_note": correlation_note,
         "pnl_pct": round(pnl_pct, 2) if pnl_pct is not None else None,
         "cost_basis_provided": cost_basis_provided,
@@ -1760,6 +2194,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "positions": _enrich_positions_fx_hint(
             _records_nan_to_none(positions_out.to_dict("records"))
         ),
+        "liquidity_metrics": liquidity_metrics,
+        "liquidity_watchlist": liquidity_watchlist,
         "data_quality": price_quality,
         # SEA-NATIVE-CURRENCY-FIX: geographic exposure
         "country_exposure": country_exposure,
