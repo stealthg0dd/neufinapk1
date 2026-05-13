@@ -114,6 +114,7 @@ from routers import (  # noqa: E402
 from services.ai_router import get_ai_analysis  # noqa: E402
 from services.auth_dependency import get_current_user  # noqa: E402
 from services.calculator import (  # noqa: E402
+    _compute_ic_readiness,
     _beta_score,
     _hhi_score,
     _tax_alpha_score,
@@ -1414,9 +1415,30 @@ Return ONLY valid JSON:
         investor_type=analysis.get("investor_type"),
     )
     num_priced = len([s for s in symbols if s not in set(failed_tickers)])
+    has_return_history = (
+        not corr_matrix.empty if hasattr(corr_matrix, "empty") else False
+    )
+    resolution_pct = num_priced / len(df) if len(df) > 0 else 0.0
+    dna_confidence = min(
+        1.0,
+        max(
+            0.4,
+            (0.5 + 0.3 * resolution_pct) + (0.2 if corr_pts >= 15 else 0.0),
+        ),
+    )
+    ic_readiness = _compute_ic_readiness(
+        prices_resolved=num_priced,
+        total_positions=len(df),
+        cost_basis_provided=cost_basis_provided,
+        swarm_complete=False,
+        dna_confidence=dna_confidence,
+        has_return_history=has_return_history,
+    )
     out: dict = {
         **analysis,
         "dna_score": dna_score,
+        "ic_readiness": ic_readiness,
+        "ic_readiness_tier": ic_readiness.get("tier"),
         "score_breakdown": score_breakdown,
         "total_value": round(total_value, 2),
         "multi_currency_portfolio": multi_ccy,

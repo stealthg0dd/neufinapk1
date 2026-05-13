@@ -167,6 +167,8 @@ Be engaging, data-driven, and make the insights feel personal and shareable."""
         "id": record_id,
         "share_token": share_token,
         "share_url": f"{APP_BASE_URL}/share/{share_token}",
+        "ic_readiness": metrics.get("ic_readiness"),
+        "ic_readiness_tier": (metrics.get("ic_readiness") or {}).get("tier"),
         "metrics": metrics,
         "quant_analysis": quant_result,
         "quant_modes": modes,

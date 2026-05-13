@@ -1430,6 +1430,65 @@ def _compute_correlation_score(
     return float(corr_pts), round(avg_corr, 3), "computed"
 
 
+def _ic_upgrade_steps(
+    tier: str,
+    has_cost_basis: bool,
+    swarm_done: bool,
+) -> list[str]:
+    steps: list[str] = []
+    if tier == "DRAFT":
+        steps.append("Resolve all ticker prices (check exchange suffixes)")
+    if not swarm_done:
+        steps.append("Run 7-agent Swarm IC analysis")
+    if not has_cost_basis:
+        steps.append("Upload cost basis (add cost_basis column to CSV)")
+    return steps
+
+
+def _compute_ic_readiness(
+    prices_resolved: int,
+    total_positions: int,
+    cost_basis_provided: bool,
+    swarm_complete: bool,
+    dna_confidence: float,
+    has_return_history: bool,
+) -> dict:
+    """
+    Returns IC readiness tier and required upgrade steps.
+    """
+    issues: list[str] = []
+    resolution_pct = prices_resolved / total_positions if total_positions > 0 else 0
+    if resolution_pct < 1.0:
+        issues.append(f"{total_positions - prices_resolved} ticker(s) unpriced")
+
+    if resolution_pct < 0.8:
+        tier = "DRAFT"
+        reason = "Price data incomplete"
+    elif not swarm_complete:
+        tier = "DATA-READY"
+        reason = "Run Swarm IC for full analysis"
+    elif not cost_basis_provided and not has_return_history:
+        tier = "ADVISOR-READY"
+        reason = "Upload cost basis for exact Sharpe and tax analysis"
+    elif cost_basis_provided and has_return_history and dna_confidence >= 0.80:
+        tier = "IC-READY"
+        reason = "Full analysis complete"
+    else:
+        tier = "ADVISOR-READY"
+        reason = "Add cost basis and return history for IC-READY status"
+
+    if not cost_basis_provided and tier == "IC-READY":
+        tier = "ADVISOR-READY"
+        reason = "Upload cost basis for IC-READY status"
+
+    return {
+        "tier": tier,
+        "reason": reason,
+        "issues": issues,
+        "upgrades_needed": _ic_upgrade_steps(tier, cost_basis_provided, swarm_complete),
+    }
+
+
 def _tax_alpha_score(df: pd.DataFrame) -> float:
     """
     Tax alpha component (0-20 pts).
@@ -1850,6 +1909,25 @@ def calculate_portfolio_metrics(positions: list) -> dict:
     )
 
     dna_score = max(5, min(100, int(hhi_pts + beta_pts + tax_pts + corr_pts)))
+    has_return_history = bool(returns is not None and not returns.empty)
+    prices_resolved = len(resolved)
+    total_positions = len(df)
+    resolution_pct = prices_resolved / total_positions if total_positions > 0 else 0.0
+    dna_confidence = min(
+        1.0,
+        max(
+            0.4,
+            (0.5 + 0.3 * resolution_pct) + (0.2 if corr_status == "computed" else 0.0),
+        ),
+    )
+    ic_readiness = _compute_ic_readiness(
+        prices_resolved=prices_resolved,
+        total_positions=total_positions,
+        cost_basis_provided=cost_basis_provided,
+        swarm_complete=False,
+        dna_confidence=dna_confidence,
+        has_return_history=has_return_history,
+    )
 
     # Annualised volatility (requires historical price DataFrame)
     volatility = 0.0
@@ -2088,6 +2166,8 @@ def calculate_portfolio_metrics(positions: list) -> dict:
         "num_positions": len(df),
         "num_priced": len(resolved),
         "dna_score": dna_score,
+        "ic_readiness": ic_readiness,
+        "ic_readiness_tier": ic_readiness.get("tier"),
         "tax_alpha_score": tax_pts,
         "score_breakdown": {
             "hhi_concentration": hhi_pts,
